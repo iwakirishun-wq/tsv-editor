@@ -2914,7 +2914,6 @@
 
       // 指定列の元ヘッダー名に対応するコメントを取得
       function getHeaderComment(colIdx) {
-        if (!state.headerMapped) return "";
         const key = state.headers[colIdx]?.trim();
         return state.headerComments[key] || "";
       }
@@ -3436,7 +3435,7 @@
           const labelTitle = titleParts.join(" ");
           // コメントアイコンとツールチップ
           const hasComment = !!comment;
-          const commentIcon = state.headerMapped ? `<span class="th-comment-icon ${hasComment ? 'has-comment' : ''}" data-comment-col="${i}" title="メモ編集" role="button" tabindex="0">📝</span>` : '';
+          const commentIcon = `<span class="th-comment-icon ${hasComment ? 'has-comment' : ''}" data-comment-col="${i}" title="メモ編集" role="button" tabindex="0">${hasComment ? '📝' : '📄'}</span>`;
           const tooltipHtml = hasComment ? `<div class="th-tooltip visible">${escHtml(comment)}</div>` : `<div class="th-tooltip" data-tooltip-col="${i}"></div>`;
           html += `<th scope="col" style="${w}${freezeLeft}" data-col="${i}" aria-colindex="${i + 2}" class="${active} ${frozen} ${freezeBorder}" aria-sort="${sortDir}">
       <div class="th-inner">
@@ -4215,16 +4214,42 @@
       function editHeaderComment(col) {
         const origKey = state.headers[col]?.trim();
         const current = state.headerComments[origKey] || "";
-        const nv = prompt(`「${getDisplayHeader(col)}」のメモを編集:`, current);
-        if (nv !== null && nv !== current) {
-          if (nv) {
-            state.headerComments[origKey] = nv;
-          } else {
-            delete state.headerComments[origKey];
-          }
+        const displayName = getDisplayHeader(col);
+
+        const overlay = document.createElement("div");
+        overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:999;display:flex;align-items:center;justify-content:center;";
+        const dlg = document.createElement("div");
+        dlg.style.cssText = "background:#fff;border-radius:6px;padding:16px;width:90vw;max-width:400px;box-shadow:0 4px 20px rgba(0,0,0,0.3);";
+        dlg.innerHTML = `
+          <h3 style="margin:0 0 8px;font-size:13px;">「${escHtml(displayName)}」のメモ編集</h3>
+          <p style="margin:0 0 6px;font-size:11px;color:#666;">${escHtml(origKey)}</p>
+          <textarea id="comment-edit-area" style="width:100%;height:120px;border:1px solid #ccc;border-radius:3px;padding:6px;font-size:12px;font-family:var(--font-ui);resize:vertical;">${escHtml(current)}</textarea>
+          <div style="margin-top:8px;text-align:right;">
+            <button type="button" id="comment-cancel" style="padding:4px 12px;font-size:12px;cursor:pointer;margin-right:6px;">キャンセル</button>
+            <button type="button" id="comment-clear" style="padding:4px 12px;font-size:12px;cursor:pointer;color:#d33;margin-right:6px;">クリア</button>
+            <button type="button" id="comment-save" style="padding:4px 12px;font-size:12px;background:var(--accent);color:#fff;border:none;border-radius:3px;cursor:pointer;">保存</button>
+          </div>`;
+        overlay.appendChild(dlg);
+        document.body.appendChild(overlay);
+
+        const textarea = dlg.querySelector("#comment-edit-area");
+        textarea.focus();
+        overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+        dlg.querySelector("#comment-cancel").onclick = () => overlay.remove();
+        dlg.querySelector("#comment-clear").onclick = () => {
+          delete state.headerComments[origKey];
           saveHeaderMapSettings();
           renderHeader();
-        }
+          overlay.remove();
+        };
+        dlg.querySelector("#comment-save").onclick = () => {
+          const nv = textarea.value;
+          if (nv) state.headerComments[origKey] = nv;
+          else delete state.headerComments[origKey];
+          saveHeaderMapSettings();
+          renderHeader();
+          overlay.remove();
+        };
       }
 
       function moveTo(r, c) {
@@ -4250,7 +4275,7 @@
           html += `<tr>
             <td style="padding:3px;border:1px solid #ddd;font-family:monospace;font-size:11px;">${escHtml(e.key)}</td>
             <td style="padding:2px;border:1px solid #ddd;"><input type="text" data-dict-key="${escHtml(e.key)}" value="${escHtml(e.display)}" style="width:100%;border:1px solid #ccc;padding:2px 4px;font-size:11px;border-radius:2px;"></td>
-            <td style="padding:2px;border:1px solid #ddd;"><input type="text" data-comment-key="${escHtml(e.key)}" value="${escHtml(e.comment)}" style="width:100%;border:1px solid #ccc;padding:2px 4px;font-size:11px;border-radius:2px;" placeholder="コメント"></td>
+            <td style="padding:2px;border:1px solid #ddd;"><textarea data-comment-key="${escHtml(e.key)}" style="width:100%;height:40px;border:1px solid #ccc;padding:2px 4px;font-size:11px;border-radius:2px;resize:vertical;font-family:var(--font-ui);" placeholder="コメント">${escHtml(e.comment)}</textarea></td>
           </tr>`;
         });
         html += '</table></div>';
@@ -4283,7 +4308,7 @@
             const val = inp.value.trim();
             if (val) state.headerDict[key] = val;
           });
-          dlg.querySelectorAll("input[data-comment-key]").forEach(inp => {
+          dlg.querySelectorAll("textarea[data-comment-key]").forEach(inp => {
             const key = inp.dataset.commentKey;
             const val = inp.value.trim();
             if (val) state.headerComments[key] = val;
