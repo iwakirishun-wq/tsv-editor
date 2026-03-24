@@ -2781,10 +2781,10 @@
 
       // 表示用ヘッダーを取得（マッピングされていなければ元のヘッダー）
       function getDisplayHeader(colIdx) {
-        if (state.displayHeaders && colIdx < state.displayHeaders.length) {
+        if (state.displayHeaders && colIdx < state.displayHeaders.length && state.displayHeaders[colIdx] != null) {
           return state.displayHeaders[colIdx];
         }
-        return state.headers[colIdx];
+        return state.headers[colIdx] ?? "";
       }
 
       // 指定列の元ヘッダー名に対応するコメントを取得
