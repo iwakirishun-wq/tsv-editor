@@ -2627,7 +2627,7 @@
           const text = e.target.result;
           state.delimiter = detectDelimiter(text, file.name);
           parseData(text);
-          removeAutoDropColumns();
+          clearAutoDropColumns();
           applyHeaderMapping();
           const tab = {
             fileName: state.fileName,
@@ -2640,7 +2640,7 @@
             sortKeys: [],
             headerMode: state.headerMode,
             dirty: false,
-            _rawText: null, // 列削除済みなのでrawTextは無効化
+            _rawText: text, // 遅延復元用にrawTextを保持
           };
           state.tabs.push(tab);
           state.activeTab = state.tabs.length - 1;
@@ -2920,23 +2920,20 @@
         return state.headerComments[key] || "";
       }
 
-      // ファイル読み込み時に不要列を自動削除（作成日時〜更新者）
-      const AUTO_DROP_HEADERS = new Set([
+      // ファイル読み込み時に不要列の値をクリア（作成日時〜更新者）
+      const AUTO_CLEAR_HEADERS = new Set([
         "create_dt", "update_dt", "create_user", "update_user",
       ]);
-      function removeAutoDropColumns() {
+      function clearAutoDropColumns() {
         if (state.headerMode === "numbered") return;
-        const dropCols = [];
+        const clearCols = [];
         state.headers.forEach((h, i) => {
-          if (AUTO_DROP_HEADERS.has(h.trim())) dropCols.push(i);
+          if (AUTO_CLEAR_HEADERS.has(h.trim())) clearCols.push(i);
         });
-        if (!dropCols.length) return;
-        // 後ろから削除して添字がずれないようにする
-        for (let k = dropCols.length - 1; k >= 0; k--) {
-          const ci = dropCols[k];
-          state.headers.splice(ci, 1);
-          state.data.forEach(row => row.splice(ci, 1));
-        }
+        if (!clearCols.length) return;
+        state.data.forEach(row => {
+          clearCols.forEach(ci => { if (ci < row.length) row[ci] = ""; });
+        });
       }
 
       // ステータス表示なしの自動幅調整（ロード時用）
