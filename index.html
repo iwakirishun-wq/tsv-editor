@@ -373,6 +373,28 @@
         background: var(--accent);
       }
 
+      /* ===ヘッダー縦書き=== */
+      .vertical-headers th {
+        height: auto;
+      }
+      .vertical-headers .th-inner {
+        min-height: 80px;
+        max-height: 160px;
+      }
+      .vertical-headers .th-label {
+        writing-mode: vertical-rl;
+        text-orientation: mixed;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-height: 140px;
+        line-height: 1.2;
+        margin: 0 auto;
+      }
+      .vertical-headers .th-controls {
+        justify-content: center;
+      }
+
       /* ===フィルター行=== */
       #filter-row th {
         background: var(--surface);
@@ -1454,6 +1476,16 @@
       <button
         type="button"
         class="btn"
+        id="btn-vertical-header"
+        title="ヘッダーを縦書き表示（列幅をコンパクトに）"
+        aria-label="ヘッダー縦書き表示の切り替え"
+        aria-pressed="false"
+      >
+        縦H
+      </button>
+      <button
+        type="button"
+        class="btn"
         id="btn-header-mode"
         title="ヘッダー: 1行目を使用中 → クリックで連番に切替"
         aria-label="ヘッダーモード切り替え"
@@ -2037,6 +2069,7 @@
         conditionalHL: false, // 条件付きハイライト
         regexMode: false, // 正規表現検索モード
         wrapCells: false, // セル折り返し表示
+        verticalHeader: false, // ヘッダー縦書き表示
         headerMode: "firstRow", // "firstRow" | "numbered"
         sortKeys: [], // 複数列ソートキー [{col, asc}, ...]
         tabs: [], // 複数ファイルタブ
@@ -2347,6 +2380,7 @@
 
         $("btn-autofit-all").onclick = autoFitAllColumns;
         $("btn-wrap").onclick = toggleWrapCells;
+        $("btn-vertical-header").onclick = toggleVerticalHeader;
         $("btn-header-mode").onclick = toggleHeaderMode;
         $("btn-new-sheet").onclick = addNewSheet;
         $("btn-manual").onclick = showManual;
@@ -2814,8 +2848,13 @@
       // ステータス表示なしの自動幅調整（ロード時用）
       function autoFitAllColumnsQuiet() {
         for (let c = 0; c < state.headers.length; c++) {
-          const displayH = getDisplayHeader(c);
-          let maxW = measureText(displayH || "", "600 13px system-ui") + 60;
+          let maxW;
+          if (state.verticalHeader) {
+            maxW = 30; // 縦書き時はヘッダー幅を無視、最小幅から開始
+          } else {
+            const displayH = getDisplayHeader(c);
+            maxW = measureText(displayH || "", "600 13px system-ui") + 60;
+          }
           const sample = Math.min(state.data.length, 300);
           for (let i = 0; i < sample; i++) {
             const v = safeGet(i, c);
@@ -6155,8 +6194,12 @@
         return _canvasCtx.measureText(text).width;
       }
       function autoFitColumn(col) {
-        let maxW =
-          measureText(state.headers[col] || "", "600 13px system-ui") + 60;
+        let maxW;
+        if (state.verticalHeader) {
+          maxW = 30;
+        } else {
+          maxW = measureText(state.headers[col] || "", "600 13px system-ui") + 60;
+        }
         const sample = Math.min(state.data.length, 300);
         for (let i = 0; i < sample; i++) {
           const v = safeGet(i, col);
@@ -6380,8 +6423,12 @@
       // ===== 全列の自動幅調整 =====
       function autoFitAllColumns() {
         for (let c = 0; c < state.headers.length; c++) {
-          let maxW =
-            measureText(state.headers[c] || "", "600 13px system-ui") + 60;
+          let maxW;
+          if (state.verticalHeader) {
+            maxW = 30;
+          } else {
+            maxW = measureText(state.headers[c] || "", "600 13px system-ui") + 60;
+          }
           const sample = Math.min(state.data.length, 300);
           for (let i = 0; i < sample; i++) {
             const v = safeGet(i, c);
@@ -6417,6 +6464,25 @@
           state.wrapCells
             ? "セル折り返し ON (最大2〜3行表示)"
             : "セル折り返し OFF",
+        );
+      }
+
+      // ===== ヘッダー縦書き =====
+      function toggleVerticalHeader() {
+        state.verticalHeader = !state.verticalHeader;
+        document.body.classList.toggle("vertical-headers", state.verticalHeader);
+        const btn = $("btn-vertical-header");
+        btn.classList.toggle("active-state", state.verticalHeader);
+        btn.setAttribute("aria-pressed", String(state.verticalHeader));
+        // 縦書き切替時に列幅を再計算（ヘッダー幅を無視してデータ幅ベースに）
+        autoFitAllColumnsQuiet();
+        renderHeader();
+        state.forceRender = true;
+        renderBody();
+        setStatus(
+          state.verticalHeader
+            ? "ヘッダー縦書き ON（列幅をデータ幅に最適化）"
+            : "ヘッダー縦書き OFF",
         );
       }
 
