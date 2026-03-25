@@ -426,7 +426,7 @@
 
       /* ===ボディ=== */
       tbody tr {
-        height: 22px;
+        height: var(--row-h, 22px);
         background: #fff;
       }
       tbody td {
@@ -440,6 +440,13 @@
         cursor: cell;
         color: var(--text);
         font-size: 12px;
+        height: var(--row-h, 22px);
+      }
+
+      /* ===セル全体表示=== */
+      body.fit-text tbody td {
+        overflow: visible;
+        text-overflow: clip;
       }
 
       /* ===行番号=== */
@@ -955,25 +962,8 @@
       }
 
       /* ===ヘッダーコメント=== */
-      .th-comment-icon {
-        display: inline-block;
-        width: 14px;
-        height: 14px;
-        font-size: 10px;
-        line-height: 14px;
-        text-align: center;
-        border-radius: 2px;
-        cursor: pointer;
-        margin-left: 2px;
-        flex-shrink: 0;
-        color: var(--text-dim);
-      }
-      .th-comment-icon:hover {
-        background: rgba(0,0,0,0.1);
-      }
-      .th-comment-icon.has-comment {
-        color: #d35400;
-        font-weight: bold;
+      th.has-comment {
+        border-bottom: 2px solid #d35400;
       }
       th .th-tooltip {
         display: none;
@@ -1363,7 +1353,7 @@
 
     </style>
   </head>
-  <body>
+  <body class="vertical-headers">
     <div
       id="toolbar"
       role="toolbar"
@@ -1459,6 +1449,15 @@
       <button
         type="button"
         class="btn"
+        id="btn-row-height"
+        title="行の高さを変更（22→30→40→22）"
+        aria-label="行の高さを変更"
+      >
+        行高
+      </button>
+      <button
+        type="button"
+        class="btn"
         id="btn-autofit-all"
         title="全列幅を自動調整"
         aria-label="全列幅を自動調整"
@@ -1478,10 +1477,20 @@
       <button
         type="button"
         class="btn"
+        id="btn-fit-text"
+        title="セル全体表示（文字サイズを列幅に合わせて自動調整）"
+        aria-label="セル全体表示の切り替え"
+        aria-pressed="false"
+      >
+        全表示
+      </button>
+      <button
+        type="button"
+        class="btn"
         id="btn-vertical-header"
         title="ヘッダーを縦書き表示（列幅をコンパクトに）"
         aria-label="ヘッダー縦書き表示の切り替え"
-        aria-pressed="false"
+        aria-pressed="true"
       >
         縦H
       </button>
@@ -2071,7 +2080,8 @@
         conditionalHL: false, // 条件付きハイライト
         regexMode: false, // 正規表現検索モード
         wrapCells: false, // セル折り返し表示
-        verticalHeader: false, // ヘッダー縦書き表示
+        verticalHeader: true, // ヘッダー縦書き表示（デフォルトON）
+        fitText: false, // セル全体表示（文字サイズ自動調整）
         headerMode: "firstRow", // "firstRow" | "numbered"
         sortKeys: [], // 複数列ソートキー [{col, asc}, ...]
         tabs: [], // 複数ファイルタブ
@@ -2106,7 +2116,7 @@
         filterExport: $("btn-export-filtered"),
       };
 
-      const ROW_H = 22;
+      let ROW_H = 22;
       const BUFFER = 20;
 
       // ===== セーフアクセス =====
@@ -2380,9 +2390,12 @@
           };
         });
 
+        $("btn-row-height").onclick = cycleRowHeight;
         $("btn-autofit-all").onclick = autoFitAllColumns;
         $("btn-wrap").onclick = toggleWrapCells;
+        $("btn-fit-text").onclick = toggleFitText;
         $("btn-vertical-header").onclick = toggleVerticalHeader;
+        if (state.verticalHeader) $("btn-vertical-header").classList.add("active-state");
         $("btn-header-mode").onclick = toggleHeaderMode;
         $("btn-new-sheet").onclick = addNewSheet;
         $("btn-manual").onclick = showManual;
@@ -3423,17 +3436,15 @@
           if (state.headerMapped && displayH !== origH) titleParts.push(`[${origH}]`);
           titleParts.push("クリックで列選択");
           const labelTitle = titleParts.join(" ");
-          // コメントアイコンとツールチップ
+          // コメントツールチップ（アイコンなし、ホバーで表示）
           const hasComment = !!comment;
-          const commentIcon = `<span class="th-comment-icon ${hasComment ? 'has-comment' : ''}" data-comment-col="${i}" title="メモ編集" role="button" tabindex="0">${hasComment ? '📝' : '📄'}</span>`;
           const tooltipHtml = hasComment ? `<div class="th-tooltip visible">${escHtml(comment)}</div>` : `<div class="th-tooltip" data-tooltip-col="${i}"></div>`;
-          html += `<th scope="col" style="${w}${freezeLeft}" data-col="${i}" aria-colindex="${i + 2}" class="${active} ${frozen} ${freezeBorder}" aria-sort="${sortDir}">
+          html += `<th scope="col" style="${w}${freezeLeft}" data-col="${i}" aria-colindex="${i + 2}" class="${active} ${frozen} ${freezeBorder} ${hasComment ? 'has-comment' : ''}" aria-sort="${sortDir}" data-comment-col="${i}">
       <div class="th-inner">
         <span class="th-label" title="${escHtml(labelTitle)}">${escHtml(displayH)}</span>
         <div class="th-controls">
-          ${commentIcon}
           <span class="sort-arrow ${sortActive}" data-sort="${i}" title="ソート" role="button" tabindex="0" aria-label="${escHtml(displayH)}列でソート">${sortIcon}</span>
-          <span class="filter-btn ${fltActive}" data-filter="${i}" title="${escHtml(displayH)}列をフィルター" aria-label="${escHtml(displayH)}列をフィルター" role="button" tabindex="0">▼</span>
+          <span class="filter-btn ${fltActive}" data-filter="${i}" title="フィルター" aria-label="${escHtml(displayH)}列をフィルター" role="button" tabindex="0">▼</span>
         </div>
       </div>
       ${tooltipHtml}
@@ -3466,6 +3477,14 @@
       // ===== theadイベント委譲（一度だけ設定）=====
       const _debouncedFilterApply = debounce(() => applyFilters(), 150);
       function setupTheadDelegation() {
+        // ダブルクリックでコメント編集
+        els.thead.addEventListener("dblclick", (e) => {
+          const th = e.target.closest("th[data-comment-col]");
+          if (th) {
+            e.stopPropagation();
+            editHeaderComment(parseInt(th.dataset.commentCol));
+          }
+        });
         // クリック委譲
         els.thead.addEventListener("click", (e) => {
           // th-corner → 全選択
@@ -3478,13 +3497,6 @@
           if (sortEl) {
             e.stopPropagation();
             sortByColumn(parseInt(sortEl.dataset.sort), e.shiftKey);
-            return;
-          }
-          // コメントアイコン
-          const commentIcon = e.target.closest(".th-comment-icon[data-comment-col]");
-          if (commentIcon) {
-            e.stopPropagation();
-            editHeaderComment(parseInt(commentIcon.dataset.commentCol));
             return;
           }
           // フィルターボタン
@@ -3507,13 +3519,6 @@
             e.preventDefault();
             e.stopPropagation();
             sortByColumn(parseInt(sortEl.dataset.sort), e.shiftKey);
-            return;
-          }
-          const commentIcon = e.target.closest(".th-comment-icon[data-comment-col]");
-          if (commentIcon && (e.key === "Enter" || e.key === " ")) {
-            e.preventDefault();
-            e.stopPropagation();
-            editHeaderComment(parseInt(commentIcon.dataset.commentCol));
             return;
           }
           const filterBtn = e.target.closest(".filter-btn[data-filter]");
@@ -3628,11 +3633,15 @@
         return cols;
       }
 
+      let _fitFont = null;
       function renderBody() {
         const rows = getVisibleRows();
         const scrollTop = els.container.scrollTop;
         const viewH = els.container.clientHeight;
         const rowH = state.wrapCells ? 56 : ROW_H;
+        if (state.fitText && !_fitFont) {
+          _fitFont = "12px " + getComputedStyle(document.body).fontFamily;
+        }
         const start = Math.max(0, Math.floor(scrollTop / rowH) - BUFFER);
         const end = Math.min(
           rows.length,
@@ -3712,9 +3721,18 @@
               extraStyle = `left:${leftVal}px;`;
             }
             const tdCw = state.colWidths[j] || 80;
-            const style =
-              `width:${tdCw}px;min-width:${tdCw}px;max-width:${tdCw}px;` + extraStyle;
             const cellVal = safeGet(i, j);
+            let fitStyle = "";
+            if (state.fitText && cellVal) {
+              const textW = measureText(cellVal, _fitFont);
+              const avail = tdCw - 12; // padding分
+              if (textW > avail && avail > 0) {
+                const fs = Math.max(6, Math.floor(12 * avail / textW));
+                fitStyle = `font-size:${fs}px;`;
+              }
+            }
+            const style =
+              `width:${tdCw}px;min-width:${tdCw}px;max-width:${tdCw}px;${fitStyle}` + extraStyle;
             const isSelected =
               cls.includes("selected") || cls.includes("in-range");
             html += `<td role="gridcell" data-col="${j}" aria-colindex="${j + 2}" ${style ? `style="${style}"` : ""} class="${cls.join(" ")}" aria-selected="${isSelected}">${escHtml(cellVal)}</td>`;
@@ -6484,6 +6502,32 @@
         state.forceRender = true;
         renderBody();
         setStatus("全列の幅を自動調整しました");
+      }
+
+      // ===== 行の高さ変更 =====
+      const ROW_H_OPTIONS = [22, 30, 40];
+      function cycleRowHeight() {
+        const idx = ROW_H_OPTIONS.indexOf(ROW_H);
+        ROW_H = ROW_H_OPTIONS[(idx + 1) % ROW_H_OPTIONS.length];
+        document.documentElement.style.setProperty("--row-h", ROW_H + "px");
+        const btn = $("btn-row-height");
+        btn.textContent = `行${ROW_H}`;
+        state.forceRender = true;
+        renderBody();
+        setStatus(`行の高さ: ${ROW_H}px`);
+      }
+
+      // ===== セル全体表示 =====
+      function toggleFitText() {
+        state.fitText = !state.fitText;
+        _fitFont = null; // キャッシュリセット
+        document.body.classList.toggle("fit-text", state.fitText);
+        const btn = $("btn-fit-text");
+        btn.classList.toggle("active-state", state.fitText);
+        btn.setAttribute("aria-pressed", String(state.fitText));
+        state.forceRender = true;
+        renderBody();
+        setStatus(state.fitText ? "セル全体表示 ON" : "セル全体表示 OFF");
       }
 
       // ===== セル折り返し =====
