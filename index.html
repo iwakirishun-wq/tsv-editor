@@ -967,25 +967,22 @@
       }
       th .th-tooltip {
         display: none;
-        position: absolute;
-        top: 100%;
-        left: 0;
-        z-index: 50;
+        position: fixed;
+        z-index: 9999;
         background: #333;
         color: #fff;
-        padding: 6px 10px;
-        font-size: 11px;
+        padding: 8px 12px;
+        font-size: 12px;
         font-weight: normal;
         white-space: pre-wrap;
         width: max-content;
-        max-width: 420px;
-        border-radius: 3px;
+        max-width: min(420px, 90vw);
+        max-height: 60vh;
+        overflow-y: auto;
+        border-radius: 4px;
         pointer-events: none;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-        line-height: 1.5;
-      }
-      th:hover .th-tooltip.visible {
-        display: block;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        line-height: 1.6;
       }
 
       body.col-resizing {
@@ -3485,6 +3482,37 @@
             editHeaderComment(parseInt(th.dataset.commentCol));
           }
         });
+        // ホバーでコメントツールチップ表示（position:fixedで位置計算）
+        els.thead.addEventListener("mouseover", (e) => {
+          const th = e.target.closest("th[data-comment-col]");
+          if (!th) return;
+          const tooltip = th.querySelector(".th-tooltip.visible");
+          if (!tooltip) return;
+          const rect = th.getBoundingClientRect();
+          tooltip.style.display = "block";
+          // 左端: thの左端、上端: thの下端
+          let left = rect.left;
+          let top = rect.bottom + 4;
+          // 画面右端をはみ出す場合は左寄せ
+          tooltip.style.left = "0px";
+          tooltip.style.top = "0px";
+          tooltip.style.display = "block";
+          const tw = tooltip.offsetWidth;
+          const tH = tooltip.offsetHeight;
+          if (left + tw > window.innerWidth) left = Math.max(4, window.innerWidth - tw - 4);
+          // 画面下端をはみ出す場合は上に表示
+          if (top + tH > window.innerHeight) top = Math.max(4, rect.top - tH - 4);
+          tooltip.style.left = left + "px";
+          tooltip.style.top = top + "px";
+        });
+        els.thead.addEventListener("mouseout", (e) => {
+          const th = e.target.closest("th[data-comment-col]");
+          if (!th) return;
+          // relatedTargetがまだth内ならスキップ
+          if (th.contains(e.relatedTarget)) return;
+          const tooltip = th.querySelector(".th-tooltip.visible");
+          if (tooltip) tooltip.style.display = "none";
+        });
         // クリック委譲
         els.thead.addEventListener("click", (e) => {
           // th-corner → 全選択
@@ -4949,6 +4977,8 @@
               ? ","
               : "\t";
           const data2d = lines.map((l) => splitDelimited(l, delim));
+          // 末尾の全セル空行を除去（コピー時の末尾改行で空行ができる場合の対策）
+          while (data2d.length > 1 && data2d[data2d.length - 1].every(c => c === "")) data2d.pop();
           cb = { data2d, rows: data2d.length, cols: data2d[0].length };
           state.clipboard = cb;
         } catch {
