@@ -2004,12 +2004,8 @@
 
         <h2>席種エリアマスター対応</h2>
         <p style="font-size: 12px; color: var(--text-dim)">
-          seat_type_area_cd列を含むファイルを読み込むと自動で以下を適用：<br>
-          ・作成日時/更新日時/作成者/更新者 → 値をクリア<br>
-          ・位置種別(place_type) → 0<br>
-          ・席種グループ名1/2 → 表示略称(disp_abb)の値をコピー<br>
-          ・特典フラグ〜入場ゲートエリア → ブランク<br>
-          ・辞書で英語カラム名を日本語に自動変換、列ヘッダーにコメント表示
+          ・辞書で英語カラム名を日本語に自動変換、列ヘッダーにコメント表示<br>
+          ・HTMLボタンで備考欄(nte)の&lt;br&gt;等を実際の表示にプレビュー
         </p>
       </div>
     </div>
@@ -2543,7 +2539,6 @@
           state.delimiter = detectDelimiter(text, file.name);
           parseData(text);
           clearAutoDropColumns();
-          applyMasterDefaults();
           applyHeaderMapping();
           const tab = {
             fileName: state.fileName,
@@ -2592,7 +2587,6 @@
         state.headerMode = tab.headerMode || "firstRow";
         parseData(tab._rawText);
         clearAutoDropColumns();
-        applyMasterDefaults();
         tab.data = state.data;
         tab.headers = state.headers;
         state.delimiter = savedDelimiter;
@@ -2859,39 +2853,7 @@
         });
       }
 
-      // 席種エリアマスタ出力: ファイル読み込み時に固定値・ブランク・コピーを自動適用
-      const BLANK_ON_LOAD_HEADERS = new Set([
-        "privilege_flg", "seattype_sn",
-        "external_stock_cond_disp_tgt_flg", "external_stock_cond_disp_sort_order",
-        "lic_plate_reg_flg", "parking_ticket_fed_flg", "entrance_gate_area",
-      ]);
-      function applyMasterDefaults() {
-        if (state.headerMode === "numbered") return;
-        // 席種エリアマスタかどうか判定
-        if (!state.headers.some(h => h.trim() === "seat_type_area_cd")) return;
-        const colMap = {};
-        state.headers.forEach((h, i) => { colMap[h.trim()] = i; });
-        const placeTypeIdx = colMap["place_type"];
-        const dispAbbIdx = colMap["disp_abb"];
-        const grpNm1Idx = colMap["seat_type_grp_nm1"];
-        const grpNm2Idx = colMap["seat_type_grp_nm2"];
-        const blankCols = [];
-        for (const key of BLANK_ON_LOAD_HEADERS) {
-          if (colMap[key] !== undefined) blankCols.push(colMap[key]);
-        }
-        state.data.forEach(row => {
-          // place_type → 0
-          if (placeTypeIdx !== undefined && placeTypeIdx < row.length) row[placeTypeIdx] = "0";
-          // seat_type_grp_nm1, nm2 → disp_abb の値をコピー
-          if (dispAbbIdx !== undefined) {
-            const abbVal = (dispAbbIdx < row.length) ? row[dispAbbIdx] : "";
-            if (grpNm1Idx !== undefined && grpNm1Idx < row.length) row[grpNm1Idx] = abbVal;
-            if (grpNm2Idx !== undefined && grpNm2Idx < row.length) row[grpNm2Idx] = abbVal;
-          }
-          // privilege_flg ～ entrance_gate_area → ブランク
-          blankCols.forEach(ci => { if (ci < row.length) row[ci] = ""; });
-        });
-      }
+
 
       // ステータス表示なしの自動幅調整（ロード時用）
       function autoFitAllColumnsQuiet() {
