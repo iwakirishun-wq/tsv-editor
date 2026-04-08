@@ -1347,6 +1347,19 @@
       body.wrap-cells tbody tr {
         height: 56px;
       }
+      /* 個別行の折り返し */
+      tr.wrap-row td {
+        white-space: pre-wrap !important;
+        overflow: hidden !important;
+        text-overflow: unset !important;
+        height: 56px !important;
+        vertical-align: top !important;
+        padding-top: 3px !important;
+        line-height: 1.4 !important;
+      }
+      tr.wrap-row {
+        height: 56px !important;
+      }
 
     </style>
   </head>
@@ -2038,7 +2051,8 @@
         freezeCols: 0, // フリーズ列数
         conditionalHL: false, // 条件付きハイライト
         regexMode: false, // 正規表現検索モード
-        wrapCells: false, // セル折り返し表示
+        wrapCells: false, // セル折り返し表示（全体）
+        wrapRows: new Set(), // 個別折り返し行
         verticalHeader: true, // ヘッダー縦書き表示（デフォルトON）
         fitText: false, // セル全体表示（文字サイズ自動調整）
         headerMode: "firstRow", // "firstRow" | "numbered"
@@ -3666,7 +3680,8 @@
           const rowInRange = isRowInRange(i);
           const isDup = state._dupSet?.has(i) ? " hl-dup" : "";
           // aria-rowindex: ヘッダー行が1なので、データ行は2から始まる
-          html += `<tr role="row" data-row="${i}" aria-rowindex="${i + 2}"${isDup ? ' class="dup-row"' : ""}>`;
+          const wrapCls = state.wrapRows.has(i) ? " wrap-row" : "";
+          html += `<tr role="row" data-row="${i}" aria-rowindex="${i + 2}" class="${isDup ? 'dup-row' : ''}${wrapCls}">`;
           html += `<td role="rowheader" class="row-num${rowInRange ? " row-selected" : ""}${isDup}" data-rownum="${i}">${i + 1}</td>`;
           for (const j of visCols) {
             let cls = [];
@@ -5891,6 +5906,7 @@
         state.freezeCols = 0;
         state.headerMode = "firstRow";
         state.wrapCells = false;
+        state.wrapRows.clear();
         state.regexMode = false;
         state.conditionalHL = false;
         state._dupSet = null;
@@ -6522,7 +6538,28 @@
 
       // ===== セル折り返し =====
       function toggleWrapCells() {
+        // 選択範囲がある場合は範囲内の行だけトグル
+        if (state.range) {
+          const r1 = Math.min(state.range.r1, state.range.r2);
+          const r2 = Math.max(state.range.r1, state.range.r2);
+          // 範囲内の行がすべてwrapRowsに入っていれば解除、それ以外は追加
+          let allWrapped = true;
+          for (let r = r1; r <= r2; r++) {
+            if (!state.wrapRows.has(r)) { allWrapped = false; break; }
+          }
+          for (let r = r1; r <= r2; r++) {
+            if (allWrapped) state.wrapRows.delete(r);
+            else state.wrapRows.add(r);
+          }
+          const count = r2 - r1 + 1;
+          state.forceRender = true;
+          renderBody();
+          setStatus(allWrapped ? `${count}行の折り返しを解除` : `${count}行に折り返しを適用`);
+          return;
+        }
+        // 範囲なし → 全体トグル
         state.wrapCells = !state.wrapCells;
+        if (state.wrapCells) state.wrapRows.clear(); // 全体ONなら個別解除
         document.body.classList.toggle("wrap-cells", state.wrapCells);
         const btn = $("btn-wrap");
         btn.classList.toggle("active-state", state.wrapCells);
@@ -6537,7 +6574,7 @@
         renderBody();
         setStatus(
           state.wrapCells
-            ? "セル折り返し ON (最大2〜3行表示)"
+            ? "セル折り返し ON (全体)"
             : "セル折り返し OFF",
         );
       }
@@ -6568,6 +6605,12 @@
         state.searchHits = [];
         state.searchIdx = -1;
         els.search.value = "";
+        // 折り返し解除
+        state.wrapCells = false;
+        state.wrapRows.clear();
+        document.body.classList.remove("wrap-cells");
+        $("btn-wrap").classList.remove("active-state");
+        $("btn-wrap").setAttribute("aria-pressed", "false");
         // 条件付きハイライト・重複ハイライト解除
         state.conditionalHL = false;
         state._dupSet = null;
