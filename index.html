@@ -1361,19 +1361,14 @@
         height: 56px !important;
       }
       /* HTMLプレビュー列 */
-      body.html-preview-mode tbody tr {
-        height: auto !important;
-      }
-      body.html-preview-mode tbody td {
-        height: auto !important;
-      }
       td.html-preview-cell {
         white-space: normal !important;
-        overflow: visible !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
         text-overflow: unset !important;
         line-height: 1.5 !important;
         vertical-align: top !important;
-        padding: 3px 6px !important;
+        padding: 2px 6px !important;
       }
 
     </style>
@@ -3668,7 +3663,7 @@
         const rows = getVisibleRows();
         const scrollTop = els.container.scrollTop;
         const viewH = els.container.clientHeight;
-        const rowH = state.htmlPreview ? 60 : state.wrapCells ? 56 : ROW_H;
+        const rowH = state.wrapCells ? 56 : ROW_H;
         if (state.fitText && !_fitFont) {
           _fitFont = "12px " + getComputedStyle(document.body).fontFamily;
         }
@@ -6624,13 +6619,26 @@
             return;
           }
           state.htmlPreviewCol = nteIdx;
-          document.body.classList.add("html-preview-mode");
+          // 折り返し表示も自動でON（内容を確認しやすくする）
+          if (!state.wrapCells) {
+            state.wrapCells = true;
+            state.wrapRows.clear();
+            document.body.classList.add("wrap-cells");
+            $("btn-wrap").classList.add("active-state");
+            $("btn-wrap").setAttribute("aria-pressed", "true");
+          }
           btn.classList.add("active-state");
           btn.setAttribute("aria-pressed", "true");
-          setStatus("備考欄HTMLプレビュー ON");
+          setStatus("備考欄HTMLプレビュー ON（折り返し表示も有効）");
         } else {
           state.htmlPreviewCol = -1;
-          document.body.classList.remove("html-preview-mode");
+          // 折り返し表示も解除
+          if (state.wrapCells) {
+            state.wrapCells = false;
+            document.body.classList.remove("wrap-cells");
+            $("btn-wrap").classList.remove("active-state");
+            $("btn-wrap").setAttribute("aria-pressed", "false");
+          }
           btn.classList.remove("active-state");
           btn.setAttribute("aria-pressed", "false");
           setStatus("備考欄HTMLプレビュー OFF");
@@ -6717,7 +6725,6 @@
         // HTMLプレビュー解除
         state.htmlPreview = false;
         state.htmlPreviewCol = -1;
-        document.body.classList.remove("html-preview-mode");
         $("btn-html-preview").classList.remove("active-state");
         $("btn-html-preview").setAttribute("aria-pressed", "false");
         // 条件付きハイライト・重複ハイライト解除
