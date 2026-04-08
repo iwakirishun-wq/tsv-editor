@@ -1360,6 +1360,21 @@
       tr.wrap-row {
         height: 56px !important;
       }
+      /* HTMLプレビュー列 */
+      body.html-preview-mode tbody tr {
+        height: auto !important;
+      }
+      body.html-preview-mode tbody td {
+        height: auto !important;
+      }
+      td.html-preview-cell {
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: unset !important;
+        line-height: 1.5 !important;
+        vertical-align: top !important;
+        padding: 3px 6px !important;
+      }
 
     </style>
   </head>
@@ -1493,6 +1508,16 @@
         aria-pressed="false"
       >
         全表示
+      </button>
+      <button
+        type="button"
+        class="btn"
+        id="btn-html-preview"
+        title="備考欄のHTMLをプレビュー表示（&lt;br&gt;等を実際の表示に変換）"
+        aria-label="備考欄HTMLプレビューの切り替え"
+        aria-pressed="false"
+      >
+        HTML
       </button>
       <button
         type="button"
@@ -2055,6 +2080,8 @@
         wrapRows: new Set(), // 個別折り返し行
         verticalHeader: true, // ヘッダー縦書き表示（デフォルトON）
         fitText: false, // セル全体表示（文字サイズ自動調整）
+        htmlPreview: false, // 備考欄HTMLプレビュー
+        htmlPreviewCol: -1, // HTMLプレビュー対象列インデックス
         headerMode: "firstRow", // "firstRow" | "numbered"
         sortKeys: [], // 複数列ソートキー [{col, asc}, ...]
         tabs: [], // 複数ファイルタブ
@@ -2367,6 +2394,7 @@
         $("btn-autofit-all").onclick = autoFitAllColumns;
         $("btn-wrap").onclick = toggleWrapCells;
         $("btn-fit-text").onclick = toggleFitText;
+        $("btn-html-preview").onclick = toggleHtmlPreview;
         $("btn-vertical-header").onclick = toggleVerticalHeader;
         if (state.verticalHeader) $("btn-vertical-header").classList.add("active-state");
         $("btn-header-mode").onclick = toggleHeaderMode;
@@ -3640,7 +3668,7 @@
         const rows = getVisibleRows();
         const scrollTop = els.container.scrollTop;
         const viewH = els.container.clientHeight;
-        const rowH = state.wrapCells ? 56 : ROW_H;
+        const rowH = state.htmlPreview ? 60 : state.wrapCells ? 56 : ROW_H;
         if (state.fitText && !_fitFont) {
           _fitFont = "12px " + getComputedStyle(document.body).fontFamily;
         }
@@ -3738,7 +3766,10 @@
               `width:${tdCw}px;min-width:${tdCw}px;max-width:${tdCw}px;${fitStyle}` + extraStyle;
             const isSelected =
               cls.includes("selected") || cls.includes("in-range");
-            html += `<td role="gridcell" data-col="${j}" aria-colindex="${j + 2}" ${style ? `style="${style}"` : ""} class="${cls.join(" ")}" aria-selected="${isSelected}">${escHtml(cellVal)}</td>`;
+            const isHtmlCol = state.htmlPreview && j === state.htmlPreviewCol;
+            if (isHtmlCol) cls.push("html-preview-cell");
+            const displayVal = isHtmlCol ? sanitizeHtmlPreview(cellVal) : escHtml(cellVal);
+            html += `<td role="gridcell" data-col="${j}" aria-colindex="${j + 2}" ${style ? `style="${style}"` : ""} class="${cls.join(" ")}" aria-selected="${isSelected}">${displayVal}</td>`;
           }
           html += `</tr>`;
         }
@@ -6536,6 +6567,78 @@
         setStatus(state.fitText ? "セル全体表示 ON" : "セル全体表示 OFF");
       }
 
+      // ===== 備考欄HTMLプレビュー =====
+      // 安全なHTMLタグのみ許可してプレビュー表示
+      function sanitizeHtmlPreview(s) {
+        const raw = String(s ?? "");
+        if (!raw) return "";
+        // まずHTMLエスケープ
+        let safe = escHtml(raw);
+        // 許可タグを実際のHTMLに復元: <br>, <b>, <i>, <u>, <s>, <span>, <font>, <strong>, <em>, <small>, <sub>, <sup>
+        // <br> / <br/> / <br />
+        safe = safe.replace(/&lt;br\s*\/?&gt;/gi, "<br>");
+        // <b>...</b>, <i>...</i>, <u>...</u>, <s>...</s>, <strong>...</strong>, <em>...</em>, <small>...</small>, <sub>...</sub>, <sup>...</sup>
+        const simpleTags = ["b", "i", "u", "s", "strong", "em", "small", "sub", "sup"];
+        for (const tag of simpleTags) {
+          const openRe = new RegExp(`&lt;${tag}(&gt;|\\s[^&]*?&gt;)`, "gi");
+          const closeRe = new RegExp(`&lt;/${tag}&gt;`, "gi");
+          safe = safe.replace(openRe, (m) => {
+            // 属性付きの場合は style のみ許可
+            const inner = m.replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+            return inner;
+          });
+          safe = safe.replace(closeRe, `</${tag}>`);
+        }
+        // <span style="...">...</span>
+        safe = safe.replace(/&lt;span(\s[^&]*?)?&gt;/gi, (m) => {
+          const inner = m.replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+          // style属性のみ許可、他の属性は除去
+          const styleMatch = inner.match(/style\s*=\s*"([^"]*)"/i);
+          if (styleMatch) return `<span style="${escHtml(styleMatch[1]).replace(/&amp;/g, "&").replace(/&quot;/g, '"')}">`;
+          return "<span>";
+        });
+        safe = safe.replace(/&lt;\/span&gt;/gi, "</span>");
+        // <font ...>...</font>
+        safe = safe.replace(/&lt;font(\s[^&]*?)?&gt;/gi, (m) => {
+          const inner = m.replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+          const colorMatch = inner.match(/color\s*=\s*"([^"]*)"/i);
+          const sizeMatch = inner.match(/size\s*=\s*"([^"]*)"/i);
+          let attrs = "";
+          if (colorMatch) attrs += ` color="${escHtml(colorMatch[1])}"`;
+          if (sizeMatch) attrs += ` size="${escHtml(sizeMatch[1])}"`;
+          return `<font${attrs}>`;
+        });
+        safe = safe.replace(/&lt;\/font&gt;/gi, "</font>");
+        return safe;
+      }
+
+      function toggleHtmlPreview() {
+        state.htmlPreview = !state.htmlPreview;
+        const btn = $("btn-html-preview");
+        if (state.htmlPreview) {
+          // nte列を探す
+          const nteIdx = state.headers.findIndex(h => h.trim() === "nte");
+          if (nteIdx === -1) {
+            state.htmlPreview = false;
+            setStatus("備考(nte)列が見つかりません");
+            return;
+          }
+          state.htmlPreviewCol = nteIdx;
+          document.body.classList.add("html-preview-mode");
+          btn.classList.add("active-state");
+          btn.setAttribute("aria-pressed", "true");
+          setStatus("備考欄HTMLプレビュー ON");
+        } else {
+          state.htmlPreviewCol = -1;
+          document.body.classList.remove("html-preview-mode");
+          btn.classList.remove("active-state");
+          btn.setAttribute("aria-pressed", "false");
+          setStatus("備考欄HTMLプレビュー OFF");
+        }
+        state.forceRender = true;
+        renderBody();
+      }
+
       // ===== セル折り返し =====
       function toggleWrapCells() {
         // 選択範囲がある場合は範囲内の行だけトグル
@@ -6611,6 +6714,12 @@
         document.body.classList.remove("wrap-cells");
         $("btn-wrap").classList.remove("active-state");
         $("btn-wrap").setAttribute("aria-pressed", "false");
+        // HTMLプレビュー解除
+        state.htmlPreview = false;
+        state.htmlPreviewCol = -1;
+        document.body.classList.remove("html-preview-mode");
+        $("btn-html-preview").classList.remove("active-state");
+        $("btn-html-preview").setAttribute("aria-pressed", "false");
         // 条件付きハイライト・重複ハイライト解除
         state.conditionalHL = false;
         state._dupSet = null;
