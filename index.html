@@ -1825,57 +1825,87 @@
         <h2>ツールバーボタン</h2>
         <div class="man-btn-section">
           <div class="man-btn-row">
-            <span class="man-btn-label">開く</span
+            <span class="man-btn-label">開く / 最近</span
             ><span class="man-btn-desc"
-              >TSV・CSV・TXTファイルを開く。ドラッグ&amp;ドロップでも開けます。拡張子で自動的にTSV/CSVを判別します。</span
+              >TSV・CSV・TXTファイルを開く。ドラッグ&amp;ドロップでも可。「最近」で過去に開いたファイル一覧を表示。</span
             >
           </div>
           <div class="man-btn-row">
             <span class="man-btn-label">保存</span
             ><span class="man-btn-desc"
-              >現在のデータをファイルに保存。赤い●が出ているときは未保存の変更があります（Ctrl+S）。</span
+              >現在のデータをファイルに保存。赤い●は未保存の変更あり（Ctrl+S）。</span
             >
           </div>
           <div class="man-btn-row">
-            <span class="man-btn-label">↩ 元に戻す</span
+            <span class="man-btn-label">↩ / ↪</span
             ><span class="man-btn-desc"
-              >直前の編集操作を取り消します（Ctrl+Z）。最大50ステップまで戻れます。</span
+              >元に戻す（Ctrl+Z）/ やり直し（Ctrl+Y）。最大50ステップ。</span
             >
           </div>
           <div class="man-btn-row">
-            <span class="man-btn-label">↪ やり直し</span
+            <span class="man-btn-label">絞込 / ×絞込 / 絞込保存</span
             ><span class="man-btn-desc"
-              >取り消した操作をやり直します（Ctrl+Y）。</span
+              >各列にフィルター入力欄を表示。テキスト・値選択・数値範囲で絞り込み。▼ドロップダウンでも操作可能。「絞込保存」で絞り込み結果だけを別ファイルに保存。</span
             >
           </div>
           <div class="man-btn-row">
-            <span class="man-btn-label">フィルター</span
+            <span class="man-btn-label">行高</span
             ><span class="man-btn-desc"
-              >各列にフィルター入力欄を表示。テキスト検索・値選択・数値範囲で絞り込めます。列ヘッダーの▼からドロップダウンでも操作可能。</span
+              >行の高さを切り替え（22px → 30px → 40px）。データの視認性を調整。</span
             >
           </div>
           <div class="man-btn-row">
-            <span class="man-btn-label">⇔ 自動幅</span
+            <span class="man-btn-label">自動幅</span
             ><span class="man-btn-desc"
-              >全列の幅をセルの内容に合わせて自動調整します。列の境界線をダブルクリックでも個別に自動調整できます。</span
+              >全列の幅をデータ内容に合わせて自動調整。列の境界線ダブルクリックで個別調整も可。</span
             >
           </div>
           <div class="man-btn-row">
-            <span class="man-btn-label">↵ 折返</span
+            <span class="man-btn-label">折返</span
             ><span class="man-btn-desc"
-              >セルの文字を折り返して表示します（最大2〜3行分）。長いテキストを確認するときに便利。</span
+              >セルの文字を折り返して表示（最大2〜3行分）。長いテキストの確認に便利。</span
             >
           </div>
           <div class="man-btn-row">
-            <span class="man-btn-label">H: 1行目 / H: 連番 ヘッダー</span
+            <span class="man-btn-label">全表示</span
             ><span class="man-btn-desc"
-              >ヘッダーモードを切り替えます。「H: 1行目」（ハイライト状態）は1行目をヘッダーとして使用、「H: 連番」は列番号（1,2,3…）を自動生成します。</span
+              >セル幅に合わせて文字サイズを自動縮小し、内容を全て表示。フラグ列など狭い列でも値が読める。</span
             >
           </div>
           <div class="man-btn-row">
-            <span class="man-btn-label">📖 ヘルプ</span
+            <span class="man-btn-label">縦H</span
             ><span class="man-btn-desc"
-              >このヘルプを表示します（?キーでも開けます）。</span
+              >ヘッダーを縦書き表示にして列幅をコンパクトに。列数の多いデータで一画面に多く表示可能（デフォルトON）。</span
+            >
+          </div>
+          <div class="man-btn-row">
+            <span class="man-btn-label">H: 1行目 / H: 連番</span
+            ><span class="man-btn-desc"
+              >ヘッダーモード切り替え。「H: 1行目」は1行目をヘッダーに、「H: 連番」は列番号（1,2,3…）を自動生成。</span
+            >
+          </div>
+          <div class="man-btn-row">
+            <span class="man-btn-label">＋</span
+            ><span class="man-btn-desc"
+              >新しい空のシートをタブとして追加。</span
+            >
+          </div>
+          <div class="man-btn-row">
+            <span class="man-btn-label">辞書 / 変換</span
+            ><span class="man-btn-desc"
+              >ヘッダー自動変換辞書を編集・適用。英語カラム名を日本語表示に変換（席種エリアマスター対応）。</span
+            >
+          </div>
+          <div class="man-btn-row">
+            <span class="man-btn-label">リセット</span
+            ><span class="man-btn-desc"
+              >フィルター・ソート・非表示行/列・フリーズ・選択・検索・ハイライトをすべて一括解除。</span
+            >
+          </div>
+          <div class="man-btn-row">
+            <span class="man-btn-label">?</span
+            ><span class="man-btn-desc"
+              >このヘルプを表示。</span
             >
           </div>
         </div>
@@ -1883,147 +1913,70 @@
         <h2>キーボードショートカット</h2>
         <div class="man-grid">
           <div>
-            <h3
-              style="
-                margin: 10px 0 6px;
-                font-size: 11px;
-                color: var(--text-dim);
-              "
-            >
-              ファイル・基本
-            </h3>
-            <div class="man-row">
-              <span>保存</span><span class="man-key">Ctrl+S</span>
-            </div>
-            <div class="man-row">
-              <span>元に戻す</span><span class="man-key">Ctrl+Z</span>
-            </div>
-            <div class="man-row">
-              <span>やり直し</span
-              ><span class="man-key">Ctrl+Y / Ctrl+Shift+Z</span>
-            </div>
-            <div class="man-row">
-              <span>全選択</span><span class="man-key">Ctrl+A</span>
-            </div>
-            <div class="man-row">
-              <span>コピー</span><span class="man-key">Ctrl+C</span>
-            </div>
-            <div class="man-row">
-              <span>切り取り</span><span class="man-key">Ctrl+X</span>
-            </div>
-            <div class="man-row">
-              <span>ペースト</span><span class="man-key">Ctrl+V</span>
-            </div>
-            <div class="man-row">
-              <span>行コピー</span><span class="man-key">Ctrl+Shift+C</span>
-            </div>
-            <div class="man-row">
-              <span>コピー行をペースト</span
-              ><span class="man-key">Ctrl+Shift+V</span>
-            </div>
-            <div class="man-row">
-              <span>セル編集開始</span><span class="man-key">Enter / F2</span>
-            </div>
-            <div class="man-row">
-              <span>セルをクリア</span
-              ><span class="man-key">Delete / Backspace</span>
-            </div>
+            <h3 style="margin:10px 0 6px;font-size:11px;color:var(--text-dim)">ファイル・基本</h3>
+            <div class="man-row"><span>保存</span><span class="man-key">Ctrl+S</span></div>
+            <div class="man-row"><span>元に戻す</span><span class="man-key">Ctrl+Z</span></div>
+            <div class="man-row"><span>やり直し</span><span class="man-key">Ctrl+Y / Ctrl+Shift+Z</span></div>
+            <div class="man-row"><span>全選択</span><span class="man-key">Ctrl+A</span></div>
+            <div class="man-row"><span>コピー</span><span class="man-key">Ctrl+C</span></div>
+            <div class="man-row"><span>切り取り</span><span class="man-key">Ctrl+X</span></div>
+            <div class="man-row"><span>ペースト</span><span class="man-key">Ctrl+V</span></div>
+            <div class="man-row"><span>行コピー</span><span class="man-key">Ctrl+Shift+C</span></div>
+            <div class="man-row"><span>コピー行をペースト</span><span class="man-key">Ctrl+Shift+V</span></div>
+            <div class="man-row"><span>セル編集開始</span><span class="man-key">Enter / F2</span></div>
+            <div class="man-row"><span>セルをクリア</span><span class="man-key">Delete / Backspace</span></div>
           </div>
           <div>
-            <h3
-              style="
-                margin: 10px 0 6px;
-                font-size: 11px;
-                color: var(--text-dim);
-              "
-            >
-              行操作・表示
-            </h3>
-            <div class="man-row">
-              <span>下に行を追加</span><span class="man-key">Ctrl+Enter</span>
-            </div>
-            <div class="man-row">
-              <span>行を複製</span><span class="man-key">Ctrl+Shift+D</span>
-            </div>
-            <div class="man-row">
-              <span>行を上に移動</span><span class="man-key">Alt+↑</span>
-            </div>
-            <div class="man-row">
-              <span>行を下に移動</span><span class="man-key">Alt+↓</span>
-            </div>
-            <div class="man-row">
-              <span>検索</span><span class="man-key">Ctrl+F</span>
-            </div>
-            <div class="man-row">
-              <span>検索と置換</span><span class="man-key">Ctrl+H</span>
-            </div>
-            <div class="man-row">
-              <span>行番号ジャンプ</span><span class="man-key">Ctrl+G</span>
-            </div>
+            <h3 style="margin:10px 0 6px;font-size:11px;color:var(--text-dim)">行操作・表示</h3>
+            <div class="man-row"><span>下に行を追加</span><span class="man-key">Ctrl+Enter</span></div>
+            <div class="man-row"><span>行を複製</span><span class="man-key">Ctrl+Shift+D</span></div>
+            <div class="man-row"><span>行を上に移動</span><span class="man-key">Alt+↑</span></div>
+            <div class="man-row"><span>行を下に移動</span><span class="man-key">Alt+↓</span></div>
+            <div class="man-row"><span>検索</span><span class="man-key">Ctrl+F</span></div>
+            <div class="man-row"><span>検索と置換</span><span class="man-key">Ctrl+H</span></div>
+            <div class="man-row"><span>行番号ジャンプ</span><span class="man-key">Ctrl+G</span></div>
+            <div class="man-row"><span>ズーム</span><span class="man-key">Alt+ホイール</span></div>
           </div>
         </div>
 
         <h2>マウス操作</h2>
         <div class="man-grid">
-          <div class="man-row">
-            <span>セルを選択</span><span class="man-key">クリック</span>
-          </div>
-          <div class="man-row">
-            <span>セルを編集</span><span class="man-key">ダブルクリック</span>
-          </div>
-          <div class="man-row">
-            <span>範囲選択</span
-            ><span class="man-key">Shift+クリック / ドラッグ</span>
-          </div>
-          <div class="man-row">
-            <span>行全体を選択</span
-            ><span class="man-key">行番号クリック / ドラッグ</span>
-          </div>
-          <div class="man-row">
-            <span>列全体を選択</span
-            ><span class="man-key">列ヘッダークリック / ドラッグ</span>
-          </div>
-          <div class="man-row">
-            <span>列ソート</span><span class="man-key">列ヘッダーの⇅</span>
-          </div>
-          <div class="man-row">
-            <span>複数列ソート</span
-            ><span class="man-key">Shift+⇅クリック</span>
-          </div>
-          <div class="man-row">
-            <span>列幅を調整</span
-            ><span class="man-key">列境界線をドラッグ</span>
-          </div>
-          <div class="man-row">
-            <span>列幅を自動調整</span
-            ><span class="man-key">列境界線をダブルクリック</span>
-          </div>
+          <div class="man-row"><span>セルを選択</span><span class="man-key">クリック</span></div>
+          <div class="man-row"><span>セルを編集</span><span class="man-key">ダブルクリック</span></div>
+          <div class="man-row"><span>範囲選択</span><span class="man-key">Shift+クリック / ドラッグ</span></div>
+          <div class="man-row"><span>行全体を選択</span><span class="man-key">行番号クリック / ドラッグ</span></div>
+          <div class="man-row"><span>列全体を選択</span><span class="man-key">列ヘッダークリック</span></div>
+          <div class="man-row"><span>列ソート</span><span class="man-key">列ヘッダーの⇅</span></div>
+          <div class="man-row"><span>複数列ソート</span><span class="man-key">Shift+⇅クリック</span></div>
+          <div class="man-row"><span>列幅を調整</span><span class="man-key">列境界線をドラッグ</span></div>
+          <div class="man-row"><span>列幅を自動調整</span><span class="man-key">列境界線をダブルクリック</span></div>
+          <div class="man-row"><span>ヘッダーコメント編集</span><span class="man-key">列ヘッダーをダブルクリック</span></div>
+          <div class="man-row"><span>コメント確認</span><span class="man-key">列ヘッダーにホバー（オレンジ下線の列）</span></div>
         </div>
 
         <h2>右クリックメニュー</h2>
         <div class="man-grid">
-          <div class="man-row">
-            <span>行の挿入・削除</span
-            ><span class="man-key">上/下に挿入、削除</span>
-          </div>
-          <div class="man-row">
-            <span>列の挿入・削除</span
-            ><span class="man-key">左/右に挿入、削除（複数列選択して一括削除も可）</span>
-          </div>
-          <div class="man-row">
-            <span>行・列の非表示</span
-            ><span class="man-key">再表示も同メニューから</span>
-          </div>
-          <div class="man-row">
-            <span>重複行をハイライト</span
-            ><span class="man-key">完全一致行を紫色で表示</span>
-          </div>
+          <div class="man-row"><span>行の挿入・削除</span><span class="man-key">上/下に挿入、削除</span></div>
+          <div class="man-row"><span>列の挿入・削除</span><span class="man-key">左/右に挿入、削除（複数列一括も可）</span></div>
+          <div class="man-row"><span>行・列の非表示</span><span class="man-key">再表示も同メニューから</span></div>
+          <div class="man-row"><span>列のフリーズ</span><span class="man-key">指定列まで固定表示（横スクロール時に固定）</span></div>
+          <div class="man-row"><span>重複行をハイライト</span><span class="man-key">完全一致行を紫色で表示</span></div>
+          <div class="man-row"><span>条件付きハイライト</span><span class="man-key">空セル・正数・負数を色分け表示</span></div>
         </div>
 
         <h2>ファイルタブ</h2>
         <p style="font-size: 12px; color: var(--text-dim)">
-          複数のファイルを同時に開いてタブで切り替えられます。タブの ×
-          で閉じます（未保存の場合は確認あり）。
+          複数のファイルを同時に開いてタブで切り替えられます。タブの × で閉じます（未保存の場合は確認あり）。「＋」ボタンで空の新規シートを追加。
+        </p>
+
+        <h2>席種エリアマスター対応</h2>
+        <p style="font-size: 12px; color: var(--text-dim)">
+          seat_type_area_cd列を含むファイルを読み込むと自動で以下を適用：<br>
+          ・作成日時/更新日時/作成者/更新者 → 値をクリア<br>
+          ・位置種別(place_type) → 0<br>
+          ・席種グループ名1/2 → 表示略称(disp_abb)の値をコピー<br>
+          ・特典フラグ〜入場ゲートエリア → ブランク<br>
+          ・辞書で英語カラム名を日本語に自動変換、列ヘッダーにコメント表示
         </p>
       </div>
     </div>
