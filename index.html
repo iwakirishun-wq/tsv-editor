@@ -2871,7 +2871,6 @@
         if (!state.headers.some(h => h.trim() === "seat_type_area_cd")) return;
         const colMap = {};
         state.headers.forEach((h, i) => { colMap[h.trim()] = i; });
-        const seatCntIdx = colMap["seat_cnt"];
         const placeTypeIdx = colMap["place_type"];
         const dispAbbIdx = colMap["disp_abb"];
         const grpNm1Idx = colMap["seat_type_grp_nm1"];
@@ -2881,8 +2880,6 @@
           if (colMap[key] !== undefined) blankCols.push(colMap[key]);
         }
         state.data.forEach(row => {
-          // seat_cnt → 1
-          if (seatCntIdx !== undefined && seatCntIdx < row.length) row[seatCntIdx] = "1";
           // place_type → 0
           if (placeTypeIdx !== undefined && placeTypeIdx < row.length) row[placeTypeIdx] = "0";
           // seat_type_grp_nm1, nm2 → disp_abb の値をコピー
