@@ -1533,6 +1533,15 @@
       <div class="toolbar-sep" role="separator" aria-hidden="true"></div>
       <button
         type="button"
+        class="btn danger"
+        id="btn-reset-view"
+        title="表示をリセット（フィルター・ソート・非表示・選択をすべて解除）"
+        aria-label="表示をすべてリセット"
+      >
+        リセット
+      </button>
+      <button
+        type="button"
         class="btn"
         id="btn-manual"
         title="ヘルプ"
@@ -2395,6 +2404,7 @@
         if (state.verticalHeader) $("btn-vertical-header").classList.add("active-state");
         $("btn-header-mode").onclick = toggleHeaderMode;
         $("btn-new-sheet").onclick = addNewSheet;
+        $("btn-reset-view").onclick = resetView;
         $("btn-manual").onclick = showManual;
         $("btn-regex").onclick = toggleRegexMode;
         $("man-close").onclick = hideManual;
@@ -6577,6 +6587,45 @@
             ? "セル折り返し ON (最大2〜3行表示)"
             : "セル折り返し OFF",
         );
+      }
+
+      // ===== 表示リセット =====
+      function resetView() {
+        // フィルター解除
+        state.columnFilters = {};
+        state.filteredIndices = null;
+        state.filterVisible = false;
+        els.filterClear.style.display = "none";
+        els.filterExport.style.display = "none";
+        // ソート解除
+        state.sortCol = -1;
+        state.sortAsc = true;
+        state.sortKeys = [];
+        // 非表示解除
+        state.hiddenRows.clear();
+        state.hiddenCols.clear();
+        // フリーズ解除
+        state.freezeCols = 0;
+        // 選択解除
+        state.selected = null;
+        state.anchor = null;
+        state.range = null;
+        state.selectedCol = null;
+        // 検索リセット
+        state.searchHits = [];
+        state.searchIdx = -1;
+        els.search.value = "";
+        // 条件付きハイライト・重複ハイライト解除
+        state.conditionalHL = false;
+        state._dupSet = null;
+        state._dupCol = null;
+        // 再描画
+        updateHiddenStatus();
+        renderHeader();
+        state.forceRender = true;
+        renderBody();
+        updateHighlight();
+        setStatus("表示をリセットしました");
       }
 
       // ===== ヘッダー縦書き =====
