@@ -6639,6 +6639,12 @@
           return;
         }
 
+        const isFiltered = rowIndices.length < state.data.length;
+        const msg = isFiltered
+          ? `フィルター適用中の ${rowIndices.length} 件（全${state.data.length}件中）をHTML出力します。\nよろしいですか？`
+          : `全 ${rowIndices.length} 件をHTML出力します。\nよろしいですか？`;
+        if (!confirm(msg)) return;
+
         // 使用可能な列を抽出（ヘッダーに存在するもののみ）
         const colMap = [];
         for (const def of HTML_EXPORT_COLS) {
@@ -6668,7 +6674,6 @@
         const fileName = state.fileName || "data";
         const totalRows = state.data.length;
         const filteredRows = rowIndices.length;
-        const isFiltered = filteredRows < totalRows;
 
         let html = `<!DOCTYPE html>
 <html lang="ja">
@@ -6701,8 +6706,7 @@
   .flag-ok { color: #16a34a; font-weight: 600; }
   .flag-off { color: #9ca3af; }
   .flag-warn { color: #dc2626; font-weight: 600; }
-  .tooltip { display: none; position: absolute; left: 0; top: 100%; z-index: 100; background: #333; color: #fff; font-size: 11px; padding: 6px 10px; border-radius: 4px; white-space: pre-wrap; max-width: 400px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
-  .field:hover .tooltip { display: block; }
+  #floating-tooltip { display: none; position: fixed; z-index: 9999; background: #1a1a1a; color: #f0f0f0; font-size: 12px; padding: 10px 14px; border-radius: 6px; white-space: pre-wrap; max-width: 480px; min-width: 120px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); line-height: 1.6; pointer-events: none; word-break: break-word; }
   .badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
   .badge-active { background: #dcfce7; color: #16a34a; }
   .badge-inactive { background: #fee2e2; color: #dc2626; }
@@ -6764,9 +6768,7 @@
               const isNte = col.key === "nte";
 
               html += `<div class="field${isNte ? " nte-field" : ""}">`;
-              html += `<span class="field-label"${tooltipContent ? ` title="${tooltipContent}"` : ""}>${escHtml(col.label)}`;
-              if (tooltipContent) html += `<span class="tooltip">${tooltipContent}</span>`;
-              html += `</span>`;
+              html += `<span class="field-label"${tooltipContent ? ` data-comment="${tooltipContent}"` : ""}>${escHtml(col.label)}${tooltipContent ? " 💬" : ""}</span>`;
               if (isNte) {
                 html += `<div class="nte-value">${rendered}</div>`;
               } else {
@@ -6780,7 +6782,35 @@
           html += `</div></div>\n`;
         }
 
-        html += `</body></html>`;
+        html += `<div id="floating-tooltip"></div>`;
+        html += "<" + "script>" +
+`(function(){
+  var tip = document.getElementById('floating-tooltip');
+  document.addEventListener('mouseover', function(e) {
+    var label = e.target.closest('.field-label[data-comment]');
+    if (!label) { tip.style.display = 'none'; return; }
+    var text = label.getAttribute('data-comment');
+    if (!text) { tip.style.display = 'none'; return; }
+    tip.textContent = text;
+    tip.style.display = 'block';
+    var rect = label.getBoundingClientRect();
+    var left = rect.left;
+    var top = rect.bottom + 6;
+    if (left + tip.offsetWidth > window.innerWidth - 12) {
+      left = window.innerWidth - tip.offsetWidth - 12;
+    }
+    if (left < 4) left = 4;
+    if (top + tip.offsetHeight > window.innerHeight - 12) {
+      top = rect.top - tip.offsetHeight - 6;
+    }
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
+  });
+  document.addEventListener('mouseout', function(e) {
+    if (e.target.closest('.field-label[data-comment]')) tip.style.display = 'none';
+  });
+})();` + "</" + "script>" +
+        `</body></html>`;
 
         // 新しいウィンドウで開く
         const blob = new Blob([html], { type: "text/html;charset=utf-8" });
