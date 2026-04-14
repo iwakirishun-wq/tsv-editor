@@ -376,10 +376,13 @@
       /* ===ヘッダー縦書き=== */
       .vertical-headers th {
         height: auto;
+        padding: 4px 2px 2px;
+        min-width: 28px;
       }
       .vertical-headers .th-inner {
-        min-height: 80px;
-        max-height: 160px;
+        min-height: 60px;
+        max-height: 140px;
+        align-items: center;
       }
       .vertical-headers .th-label {
         writing-mode: vertical-rl;
@@ -387,12 +390,22 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        max-height: 140px;
-        line-height: 1.2;
+        max-height: 120px;
+        line-height: 1.1;
+        font-size: 10.5px;
+        letter-spacing: 0.5px;
         margin: 0 auto;
       }
       .vertical-headers .th-controls {
         justify-content: center;
+        gap: 1px;
+        flex-wrap: nowrap;
+      }
+      .vertical-headers .th-controls .sort-arrow,
+      .vertical-headers .th-controls .filter-btn,
+      .vertical-headers .th-controls .memo-icon {
+        font-size: 9px;
+        padding: 0 1px;
       }
 
       /* ===フィルター行=== */
@@ -441,6 +454,11 @@
         color: var(--text);
         font-size: 12px;
         height: var(--row-h, 22px);
+      }
+
+      /* 縦書きヘッダー時のセル最適化 */
+      .vertical-headers tbody td {
+        padding: 0 4px;
       }
 
       /* ===セル全体表示=== */
@@ -2860,7 +2878,7 @@
         for (let c = 0; c < state.headers.length; c++) {
           let maxW;
           if (state.verticalHeader) {
-            maxW = 30; // 縦書き時はヘッダー幅を無視、最小幅から開始
+            maxW = 20; // 縦書き時はヘッダー幅を無視、最小幅から開始
           } else {
             const displayH = getDisplayHeader(c);
             maxW = measureText(displayH || "", "600 13px system-ui") + 60;
@@ -2869,11 +2887,12 @@
           for (let i = 0; i < sample; i++) {
             const v = safeGet(i, c);
             if (v) {
-              const w = measureText(v, "12px Menlo,Consolas,monospace") + 20;
+              const w = measureText(v, "12px Menlo,Consolas,monospace") + 16;
               if (w > maxW) maxW = w;
             }
           }
-          state.colWidths[c] = Math.max(40, Math.min(maxW, 500));
+          const minW = state.verticalHeader ? 28 : 40;
+          state.colWidths[c] = Math.max(minW, Math.min(maxW, 400));
         }
       }
 
@@ -6249,7 +6268,7 @@
       function autoFitColumn(col) {
         let maxW;
         if (state.verticalHeader) {
-          maxW = 30;
+          maxW = 20;
         } else {
           maxW = measureText(state.headers[col] || "", "600 13px system-ui") + 60;
         }
@@ -6257,11 +6276,12 @@
         for (let i = 0; i < sample; i++) {
           const v = safeGet(i, col);
           if (v) {
-            const w = measureText(v, "12px Menlo,Consolas,monospace") + 20;
+            const w = measureText(v, "12px Menlo,Consolas,monospace") + 16;
             if (w > maxW) maxW = w;
           }
         }
-        state.colWidths[col] = Math.max(40, Math.min(maxW, 500));
+        const minW = state.verticalHeader ? 28 : 40;
+        state.colWidths[col] = Math.max(minW, Math.min(maxW, 400));
         renderHeader();
         state.forceRender = true;
         renderBody();
@@ -6607,6 +6627,11 @@
         }
         state.forceRender = true;
         renderBody();
+        // 切り替え前に見ていた行位置を復元
+        if (topRow >= 0) {
+          const newRowH = state.wrapCells ? 56 : ROW_H;
+          els.container.scrollTop = topRow * newRowH;
+        }
       }
 
       // ===== セル折り返し =====
