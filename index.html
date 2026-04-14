@@ -1581,6 +1581,15 @@
       >
         変換
       </button>
+      <button
+        type="button"
+        class="btn"
+        id="btn-color-preview"
+        title="カラーコード列の背景色をプレビュー表示"
+        aria-label="カラーコード列の背景色をプレビュー表示"
+      >
+        🎨色
+      </button>
       <div class="toolbar-sep" role="separator" aria-hidden="true"></div>
       <button
         type="button"
@@ -2091,6 +2100,8 @@
         fitText: false, // セル全体表示（文字サイズ自動調整）
         htmlPreview: false, // 備考欄HTMLプレビュー
         htmlPreviewCol: -1, // HTMLプレビュー対象列インデックス
+        colorPreview: false, // カラーコード列の背景色プレビュー
+        colorPreviewCol: -1, // カラーコード列インデックス
         headerMode: "firstRow", // "firstRow" | "numbered"
         sortKeys: [], // 複数列ソートキー [{col, asc}, ...]
         tabs: [], // 複数ファイルタブ
@@ -2425,6 +2436,8 @@
           renderBody();
           setStatus(state.headerMapped ? "ヘッダー変換を適用しました" : "一致するヘッダーが見つかりません");
         };
+
+        $("btn-color-preview").onclick = toggleColorPreview;
 
         // 絞込保存ボタン
         els.filterExport.onclick = exportFiltered;
@@ -3740,6 +3753,13 @@
             }
             const style =
               `width:${tdCw}px;min-width:${tdCw}px;max-width:${tdCw}px;${fitStyle}` + extraStyle;
+            // カラーコードプレビュー: セル背景色を設定
+            if (state.colorPreview && j === state.colorPreviewCol && cellVal) {
+              const color = normalizeColorCode(cellVal);
+              if (color) {
+                extraStyle += `background:${color};color:${getContrastColor(color)};`;
+              }
+            }
             const isSelected =
               cls.includes("selected") || cls.includes("in-range");
             const isHtmlCol = state.htmlPreview && j === state.htmlPreviewCol;
@@ -6714,10 +6734,14 @@
         state.htmlPreviewCol = -1;
         $("btn-html-preview").classList.remove("active-state");
         $("btn-html-preview").setAttribute("aria-pressed", "false");
-        // 条件付きハイライト・重複ハイライト解除
+        // 条件付きハイライト・重複ハイライト・カラープレビュー解除
         state.conditionalHL = false;
         state._dupSet = null;
         state._dupCol = null;
+        state.colorPreview = false;
+        state.colorPreviewCol = -1;
+        $("btn-color-preview").classList.remove("active-state");
+        $("btn-color-preview").setAttribute("aria-pressed", "false");
         // 再描画
         updateHiddenStatus();
         renderHeader();
@@ -6744,6 +6768,62 @@
             ? "ヘッダー縦書き ON（列幅をデータ幅に最適化）"
             : "ヘッダー縦書き OFF",
         );
+      }
+
+      // ===== カラーコードプレビュー =====
+      function normalizeColorCode(val) {
+        const v = String(val).trim();
+        if (!v) return null;
+        // #RRGGBB or #RGB
+        if (/^#([0-9a-fA-F]{3}){1,2}$/.test(v)) return v;
+        // RRGGBB without #
+        if (/^[0-9a-fA-F]{6}$/.test(v)) return "#" + v;
+        // RGB without #
+        if (/^[0-9a-fA-F]{3}$/.test(v)) return "#" + v;
+        // Named CSS colors or rgb() etc.
+        if (/^(rgb|hsl)/i.test(v)) return v;
+        return null;
+      }
+
+      function getContrastColor(hex) {
+        // Determine black or white text based on luminance
+        let c = hex.replace("#", "");
+        if (c.length === 3) c = c[0]+c[0]+c[1]+c[1]+c[2]+c[2];
+        const r = parseInt(c.substring(0, 2), 16);
+        const g = parseInt(c.substring(2, 4), 16);
+        const b = parseInt(c.substring(4, 6), 16);
+        if (isNaN(r) || isNaN(g) || isNaN(b)) return "#000";
+        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        return luminance > 0.5 ? "#000" : "#fff";
+      }
+
+      function toggleColorPreview() {
+        if (state.colorPreview) {
+          // OFF
+          state.colorPreview = false;
+          state.colorPreviewCol = -1;
+          const btn = $("btn-color-preview");
+          btn.classList.remove("active-state");
+          btn.setAttribute("aria-pressed", "false");
+          state.forceRender = true;
+          renderBody();
+          setStatus("カラープレビュー OFF");
+          return;
+        }
+        // Find disp_color_cd column
+        const colIdx = state.headers.findIndex(h => h.trim() === "disp_color_cd");
+        if (colIdx === -1) {
+          setStatus("⚠ カラーコード列 (disp_color_cd) が見つかりません");
+          return;
+        }
+        state.colorPreview = true;
+        state.colorPreviewCol = colIdx;
+        const btn = $("btn-color-preview");
+        btn.classList.add("active-state");
+        btn.setAttribute("aria-pressed", "true");
+        state.forceRender = true;
+        renderBody();
+        setStatus(`カラープレビュー ON（列: ${getDisplayHeader(colIdx)}）`);
       }
 
       // ===== 正規表現モード =====
