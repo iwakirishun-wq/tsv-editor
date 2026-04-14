@@ -1378,16 +1378,6 @@
       tr.wrap-row {
         height: 56px !important;
       }
-      /* HTMLプレビュー列 */
-      td.html-preview-cell {
-        white-space: normal !important;
-        overflow-y: auto !important;
-        overflow-x: hidden !important;
-        text-overflow: unset !important;
-        line-height: 1.5 !important;
-        vertical-align: top !important;
-        padding: 2px 6px !important;
-      }
 
     </style>
   </head>
@@ -1525,12 +1515,11 @@
       <button
         type="button"
         class="btn"
-        id="btn-html-preview"
-        title="備考欄のHTMLをプレビュー表示（&lt;br&gt;等を実際の表示に変換）"
-        aria-label="備考欄HTMLプレビューの切り替え"
-        aria-pressed="false"
+        id="btn-html-export"
+        title="マスターデータをHTMLで出力してブラウザ表示（備考のHTML・リンクも忠実に再現）"
+        aria-label="HTMLプレビュー出力"
       >
-        HTML
+        HTML出力
       </button>
       <button
         type="button"
@@ -2414,7 +2403,7 @@
         $("btn-autofit-all").onclick = autoFitAllColumns;
         $("btn-wrap").onclick = toggleWrapCells;
         $("btn-fit-text").onclick = toggleFitText;
-        $("btn-html-preview").onclick = toggleHtmlPreview;
+        $("btn-html-export").onclick = exportHtmlPreview;
         $("btn-vertical-header").onclick = toggleVerticalHeader;
         if (state.verticalHeader) $("btn-vertical-header").classList.add("active-state");
         $("btn-header-mode").onclick = toggleHeaderMode;
@@ -3762,9 +3751,7 @@
             }
             const isSelected =
               cls.includes("selected") || cls.includes("in-range");
-            const isHtmlCol = state.htmlPreview && j === state.htmlPreviewCol;
-            if (isHtmlCol) cls.push("html-preview-cell");
-            const displayVal = isHtmlCol ? sanitizeHtmlPreview(cellVal) : escHtml(cellVal);
+            const displayVal = escHtml(cellVal);
             html += `<td role="gridcell" data-col="${j}" aria-colindex="${j + 2}" ${style ? `style="${style}"` : ""} class="${cls.join(" ")}" aria-selected="${isSelected}">${displayVal}</td>`;
           }
           html += `</tr>`;
@@ -6566,92 +6553,241 @@
 
       // ===== 備考欄HTMLプレビュー =====
       // 安全なHTMLタグのみ許可してプレビュー表示
-      function sanitizeHtmlPreview(s) {
-        const raw = String(s ?? "");
-        if (!raw) return "";
-        // まずHTMLエスケープ
-        let safe = escHtml(raw);
-        // 許可タグを実際のHTMLに復元: <br>, <b>, <i>, <u>, <s>, <span>, <font>, <strong>, <em>, <small>, <sub>, <sup>
-        // <br> / <br/> / <br />
-        safe = safe.replace(/&lt;br\s*\/?&gt;/gi, "<br>");
-        // <b>...</b>, <i>...</i>, <u>...</u>, <s>...</s>, <strong>...</strong>, <em>...</em>, <small>...</small>, <sub>...</sub>, <sup>...</sup>
-        const simpleTags = ["b", "i", "u", "s", "strong", "em", "small", "sub", "sup"];
-        for (const tag of simpleTags) {
-          const openRe = new RegExp(`&lt;${tag}(&gt;|\\s[^&]*?&gt;)`, "gi");
-          const closeRe = new RegExp(`&lt;/${tag}&gt;`, "gi");
-          safe = safe.replace(openRe, (m) => {
-            // 属性付きの場合は style のみ許可
-            const inner = m.replace(/&lt;/g, "<").replace(/&gt;/g, ">");
-            return inner;
-          });
-          safe = safe.replace(closeRe, `</${tag}>`);
+      // ===== HTML出力プレビュー =====
+      // 表示対象列（優先度順に表示）
+      const HTML_EXPORT_COLS = [
+        { key: "seat_type_area_cd", label: "席種エリアコード", group: "基本" },
+        { key: "seat_type_area_control_nm", label: "管理名", group: "基本" },
+        { key: "seat_type_area_disp_nm", label: "表示名", group: "基本" },
+        { key: "disp_abb", label: "表示略称", group: "名称" },
+        { key: "nte", label: "備考", group: "名称", isHtml: true },
+        { key: "seat_type_grp_nm1", label: "席種グループ名1", group: "名称" },
+        { key: "seat_type_grp_nm2", label: "席種グループ名2", group: "名称" },
+        { key: "disp_color_cd", label: "カラーコード", group: "表示", isColor: true },
+        { key: "rsve_unrsve_kbn", label: "指定/自由席", group: "区分" },
+        { key: "grp_nm", label: "グループ名", group: "区分" },
+        { key: "qr_code_issue_presence_flg", label: "QR発行", group: "フラグ", isFlag: true },
+        { key: "enter_possible_flg", label: "入場可能", group: "フラグ", isFlag: true },
+        { key: "box_seat_flg", label: "BOX席", group: "フラグ", isFlag: true },
+        { key: "seat_cnt", label: "席数", group: "フラグ" },
+        { key: "presence_flg", label: "有効", group: "フラグ", isFlag: true },
+        { key: "parking_ticket_flg", label: "駐車券", group: "フラグ", isFlag: true },
+        { key: "place_type", label: "位置種別", group: "その他" },
+        { key: "seattype_stock_control_typ", label: "在庫管理種別", group: "その他" },
+        { key: "privilege_flg", label: "特典", group: "その他", isFlag: true },
+        { key: "seattype_sn", label: "席種連番", group: "その他" },
+        { key: "external_stock_cond_disp_tgt_flg", label: "外部在庫表示", group: "その他", isFlag: true },
+        { key: "external_stock_cond_disp_sort_order", label: "外部在庫並び順", group: "その他" },
+        { key: "lic_plate_reg_flg", label: "車両番号登録", group: "その他", isFlag: true },
+        { key: "parking_ticket_fed_flg", label: "駐車券連携", group: "その他", isFlag: true },
+        { key: "entrance_gate_area", label: "入場ゲートエリア", group: "その他" },
+        { key: "gate_stage_typ1", label: "ゲート用公演種別", group: "その他" },
+        { key: "front_pay_disp_flg", label: "フロント決済表示", group: "その他", isFlag: true },
+        { key: "single_day_admission_flg", label: "単日入場", group: "その他", isFlag: true },
+      ];
+
+      function renderHtmlValue(val, colDef) {
+        const v = String(val ?? "").trim();
+        if (!v) return '<span style="color:#aaa">—</span>';
+
+        if (colDef.isColor) {
+          const color = normalizeColorCode(v);
+          if (color) {
+            return `<span style="display:inline-block;width:16px;height:16px;border-radius:3px;background:${escHtml(color)};vertical-align:middle;border:1px solid #ccc;margin-right:4px"></span><code>${escHtml(v)}</code>`;
+          }
+          return `<code>${escHtml(v)}</code>`;
         }
-        // <span style="...">...</span>
-        safe = safe.replace(/&lt;span(\s[^&]*?)?&gt;/gi, (m) => {
-          const inner = m.replace(/&lt;/g, "<").replace(/&gt;/g, ">");
-          // style属性のみ許可、他の属性は除去
-          const styleMatch = inner.match(/style\s*=\s*"([^"]*)"/i);
-          if (styleMatch) return `<span style="${escHtml(styleMatch[1]).replace(/&amp;/g, "&").replace(/&quot;/g, '"')}">`;
-          return "<span>";
-        });
-        safe = safe.replace(/&lt;\/span&gt;/gi, "</span>");
-        // <font ...>...</font>
-        safe = safe.replace(/&lt;font(\s[^&]*?)?&gt;/gi, (m) => {
-          const inner = m.replace(/&lt;/g, "<").replace(/&gt;/g, ">");
-          const colorMatch = inner.match(/color\s*=\s*"([^"]*)"/i);
-          const sizeMatch = inner.match(/size\s*=\s*"([^"]*)"/i);
-          let attrs = "";
-          if (colorMatch) attrs += ` color="${escHtml(colorMatch[1])}"`;
-          if (sizeMatch) attrs += ` size="${escHtml(sizeMatch[1])}"`;
-          return `<font${attrs}>`;
-        });
-        safe = safe.replace(/&lt;\/font&gt;/gi, "</font>");
-        return safe;
+
+        if (colDef.isFlag) {
+          if (v === "1") return '<span style="color:#16a34a;font-weight:600">✓ 1</span>';
+          if (v === "0") return '<span style="color:#9ca3af">✗ 0</span>';
+          return `<span style="color:#dc2626;font-weight:600">⚠ ${escHtml(v)}</span>`;
+        }
+
+        if (colDef.isHtml) {
+          // 備考欄: <br>, HTMLタグ, リンクを忠実に再現
+          let html = escHtml(v);
+          // <br> / <br/> / <br />
+          html = html.replace(/&lt;br\s*\/?&gt;/gi, "<br>");
+          // <font color="red">...</font> → 赤字表示
+          html = html.replace(/&lt;font\s+color\s*=\s*&quot;([^&]*)&quot;\s*&gt;/gi, (_, c) => `<span style="color:${escHtml(c)}">`);
+          html = html.replace(/&lt;\/font&gt;/gi, "</span>");
+          // <b>, <i>, <u>, <s>, <strong>, <em>
+          const tags = ["b", "i", "u", "s", "strong", "em"];
+          for (const t of tags) {
+            html = html.replace(new RegExp(`&lt;${t}&gt;`, "gi"), `<${t}>`);
+            html = html.replace(new RegExp(`&lt;/${t}&gt;`, "gi"), `</${t}>`);
+          }
+          // URL → clickable link (blue)
+          html = html.replace(/(https?:\/\/[^\s<"&]+)/g, '<a href="$1" target="_blank" style="color:#2563eb;text-decoration:underline">$1</a>');
+          return html;
+        }
+
+        // 通常値
+        return escHtml(v);
       }
 
-      function toggleHtmlPreview() {
-        state.htmlPreview = !state.htmlPreview;
-        const btn = $("btn-html-preview");
-        if (state.htmlPreview) {
-          // nte列を探す
-          const nteIdx = state.headers.findIndex(h => h.trim() === "nte");
-          if (nteIdx === -1) {
-            state.htmlPreview = false;
-            setStatus("備考(nte)列が見つかりません");
-            return;
-          }
-          state.htmlPreviewCol = nteIdx;
-          // 折り返し表示も自動でON（内容を確認しやすくする）
-          if (!state.wrapCells) {
-            state.wrapCells = true;
-            state.wrapRows.clear();
-            document.body.classList.add("wrap-cells");
-            $("btn-wrap").classList.add("active-state");
-            $("btn-wrap").setAttribute("aria-pressed", "true");
-          }
-          btn.classList.add("active-state");
-          btn.setAttribute("aria-pressed", "true");
-          setStatus("備考欄HTMLプレビュー ON（折り返し表示も有効）");
-        } else {
-          state.htmlPreviewCol = -1;
-          // 折り返し表示も解除
-          if (state.wrapCells) {
-            state.wrapCells = false;
-            document.body.classList.remove("wrap-cells");
-            $("btn-wrap").classList.remove("active-state");
-            $("btn-wrap").setAttribute("aria-pressed", "false");
-          }
-          btn.classList.remove("active-state");
-          btn.setAttribute("aria-pressed", "false");
-          setStatus("備考欄HTMLプレビュー OFF");
+      function exportHtmlPreview() {
+        // 対象行を決定（フィルター/表示行のみ）
+        const vr = getVisibleRows();
+        const rowIndices = vr._direct
+          ? Array.from({ length: state.data.length }, (_, i) => i)
+          : [...vr._indices];
+
+        if (!rowIndices.length) {
+          setStatus("⚠ 表示する行がありません");
+          return;
         }
-        state.forceRender = true;
-        renderBody();
-        // 切り替え前に見ていた行位置を復元
-        if (topRow >= 0) {
-          const newRowH = state.wrapCells ? 56 : ROW_H;
-          els.container.scrollTop = topRow * newRowH;
+
+        // 使用可能な列を抽出（ヘッダーに存在するもののみ）
+        const colMap = [];
+        for (const def of HTML_EXPORT_COLS) {
+          const idx = state.headers.findIndex(h => h.trim() === def.key);
+          if (idx !== -1) colMap.push({ ...def, idx });
         }
+
+        if (!colMap.length) {
+          setStatus("⚠ マスター列が見つかりません");
+          return;
+        }
+
+        // コメントデータ取得
+        const comments = {};
+        for (const c of colMap) {
+          const comment = state.headerComments[c.key] || "";
+          if (comment) comments[c.key] = comment;
+        }
+
+        // グループ分け
+        const groups = {};
+        for (const c of colMap) {
+          if (!groups[c.group]) groups[c.group] = [];
+          groups[c.group].push(c);
+        }
+
+        const fileName = state.fileName || "data";
+        const totalRows = state.data.length;
+        const filteredRows = rowIndices.length;
+        const isFiltered = filteredRows < totalRows;
+
+        let html = `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>${escHtml(fileName)} - マスターデータプレビュー</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "Hiragino Kaku Gothic ProN", "Yu Gothic UI", sans-serif; background: #f8f9fa; color: #333; padding: 20px; }
+  .header { background: #fff; padding: 16px 24px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; }
+  .header h1 { font-size: 18px; font-weight: 600; }
+  .header .meta { font-size: 12px; color: #666; margin-top: 4px; }
+  .card { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 12px; overflow: hidden; }
+  .card-head { background: #f5f5f5; padding: 10px 16px; border-bottom: 1px solid #e5e5e5; display: flex; align-items: center; gap: 8px; }
+  .card-head .code { font-family: monospace; font-size: 13px; font-weight: 600; color: #1a1a1a; }
+  .card-head .name { font-size: 13px; color: #555; }
+  .card-head .color-chip { width: 20px; height: 20px; border-radius: 4px; border: 1px solid #ddd; flex-shrink: 0; }
+  .card-body { padding: 12px 16px; }
+  .group-label { font-size: 10px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: 0.5px; margin: 8px 0 4px; }
+  .group-label:first-child { margin-top: 0; }
+  .fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 4px 16px; }
+  .field { display: flex; flex-direction: column; padding: 3px 0; position: relative; }
+  .field-label { font-size: 10px; color: #888; cursor: help; border-bottom: 1px dotted #ccc; display: inline-block; width: fit-content; }
+  .field-label:hover { color: #333; }
+  .field-value { font-size: 13px; line-height: 1.5; word-break: break-all; }
+  .field-value a { color: #2563eb; text-decoration: underline; }
+  .field-value code { background: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+  .nte-field { grid-column: 1 / -1; }
+  .nte-value { background: #fafafa; border: 1px solid #eee; border-radius: 4px; padding: 8px 10px; font-size: 13px; line-height: 1.7; min-height: 24px; }
+  .flag-ok { color: #16a34a; font-weight: 600; }
+  .flag-off { color: #9ca3af; }
+  .flag-warn { color: #dc2626; font-weight: 600; }
+  .tooltip { display: none; position: absolute; left: 0; top: 100%; z-index: 100; background: #333; color: #fff; font-size: 11px; padding: 6px 10px; border-radius: 4px; white-space: pre-wrap; max-width: 400px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+  .field:hover .tooltip { display: block; }
+  .badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+  .badge-active { background: #dcfce7; color: #16a34a; }
+  .badge-inactive { background: #fee2e2; color: #dc2626; }
+  .filter-note { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 4px; padding: 8px 12px; font-size: 12px; color: #1d4ed8; margin-bottom: 16px; }
+  @media print { body { background: #fff; padding: 10px; } .card { break-inside: avoid; box-shadow: none; border: 1px solid #ddd; } }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>📋 ${escHtml(fileName)}</h1>
+  <div class="meta">${filteredRows}件${isFiltered ? ` / 全${totalRows}件（フィルター適用中）` : ""} — ${new Date().toLocaleString("ja-JP")}</div>
+</div>
+`;
+
+        if (isFiltered) {
+          html += `<div class="filter-note">🔍 フィルターが適用されています。表示中の ${filteredRows} 件のみ出力しています。</div>\n`;
+        }
+
+        // カラーコード列のインデックス
+        const colorColDef = colMap.find(c => c.key === "disp_color_cd");
+
+        for (const ri of rowIndices) {
+          const row = state.data[ri];
+          if (!row) continue;
+
+          // カード見出し
+          const cdVal = row[colMap.find(c => c.key === "seat_type_area_cd")?.idx] ?? "";
+          const ctrlNm = row[colMap.find(c => c.key === "seat_type_area_control_nm")?.idx] ?? "";
+          const dispNm = row[colMap.find(c => c.key === "seat_type_area_disp_nm")?.idx] ?? "";
+          const colorVal = colorColDef ? (row[colorColDef.idx] ?? "") : "";
+          const colorHex = normalizeColorCode(colorVal);
+          const presenceIdx = colMap.find(c => c.key === "presence_flg")?.idx;
+          const isActive = presenceIdx !== undefined ? row[presenceIdx]?.trim() === "1" : true;
+
+          html += `<div class="card">
+  <div class="card-head">`;
+          if (colorHex) html += `<div class="color-chip" style="background:${escHtml(colorHex)}"></div>`;
+          html += `<span class="code">${escHtml(cdVal)}</span>
+    <span class="name">${escHtml(ctrlNm)}${dispNm ? " / " + escHtml(dispNm) : ""}</span>
+    <span class="badge ${isActive ? "badge-active" : "badge-inactive"}">${isActive ? "有効" : "無効"}</span>
+  </div>
+  <div class="card-body">`;
+
+          // グループ別に出力
+          for (const [gName, cols] of Object.entries(groups)) {
+            // 基本グループの一部は見出しに含まれるのでスキップ
+            const showCols = cols.filter(c => {
+              if (gName === "基本") return false; // card-headに表示済み
+              return true;
+            });
+            if (!showCols.length) continue;
+
+            html += `<div class="group-label">${escHtml(gName)}</div><div class="fields">`;
+
+            for (const col of showCols) {
+              const val = row[col.idx] ?? "";
+              const rendered = renderHtmlValue(val, col);
+              const tooltipContent = comments[col.key] ? escHtml(comments[col.key]) : "";
+              const isNte = col.key === "nte";
+
+              html += `<div class="field${isNte ? " nte-field" : ""}">`;
+              html += `<span class="field-label"${tooltipContent ? ` title="${tooltipContent}"` : ""}>${escHtml(col.label)}`;
+              if (tooltipContent) html += `<span class="tooltip">${tooltipContent}</span>`;
+              html += `</span>`;
+              if (isNte) {
+                html += `<div class="nte-value">${rendered}</div>`;
+              } else {
+                html += `<div class="field-value">${rendered}</div>`;
+              }
+              html += `</div>`;
+            }
+            html += `</div>`;
+          }
+
+          html += `</div></div>\n`;
+        }
+
+        html += `</body></html>`;
+
+        // 新しいウィンドウで開く
+        const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        window.open(url, "_blank");
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        setStatus(`HTML出力完了（${filteredRows}件）`);
       }
 
       // ===== セル折り返し =====
@@ -6732,8 +6868,6 @@
         // HTMLプレビュー解除
         state.htmlPreview = false;
         state.htmlPreviewCol = -1;
-        $("btn-html-preview").classList.remove("active-state");
-        $("btn-html-preview").setAttribute("aria-pressed", "false");
         // 条件付きハイライト・重複ハイライト・カラープレビュー解除
         state.conditionalHL = false;
         state._dupSet = null;
