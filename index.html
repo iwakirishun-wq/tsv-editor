@@ -1570,15 +1570,6 @@
       >
         変換
       </button>
-      <button
-        type="button"
-        class="btn"
-        id="btn-color-preview"
-        title="カラーコード列の背景色をプレビュー表示"
-        aria-label="カラーコード列の背景色をプレビュー表示"
-      >
-        🎨色
-      </button>
       <div class="toolbar-sep" role="separator" aria-hidden="true"></div>
       <button
         type="button"
@@ -2425,8 +2416,6 @@
           renderBody();
           setStatus(state.headerMapped ? "ヘッダー変換を適用しました" : "一致するヘッダーが見つかりません");
         };
-
-        $("btn-color-preview").onclick = toggleColorPreview;
 
         // 絞込保存ボタン
         els.filterExport.onclick = exportFiltered;
@@ -3742,13 +3731,6 @@
             }
             const style =
               `width:${tdCw}px;min-width:${tdCw}px;max-width:${tdCw}px;${fitStyle}` + extraStyle;
-            // カラーコードプレビュー: セル背景色を設定
-            if (state.colorPreview && j === state.colorPreviewCol && cellVal) {
-              const color = normalizeColorCode(cellVal);
-              if (color) {
-                extraStyle += `background:${color};color:${getContrastColor(color)};`;
-              }
-            }
             const isSelected =
               cls.includes("selected") || cls.includes("in-range");
             const displayVal = escHtml(cellVal);
@@ -6599,9 +6581,7 @@
         }
 
         if (colDef.isFlag) {
-          if (v === "1") return '<span style="color:#16a34a;font-weight:600">✓ 1</span>';
-          if (v === "0") return '<span style="color:#9ca3af">✗ 0</span>';
-          return `<span style="color:#dc2626;font-weight:600">⚠ ${escHtml(v)}</span>`;
+          return escHtml(v);
         }
 
         if (colDef.isHtml) {
@@ -6609,8 +6589,15 @@
           let html = escHtml(v);
           // <br> / <br/> / <br />
           html = html.replace(/&lt;br\s*\/?&gt;/gi, "<br>");
+          // <a href=URL target=...>テキスト</a> → クリック可能リンク（青字）
+          html = html.replace(/&lt;a\s+href\s*=\s*(?:&quot;([^&]*)&quot;|([^\s&>]+))(?:\s[^&]*?)?&gt;(.*?)&lt;\/a&gt;/gi,
+            (_, q, nq, text) => {
+              const url = q || nq || "";
+              return `<a href="${escHtml(url)}" target="_blank" style="color:#2563eb;text-decoration:underline">${text}</a>`;
+            });
           // <font color="red">...</font> → 赤字表示
-          html = html.replace(/&lt;font\s+color\s*=\s*&quot;([^&]*)&quot;\s*&gt;/gi, (_, c) => `<span style="color:${escHtml(c)}">`);
+          html = html.replace(/&lt;font\s+color\s*=\s*(?:&quot;([^&]*)&quot;|([^\s&>]+))\s*&gt;/gi,
+            (_, q, nq) => `<span style="color:${escHtml(q || nq || "")}">`);
           html = html.replace(/&lt;\/font&gt;/gi, "</span>");
           // <b>, <i>, <u>, <s>, <strong>, <em>
           const tags = ["b", "i", "u", "s", "strong", "em"];
@@ -6618,8 +6605,8 @@
             html = html.replace(new RegExp(`&lt;${t}&gt;`, "gi"), `<${t}>`);
             html = html.replace(new RegExp(`&lt;/${t}&gt;`, "gi"), `</${t}>`);
           }
-          // URL → clickable link (blue)
-          html = html.replace(/(https?:\/\/[^\s<"&]+)/g, '<a href="$1" target="_blank" style="color:#2563eb;text-decoration:underline">$1</a>');
+          // 生のURL（既にリンク化されたものは除く）→ クリック可能リンク
+          html = html.replace(/(?<![">])(https?:\/\/[^\s<"]+)/g, '<a href="$1" target="_blank" style="color:#2563eb;text-decoration:underline">$1</a>');
           return html;
         }
 
@@ -6707,9 +6694,7 @@
   .flag-off { color: #9ca3af; }
   .flag-warn { color: #dc2626; font-weight: 600; }
   #floating-tooltip { display: none; position: fixed; z-index: 9999; background: #1a1a1a; color: #f0f0f0; font-size: 12px; padding: 10px 14px; border-radius: 6px; white-space: pre-wrap; max-width: 480px; min-width: 120px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); line-height: 1.6; pointer-events: none; word-break: break-word; }
-  .badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
-  .badge-active { background: #dcfce7; color: #16a34a; }
-  .badge-inactive { background: #fee2e2; color: #dc2626; }
+  .color-code { font-size: 11px; color: #888; }
   .filter-note { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 4px; padding: 8px 12px; font-size: 12px; color: #1d4ed8; margin-bottom: 16px; }
   @media print { body { background: #fff; padding: 10px; } .card { break-inside: avoid; box-shadow: none; border: 1px solid #ddd; } }
 </style>
@@ -6732,29 +6717,26 @@
           const row = state.data[ri];
           if (!row) continue;
 
-          // カード見出し
+          // カード見出し: エリアコード、席種名（表示名）、カラーコード
           const cdVal = row[colMap.find(c => c.key === "seat_type_area_cd")?.idx] ?? "";
-          const ctrlNm = row[colMap.find(c => c.key === "seat_type_area_control_nm")?.idx] ?? "";
           const dispNm = row[colMap.find(c => c.key === "seat_type_area_disp_nm")?.idx] ?? "";
           const colorVal = colorColDef ? (row[colorColDef.idx] ?? "") : "";
           const colorHex = normalizeColorCode(colorVal);
-          const presenceIdx = colMap.find(c => c.key === "presence_flg")?.idx;
-          const isActive = presenceIdx !== undefined ? row[presenceIdx]?.trim() === "1" : true;
 
           html += `<div class="card">
   <div class="card-head">`;
           if (colorHex) html += `<div class="color-chip" style="background:${escHtml(colorHex)}"></div>`;
-          html += `<span class="code">${escHtml(cdVal)}</span>
-    <span class="name">${escHtml(ctrlNm)}${dispNm ? " / " + escHtml(dispNm) : ""}</span>
-    <span class="badge ${isActive ? "badge-active" : "badge-inactive"}">${isActive ? "有効" : "無効"}</span>
-  </div>
+          html += `<span class="code">${escHtml(cdVal)}</span>`;
+          if (dispNm) html += `<span class="name">${escHtml(dispNm)}</span>`;
+          if (colorVal) html += `<span class="color-code"><code>${escHtml(colorVal)}</code></span>`;
+          html += `</div>
   <div class="card-body">`;
 
           // グループ別に出力
           for (const [gName, cols] of Object.entries(groups)) {
-            // 基本グループの一部は見出しに含まれるのでスキップ
+            // card-headに表示済みの項目はスキップ
             const showCols = cols.filter(c => {
-              if (gName === "基本") return false; // card-headに表示済み
+              if (c.key === "seat_type_area_cd") return false;
               return true;
             });
             if (!showCols.length) continue;
@@ -6904,8 +6886,6 @@
         state._dupCol = null;
         state.colorPreview = false;
         state.colorPreviewCol = -1;
-        $("btn-color-preview").classList.remove("active-state");
-        $("btn-color-preview").setAttribute("aria-pressed", "false");
         // 再描画
         updateHiddenStatus();
         renderHeader();
@@ -6959,35 +6939,6 @@
         if (isNaN(r) || isNaN(g) || isNaN(b)) return "#000";
         const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
         return luminance > 0.5 ? "#000" : "#fff";
-      }
-
-      function toggleColorPreview() {
-        if (state.colorPreview) {
-          // OFF
-          state.colorPreview = false;
-          state.colorPreviewCol = -1;
-          const btn = $("btn-color-preview");
-          btn.classList.remove("active-state");
-          btn.setAttribute("aria-pressed", "false");
-          state.forceRender = true;
-          renderBody();
-          setStatus("カラープレビュー OFF");
-          return;
-        }
-        // Find disp_color_cd column
-        const colIdx = state.headers.findIndex(h => h.trim() === "disp_color_cd");
-        if (colIdx === -1) {
-          setStatus("⚠ カラーコード列 (disp_color_cd) が見つかりません");
-          return;
-        }
-        state.colorPreview = true;
-        state.colorPreviewCol = colIdx;
-        const btn = $("btn-color-preview");
-        btn.classList.add("active-state");
-        btn.setAttribute("aria-pressed", "true");
-        state.forceRender = true;
-        renderBody();
-        setStatus(`カラープレビュー ON（列: ${getDisplayHeader(colIdx)}）`);
       }
 
       // ===== 正規表現モード =====
