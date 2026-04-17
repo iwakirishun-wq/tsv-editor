@@ -6600,9 +6600,13 @@
         if (char6 === "E" && !hasArrow) {
           add("enter_possible_flg", enterFlg === "1", "6桁目E → 入場可能=1");
         }
-        // 6桁目U/O → 入場可能=0
-        if ((char6 === "U" || char6 === "O") && !hasArrow) {
-          add("enter_possible_flg", enterFlg === "0", `6桁目${char6} → 入場可能=0`);
+        // 6桁目U → 入場可能=0
+        if (char6 === "U" && !hasArrow) {
+          add("enter_possible_flg", enterFlg === "0", "6桁目U → 入場可能=0");
+        }
+        // 6桁目O → 入場可能=1（端末読込あり）
+        if (char6 === "O" && !hasArrow) {
+          add("enter_possible_flg", enterFlg === "1", "6桁目O → 入場可能=1");
         }
         // 複数名利用 → BOX席=1, 席数>=2
         if (isMultiPerson) {
