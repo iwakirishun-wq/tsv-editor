@@ -1577,7 +1577,7 @@
         type="button"
         class="btn"
         id="btn-manual"
-        title="操作ヘルプを表示&#10;ショートカットキー一覧や&#10;使い方を確認できます（?キーでも開けます）"
+        title="操作ヘルプを表示（?キーでも開けます）&#10;&#10;【ツールバー機能一覧】&#10;開く: TSV/CSVファイルを開く（ドラッグ&amp;ドロップ可）&#10;▾: 最近開いたファイル履歴&#10;保存: 編集中のファイルを保存（Ctrl+S）&#10;↩/↪: 元に戻す/やり直し（Ctrl+Z / Ctrl+Y）&#10;フィルター: 列ヘッダー右クリックでフィルター設定&#10;クリア: フィルターを全解除&#10;絞込保存: フィルター結果のみ保存&#10;行高: 行の高さを切り替え（22→30→40px）&#10;自動幅: 全列幅をデータに合わせて自動調整&#10;折返: セル内テキストの折り返し表示&#10;全表示: 文字サイズを自動縮小して全文表示&#10;HTML出力: マスターデータをHTML形式でプレビュー&#10;縦H: ヘッダーを縦書き表示に切替&#10;H:1行目: ヘッダーモード切替（1行目/連番）&#10;＋: 新しいシートタブを追加&#10;変換: 辞書でヘッダーを日本語に変換（Shift+クリックで辞書編集）&#10;リセット: フィルター・ソート等を全解除"
         aria-label="ヘルプを開く"
       >
         ?
@@ -6535,10 +6535,9 @@
         { key: "seat_type_area_control_nm", label: "管理名", group: "基本" },
         { key: "seat_type_area_disp_nm", label: "表示名", group: "基本" },
         { key: "disp_abb", label: "表示略称", group: "名称" },
-        { key: "nte", label: "備考", group: "名称", isHtml: true },
-        { key: "seat_type_grp_nm1", label: "席種グループ名1", group: "名称" },
-        { key: "seat_type_grp_nm2", label: "席種グループ名2", group: "名称" },
-        { key: "disp_color_cd", label: "カラーコード", group: "表示", isColor: true },
+        { key: "seat_type_grp_nm1", label: "グループ名1", group: "名称" },
+        { key: "seat_type_grp_nm2", label: "グループ名2", group: "名称" },
+        { key: "nte", label: "備考", group: "備考", isHtml: true },
         { key: "rsve_unrsve_kbn", label: "指定/自由席", group: "区分" },
         { key: "grp_nm", label: "グループ名", group: "区分" },
         { key: "qr_code_issue_presence_flg", label: "QR発行", group: "フラグ", isFlag: true },
@@ -6742,7 +6741,7 @@
   .card-head { background: #f5f5f5; padding: 10px 16px; border-bottom: 1px solid #e5e5e5; display: flex; align-items: center; gap: 8px; }
   .card-head .code { font-family: monospace; font-size: 15px; font-weight: 600; color: #1a1a1a; }
   .card-head .name { font-size: 15px; color: #555; }
-  .card-head .color-chip { width: 20px; height: 20px; border-radius: 4px; border: 1px solid #ddd; flex-shrink: 0; }
+  .card-head .ctrl-nm { font-size: 12px; color: #888; }
   .card-body { padding: 12px 16px; }
   .group-label { font-size: 10px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: 0.5px; margin: 8px 0 4px; }
   .group-label:first-child { margin-top: 0; }
@@ -6754,12 +6753,11 @@
   .field-value a { color: #2563eb; text-decoration: underline; }
   .field-value code { background: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-size: 14px; }
   .nte-field { grid-column: 1 / -1; }
-  .nte-value { background: #fafafa; border: 1px solid #eee; border-radius: 4px; padding: 8px 10px; font-size: 15px; line-height: 1.7; min-height: 24px; }
+  .nte-value { background: #fafafa; border: 1px solid #eee; border-radius: 4px; padding: 8px 10px; font-size: 15px; line-height: 1.7; min-height: 24px; color: #dc2626; }
   .flag-ok { color: #16a34a; font-weight: 600; }
   .flag-off { color: #9ca3af; }
   .flag-warn { color: #dc2626; font-weight: 600; }
   #floating-tooltip { display: none; position: fixed; z-index: 9999; background: #1a1a1a; color: #f0f0f0; font-size: 12px; padding: 10px 14px; border-radius: 6px; white-space: pre-wrap; max-width: 480px; min-width: 120px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); line-height: 1.6; pointer-events: none; word-break: break-word; }
-  .color-code { font-size: 11px; color: #888; }
   .vbadge { display: inline-block; font-size: 12px; margin-left: 6px; padding: 1px 6px; border-radius: 4px; vertical-align: middle; white-space: nowrap; }
   .vbadge-ok { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
   .vbadge-ng { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; font-weight: 600; }
@@ -6786,25 +6784,20 @@
         html += "<!-- VALIDATION_SUMMARY -->\n";
         let totalOk = 0, totalNg = 0, totalSkip = 0;
 
-        // カラーコード列のインデックス
-        const colorColDef = colMap.find(c => c.key === "disp_color_cd");
-
         for (const ri of rowIndices) {
           const row = state.data[ri];
           if (!row) continue;
 
-          // カード見出し: エリアコード、席種名（表示名）、カラーコード
+          // カード見出し: エリアコード、表示名、管理名
           const cdVal = row[colMap.find(c => c.key === "seat_type_area_cd")?.idx] ?? "";
           const dispNm = row[colMap.find(c => c.key === "seat_type_area_disp_nm")?.idx] ?? "";
-          const colorVal = colorColDef ? (row[colorColDef.idx] ?? "") : "";
-          const colorHex = normalizeColorCode(colorVal);
+          const ctrlNm = row[colMap.find(c => c.key === "seat_type_area_control_nm")?.idx] ?? "";
 
           html += `<div class="card">
   <div class="card-head">`;
-          if (colorHex) html += `<div class="color-chip" style="background:${escHtml(colorHex)}"></div>`;
           html += `<span class="code">${escHtml(cdVal)}</span>`;
           if (dispNm) html += `<span class="name">${escHtml(dispNm)}</span>`;
-          if (colorVal) html += `<span class="color-code"><code>${escHtml(colorVal)}</code></span>`;
+          if (ctrlNm) html += `<span class="ctrl-nm">${escHtml(ctrlNm)}</span>`;
           html += `</div>
   <div class="card-body">`;
 
@@ -6821,7 +6814,7 @@
 
           // グループ別に出力
           for (const [gName, cols] of Object.entries(groups)) {
-            const showCols = cols.filter(c => c.key !== "seat_type_area_cd");
+            const showCols = cols.filter(c => c.key !== "seat_type_area_cd" && c.key !== "seat_type_area_control_nm");
             if (!showCols.length) continue;
 
             html += `<div class="group-label">${escHtml(gName)}</div><div class="fields">`;
