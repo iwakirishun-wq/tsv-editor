@@ -1557,17 +1557,8 @@
       <button
         type="button"
         class="btn"
-        id="btn-header-dict"
-        title="ヘッダー自動変換辞書を編集&#10;英語カラム名と日本語表示名の対応表を管理&#10;コメント（メモ）もここで編集できます"
-        aria-label="ヘッダー自動変換辞書を編集"
-      >
-        辞書
-      </button>
-      <button
-        type="button"
-        class="btn"
         id="btn-apply-dict"
-        title="辞書を使ってヘッダーを日本語に変換&#10;50%以上のヘッダーが辞書と一致する場合に適用&#10;保存時は元の英語ヘッダーに戻ります"
+        title="辞書を使ってヘッダーを日本語に変換&#10;50%以上のヘッダーが辞書と一致する場合に適用&#10;保存時は元の英語ヘッダーに戻ります&#10;&#10;Shift+クリックで辞書編集画面を開きます"
         aria-label="辞書を適用してヘッダーを変換"
       >
         変換
@@ -1933,9 +1924,9 @@
             >
           </div>
           <div class="man-btn-row">
-            <span class="man-btn-label">辞書 / 変換</span
+            <span class="man-btn-label">変換</span
             ><span class="man-btn-desc"
-              >ヘッダー自動変換辞書を編集・適用。英語カラム名を日本語表示に変換（席種エリアマスター対応）。</span
+              >辞書を使ってヘッダーを日本語に変換。50%以上一致で適用。保存時は元の英語に戻ります。</span
             >
           </div>
           <div class="man-btn-row">
@@ -2409,9 +2400,9 @@
           if (e.target === $("manual-dialog")) hideManual();
         };
 
-        // 辞書ボタン
-        $("btn-header-dict").onclick = openDictEditor;
-        $("btn-apply-dict").onclick = () => {
+        // 辞書・変換ボタン（Shift+クリックで辞書編集）
+        $("btn-apply-dict").onclick = (e) => {
+          if (e.shiftKey) { openDictEditor(); return; }
           applyHeaderMapping();
           renderHeader();
           state.forceRender = true;
