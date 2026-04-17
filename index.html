@@ -1392,6 +1392,7 @@
         type="button"
         class="btn"
         id="btn-open"
+        title="TSV/CSVファイルを開く&#10;ドラッグ&ドロップでも読み込めます"
         aria-label="ファイルを開く"
       >
         開く
@@ -1400,7 +1401,7 @@
         type="button"
         class="btn"
         id="btn-open-recent"
-        title="最近開いたファイル"
+        title="最近開いたファイルの一覧を表示&#10;クリックで再度開けます"
         aria-label="最近開いたファイル"
         aria-haspopup="menu"
         aria-expanded="false"
@@ -1414,6 +1415,7 @@
         type="button"
         class="btn"
         id="btn-save"
+        title="現在のデータをファイルとして保存&#10;ショートカット: Ctrl+S"
         aria-label="ファイルを保存"
       >
         保存
@@ -1422,14 +1424,14 @@
         id="dirty-indicator"
         role="status"
         aria-label="未保存の変更があります"
-        title="未保存の変更があります"
+        title="未保存の変更があります&#10;保存ボタンまたはCtrl+Sで保存してください"
       ></span>
       <div class="toolbar-sep" role="separator" aria-hidden="true"></div>
       <button
         type="button"
         class="btn"
         id="btn-undo"
-        title="元に戻す (Ctrl+Z)"
+        title="直前の操作を元に戻す&#10;ショートカット: Ctrl+Z"
         aria-label="元に戻す"
       >
         ↩
@@ -1438,7 +1440,7 @@
         type="button"
         class="btn"
         id="btn-redo"
-        title="やり直し (Ctrl+Y)"
+        title="元に戻した操作をやり直す&#10;ショートカット: Ctrl+Y / Ctrl+Shift+Z"
         aria-label="やり直し"
       >
         ↪
@@ -1448,7 +1450,7 @@
         type="button"
         class="btn"
         id="btn-filter-toggle"
-        title="フィルター行を表示"
+        title="各列のフィルター入力行を表示/非表示&#10;テキスト入力で行を絞り込めます"
         aria-label="フィルター行を表示"
         aria-pressed="false"
       >
@@ -1459,7 +1461,7 @@
         class="btn danger"
         id="btn-filter-clear"
         style="display: none"
-        title="フィルターをクリア"
+        title="現在設定されているフィルターをすべて解除&#10;非表示の行も再表示されます"
         aria-label="フィルターをクリア"
       >
         クリア
@@ -1469,7 +1471,7 @@
         class="btn"
         id="btn-export-filtered"
         style="display: none"
-        title="フィルター結果のみを保存"
+        title="フィルターで絞り込んだ行だけを&#10;新しいファイルとして保存します"
         aria-label="フィルター結果のみを保存"
       >
         絞込保存
@@ -1478,7 +1480,7 @@
         type="button"
         class="btn"
         id="btn-row-height"
-        title="行の高さを変更（22→30→40→22）"
+        title="行の高さを順番に切り替え&#10;（22px → 30px → 40px → 22px）&#10;データが多い場合は高くすると見やすくなります"
         aria-label="行の高さを変更"
       >
         行高
@@ -1487,7 +1489,7 @@
         type="button"
         class="btn"
         id="btn-autofit-all"
-        title="全列幅を自動調整"
+        title="全列の幅をデータの内容に合わせて自動調整&#10;列ヘッダーのダブルクリックで個別調整も可能"
         aria-label="全列幅を自動調整"
       >
         自動幅
@@ -1496,7 +1498,7 @@
         type="button"
         class="btn"
         id="btn-wrap"
-        title="セル折り返し表示"
+        title="セル内の長いテキストを折り返して表示&#10;OFFの場合は1行で省略表示されます&#10;選択範囲がある場合はその行だけ切り替え"
         aria-label="セル折り返し表示の切り替え"
         aria-pressed="false"
       >
@@ -1506,7 +1508,7 @@
         type="button"
         class="btn"
         id="btn-fit-text"
-        title="セル全体表示（文字サイズを列幅に合わせて自動調整）"
+        title="セルの幅に合わせて文字サイズを自動縮小&#10;列幅が狭くても全文が見えるようになります"
         aria-label="セル全体表示の切り替え"
         aria-pressed="false"
       >
@@ -1516,7 +1518,7 @@
         type="button"
         class="btn"
         id="btn-html-export"
-        title="マスターデータをHTMLで出力してブラウザ表示（備考のHTML・リンクも忠実に再現）"
+        title="マスターデータをHTMLページとして出力&#10;新しいタブで開き、備考欄のHTML・リンク・&#10;カラーコード等を実際の見た目で確認できます&#10;フィルター中は絞り込んだ行のみ出力"
         aria-label="HTMLプレビュー出力"
       >
         HTML出力
@@ -1525,7 +1527,7 @@
         type="button"
         class="btn"
         id="btn-vertical-header"
-        title="ヘッダーを縦書き表示（列幅をコンパクトに）"
+        title="ヘッダーを縦書き表示に切り替え&#10;列幅がコンパクトになり&#10;多くの列を一度に表示できます"
         aria-label="ヘッダー縦書き表示の切り替え"
         aria-pressed="true"
       >
@@ -1535,7 +1537,7 @@
         type="button"
         class="btn"
         id="btn-header-mode"
-        title="ヘッダー: 1行目を使用中 → クリックで連番に切替"
+        title="ヘッダーモードを切り替え&#10;「1行目」: ファイルの1行目をヘッダーとして使用&#10;「連番」: 1, 2, 3...の連番ヘッダー（全行がデータ）"
         aria-label="ヘッダーモード切り替え"
         aria-pressed="true"
         class="btn active-state"
@@ -1547,7 +1549,7 @@
         type="button"
         class="btn"
         id="btn-new-sheet"
-        title="新しいシートを追加"
+        title="新しい空のシートタブを追加&#10;複数ファイルをタブで切り替えて編集できます"
         aria-label="新しいシートを追加"
       >
         ＋
@@ -1556,7 +1558,7 @@
         type="button"
         class="btn"
         id="btn-header-dict"
-        title="ヘッダー自動変換辞書"
+        title="ヘッダー自動変換辞書を編集&#10;英語カラム名と日本語表示名の対応表を管理&#10;コメント（メモ）もここで編集できます"
         aria-label="ヘッダー自動変換辞書を編集"
       >
         辞書
@@ -1565,7 +1567,7 @@
         type="button"
         class="btn"
         id="btn-apply-dict"
-        title="辞書を適用してヘッダーを変換"
+        title="辞書を使ってヘッダーを日本語に変換&#10;50%以上のヘッダーが辞書と一致する場合に適用&#10;保存時は元の英語ヘッダーに戻ります"
         aria-label="辞書を適用してヘッダーを変換"
       >
         変換
@@ -1575,7 +1577,7 @@
         type="button"
         class="btn danger"
         id="btn-reset-view"
-        title="表示をリセット（フィルター・ソート・非表示・選択をすべて解除）"
+        title="表示状態をすべてリセット&#10;フィルター・ソート・非表示列/行・&#10;選択範囲をすべて解除します"
         aria-label="表示をすべてリセット"
       >
         リセット
@@ -1584,7 +1586,7 @@
         type="button"
         class="btn"
         id="btn-manual"
-        title="ヘルプ"
+        title="操作ヘルプを表示&#10;ショートカットキー一覧や&#10;使い方を確認できます（?キーでも開けます）"
         aria-label="ヘルプを開く"
       >
         ?
