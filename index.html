@@ -6570,6 +6570,130 @@
         { key: "single_day_admission_flg", label: "単日入場", group: "その他", isFlag: true },
       ];
 
+      // ===== HTML出力時のバリデーション =====
+      function validateMasterRow(row, colMap) {
+        const results = [];
+        const get = (key) => {
+          const c = colMap.find(x => x.key === key);
+          return c ? (row[c.idx] ?? "").trim() : "";
+        };
+
+        const cd = get("seat_type_area_cd");
+        const char6 = cd.length >= 6 ? cd[5].toUpperCase() : "";
+        const enterFlg = get("enter_possible_flg");
+        const parkingFlg = get("parking_ticket_flg");
+        const boxFlg = get("box_seat_flg");
+        const seatCnt = parseInt(get("seat_cnt"), 10) || 0;
+        const rsveKbn = get("rsve_unrsve_kbn");
+        const stockTyp = get("seattype_stock_control_typ");
+        const dispNm = get("seat_type_area_disp_nm");
+        const controlNm = get("seat_type_area_control_nm");
+        const dispAbb = get("disp_abb");
+        const nameTexts = [dispNm, controlNm, dispAbb].join(" ");
+
+        // → 付き席種判定
+        const hasArrow = /→/.test(nameTexts);
+
+        // 複数名利用判定: 「〇名」パターン（数字＋名）、「ボックス」「BOX」「テーブル」「ラウンジ」など
+        const isMultiPerson = /[0-9０-９]+名/.test(nameTexts) ||
+          /ボックス|BOX|box|テーブル|ラウンジ|スイート|ルーム|パーティ/i.test(nameTexts);
+
+        // 指定席判定
+        const isReserved = /指定席|指定/.test(nameTexts) || isMultiPerson;
+        // エリア席判定
+        const isAreaSeat = /エリア|自由席|自由|立見|芝生|広場/.test(nameTexts);
+
+        // ルール1: 6桁目がP → 駐車券=1
+        if (char6 === "P") {
+          results.push({
+            ok: parkingFlg === "1",
+            rule: "6桁目P → 駐車券=1",
+            detail: `コード6桁目: ${char6}, 駐車券: ${parkingFlg || "(空)"}`,
+          });
+        }
+
+        // ルール2: 6桁目がE → 入場可能=1
+        if (char6 === "E" && !hasArrow) {
+          results.push({
+            ok: enterFlg === "1",
+            rule: "6桁目E → 入場可能=1",
+            detail: `コード6桁目: ${char6}, 入場可能: ${enterFlg || "(空)"}`,
+          });
+        }
+
+        // ルール3: 6桁目がU or O → 入場可能=0
+        if ((char6 === "U" || char6 === "O") && !hasArrow) {
+          results.push({
+            ok: enterFlg === "0",
+            rule: `6桁目${char6} → 入場可能=0`,
+            detail: `コード6桁目: ${char6}, 入場可能: ${enterFlg || "(空)"}`,
+          });
+        }
+
+        // ルール4: 複数名利用区画 → BOX席=1, 席数>=2
+        if (isMultiPerson) {
+          results.push({
+            ok: boxFlg === "1",
+            rule: "複数名利用 → BOX席=1",
+            detail: `名称: ${dispNm}, BOX席: ${boxFlg || "(空)"}`,
+          });
+          results.push({
+            ok: seatCnt >= 2,
+            rule: "複数名利用 → 席数2以上",
+            detail: `名称: ${dispNm}, 席数: ${seatCnt}`,
+          });
+        }
+
+        // ルール5: → 付き席種 → 入場可能=0, 指定自由区分=2, 在庫管理種別=2
+        if (hasArrow) {
+          results.push({
+            ok: enterFlg === "0",
+            rule: "→付き → 入場可能=0",
+            detail: `名称: ${dispNm}, 入場可能: ${enterFlg || "(空)"}`,
+          });
+          results.push({
+            ok: rsveKbn === "2",
+            rule: "→付き → 指定/自由区分=2",
+            detail: `名称: ${dispNm}, 指定/自由区分: ${rsveKbn || "(空)"}`,
+          });
+          results.push({
+            ok: stockTyp === "2",
+            rule: "→付き → 在庫管理種別=2",
+            detail: `名称: ${dispNm}, 在庫管理種別: ${stockTyp || "(空)"}`,
+          });
+        } else {
+          // ルール6: 指定席/複数名利用 → 指定自由区分=1, 在庫管理種別=1
+          if (isReserved && !isAreaSeat) {
+            results.push({
+              ok: rsveKbn === "1",
+              rule: "指定席 → 指定/自由区分=1",
+              detail: `名称: ${dispNm}, 指定/自由区分: ${rsveKbn || "(空)"}`,
+            });
+            results.push({
+              ok: stockTyp === "1",
+              rule: "指定席 → 在庫管理種別=1",
+              detail: `名称: ${dispNm}, 在庫管理種別: ${stockTyp || "(空)"}`,
+            });
+          }
+
+          // ルール7: エリア席 → 指定自由区分=2, 在庫管理種別=2
+          if (isAreaSeat && !isReserved) {
+            results.push({
+              ok: rsveKbn === "2",
+              rule: "エリア席 → 指定/自由区分=2",
+              detail: `名称: ${dispNm}, 指定/自由区分: ${rsveKbn || "(空)"}`,
+            });
+            results.push({
+              ok: stockTyp === "2",
+              rule: "エリア席 → 在庫管理種別=2",
+              detail: `名称: ${dispNm}, 在庫管理種別: ${stockTyp || "(空)"}`,
+            });
+          }
+        }
+
+        return results;
+      }
+
       function renderHtmlValue(val, colDef) {
         const v = String(val ?? "").trim();
         if (!v) return '<span style="color:#aaa">—</span>';
@@ -6697,6 +6821,23 @@
   .flag-warn { color: #dc2626; font-weight: 600; }
   #floating-tooltip { display: none; position: fixed; z-index: 9999; background: #1a1a1a; color: #f0f0f0; font-size: 12px; padding: 10px 14px; border-radius: 6px; white-space: pre-wrap; max-width: 480px; min-width: 120px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); line-height: 1.6; pointer-events: none; word-break: break-word; }
   .color-code { font-size: 11px; color: #888; }
+  .validation { margin-top: 8px; padding: 8px 12px; border-radius: 6px; }
+  .validation.all-ok { background: #f0fdf4; border: 1px solid #bbf7d0; }
+  .validation.has-error { background: #fef2f2; border: 1px solid #fecaca; }
+  .validation-title { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+  .validation.all-ok .validation-title { color: #16a34a; }
+  .validation.has-error .validation-title { color: #dc2626; }
+  .vr { display: flex; align-items: flex-start; gap: 6px; padding: 3px 0; font-size: 13px; line-height: 1.4; }
+  .vr-icon { flex-shrink: 0; font-size: 15px; }
+  .vr-ok { color: #16a34a; }
+  .vr-ng { color: #dc2626; font-weight: 600; }
+  .vr-rule { font-weight: 600; }
+  .vr-detail { color: #666; font-size: 12px; }
+  .validation-summary { background: #fff; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; }
+  .validation-summary h2 { font-size: 16px; margin-bottom: 8px; }
+  .summary-stats { display: flex; gap: 16px; font-size: 14px; }
+  .summary-stats .stat-ok { color: #16a34a; font-weight: 600; }
+  .summary-stats .stat-ng { color: #dc2626; font-weight: 600; }
   .filter-note { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 4px; padding: 8px 12px; font-size: 12px; color: #1d4ed8; margin-bottom: 16px; }
   @media print { body { background: #fff; padding: 10px; } .card { break-inside: avoid; box-shadow: none; border: 1px solid #ddd; } }
 </style>
@@ -6711,6 +6852,9 @@
         if (isFiltered) {
           html += `<div class="filter-note">🔍 フィルターが適用されています。表示中の ${filteredRows} 件のみ出力しています。</div>\n`;
         }
+
+        html += "<!-- VALIDATION_SUMMARY -->\n";
+        let totalOk = 0, totalNg = 0, totalSkip = 0;
 
         // カラーコード列のインデックス
         const colorColDef = colMap.find(c => c.key === "disp_color_cd");
@@ -6763,8 +6907,35 @@
             html += `</div>`;
           }
 
+          // バリデーション結果
+          const vResults = validateMasterRow(row, colMap);
+          if (vResults.length > 0) {
+            const hasErr = vResults.some(r => !r.ok);
+            if (hasErr) totalNg++;
+            else totalOk++;
+            html += `<div class="validation ${hasErr ? "has-error" : "all-ok"}">`;
+            html += `<div class="validation-title">${hasErr ? "⚠ 検証エラーあり" : "✅ 検証OK"}</div>`;
+            for (const r of vResults) {
+              html += `<div class="vr">`;
+              html += `<span class="vr-icon">${r.ok ? "⭕" : "❌"}</span>`;
+              html += `<span><span class="vr-rule ${r.ok ? "vr-ok" : "vr-ng"}">${escHtml(r.rule)}</span><br><span class="vr-detail">${escHtml(r.detail)}</span></span>`;
+              html += `</div>`;
+            }
+            html += `</div>`;
+          } else {
+            totalSkip++;
+          }
+
           html += `</div></div>\n`;
         }
+
+        // サマリーをヘッダー直後に挿入
+        let summaryHtml = `<div class="validation-summary"><h2>🔍 データ検証サマリー</h2><div class="summary-stats">`;
+        summaryHtml += `<span class="stat-ok">⭕ 正常: ${totalOk}件</span>`;
+        summaryHtml += `<span class="stat-ng">❌ エラー: ${totalNg}件</span>`;
+        summaryHtml += `<span>— 判定対象外: ${totalSkip}件</span>`;
+        summaryHtml += `</div></div>\n`;
+        html = html.replace("<!-- VALIDATION_SUMMARY -->", summaryHtml);
 
         html += `<div id="floating-tooltip"></div>`;
         html += "<" + "script>" +
