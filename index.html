@@ -6934,10 +6934,26 @@
           const tplMatch = tpl === expectedTpl;
           if (tplMatch) tplOk++; else tplNg++;
 
-          // word値を収集してマスタ備考(nte)と比較
+          // マスタ備考を <br> / 改行で分割し、HTMLタグを除いた純テキストとして項目化
+          const splitNte = (s) => {
+            if (!s) return [];
+            return s
+              .split(/<br\s*\/?>|\r?\n/i)
+              .map(x => x.replace(/<[^>]+>/g, "").replace(/&nbsp;/gi, " ").trim())
+              .filter(x => x);
+          };
+          const masterItems = splitNte(masterNte);
+          // 比較用: 正規化（全角スペース・制御文字・連続空白を除去）
+          const norm = (s) => s.replace(/[\u3000\s]+/g, "").replace(/[\u200B-\u200F\uFEFF]/g, "");
+          const masterItemsNorm = masterItems.map(norm);
+
+          // word値を収集してマスタ項目集合と比較
           const wordVals = wordIdx.map(w => (row[w.idx] ?? "").trim()).filter(v => v);
-          const currentNte = wordVals.join("\n");
-          const hasDiff = master && currentNte !== masterNte.trim();
+          const currentItemsNorm = wordVals.map(norm);
+          // 差分判定: word側とマスタ側の正規化集合が一致しないもの
+          const setsEqual = masterItemsNorm.length === currentItemsNorm.length &&
+            masterItemsNorm.every(x => currentItemsNorm.includes(x));
+          const hasDiff = master && !setsEqual;
           if (hasDiff) diffRows++;
 
           html += `<div class="card"><div class="card-head">`;
@@ -6955,20 +6971,48 @@
           }
           html += `</span></div><div class="card-body">`;
 
-          // 備考（word1〜7）をマスタと比較
-          const masterWords = masterNte.split(/\r?\n/).map(s => s.trim()).filter(s => s);
+          // 備考（word1〜7）をマスタと比較（<br>区切り＋タグ除去＋正規化）
+          const masterDisplay = masterItems.length
+            ? masterItems.map((s, i) => `${i + 1}. ${s}`).join("\n")
+            : (masterNte || "(マスタ備考なし)");
+          const tipBase = state.sejMaster
+            ? `席種エリアマスタ備考（${masterItems.length}項目）:\n${masterDisplay}`
+            : "マスタ未連携";
+
           for (const w of wordIdx) {
             const v = (row[w.idx] ?? "").trim();
             if (!v && !master) continue;
             let cls = "empty";
+            let extraTip = "";
             if (v) {
-              cls = master && masterWords.includes(v) ? "match" : (master ? "diff" : "");
+              if (master) {
+                const vN = norm(v);
+                if (masterItemsNorm.includes(vN)) {
+                  cls = "match";
+                } else {
+                  cls = "diff";
+                  extraTip = `\n\n⚠ この値はマスタ備考に一致する項目がありません`;
+                }
+              } else {
+                cls = "";
+              }
             }
-            const tip = masterNte ? `席種エリアマスタ備考:\n${masterNte}` : "マスタ未連携または備考なし";
+            const tip = tipBase + extraTip;
             html += `<div class="word-row">`;
             html += `<div class="word-label">word${w.n}</div>`;
             html += `<div class="word-val ${cls}" data-tip="${escHtml(tip)}">${v ? escHtml(v) : '<span style="color:#ccc">—</span>'}</div>`;
             html += `</div>`;
+          }
+
+          // マスタにあるがwordに無い項目を警告表示
+          if (master && masterItems.length) {
+            const missing = masterItems.filter((m, i) => !currentItemsNorm.includes(masterItemsNorm[i]));
+            if (missing.length) {
+              html += `<div class="word-row" style="background:#fffbeb;border-top:2px solid #fde68a;margin-top:4px">`;
+              html += `<div class="word-label" style="color:#b45309">不足</div>`;
+              html += `<div class="word-val diff" data-tip="${escHtml(tipBase)}">マスタにあるがwordに無い項目: ${missing.map(m => escHtml(m)).join(" / ")}</div>`;
+              html += `</div>`;
+            }
           }
           html += `</div></div>\n`;
         }
