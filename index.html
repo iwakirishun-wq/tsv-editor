@@ -6767,17 +6767,39 @@
               const code = (r[codeIdx] || "").trim();
               if (!code) continue;
               const obj = {};
-              headers.forEach((h, idx) => { obj[h] = r[idx] ?? ""; });
+              headers.forEach((h, idx) => { obj[h] = (r[idx] ?? "").replace(/^\ufeff/, ""); });
               byCode[code] = obj;
             }
             state.sejMaster = { byCode, fileName: file.name, headers };
             const cnt = Object.keys(byCode).length;
+            // 現在のデータでどれだけヒットするか確認
+            const curCodeIdx = state.headers.findIndex(h => h.trim() === "seat_type_area_cd");
+            let hitCnt = 0, missCnt = 0;
+            if (curCodeIdx !== -1) {
+              for (const row of state.data) {
+                const cd = (row[curCodeIdx] ?? "").trim();
+                if (!cd) continue;
+                if (byCode[cd]) hitCnt++; else missCnt++;
+              }
+            }
             $("btn-sej-link").classList.add("active-state");
             $("btn-sej-link").textContent = `SEJ連携中 (${cnt})`;
+            // 席種エリアコード列を自動で広く取る（席種名が併記されるため）
+            if (curCodeIdx !== -1) {
+              let maxLen = 12;
+              for (const row of state.data) {
+                const cd = (row[curCodeIdx] ?? "").trim();
+                const m = byCode[cd];
+                const nm = m ? (m.seat_type_area_disp_nm || m.seat_type_area_control_nm || "") : "";
+                const total = cd.length + nm.length + 4;
+                if (total > maxLen) maxLen = total;
+              }
+              state.colWidths[curCodeIdx] = Math.min(maxLen * 10, 420);
+            }
             state.forceRender = true;
             renderHeader();
             renderBody();
-            setStatus(`SEJマスタ連携: ${file.name} (${cnt}件)`);
+            setStatus(`SEJマスタ連携: ${file.name} / マスタ${cnt}件 / 現データヒット${hitCnt}件 未登録${missCnt}件`);
           } catch (err) {
             setStatus("⚠ マスタ読込失敗: " + err.message);
           }
@@ -6787,6 +6809,8 @@
 
       function toggleSejLink() {
         if (state.sejMaster) {
+          const fn = state.sejMaster.fileName || "(不明)";
+          if (!confirm(`SEJ連携を解除しますか？\n\n現在読み込んでいる席種エリアマスタ:\n${fn}\n\n解除するとメモリ上のマスタデータは破棄されます。\n（再度連携するにはマスタファイルを再選択する必要があります）`)) return;
           state.sejMaster = null;
           $("btn-sej-link").classList.remove("active-state");
           $("btn-sej-link").textContent = "SEJ連携";
