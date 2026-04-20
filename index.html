@@ -113,6 +113,29 @@
         background: var(--border);
         margin: 0 6px;
       }
+      #custom-tooltip {
+        position: fixed;
+        z-index: 99999;
+        background: #1a1a1a;
+        color: #f0f0f0;
+        font-size: 12px;
+        padding: 8px 12px;
+        border-radius: 6px;
+        white-space: pre-line;
+        max-width: 420px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+        line-height: 1.6;
+        pointer-events: none;
+        opacity: 0;
+        transform: translateY(-4px);
+        transition: opacity 0.12s ease, transform 0.12s ease;
+        word-break: break-word;
+        display: none;
+      }
+      #custom-tooltip.show {
+        opacity: 1;
+        transform: translateY(0);
+      }
       .btn {
         height: 28px;
         padding: 0 10px;
@@ -1382,6 +1405,7 @@
     </style>
   </head>
   <body class="vertical-headers">
+    <div id="custom-tooltip" role="tooltip" aria-hidden="true"></div>
     <div
       id="toolbar"
       role="toolbar"
@@ -2352,7 +2376,76 @@
       }
 
       // ===== 初期化 =====
+      function setupCustomTooltips() {
+        const tip = document.getElementById("custom-tooltip");
+        if (!tip) return;
+        // title属性を data-tip に退避（ネイティブtooltipとの二重表示を防ぐ）
+        const stash = (el) => {
+          const t = el.getAttribute("title");
+          if (t) {
+            el.setAttribute("data-tip", t);
+            el.removeAttribute("title");
+          }
+        };
+        document.querySelectorAll("#toolbar [title], #search-area [title]").forEach(stash);
+
+        let hoverTarget = null;
+        let hoverTimer = null;
+
+        const hide = () => {
+          tip.classList.remove("show");
+          setTimeout(() => {
+            if (!tip.classList.contains("show")) tip.style.display = "none";
+          }, 130);
+          hoverTarget = null;
+        };
+
+        const show = (el) => {
+          const text = el.getAttribute("data-tip");
+          if (!text) return;
+          // &#10; は属性値解釈時に既に \n に変換されるが、念のため両対応
+          tip.textContent = text.replace(/\\n/g, "\n");
+          tip.style.display = "block";
+          // 一度強制レイアウトしてサイズ取得
+          const rect = el.getBoundingClientRect();
+          const tipW = tip.offsetWidth;
+          const tipH = tip.offsetHeight;
+          let left = rect.left + rect.width / 2 - tipW / 2;
+          let top = rect.bottom + 8;
+          if (left + tipW > window.innerWidth - 8) left = window.innerWidth - tipW - 8;
+          if (left < 8) left = 8;
+          if (top + tipH > window.innerHeight - 8) {
+            top = rect.top - tipH - 8;
+          }
+          tip.style.left = left + "px";
+          tip.style.top = top + "px";
+          requestAnimationFrame(() => tip.classList.add("show"));
+        };
+
+        document.addEventListener("mouseover", (e) => {
+          const el = e.target.closest("[data-tip]");
+          if (!el || el === hoverTarget) return;
+          clearTimeout(hoverTimer);
+          hoverTarget = el;
+          hoverTimer = setTimeout(() => {
+            if (hoverTarget === el) show(el);
+          }, 250);
+        });
+        document.addEventListener("mouseout", (e) => {
+          const el = e.target.closest("[data-tip]");
+          if (!el) return;
+          const rel = e.relatedTarget;
+          if (rel && el.contains(rel)) return;
+          clearTimeout(hoverTimer);
+          hide();
+        });
+        // スクロール・クリックで閉じる
+        window.addEventListener("scroll", hide, true);
+        document.addEventListener("click", hide, true);
+      }
+
       function init() {
+        setupCustomTooltips();
         $("btn-open").onclick = () => {
           const doOpen = () => els.fileInput.click();
           if (state.dirty) showReloadDialog(doOpen);
