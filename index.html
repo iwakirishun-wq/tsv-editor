@@ -1563,6 +1563,15 @@
       >
         変換
       </button>
+      <button
+        type="button"
+        class="btn"
+        id="btn-sej-link"
+        title="SEJデータに席種エリアマスタを連携&#10;クリック: マスタファイル(TSV)を選択&#10;席種エリアコードをキーに席種名を画面表示&#10;（保存時は元データのまま）&#10;&#10;もう一度押すと連携解除"
+        aria-label="SEJマスタ連携"
+      >
+        SEJ連携
+      </button>
       <div class="toolbar-sep" role="separator" aria-hidden="true"></div>
       <button
         type="button"
@@ -2059,6 +2068,9 @@
         displayHeaders: null, // 日本語表示用ヘッダー (null=変換なし)
         headerMapped: false, // ヘッダーマッピングが適用されているか
 
+        // SEJ連携用: 席種エリアマスタ
+        sejMaster: null, // { byCode: { "MMTGPE25021": { disp_nm, control_nm, nte, ... } }, fileName }
+
         // ズーム
         zoomLevel: 100, // パーセント
 
@@ -2388,6 +2400,18 @@
         $("btn-wrap").onclick = toggleWrapCells;
         $("btn-fit-text").onclick = toggleFitText;
         $("btn-html-export").onclick = exportHtmlPreview;
+        $("btn-sej-link").onclick = toggleSejLink;
+        // ドラッグ&ドロップでSEJマスタを読込
+        const sejBtn = $("btn-sej-link");
+        sejBtn.addEventListener("dragover", (e) => { e.preventDefault(); sejBtn.classList.add("drag-over"); });
+        sejBtn.addEventListener("dragleave", () => sejBtn.classList.remove("drag-over"));
+        sejBtn.addEventListener("drop", (e) => {
+          e.preventDefault();
+          sejBtn.classList.remove("drag-over");
+          if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            loadSejMasterFile(e.dataTransfer.files[0]);
+          }
+        });
         $("btn-vertical-header").onclick = toggleVerticalHeader;
         if (state.verticalHeader) $("btn-vertical-header").classList.add("active-state");
         $("btn-header-mode").onclick = toggleHeaderMode;
@@ -3662,6 +3686,11 @@
         // aria-rowcount を総行数（ヘッダー行+1）に更新
         $("main-table").setAttribute("aria-rowcount", String(rows.length + 1));
 
+        // SEJ連携: 席種エリアコード列のインデックス
+        const sejCodeColIdx = state.sejMaster
+          ? state.headers.findIndex(h => h.trim() === "seat_type_area_cd")
+          : -1;
+
         for (let vi = start; vi < end; vi++) {
           const i = rows._direct ? vi : rows._indices[vi];
           const row = state.data[i];
@@ -3726,7 +3755,17 @@
               `width:${tdCw}px;min-width:${tdCw}px;max-width:${tdCw}px;${fitStyle}` + extraStyle;
             const isSelected =
               cls.includes("selected") || cls.includes("in-range");
-            const displayVal = escHtml(cellVal);
+            let displayVal = escHtml(cellVal);
+            // SEJ連携: 席種エリアコード列に席種名を併記
+            if (j === sejCodeColIdx && cellVal) {
+              const m = state.sejMaster.byCode[cellVal.trim()];
+              if (m) {
+                const nm = m.seat_type_area_disp_nm || m.seat_type_area_control_nm || "";
+                if (nm) displayVal += `<span style="color:#2563eb;margin-left:6px;font-size:11px">▸ ${escHtml(nm)}</span>`;
+              } else {
+                displayVal += `<span style="color:#dc2626;margin-left:6px;font-size:11px">▸ 未登録</span>`;
+              }
+            }
             html += `<td role="gridcell" data-col="${j}" aria-colindex="${j + 2}" ${style ? `style="${style}"` : ""} class="${cls.join(" ")}" aria-selected="${isSelected}">${displayVal}</td>`;
           }
           html += `</tr>`;
@@ -6682,6 +6721,279 @@
         return escHtml(v);
       }
 
+      // ===== SEJ連携: 席種エリアマスタ読込 =====
+      function parseTsvText(text) {
+        if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+        const rows = [];
+        let row = [], cur = "", inQuote = false;
+        for (let i = 0; i < text.length; i++) {
+          const c = text[i], next = text[i + 1];
+          if (inQuote) {
+            if (c === '"' && next === '"') { cur += '"'; i++; }
+            else if (c === '"') inQuote = false;
+            else cur += c;
+          } else {
+            if (c === '"') inQuote = true;
+            else if (c === "\t") { row.push(cur); cur = ""; }
+            else if (c === "\r" || c === "\n") {
+              if (c === "\r" && next === "\n") i++;
+              row.push(cur); rows.push(row); row = []; cur = "";
+            } else cur += c;
+          }
+        }
+        if (cur || row.length) { row.push(cur); rows.push(row); }
+        return rows;
+      }
+
+      function loadSejMasterFile(file) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const text = reader.result;
+            const rows = parseTsvText(text);
+            if (rows.length < 2) {
+              setStatus("⚠ マスタファイルにデータがありません");
+              return;
+            }
+            const headers = rows[0].map(h => h.trim());
+            const codeIdx = headers.indexOf("seat_type_area_cd");
+            if (codeIdx === -1) {
+              setStatus("⚠ seat_type_area_cd 列が見つかりません");
+              return;
+            }
+            const byCode = {};
+            for (let i = 1; i < rows.length; i++) {
+              const r = rows[i];
+              const code = (r[codeIdx] || "").trim();
+              if (!code) continue;
+              const obj = {};
+              headers.forEach((h, idx) => { obj[h] = r[idx] ?? ""; });
+              byCode[code] = obj;
+            }
+            state.sejMaster = { byCode, fileName: file.name, headers };
+            const cnt = Object.keys(byCode).length;
+            $("btn-sej-link").classList.add("active-state");
+            $("btn-sej-link").textContent = `SEJ連携中 (${cnt})`;
+            state.forceRender = true;
+            renderHeader();
+            renderBody();
+            setStatus(`SEJマスタ連携: ${file.name} (${cnt}件)`);
+          } catch (err) {
+            setStatus("⚠ マスタ読込失敗: " + err.message);
+          }
+        };
+        reader.readAsText(file, "utf-8");
+      }
+
+      function toggleSejLink() {
+        if (state.sejMaster) {
+          state.sejMaster = null;
+          $("btn-sej-link").classList.remove("active-state");
+          $("btn-sej-link").textContent = "SEJ連携";
+          state.forceRender = true;
+          renderHeader();
+          renderBody();
+          setStatus("SEJ連携を解除しました");
+          return;
+        }
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".tsv,.txt,text/plain";
+        input.onchange = () => {
+          if (input.files && input.files[0]) loadSejMasterFile(input.files[0]);
+        };
+        input.click();
+      }
+
+      // 現在の行データから席種エリアコードを取り、マスタの表示名を返す
+      function getSejMasterInfo(row) {
+        if (!state.sejMaster) return null;
+        const codeIdx = state.headers.findIndex(h => h.trim() === "seat_type_area_cd");
+        if (codeIdx === -1) return null;
+        const code = (row[codeIdx] ?? "").trim();
+        if (!code) return null;
+        return state.sejMaster.byCode[code] || null;
+      }
+
+      // SEJデータかどうか判定（word1〜word7 と sej_template_cd が存在）
+      function isSejData() {
+        const hs = state.headers.map(h => h.trim());
+        return hs.includes("sej_template_cd") && hs.includes("word1");
+      }
+
+      // ===== SEJ HTML出力 =====
+      function exportSejHtml(rowIndices, isFiltered) {
+        const H = state.headers.map(h => h.trim());
+        const idx = {
+          cd: H.indexOf("seat_type_area_cd"),
+          tpl: H.indexOf("sej_template_cd"),
+          opt: H.indexOf("opt_ok_flg"),
+          optCd: H.indexOf("opt_cd"),
+        };
+        const wordIdx = [];
+        for (let i = 1; i <= 7; i++) {
+          const x = H.indexOf("word" + i);
+          if (x !== -1) wordIdx.push({ n: i, idx: x });
+        }
+
+        const fileName = state.fileName || "data";
+        const totalRows = state.data.length;
+        const filteredRows = rowIndices.length;
+        const masterFile = state.sejMaster ? state.sejMaster.fileName : null;
+
+        let html = `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>${escHtml(fileName)} - SEJ設定プレビュー</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "Hiragino Kaku Gothic ProN", "Yu Gothic UI", sans-serif; background: #f8f9fa; color: #333; padding: 20px; }
+  .header { background: #fff; padding: 16px 24px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; }
+  .header h1 { font-size: 18px; font-weight: 600; }
+  .header .meta { font-size: 12px; color: #666; margin-top: 4px; }
+  .filter-note { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 4px; padding: 8px 12px; font-size: 12px; color: #1d4ed8; margin-bottom: 16px; }
+  .card { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 12px; overflow: hidden; }
+  .card-head { background: #f5f5f5; padding: 10px 16px; border-bottom: 1px solid #e5e5e5; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .card-head .code { font-family: monospace; font-size: 15px; font-weight: 600; color: #1a1a1a; }
+  .card-head .area-nm { font-size: 15px; color: #2563eb; font-weight: 600; }
+  .card-head .area-nm.missing { color: #dc2626; }
+  .card-head .tpl { margin-left: auto; font-size: 12px; color: #666; }
+  .card-head .tpl code { background: #f0f0f0; padding: 2px 6px; border-radius: 3px; }
+  .card-head .tpl.ng code { background: #fef2f2; color: #dc2626; font-weight: 600; }
+  .card-body { padding: 12px 16px; }
+  .word-row { display: flex; align-items: flex-start; gap: 8px; padding: 4px 0; font-size: 14px; line-height: 1.5; border-bottom: 1px dashed #eee; }
+  .word-row:last-child { border-bottom: none; }
+  .word-label { flex-shrink: 0; font-size: 11px; color: #888; width: 48px; padding-top: 2px; }
+  .word-val { flex: 1; cursor: help; position: relative; word-break: break-all; }
+  .word-val.match { color: #2563eb; }
+  .word-val.diff { color: #dc2626; font-weight: 500; }
+  .word-val.empty { color: #ccc; }
+  .vbadge { display: inline-block; font-size: 11px; margin-left: 6px; padding: 1px 6px; border-radius: 4px; vertical-align: middle; }
+  .vbadge-ok { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+  .vbadge-ng { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; font-weight: 600; }
+  #floating-tooltip { display: none; position: fixed; z-index: 9999; background: #1a1a1a; color: #f0f0f0; font-size: 12px; padding: 10px 14px; border-radius: 6px; white-space: pre-wrap; max-width: 520px; min-width: 160px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); line-height: 1.6; pointer-events: none; word-break: break-word; }
+  .summary { background: #fff; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; }
+  .summary h2 { font-size: 16px; margin-bottom: 8px; }
+  .summary-stats { display: flex; gap: 16px; font-size: 14px; flex-wrap: wrap; }
+  .summary-stats .stat-ok { color: #16a34a; font-weight: 600; }
+  .summary-stats .stat-ng { color: #dc2626; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>🎫 ${escHtml(fileName)} <span style="font-size:12px;color:#666;font-weight:400">(SEJ設定)</span></h1>
+  <div class="meta">${filteredRows}件${isFiltered ? ` / 全${totalRows}件（フィルター適用中）` : ""} — ${new Date().toLocaleString("ja-JP")}${masterFile ? `　連携マスタ: ${escHtml(masterFile)}` : "　⚠ マスタ未連携"}</div>
+</div>
+`;
+
+        if (isFiltered) {
+          html += `<div class="filter-note">🔍 フィルターが適用されています。表示中の ${filteredRows} 件のみ出力しています。</div>\n`;
+        }
+
+        html += "<!-- SEJ_SUMMARY -->\n";
+        let tplOk = 0, tplNg = 0, diffRows = 0;
+
+        for (const ri of rowIndices) {
+          const row = state.data[ri];
+          if (!row) continue;
+
+          const code = (row[idx.cd] ?? "").trim();
+          const tpl = (row[idx.tpl] ?? "").trim();
+          const master = state.sejMaster ? state.sejMaster.byCode[code] : null;
+          const areaNm = master ? (master.seat_type_area_disp_nm || master.seat_type_area_control_nm || "") : "";
+          const masterNte = master ? (master.nte || "") : "";
+
+          // テンプレートコード検証: 6桁目Pは NTFJ910002, それ以外は NTFJ910001
+          const char6 = code.length >= 6 ? code[5].toUpperCase() : "";
+          const expectedTpl = char6 === "P" ? "NTFJ910002" : "NTFJ910001";
+          const tplMatch = tpl === expectedTpl;
+          if (tplMatch) tplOk++; else tplNg++;
+
+          // word値を収集してマスタ備考(nte)と比較
+          const wordVals = wordIdx.map(w => (row[w.idx] ?? "").trim()).filter(v => v);
+          const currentNte = wordVals.join("\n");
+          const hasDiff = master && currentNte !== masterNte.trim();
+          if (hasDiff) diffRows++;
+
+          html += `<div class="card"><div class="card-head">`;
+          html += `<span class="code">${escHtml(code)}</span>`;
+          if (areaNm) {
+            html += `<span class="area-nm">${escHtml(areaNm)}</span>`;
+          } else if (state.sejMaster) {
+            html += `<span class="area-nm missing">⚠ マスタ未登録</span>`;
+          }
+          html += `<span class="tpl${tplMatch ? "" : " ng"}">テンプレート: <code>${escHtml(tpl || "(空)")}</code>`;
+          if (!tplMatch) {
+            html += ` <span class="vbadge vbadge-ng">❌ 期待値: ${escHtml(expectedTpl)}</span>`;
+          } else {
+            html += ` <span class="vbadge vbadge-ok">⭕</span>`;
+          }
+          html += `</span></div><div class="card-body">`;
+
+          // 備考（word1〜7）をマスタと比較
+          const masterWords = masterNte.split(/\r?\n/).map(s => s.trim()).filter(s => s);
+          for (const w of wordIdx) {
+            const v = (row[w.idx] ?? "").trim();
+            if (!v && !master) continue;
+            let cls = "empty";
+            if (v) {
+              cls = master && masterWords.includes(v) ? "match" : (master ? "diff" : "");
+            }
+            const tip = masterNte ? `席種エリアマスタ備考:\n${masterNte}` : "マスタ未連携または備考なし";
+            html += `<div class="word-row">`;
+            html += `<div class="word-label">word${w.n}</div>`;
+            html += `<div class="word-val ${cls}" data-tip="${escHtml(tip)}">${v ? escHtml(v) : '<span style="color:#ccc">—</span>'}</div>`;
+            html += `</div>`;
+          }
+          html += `</div></div>\n`;
+        }
+
+        // サマリー
+        let summaryHtml = `<div class="summary"><h2>🔍 SEJ設定検証サマリー</h2><div class="summary-stats">`;
+        summaryHtml += `<span class="stat-ok">⭕ テンプレート一致: ${tplOk}件</span>`;
+        summaryHtml += `<span class="stat-ng">❌ テンプレート不一致: ${tplNg}件</span>`;
+        if (state.sejMaster) summaryHtml += `<span>📝 マスタ備考と差分: ${diffRows}件</span>`;
+        summaryHtml += `</div></div>\n`;
+        html = html.replace("<!-- SEJ_SUMMARY -->", summaryHtml);
+
+        html += `<div id="floating-tooltip"></div>`;
+        html += "<" + "script>" +
+`(function(){
+  var tip = document.getElementById('floating-tooltip');
+  document.addEventListener('mouseover', function(e) {
+    var el = e.target.closest('.word-val[data-tip]');
+    if (!el) { tip.style.display = 'none'; return; }
+    var text = el.getAttribute('data-tip');
+    if (!text) { tip.style.display = 'none'; return; }
+    tip.textContent = text;
+    tip.style.display = 'block';
+    var rect = el.getBoundingClientRect();
+    var left = rect.left;
+    var top = rect.bottom + 6;
+    if (left + tip.offsetWidth > window.innerWidth - 12) {
+      left = window.innerWidth - tip.offsetWidth - 12;
+    }
+    if (left < 4) left = 4;
+    if (top + tip.offsetHeight > window.innerHeight - 12) {
+      top = rect.top - tip.offsetHeight - 6;
+    }
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
+  });
+  document.addEventListener('mouseout', function(e) {
+    if (e.target.closest('.word-val[data-tip]')) tip.style.display = 'none';
+  });
+})();` + "</" + "script>" +
+        `</body></html>`;
+
+        const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        window.open(url, "_blank");
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        setStatus(`SEJ HTML出力完了（${filteredRows}件）`);
+      }
+
       function exportHtmlPreview() {
         // 対象行を決定（フィルター/表示行のみ）
         const vr = getVisibleRows();
@@ -6699,6 +7011,12 @@
           ? `フィルター適用中の ${rowIndices.length} 件（全${state.data.length}件中）をHTML出力します。\nよろしいですか？`
           : `全 ${rowIndices.length} 件をHTML出力します。\nよろしいですか？`;
         if (!confirm(msg)) return;
+
+        // SEJデータの場合は専用レイアウトで出力
+        if (isSejData()) {
+          exportSejHtml(rowIndices, isFiltered);
+          return;
+        }
 
         // 使用可能な列を抽出（ヘッダーに存在するもののみ）
         const colMap = [];
