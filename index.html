@@ -2094,6 +2094,7 @@
 
         // SEJ連携用: 席種エリアマスタ
         sejMaster: null, // { byCode: { "MMTGPE25021": { disp_nm, control_nm, nte, ... } }, fileName }
+        sejVirtualCols: null, // { indices: [i1, i2, ...], keys: ["grp_nm", ...] } 保存時除外する仮想列
 
         // ズーム
         zoomLevel: 100, // パーセント
@@ -3005,14 +3006,23 @@
             ? '"' + s.replace(/"/g, '""') + '"'
             : s;
         };
+        // 仮想列（SEJ連携で追加したグループ名など）を除外
+        const virtualSet = state.sejVirtualCols
+          ? new Set(state.sejVirtualCols.indices)
+          : null;
+        const filterCols = (arr) =>
+          virtualSet ? arr.filter((_, i) => !virtualSet.has(i)) : arr;
+        // フィルター中は表示行のみ、未フィルター時は全行
+        const rows = state.filteredIndices
+          ? state.filteredIndices.map((i) => state.data[i])
+          : state.data;
         if (state.headerMode === "numbered") {
-          // 連番モード: ヘッダー行は出力しない（データのみ）
-          return state.data.map((r) => r.map(esc).join(d)).join("\n");
+          return rows.map((r) => filterCols(r).map(esc).join(d)).join("\n");
         }
         return (
-          state.headers.map(esc).join(d) +
+          filterCols(state.headers).map(esc).join(d) +
           "\n" +
-          state.data.map((r) => r.map(esc).join(d)).join("\n")
+          rows.map((r) => filterCols(r).map(esc).join(d)).join("\n")
         );
       }
 
@@ -3076,6 +3086,18 @@
       }
 
       async function saveFile() {
+        // フィルター中は表示行のみ保存する確認
+        if (state.filteredIndices) {
+          const shown = state.filteredIndices.length;
+          const total = state.data.length;
+          if (shown < total) {
+            if (!confirm(`フィルター中のため、表示中の ${shown} 行のみを保存します。\n（全 ${total} 行のうち ${total - shown} 行は除外されます）\n\n続行しますか？`)) {
+              setStatus("保存をキャンセルしました");
+              return;
+            }
+          }
+        }
+        const virtualNote = state.sejVirtualCols ? "（仮想列は除外）" : "";
         const bom = state.encoding === "utf8bom" ? "\uFEFF" : "";
         const txt = bom + buildFileContent();
         const blob = new Blob([txt], { type: "text/plain" });
@@ -3086,7 +3108,8 @@
         a.click();
         setTimeout(() => URL.revokeObjectURL(objUrl), 1000);
         markClean();
-        setStatus("保存しました");
+        const savedRows = state.filteredIndices ? state.filteredIndices.length : state.data.length;
+        setStatus(`保存しました（${savedRows}行${virtualNote}）`);
       }
 
       // ===== ソート =====
@@ -6875,6 +6898,37 @@
                 if (byCode[cd]) hitCnt++; else missCnt++;
               }
             }
+            // 仮想列「グループ名」を追加（保存時除外・フィルター/ソート可能）
+            // マスタ側のグループ名候補列を優先順位で探す（BOM/空白除去）
+            const normHeaders = headers.map(h => (h || "").replace(/^\ufeff/, "").trim());
+            const grpKeyCandidates = ["grp_nm", "seat_type_grp_nm1", "seat_type_grp_nm2", "group_nm"];
+            const grpKeyIdx = grpKeyCandidates
+              .map(k => normHeaders.indexOf(k))
+              .find(i => i !== -1);
+            const grpKey = grpKeyIdx != null ? headers[grpKeyIdx] : null;
+            console.log("[SEJ] 仮想列追加チェック:", {
+              curCodeIdx,
+              masterHeaders: normHeaders,
+              grpKey,
+              hasExistingVirtual: !!state.sejVirtualCols,
+              dataRows: state.data.length,
+            });
+            if (curCodeIdx !== -1 && grpKey && !state.sejVirtualCols) {
+              const vIdx = state.headers.length;
+              state.headers.push("グループ名");
+              state.data.forEach(row => {
+                const cd = (row[curCodeIdx] ?? "").trim();
+                const m = byCode[cd];
+                row.push(m && m[grpKey] ? m[grpKey] : "");
+              });
+              state.sejVirtualCols = { indices: [vIdx], keys: [grpKey] };
+              if (state.displayHeaders) state.displayHeaders.push("グループ名");
+              console.log("[SEJ] 仮想列追加完了 index=" + vIdx);
+            } else if (!grpKey) {
+              console.warn("[SEJ] マスタにグループ名列が見つかりません。利用可能な列:", normHeaders);
+            } else if (state.sejVirtualCols) {
+              console.warn("[SEJ] 既に仮想列が存在するためスキップ:", state.sejVirtualCols);
+            }
             $("btn-sej-link").classList.add("active-state");
             $("btn-sej-link").textContent = `SEJ連携中 (${cnt})`;
             // 席種エリアコード列を自動で広く取る（席種名が併記されるため）
@@ -6889,6 +6943,18 @@
               }
               state.colWidths[curCodeIdx] = Math.min(maxLen * 10, 420);
             }
+            // 仮想列の列幅を設定
+            if (state.sejVirtualCols) {
+              for (const vIdx of state.sejVirtualCols.indices) {
+                let maxLen = 8;
+                for (const row of state.data) {
+                  const v = String(row[vIdx] ?? "");
+                  if (v.length > maxLen) maxLen = v.length;
+                }
+                state.colWidths[vIdx] = Math.min(maxLen * 12 + 24, 260);
+              }
+            }
+            applyFilters();
             state.forceRender = true;
             renderHeader();
             renderBody();
@@ -6904,6 +6970,19 @@
         if (state.sejMaster) {
           const fn = state.sejMaster.fileName || "(不明)";
           if (!confirm(`SEJ連携を解除しますか？\n\n現在読み込んでいる席種エリアマスタ:\n${fn}\n\n解除するとメモリ上のマスタデータは破棄されます。\n（再度連携するにはマスタファイルを再選択する必要があります）`)) return;
+          // 仮想列を削除（末尾から削ることで他indexに影響しない）
+          if (state.sejVirtualCols && state.sejVirtualCols.indices.length) {
+            const sorted = [...state.sejVirtualCols.indices].sort((a, b) => b - a);
+            for (const vIdx of sorted) {
+              state.headers.splice(vIdx, 1);
+              if (state.displayHeaders) state.displayHeaders.splice(vIdx, 1);
+              state.data.forEach(row => row.splice(vIdx, 1));
+              if (state.columnFilters && state.columnFilters[vIdx]) delete state.columnFilters[vIdx];
+              if (state.colWidths && state.colWidths[vIdx] != null) delete state.colWidths[vIdx];
+            }
+            state.sejVirtualCols = null;
+            applyFilters();
+          }
           state.sejMaster = null;
           $("btn-sej-link").classList.remove("active-state");
           $("btn-sej-link").textContent = "SEJ連携";
