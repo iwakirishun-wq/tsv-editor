@@ -2456,6 +2456,7 @@
         state.dirty = true;
         els.dirty.classList.add("show");
         document.title = "● TSV/CSV Editor";
+        updateEncodingStatus(); // 行数×列数・マーカー数を常に最新へ（O(1)）
         if (state.activeTab >= 0 && state.tabs[state.activeTab]) {
           state.tabs[state.activeTab].dirty = true;
           delete state.tabs[state.activeTab]._isBlankSheet;
@@ -3567,7 +3568,7 @@
           }
         }
         const virtualNote = state.sejVirtualCols ? "（仮想列は除外）" : "";
-        const bom = state.encoding === "utf8bom" ? "﻿" : "";
+        const bom = state.encoding === "utf8bom" ? "\uFEFF" : "";
         const txt = bom + buildFileContent();
         const blob = new Blob([txt], { type: "text/plain" });
         const a = document.createElement("a");
@@ -5187,6 +5188,7 @@
           saveUndo();
           _shiftRowColors(state.selected.row, 1);
           _shiftHiddenRows(state.selected.row, 1);
+          shiftMarkers(state.selected.row, 1);
           state._dupSet = null;
           state.data.splice(state.selected.row, 0, new Array(state.headers.length).fill(""));
           markDirty();
@@ -5902,6 +5904,7 @@
           : state.data.length;
         _shiftRowColors(insertAt, state.copiedRows.length);
         _shiftHiddenRows(insertAt, state.copiedRows.length);
+        shiftMarkers(insertAt, state.copiedRows.length);
         state._dupSet = null;
         state.copiedRows.forEach((r, i) => {
           const row = [...r];
@@ -6285,6 +6288,7 @@
                   saveUndo();
                   _shiftRowColors(row, 1);
                   _shiftHiddenRows(row, 1);
+                  shiftMarkers(row, 1);
                   state._dupSet = null;
                   state.data.splice(
                     row,
@@ -6304,6 +6308,7 @@
                   saveUndo();
                   _shiftRowColors(row + 1, 1);
                   _shiftHiddenRows(row + 1, 1);
+                  shiftMarkers(row + 1, 1);
                   state._dupSet = null;
                   state.data.splice(
                     row + 1,
@@ -6897,7 +6902,7 @@
         saveUndo();
         state.data.splice(r1, delCount);
         state._dupSet = null;
-        for (let _dr = 0; _dr < delCount; _dr++) shiftMarkers(r1, -1);
+        removeMarkerRows(r1, r2);
         _deleteRangeHiddenRows(r1, r2);
         // 削除行の色を除去し、後続行のインデックスをシフト
         const newCC = {};
@@ -7164,6 +7169,8 @@
           sejVirtualCols: state.sejVirtualCols
             ? { indices: [...state.sejVirtualCols.indices], keys: [...state.sejVirtualCols.keys] }
             : null,
+          // マーカーは行インデックスに紐づくため、行操作のundo時に一緒に戻す
+          markedCells: new Set(state.markedCells),
         };
       }
       function restoreState(s) {
@@ -7183,6 +7190,7 @@
         state.sejVirtualCols = s.sejVirtualCols
           ? { indices: [...s.sejVirtualCols.indices], keys: [...s.sejVirtualCols.keys] }
           : null;
+        state.markedCells = s.markedCells ? new Set(s.markedCells) : new Set();
         applyHeaderMapping();
         updateHeaderModeBtn();
       }
@@ -7603,6 +7611,7 @@
           state.hiddenRows = remapSet(state.hiddenRows);
           state.wrapRows   = remapSet(state.wrapRows);
         }
+        remapMarkerRows(new Map(keptIdx.map((oi, ni) => [oi, ni])));
         const removed = before - state.data.length;
         if (removed > 0) {
           markDirty();
@@ -7645,6 +7654,7 @@
         saveUndo();
         _swapRowColors(r - 1, r);
         _swapHiddenRows(r - 1, r);
+        swapMarkerRows(r - 1, r);
         state._dupSet = null;
         [state.data[r - 1], state.data[r]] = [state.data[r], state.data[r - 1]];
         state.selected.row = r - 1;
@@ -7661,6 +7671,7 @@
         saveUndo();
         _swapRowColors(r, r + 1);
         _swapHiddenRows(r, r + 1);
+        swapMarkerRows(r, r + 1);
         state._dupSet = null;
         [state.data[r], state.data[r + 1]] = [state.data[r + 1], state.data[r]];
         state.selected.row = r + 1;
@@ -8779,13 +8790,14 @@
             ? '"' + s.replace(/"/g, '""') + '"'
             : s;
         };
+        const nl = state.newline === "crlf" ? "\r\n" : "\n";
         const dataLines = indices
           .map((i) => state.data[i].map(esc).join(d))
-          .join("\n");
+          .join(nl);
         const txt =
           state.headerMode === "numbered"
             ? dataLines
-            : state.headers.map(esc).join(d) + "\n" + dataLines;
+            : state.headers.map(esc).join(d) + nl + dataLines;
         const bom = state.encoding === "utf8bom" ? "\uFEFF" : "";
         const blob = new Blob([bom + txt], { type: "text/plain" });
         const ext = state.fileName.includes(".")
@@ -9375,8 +9387,14 @@
       // ===== lint / marker / statusbar =====
 
       function detectNewline(text) {
-        const crlf = (text.match(/\r\n/g) || []).length;
-        const lf   = (text.match(/(?<!\r)\n/g) || []).length;
+        // 1パス・追加アロケーションなしで CRLF / 裸LF を数える（大容量ファイル対策）
+        let crlf = 0, lf = 0;
+        let i = text.indexOf("\n");
+        while (i !== -1) {
+          if (i > 0 && text.charCodeAt(i - 1) === 13) crlf++;
+          else lf++;
+          i = text.indexOf("\n", i + 1);
+        }
         if (crlf > 0 && lf > 0) {
           state.newlineMixed = true;
           state.newline = crlf >= lf ? "crlf" : "lf";
@@ -9397,33 +9415,58 @@
         els.statusEncoding.textContent = `${enc} | ${nl} | ${rows.toLocaleString()}行 × ${cols}列${markerPart}`;
       }
 
+      const LINT_MAX_ISSUES = 500; // 収集上限（超えた時点で打ち切り。ダイアログ肥大とUIフリーズ防止）
+
       function runLint() {
         const issues = [];
         const expRe = /^[+-]?\d+(\.\d+)?[eE][+-]?\d+$/;
-        for (let r = 0; r < state.data.length; r++) {
+        // 保存されるのはフィルター後の行のみなので、リント対象も揃える
+        const targetRows = state.filteredIndices || null;
+        const rowCount = targetRows ? targetRows.length : state.data.length;
+        let truncated = false;
+        outer:
+        for (let i = 0; i < rowCount; i++) {
+          const r = targetRows ? targetRows[i] : i;
           const row = state.data[r];
           const isEmpty = row.every(v => v === "" || v == null);
-          if (isEmpty) { issues.push({ type: "empty_row", row: r, msg: `行${r + 1}: 空行` }); continue; }
+          if (isEmpty) {
+            issues.push({ type: "empty_row", row: r, msg: `行${r + 1}: 空行` });
+            if (issues.length >= LINT_MAX_ISSUES) { truncated = true; break; }
+            continue;
+          }
           for (let c = 0; c < row.length; c++) {
             const v = String(row[c] ?? "");
             if (v !== v.trim()) issues.push({ type: "whitespace", row: r, col: c, msg: `行${r+1} 列${c+1}: 前後に空白「${v}」` });
             if (expRe.test(v)) issues.push({ type: "exp_notation", row: r, col: c, msg: `行${r+1} 列${c+1}: 指数表記「${v}」` });
+            if (issues.length >= LINT_MAX_ISSUES) { truncated = true; break outer; }
           }
         }
         if (state.newlineMixed) issues.push({ type: "mixed_nl", msg: "改行コードが混在しています (LF/CRLF)" });
+        if (truncated) issues.push({ type: "truncated", msg: `※ 問題が${LINT_MAX_ISSUES}件を超えたため検査を打ち切りました` });
         return issues;
       }
+
+      const LINT_MAX_DISPLAY = 200; // ダイアログに描画する上限
 
       function showLintDialog(issues, onSave) {
         const dlg = $("lint-dialog");
         const list = $("lint-issue-list");
         list.innerHTML = "";
-        issues.forEach(iss => {
+        const frag = document.createDocumentFragment();
+        const shown = issues.slice(0, LINT_MAX_DISPLAY);
+        shown.forEach(iss => {
           const div = document.createElement("div");
           div.style.cssText = "background:var(--bg,#f8f9fa);border-radius:4px;padding:4px 8px;color:var(--text,#333)";
           div.textContent = iss.msg;
-          list.appendChild(div);
+          frag.appendChild(div);
         });
+        if (issues.length > LINT_MAX_DISPLAY) {
+          const more = document.createElement("div");
+          more.style.cssText = "padding:4px 8px;color:var(--text-dim,#888);font-weight:600";
+          more.textContent = `…他 ${issues.length - LINT_MAX_DISPLAY} 件`;
+          frag.appendChild(more);
+        }
+        list.appendChild(frag);
         dlg.style.display = "flex";
         $("lint-save-anyway").onclick = () => { dlg.style.display = "none"; onSave(); };
         $("lint-cancel").onclick = () => { dlg.style.display = "none"; };
@@ -9444,21 +9487,61 @@
         if (state.markedCells.has(key)) state.markedCells.delete(key);
         else state.markedCells.add(key);
         updateEncodingStatus();
+        state.forceRender = true;
         renderBody();
       }
 
       function clearAllMarkers() {
         state.markedCells.clear();
         updateEncodingStatus();
+        state.forceRender = true;
         renderBody();
       }
 
+      // 行挿入時: atRow 以降のマーカーを delta 行下へ
       function shiftMarkers(atRow, delta) {
         if (state.markedCells.size === 0) return;
         const next = new Set();
         for (const key of state.markedCells) {
           const [r, c] = key.split(",").map(Number);
           next.add(r >= atRow ? `${r + delta},${c}` : key);
+        }
+        state.markedCells = next;
+      }
+
+      // 行削除時: [r1,r2] のマーカーを除去し、r2 より下を delCount 行上へ
+      function removeMarkerRows(r1, r2) {
+        if (state.markedCells.size === 0) return;
+        const delCount = r2 - r1 + 1;
+        const next = new Set();
+        for (const key of state.markedCells) {
+          const [r, c] = key.split(",").map(Number);
+          if (r >= r1 && r <= r2) continue;
+          next.add(r > r2 ? `${r - delCount},${c}` : key);
+        }
+        state.markedCells = next;
+      }
+
+      // 行入替時: 行 a と行 b のマーカーを入れ替え
+      function swapMarkerRows(a, b) {
+        if (state.markedCells.size === 0) return;
+        const next = new Set();
+        for (const key of state.markedCells) {
+          const [r, c] = key.split(",").map(Number);
+          const nr = r === a ? b : r === b ? a : r;
+          next.add(`${nr},${c}`);
+        }
+        state.markedCells = next;
+      }
+
+      // 行の再マッピング（空行一括削除など）: origToNew に無い行のマーカーは除去
+      function remapMarkerRows(origToNew) {
+        if (state.markedCells.size === 0) return;
+        const next = new Set();
+        for (const key of state.markedCells) {
+          const [r, c] = key.split(",").map(Number);
+          const nr = origToNew.get(r);
+          if (nr !== undefined) next.add(`${nr},${c}`);
         }
         state.markedCells = next;
       }
