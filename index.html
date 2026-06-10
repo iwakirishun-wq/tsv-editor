@@ -2017,6 +2017,7 @@
           <div class="man-row"><span>列幅を調整</span><span class="man-key">列境界線をドラッグ</span></div>
           <div class="man-row"><span>列幅を自動調整</span><span class="man-key">列境界線をダブルクリック</span></div>
           <div class="man-row"><span>ヘッダーコメント編集</span><span class="man-key">列ヘッダーをダブルクリック</span></div>
+          <div class="man-row"><span>列名（表示名）を編集</span><span class="man-key">Shift+列ヘッダーをダブルクリック</span></div>
           <div class="man-row"><span>コメント確認</span><span class="man-key">列ヘッダーにホバー（オレンジ下線の列）</span></div>
         </div>
 
@@ -2216,6 +2217,10 @@
         t.dirty = state.dirty;
         t.undoStack = [...state.undoStack];
         t.redoStack = [...state.redoStack];
+        // SEJ仮想列はタブごとのdataに紐づく（共有すると別タブ保存時に実列を誤除外）
+        t.sejVirtualCols = state.sejVirtualCols
+          ? { indices: [...state.sejVirtualCols.indices], keys: [...state.sejVirtualCols.keys] }
+          : null;
       }
 
       function switchTab(idx) {
@@ -2249,6 +2254,9 @@
         state.dirty = savedDirty;
         state.undoStack = savedUndo;
         state.redoStack = savedRedo;
+        state.sejVirtualCols = t.sejVirtualCols
+          ? { indices: [...t.sejVirtualCols.indices], keys: [...t.sejVirtualCols.keys] }
+          : null;
         applyHeaderMapping();
         if (state.dirty) {
           els.dirty.classList.add("show");
@@ -2865,6 +2873,7 @@
         "presence_flg": "1/0\n1=有効",
         "parking_ticket_flg": "駐車券は1",
         "create_dt": "入力しない\n入ってれば削除",
+        "update_dt": "入力しない\n入ってれば削除",
         "create_user": "入力しない\n入ってれば削除",
         "update_user": "入力しない\n入ってれば削除",
         "place_type": "HML不使用\n0固定値",
@@ -3576,14 +3585,6 @@
       // ===== theadイベント委譲（一度だけ設定）=====
       const _debouncedFilterApply = debounce(() => applyFilters(), 150);
       function setupTheadDelegation() {
-        // ダブルクリックでコメント編集
-        els.thead.addEventListener("dblclick", (e) => {
-          const th = e.target.closest("th[data-comment-col]");
-          if (th) {
-            e.stopPropagation();
-            editHeaderComment(parseInt(th.dataset.commentCol));
-          }
-        });
         // ホバーでコメントツールチップ表示（position:fixedで位置計算）
         els.thead.addEventListener("mouseover", (e) => {
           const th = e.target.closest("th[data-comment-col]");
@@ -3689,10 +3690,11 @@
             autoFitColumn(parseInt(rh.dataset.resize));
             return;
           }
-          // ヘッダーセルダブルクリック → ヘッダー編集
+          // ヘッダーセルダブルクリック → コメント編集（Shift併用で列名編集）
           const th = e.target.closest("th[data-col]");
           if (th && !e.target.closest(".filter-input")) {
-            editHeader(parseInt(th.dataset.col));
+            if (e.shiftKey) editHeader(parseInt(th.dataset.col));
+            else editHeaderComment(parseInt(th.dataset.col));
           }
         });
         // mousedown委譲（リサイズハンドル）
@@ -5396,6 +5398,8 @@
         }
         const useScope = $("replace-scope")?.checked;
         const scope = useScope ? getSearchScope() : null;
+        // フィルター中は可視行のみ、非表示行・非表示列はスキップ（置換ループと同条件）
+        const filteredSetRepl = state.filteredIndices ? new Set(state.filteredIndices) : null;
         // まず件数をカウント
         let cnt = 0;
         if (scope) {
@@ -5403,11 +5407,14 @@
             for (let c = scope.c1; c <= scope.c2; c++)
               if (matchFn(safeGet(r, c))) cnt++;
         } else {
-          state.data.forEach((row) =>
-            row.forEach((v) => {
+          state.data.forEach((row, r) => {
+            if (state.hiddenRows.has(r)) return;
+            if (filteredSetRepl && !filteredSetRepl.has(r)) return;
+            row.forEach((v, c) => {
+              if (state.hiddenCols.has(c)) return;
               if (matchFn(v)) cnt++;
-            }),
-          );
+            });
+          });
         }
         if (cnt === 0) {
           setStatus("該当なし");
@@ -5425,7 +5432,6 @@
             }
         } else {
           // フィルター中は可視行のみ、非表示行はスキップ
-          const filteredSetRepl = state.filteredIndices ? new Set(state.filteredIndices) : null;
           state.data.forEach((row, r) => {
             if (state.hiddenRows.has(r)) return;
             if (filteredSetRepl && !filteredSetRepl.has(r)) return;
@@ -6055,6 +6061,7 @@
         state.conditionalHL = false;
         state._dupSet = null;
         state._dupCol = null;
+        state.sejVirtualCols = null; // 仮想列情報は読み込みデータと不可分（残すと保存時に実列を誤除外）
         state.dirty = false;
         document.body.classList.remove("wrap-cells");
         $("btn-wrap").classList.remove("active-state");
@@ -6206,6 +6213,10 @@
           hiddenRows: new Set(state.hiddenRows),
           hiddenCols: new Set(state.hiddenCols),
           headerMode: state.headerMode,
+          // SEJ仮想列はdata/headersと不可分（欠落するとundo後の保存で実列を誤除外）
+          sejVirtualCols: state.sejVirtualCols
+            ? { indices: [...state.sejVirtualCols.indices], keys: [...state.sejVirtualCols.keys] }
+            : null,
         };
       }
       function restoreState(s) {
@@ -6220,6 +6231,9 @@
         state.hiddenRows = s.hiddenRows || new Set();
         state.hiddenCols = s.hiddenCols || new Set();
         state.headerMode = s.headerMode || "firstRow";
+        state.sejVirtualCols = s.sejVirtualCols
+          ? { indices: [...s.sejVirtualCols.indices], keys: [...s.sejVirtualCols.keys] }
+          : null;
         applyHeaderMapping();
         updateHeaderModeBtn();
       }
@@ -6813,10 +6827,12 @@
           // <br> / <br/> / <br />
           html = html.replace(/&lt;br\s*\/?&gt;/gi, "<br>");
           // <a href=URL target=...>テキスト</a> → クリック可能リンク（青字）
+          // ※ http/https 以外のスキーム（javascript: 等）はリンク化せずエスケープ済みテキストのまま表示
           html = html.replace(/&lt;a\s+href\s*=\s*(?:&quot;([^&]*)&quot;|([^\s&>]+))(?:\s[^&]*?)?&gt;(.*?)&lt;\/a&gt;/gi,
-            (_, q, nq, text) => {
-              const url = q || nq || "";
-              return `<a href="${escHtml(url)}" target="_blank" style="color:#2563eb;text-decoration:underline">${text}</a>`;
+            (m, q, nq, text) => {
+              const url = (q || nq || "").trim();
+              if (!/^https?:\/\//i.test(url)) return m;
+              return `<a href="${escHtml(url)}" target="_blank" rel="noopener" style="color:#2563eb;text-decoration:underline">${text}</a>`;
             });
           // <font color="red">...</font> → 赤字表示
           html = html.replace(/&lt;font\s+color\s*=\s*(?:&quot;([^&]*)&quot;|([^\s&>]+))\s*&gt;/gi,
@@ -6829,7 +6845,7 @@
             html = html.replace(new RegExp(`&lt;/${t}&gt;`, "gi"), `</${t}>`);
           }
           // 生のURL（既にリンク化されたものは除く）→ クリック可能リンク
-          html = html.replace(/(?<![">])(https?:\/\/[^\s<"]+)/g, '<a href="$1" target="_blank" style="color:#2563eb;text-decoration:underline">$1</a>');
+          html = html.replace(/(?<![">])(https?:\/\/[^\s<"]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:#2563eb;text-decoration:underline">$1</a>');
           return html;
         }
 
