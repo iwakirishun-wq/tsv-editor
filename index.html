@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="ja">
   <head>
     <meta charset="UTF-8" />
@@ -306,7 +306,6 @@
       table {
         border-collapse: collapse;
         table-layout: fixed;
-        min-width: 100%;
       }
 
       /* ===ヘッダー=== */
@@ -694,6 +693,19 @@
         min-width: 200px;
         z-index: 1001;
       }
+      /* ラベル→サブメニュー間のギャップを埋める透明ブリッジ（mouseleave誤発火防止） */
+      .ctx-submenu::before {
+        content: '';
+        position: absolute;
+        right: 100%;
+        top: 0;
+        width: 8px;
+        height: 100%;
+      }
+      .ctx-submenu.open-left::before {
+        right: auto;
+        left: 100%;
+      }
       .ctx-group .ctx-submenu.open {
         display: block;
       }
@@ -1048,6 +1060,13 @@
         background: rgba(168, 85, 247, 0.1) !important;
       }
 
+      /* ===価格連携チェック=== */
+      td.price-ng {
+        background: rgba(220, 38, 38, 0.10) !important;
+        outline: 1px solid rgba(220, 38, 38, 0.35);
+        outline-offset: -1px;
+      }
+
       /* ===フリーズ列=== */
       td.frozen-col {
         position: -webkit-sticky;
@@ -1078,6 +1097,138 @@
       #manual-dialog.show {
         display: flex;
       }
+
+      /* ===デバッグメモダイアログ=== */
+      #debug-memo-dialog {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.4);
+        z-index: 1300;
+        align-items: center;
+        justify-content: center;
+      }
+      #debug-memo-dialog.show {
+        display: flex;
+      }
+      #debug-memo-inner {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        padding: 20px 24px;
+        width: min(560px, calc(100vw - 24px));
+        max-height: 90vh;
+        overflow-y: auto;
+        position: relative;
+        font-family: var(--font-ui);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      #debug-memo-inner h2 {
+        font-size: 14px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      .dbm-label {
+        font-size: 11px;
+        color: var(--text-dim);
+        margin-bottom: 3px;
+      }
+      #debug-memo-title {
+        width: 100%;
+        padding: 5px 8px;
+        border: 1px solid var(--border);
+        background: var(--surface2);
+        font-size: 12px;
+        font-family: var(--font-ui);
+        outline: none;
+        box-sizing: border-box;
+      }
+      #debug-memo-title:focus { border-color: var(--accent); }
+      #debug-memo-body {
+        min-height: 120px;
+        max-height: 260px;
+        overflow-y: auto;
+        padding: 7px 9px;
+        border: 1px solid var(--border);
+        background: var(--surface2);
+        font-size: 12px;
+        font-family: var(--font-ui);
+        line-height: 1.6;
+        outline: none;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      #debug-memo-body:focus { border-color: var(--accent); }
+      #debug-memo-body[data-placeholder]:empty::before {
+        content: attr(data-placeholder);
+        color: var(--text-dim);
+        pointer-events: none;
+      }
+      #debug-memo-images {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .dbm-img-thumb {
+        position: relative;
+        border: 1px solid var(--border);
+      }
+      .dbm-img-thumb img {
+        display: block;
+        max-width: 140px;
+        max-height: 100px;
+        object-fit: contain;
+      }
+      .dbm-img-del {
+        position: absolute;
+        top: 1px;
+        right: 1px;
+        background: rgba(0,0,0,0.55);
+        color: #fff;
+        border: none;
+        font-size: 11px;
+        cursor: pointer;
+        padding: 1px 4px;
+        line-height: 1.4;
+      }
+      .dbm-pat-row {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+      #debug-memo-pat {
+        flex: 1;
+        padding: 5px 8px;
+        border: 1px solid var(--border);
+        background: var(--surface2);
+        font-size: 12px;
+        font-family: var(--font-mono);
+        outline: none;
+      }
+      #debug-memo-pat:focus { border-color: var(--accent); }
+      .dbm-btns {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+        margin-top: 4px;
+      }
+      .dbm-btns button {
+        padding: 6px 14px;
+        font-size: 12px;
+        border: 1px solid var(--border);
+        cursor: pointer;
+        background: var(--surface2);
+        font-family: var(--font-ui);
+      }
+      .dbm-btns button:hover { background: #e5e5e7; }
+      .dbm-btns button.primary {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+      }
+      .dbm-btns button.primary:hover { opacity: 0.88; }
+      .dbm-btns button:disabled { opacity: 0.5; cursor: default; }
       #manual-content {
         background: var(--surface);
         border: 1px solid var(--border);
@@ -1402,6 +1553,11 @@
         height: 56px !important;
       }
 
+      /* マーカー機能 */
+      td.marked { background: rgba(255, 80, 160, 0.25) !important; }
+      #btn-marker.active-state { background: #fff0f6; border-color: #f472b6; color: #be185d; }
+      body.marker-mode td[data-col] { cursor: crosshair; }
+
     </style>
   </head>
   <body class="vertical-headers">
@@ -1596,6 +1752,35 @@
       >
         SEJ連携
       </button>
+      <button
+        type="button"
+        class="btn"
+        id="btn-price-ref"
+        title="経路価格スケジュール参照JSONを連携&#10;クリック: 参照JSONファイルを選択&#10;チケット名をキーに価格・アップグレード情報を照合&#10;不一致セルを赤ハイライト表示&#10;&#10;もう一度押すと連携解除"
+        aria-label="経路価格スケジュール連携"
+      >
+        価格連携
+      </button>
+      <div class="toolbar-sep" role="separator" aria-hidden="true"></div>
+      <button
+        type="button"
+        class="btn"
+        id="btn-marker"
+        title="マーカーモード (M)&#10;ON中: ダブルクリックでセルにマーカーを付与/解除&#10;チェック作業・レビュー用"
+        aria-label="マーカーモードの切り替え"
+        aria-pressed="false"
+      >
+        🔴 M
+      </button>
+      <button
+        type="button"
+        class="btn"
+        id="btn-marker-clear"
+        title="マーカーをすべてクリア"
+        aria-label="マーカーをすべてクリア"
+      >
+        M×
+      </button>
       <div class="toolbar-sep" role="separator" aria-hidden="true"></div>
       <button
         type="button"
@@ -1614,6 +1799,15 @@
         aria-label="ヘルプを開く"
       >
         ?
+      </button>
+      <button
+        type="button"
+        class="btn"
+        id="btn-debug-memo"
+        title="デバッグメモを書いてGitHubに送信&#10;バグ・改善点をメモしてアップロード&#10;スクリーンショットも貼り付け可能&#10;&#10;蓄積したメモは /fixmemos コマンドで一括処理"
+        aria-label="デバッグメモを書いてGitHubに送信"
+      >
+        🐛 メモ
       </button>
 
       <div id="search-area" role="search">
@@ -1722,10 +1916,26 @@
       <span id="status-filter" aria-live="polite"></span>
       <span id="status-stats" aria-live="off"></span>
       <span id="status-pos" aria-live="off"></span>
+      <span id="status-encoding" aria-live="off" style="margin-left:auto;color:var(--text-dim);font-size:11px;padding-right:4px"></span>
     </div>
 
     <!-- 右クリックメニュー -->
     <div id="context-menu"></div>
+
+    <!-- リントダイアログ -->
+    <div id="lint-dialog" role="dialog" aria-modal="true" aria-labelledby="lint-dialog-title" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:none;align-items:center;justify-content:center">
+      <div style="background:var(--bg-panel,#fff);border:1px solid var(--border,#ccc);border-radius:8px;padding:20px 24px;min-width:380px;max-width:560px;max-height:70vh;display:flex;flex-direction:column;gap:12px;box-shadow:0 8px 32px rgba(0,0,0,.18)">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:18px">⚠️</span>
+          <strong id="lint-dialog-title" style="font-size:14px">保存前の確認</strong>
+        </div>
+        <div id="lint-issue-list" style="overflow-y:auto;max-height:40vh;display:grid;gap:4px;font-size:12px"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
+          <button type="button" id="lint-save-anyway" class="btn" style="background:#f59e0b;color:#fff;border-color:#d97706">このまま保存</button>
+          <button type="button" id="lint-cancel" class="btn">キャンセル</button>
+        </div>
+      </div>
+    </div>
 
     <!-- 置換ダイアログ -->
     <div
@@ -1867,6 +2077,51 @@
       </div>
     </div>
 
+    <!-- デバッグメモダイアログ -->
+    <div id="debug-memo-dialog" role="dialog" aria-modal="true" aria-labelledby="dbm-title">
+      <div id="debug-memo-inner">
+        <h2 id="dbm-title">🐛 デバッグメモ</h2>
+
+        <!-- PAT未設定時のみ表示 -->
+        <div id="dbm-pat-section" style="display:none">
+          <div class="dbm-label">GitHub Personal Access Token（初回のみ）
+            <a href="https://github.com/settings/tokens/new?scopes=repo&description=tsv-editor-debug-memo"
+               target="_blank" rel="noopener" style="margin-left:6px;color:var(--accent);font-size:10px">
+              ↗ 発行ページ（repo スコープ）
+            </a>
+          </div>
+          <div class="dbm-pat-row">
+            <input type="password" id="debug-memo-pat" placeholder="ghp_xxxxx..." autocomplete="off" />
+            <button type="button" id="dbm-save-pat" class="primary"
+                    style="padding:5px 10px;font-size:12px;border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer;font-family:var(--font-ui)">
+              保存
+            </button>
+          </div>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:3px">
+            localStorageに保存されます。必要最小限スコープ: <code>public_repo</code>
+          </div>
+        </div>
+
+        <div>
+          <div class="dbm-label">タイトル（任意）</div>
+          <input type="text" id="debug-memo-title" placeholder="例: 検索後にUndoが効かない" maxlength="80" />
+        </div>
+
+        <div>
+          <div class="dbm-label">内容（スクリーンショットは Ctrl+V / Cmd+V でペースト可）</div>
+          <div id="debug-memo-body" contenteditable="true" role="textbox" aria-multiline="true"
+               data-placeholder="バグの再現手順・期待動作・実際の動作などを書いてください..."></div>
+        </div>
+
+        <div id="debug-memo-images"></div>
+
+        <div class="dbm-btns">
+          <button type="button" id="dbm-cancel">キャンセル</button>
+          <button type="button" id="dbm-upload" class="primary">⬆ GitHubにアップロード</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ヘルプダイアログ（マニュアル＋ショートカット統合） -->
     <div
       id="manual-dialog"
@@ -1995,9 +2250,22 @@
           <div>
             <h3 style="margin:10px 0 6px;font-size:11px;color:var(--text-dim)">行操作・表示</h3>
             <div class="man-row"><span>下に行を追加</span><span class="man-key">Ctrl+Enter</span></div>
+            <div class="man-row"><span>行全体を選択</span><span class="man-key">Shift+Space</span></div>
+            <div class="man-row"><span>列全体を選択</span><span class="man-key">Ctrl+Space</span></div>
+            <div class="man-row"><span>上に行を挿入</span><span class="man-key">Alt+Shift+↑</span></div>
+            <div class="man-row"><span>下に行を挿入</span><span class="man-key">Ctrl+Enter</span></div>
             <div class="man-row"><span>行を複製</span><span class="man-key">Ctrl+Shift+D</span></div>
+            <div class="man-row"><span>選択行を削除</span><span class="man-key">Ctrl+Shift+K</span></div>
+            <div class="man-row"><span>左に列を挿入</span><span class="man-key">Alt+Shift+←</span></div>
+            <div class="man-row"><span>右に列を挿入</span><span class="man-key">Alt+Shift+→</span></div>
+            <div class="man-row"><span>選択列を削除</span><span class="man-key">Ctrl+Alt+K</span></div>
             <div class="man-row"><span>行を上に移動</span><span class="man-key">Alt+↑</span></div>
             <div class="man-row"><span>行を下に移動</span><span class="man-key">Alt+↓</span></div>
+            <div class="man-row"><span>行を非表示</span><span class="man-key">Ctrl+Shift+H</span></div>
+            <div class="man-row"><span>列を非表示</span><span class="man-key">Ctrl+Alt+H</span></div>
+            <div class="man-row"><span>非表示行を再表示</span><span class="man-key">Ctrl+Shift+U</span></div>
+            <div class="man-row"><span>非表示列を再表示</span><span class="man-key">Ctrl+Alt+U</span></div>
+            <div class="man-row"><span>列フリーズ切替</span><span class="man-key">Ctrl+Shift+F</span></div>
             <div class="man-row"><span>検索</span><span class="man-key">Ctrl+F</span></div>
             <div class="man-row"><span>検索と置換</span><span class="man-key">Ctrl+H</span></div>
             <div class="man-row"><span>行番号ジャンプ</span><span class="man-key">Ctrl+G</span></div>
@@ -2012,6 +2280,7 @@
           <div class="man-row"><span>範囲選択</span><span class="man-key">Shift+クリック / ドラッグ</span></div>
           <div class="man-row"><span>行全体を選択</span><span class="man-key">行番号クリック / ドラッグ</span></div>
           <div class="man-row"><span>列全体を選択</span><span class="man-key">列ヘッダークリック</span></div>
+          <div class="man-row"><span>複数列を選択</span><span class="man-key">列ヘッダーをShift+クリック / ドラッグ</span></div>
           <div class="man-row"><span>列ソート</span><span class="man-key">列ヘッダーの⇅</span></div>
           <div class="man-row"><span>複数列ソート</span><span class="man-key">Shift+⇅クリック</span></div>
           <div class="man-row"><span>列幅を調整</span><span class="man-key">列境界線をドラッグ</span></div>
@@ -2096,6 +2365,7 @@
         // SEJ連携用: 席種エリアマスタ
         sejMaster: null, // { byCode: { "MMTGPE25021": { disp_nm, control_nm, nte, ... } }, fileName }
         sejVirtualCols: null, // { indices: [i1, i2, ...], keys: ["grp_nm", ...] } 保存時除外する仮想列
+        priceRef: null, // 経路価格スケジュール参照 { meta, colMap, lookup: Map<ticket→row> }
 
         // ズーム
         zoomLevel: 100, // パーセント
@@ -2115,8 +2385,15 @@
         colorPreviewCol: -1, // カラーコード列インデックス
         headerMode: "firstRow", // "firstRow" | "numbered"
         sortKeys: [], // 複数列ソートキー [{col, asc}, ...]
+        cellColors: {}, // {"row,col": "#RRGGBB"} セル背景色（保存非対応・セッション内のみ）
         tabs: [], // 複数ファイルタブ
         activeTab: -1,
+
+        // lint / marker / statusbar
+        newline: "lf",       // 読込時に検出した改行コード: "lf" | "crlf"
+        newlineMixed: false, // LF/CRLF混在を検出した場合 true
+        markerMode: false,   // マーカーモード ON/OFF
+        markedCells: new Set(), // "row,col" キーセット
       };
 
       // ===== DOM =====
@@ -2145,6 +2422,7 @@
         filterToggle: $("btn-filter-toggle"),
         filterClear: $("btn-filter-clear"),
         filterExport: $("btn-export-filtered"),
+        statusEncoding: $("status-encoding"),
       };
 
       let ROW_H = 22;
@@ -2165,6 +2443,7 @@
         // 列が足りなければ自動追加
         while (c >= state.headers.length) {
           state.headers.push("列" + (state.headers.length + 1));
+          if (state.displayHeaders) state.displayHeaders.push(null);
           state.data.forEach((row) => row.push(""));
         }
         const row = state.data[r];
@@ -2179,6 +2458,7 @@
         document.title = "● TSV/CSV Editor";
         if (state.activeTab >= 0 && state.tabs[state.activeTab]) {
           state.tabs[state.activeTab].dirty = true;
+          delete state.tabs[state.activeTab]._isBlankSheet;
           renderTabBar();
         }
       }
@@ -2217,10 +2497,31 @@
         t.dirty = state.dirty;
         t.undoStack = [...state.undoStack];
         t.redoStack = [...state.redoStack];
+        // フィルター・表示状態をタブごとに保存
+        const savedCF = {};
+        for (const k in state.columnFilters) {
+          const f = state.columnFilters[k];
+          savedCF[k] = f.type === 'values'
+            ? { type: 'values', values: new Set(f.values) }
+            : { ...f };
+        }
+        t.columnFilters = savedCF;
+        t.filterVisible = state.filterVisible;
+        t.hiddenRows = new Set(state.hiddenRows);
+        t.hiddenCols = new Set(state.hiddenCols);
+        t.freezeCols = state.freezeCols;
+        t.wrapCells = state.wrapCells;
+        t.wrapRows = new Set(state.wrapRows);
+        t.conditionalHL = state.conditionalHL;
+        t.cellColors = { ...state.cellColors };
+        t.encoding = state.encoding;
         // SEJ仮想列はタブごとのdataに紐づく（共有すると別タブ保存時に実列を誤除外）
         t.sejVirtualCols = state.sejVirtualCols
           ? { indices: [...state.sejVirtualCols.indices], keys: [...state.sejVirtualCols.keys] }
           : null;
+        t.newline = state.newline;
+        t.newlineMixed = state.newlineMixed;
+        t.markedCells = new Set(state.markedCells);
       }
 
       function switchTab(idx) {
@@ -2254,9 +2555,74 @@
         state.dirty = savedDirty;
         state.undoStack = savedUndo;
         state.redoStack = savedRedo;
+        // フィルター・表示状態をタブから復元
+        {
+          const restoredCF = {};
+          for (const k in (t.columnFilters || {})) {
+            const f = t.columnFilters[k];
+            restoredCF[k] = f.type === 'values'
+              ? { type: 'values', values: new Set(f.values) }
+              : { ...f };
+          }
+          state.columnFilters = restoredCF;
+          state.filterVisible = t.filterVisible || false;
+          state.hiddenRows = t.hiddenRows ? new Set(t.hiddenRows) : new Set();
+          state.hiddenCols = t.hiddenCols ? new Set(t.hiddenCols) : new Set();
+          state.freezeCols = t.freezeCols || 0;
+          state.wrapCells = t.wrapCells || false;
+          state.wrapRows = t.wrapRows ? new Set(t.wrapRows) : new Set();
+          state.conditionalHL = t.conditionalHL || false;
+          state.cellColors = t.cellColors ? { ...t.cellColors } : {};
+          if (t.encoding) state.encoding = t.encoding;
+          // filteredIndicesをレンダリングなしで再計算
+          _visibleRowsCache = null;
+          const fkeys = Object.keys(state.columnFilters);
+          if (!fkeys.length) {
+            state.filteredIndices = null;
+            els.filterClear.style.display = 'none';
+            els.filterExport.style.display = 'none';
+          } else {
+            const fi = [];
+            state.data.forEach((row, idx) => {
+              let match = true;
+              for (const k of fkeys) {
+                const ci = parseInt(k);
+                const f = state.columnFilters[k];
+                const val = (ci < row.length ? row[ci] : '') ?? '';
+                if (f.type === 'text' && !val.toLowerCase().includes(f.query.toLowerCase())) { match = false; break; }
+                if (f.type === 'values' && !f.values.has(val)) { match = false; break; }
+                if (f.type === 'range') {
+                  const num = parseFloat(val);
+                  if (isNaN(num) || (f.min !== null && num < f.min) || (f.max !== null && num > f.max)) { match = false; break; }
+                }
+              }
+              if (match) fi.push(idx);
+            });
+            state.filteredIndices = fi;
+            els.filterClear.style.display = '';
+            els.filterExport.style.display = '';
+          }
+          updateHiddenStatus();
+          // フィルタートグルボタン外観を復元
+          const fOn = state.filterVisible;
+          els.filterToggle.style.background = fOn ? '#eff6ff' : '';
+          els.filterToggle.style.borderColor = fOn ? 'var(--accent)' : '';
+          els.filterToggle.style.color = fOn ? 'var(--accent)' : '';
+          els.filterToggle.setAttribute('aria-pressed', String(fOn));
+          els.filterToggle.setAttribute('aria-label', fOn ? 'フィルター行を非表示' : 'フィルター行を表示');
+          // 折り返しボタン外観を復元
+          document.body.classList.toggle('wrap-cells', state.wrapCells);
+          const bw = $('btn-wrap');
+          bw.classList.toggle('active-state', state.wrapCells);
+          bw.setAttribute('aria-pressed', String(state.wrapCells));
+          bw.setAttribute('aria-label', state.wrapCells ? 'セル折り返しをOFFにする' : 'セル折り返しをONにする');
+        }
         state.sejVirtualCols = t.sejVirtualCols
           ? { indices: [...t.sejVirtualCols.indices], keys: [...t.sejVirtualCols.keys] }
           : null;
+        state.newline = t.newline || "lf";
+        state.newlineMixed = t.newlineMixed || false;
+        state.markedCells = t.markedCells ? new Set(t.markedCells) : new Set();
         applyHeaderMapping();
         if (state.dirty) {
           els.dirty.classList.add("show");
@@ -2271,6 +2637,7 @@
         state.forceRender = true;
         renderBody();
         showTable();
+        updateEncodingStatus();
       }
 
       function closeTab(idx) {
@@ -2466,7 +2833,11 @@
         $("btn-redo").onclick = redo;
         els.filterToggle.onclick = toggleFilter;
         els.filterClear.onclick = clearAllFilters;
-        els.search.oninput = debounce(execSearch, 150);
+        let _imeComposing = false;
+        let _lastSearched = '';
+        els.search.addEventListener('compositionstart', () => { _imeComposing = true; });
+        els.search.addEventListener('compositionend', () => { _imeComposing = false; execSearch(); });
+        els.search.oninput = debounce(() => { if (!_imeComposing) execSearch(); }, 150);
         $("btn-next").onclick = () => moveSearch(1);
         $("btn-prev").onclick = () => moveSearch(-1);
         $("goto-input").onkeydown = (e) => {
@@ -2514,12 +2885,25 @@
             loadSejMasterFile(e.dataTransfer.files[0]);
           }
         });
+        $("btn-price-ref").onclick = togglePriceRef;
+        // ドラッグ&ドロップで価格参照JSONを読込
+        const priceRefBtn = $("btn-price-ref");
+        priceRefBtn.addEventListener("dragover", (e) => { e.preventDefault(); priceRefBtn.classList.add("drag-over"); });
+        priceRefBtn.addEventListener("dragleave", () => priceRefBtn.classList.remove("drag-over"));
+        priceRefBtn.addEventListener("drop", (e) => {
+          e.preventDefault();
+          priceRefBtn.classList.remove("drag-over");
+          if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            loadPriceRefFile(e.dataTransfer.files[0]);
+          }
+        });
         $("btn-vertical-header").onclick = toggleVerticalHeader;
         if (state.verticalHeader) $("btn-vertical-header").classList.add("active-state");
         $("btn-header-mode").onclick = toggleHeaderMode;
         $("btn-new-sheet").onclick = addNewSheet;
         $("btn-reset-view").onclick = resetView;
         $("btn-manual").onclick = showManual;
+        $("btn-debug-memo").onclick = openDebugMemoDialog;
         $("btn-regex").onclick = toggleRegexMode;
         $("man-close").onclick = hideManual;
         $("manual-dialog").onclick = (e) => {
@@ -2624,7 +3008,8 @@
 
         // リロード/離脱時のブラウザデフォルト警告（フォールバック）
         window.onbeforeunload = (e) => {
-          if (state.dirty) {
+          const anyDirty = state.dirty || state.tabs.some(t => t.dirty);
+          if (anyDirty) {
             e.preventDefault();
             return "";
           }
@@ -2668,6 +3053,36 @@
           parseData(text);
           clearAutoDropColumns();
           applyHeaderMapping();
+          // 前タブの表示状態が新ファイルに引き継がれないようリセット
+          state.cellColors = {};
+          state.hiddenRows = new Set();
+          state.hiddenCols = new Set();
+          state.wrapRows.clear();
+          state.wrapCells = false;
+          state.conditionalHL = false;
+          state.columnFilters = {};
+          state.filteredIndices = null;
+          state.filterVisible = false;
+          state.freezeCols = 0;
+          state.sortCol = -1;
+          state.sortAsc = true;
+          state.sortKeys = [];
+          state.undoStack = [];
+          state.redoStack = [];
+          state.selected = null;
+          state.range = null;
+          state.anchor = null;
+          _visibleRowsCache = null;
+          // UI 同期（前タブのボタン状態を引き継がない）
+          document.body.classList.remove('wrap-cells');
+          const _bwLF = $('btn-wrap');
+          if (_bwLF) { _bwLF.classList.remove('active-state'); _bwLF.setAttribute('aria-pressed', 'false'); }
+          els.filterToggle.style.background = '';
+          els.filterToggle.style.borderColor = '';
+          els.filterToggle.style.color = '';
+          els.filterToggle.setAttribute('aria-pressed', 'false');
+          els.filterClear.style.display = 'none';
+          els.filterExport.style.display = 'none';
           const tab = {
             fileName: state.fileName,
             headers: state.headers,
@@ -2678,14 +3093,23 @@
             sortAsc: true,
             sortKeys: [],
             headerMode: state.headerMode,
+            encoding: state.encoding,
             dirty: false,
             _rawText: text, // 遅延復元用にrawTextを保持
           };
-          state.tabs.push(tab);
-          state.activeTab = state.tabs.length - 1;
+          // 現在のタブが空白シート（+ボタンで作成・未編集）なら上書き、それ以外は新タブ
+          const cur = state.tabs[state.activeTab];
+          const isBlankSheet = cur?._isBlankSheet === true && !cur.dirty;
+          if (isBlankSheet) {
+            state.tabs[state.activeTab] = tab;
+          } else {
+            state.tabs.push(tab);
+            state.activeTab = state.tabs.length - 1;
+          }
           updateHeaderModeBtn();
           renderTabBar();
           autoFitAllColumnsQuiet();
+          state.tabs[state.activeTab].colWidths = { ...state.colWidths };
           renderHeader();
           state.forceRender = true;
           renderBody();
@@ -2695,6 +3119,7 @@
           setStatus(
             `ロード完了: ${state.data.length}行 × ${state.headers.length}列`,
           );
+          updateEncodingStatus();
         };
         reader.onerror = () => setStatus("ファイルの読み込みに失敗しました");
         reader.readAsText(file);
@@ -2744,6 +3169,7 @@
         } else {
           state.encoding = "utf8";
         }
+        detectNewline(text);
         const rows = [];
         let row = [],
           cur = "",
@@ -2756,6 +3182,7 @@
               cur += '"';
               i++;
             } else if (c === '"') inQuote = false;
+            else if (c === '\r') { cur += '\n'; if (next === '\n') i++; }
             else cur += c;
           } else {
             if (c === '"') inQuote = true;
@@ -2814,6 +3241,9 @@
       }
 
       // ===== ヘッダー自動変換（席種エリアマスター対応）=====
+      const DEBUG_MEMO_PAT_KEY    = "tsv-editor-debug-memo-pat";
+      const DEBUG_MEMO_REPO_KEY   = "tsv-editor-debug-memo-repo";
+      const DEBUG_MEMO_BRANCH_KEY = "tsv-editor-debug-memo-branch";
       const HEADER_MAP_STORAGE_KEY = "tsv-editor-header-map";
       const HEADER_COMMENTS_STORAGE_KEY = "tsv-editor-header-comments";
 
@@ -3009,6 +3439,7 @@
 
       function buildFileContent() {
         const d = state.delimiter;
+        const nl = state.newline === "crlf" ? "\r\n" : "\n";
         const esc = (v) => {
           const s = String(v ?? "");
           return s.includes(d) || s.includes('"') || s.includes("\n") || s.includes("\r")
@@ -3026,12 +3457,12 @@
           ? state.filteredIndices.map((i) => state.data[i])
           : state.data;
         if (state.headerMode === "numbered") {
-          return rows.map((r) => filterCols(r).map(esc).join(d)).join("\n");
+          return rows.map((r) => filterCols(r).map(esc).join(d)).join(nl);
         }
         return (
           filterCols(state.headers).map(esc).join(d) +
-          "\n" +
-          rows.map((r) => filterCols(r).map(esc).join(d)).join("\n")
+          nl +
+          rows.map((r) => filterCols(r).map(esc).join(d)).join(nl)
         );
       }
 
@@ -3050,19 +3481,48 @@
       function toggleHeaderMode() {
         saveUndo();
         if (state.headerMode === "firstRow") {
-          // firstRow → numbered: ヘッダー行をデータの先頭行に戻す
+          // firstRow → numbered: ヘッダー行をデータの先頭行に戻す（row 0に挿入）
+          _shiftRowColors(0, 1);
+          _shiftHiddenRows(0, 1);
+          state._dupSet = null;
           state.data.unshift([...state.headers]);
           state.headers = Array.from({ length: state.headers.length }, (_, i) =>
             String(i + 1),
           );
+          // row 0 挿入に伴い選択位置を +1 シフト
+          if (state.selected) state.selected.row++;
+          if (state.anchor) state.anchor.row++;
+          if (state.range) { state.range.r1++; state.range.r2++; }
           state.headerMode = "numbered";
         } else {
-          // numbered → firstRow: データの1行目をヘッダーにする
+          // numbered → firstRow: データの1行目をヘッダーにする（row 0を削除）
           if (state.data.length > 0) {
             state.headers = state.data[0].map((v) => String(v || ""));
             state.data = state.data.slice(1);
             if (!state.data.length)
               state.data = [new Array(state.headers.length).fill("")];
+            // row 0 削除に伴いインデックスをシフト（hiddenRows/wrapRows）
+            _deleteRangeHiddenRows(0, 0);
+            state._dupSet = null;
+            // cellColors: row 0 を除去し残りを -1 シフト
+            if (Object.keys(state.cellColors).length) {
+              const newCC = {};
+              for (const [k, v] of Object.entries(state.cellColors)) {
+                const sep = k.indexOf(",");
+                const ri = parseInt(k.slice(0, sep));
+                if (ri === 0) continue;
+                newCC[(ri - 1) + k.slice(sep)] = v;
+              }
+              state.cellColors = newCC;
+            }
+            // row 0 削除に伴い選択位置を -1 シフト
+            const maxRow = state.data.length - 1;
+            if (state.selected) state.selected.row = Math.max(0, Math.min(state.selected.row - 1, maxRow));
+            if (state.anchor) state.anchor.row = Math.max(0, Math.min(state.anchor.row - 1, maxRow));
+            if (state.range) {
+              state.range.r1 = Math.max(0, state.range.r1 - 1);
+              state.range.r2 = Math.max(0, state.range.r2 - 1);
+            }
           }
           state.headerMode = "firstRow";
         }
@@ -3094,7 +3554,7 @@
         _reloadCallback = null;
       }
 
-      async function saveFile() {
+      async function doSaveFile() {
         // フィルター中は表示行のみ保存する確認
         if (state.filteredIndices) {
           const shown = state.filteredIndices.length;
@@ -3107,7 +3567,7 @@
           }
         }
         const virtualNote = state.sejVirtualCols ? "（仮想列は除外）" : "";
-        const bom = state.encoding === "utf8bom" ? "\uFEFF" : "";
+        const bom = state.encoding === "utf8bom" ? "﻿" : "";
         const txt = bom + buildFileContent();
         const blob = new Blob([txt], { type: "text/plain" });
         const a = document.createElement("a");
@@ -3121,6 +3581,14 @@
         setStatus(`保存しました（${savedRows}行${virtualNote}）`);
       }
 
+      async function saveFile() {
+        const lintIssues = runLint();
+        if (lintIssues.length > 0) {
+          showLintDialog(lintIssues, () => doSaveFile());
+          return;
+        }
+        await doSaveFile();
+      }
       // ===== ソート =====
       function sortByColumn(col, shiftKey = false) {
         if (col < 0 || col >= state.headers.length) return;
@@ -3143,11 +3611,16 @@
           }
           state.sortKeys = [{ col: state.sortCol, asc: state.sortAsc }];
         }
-        state.data.sort((a, b) => {
+        // numberedモードのみ先頭行（元ヘッダー行）を固定してそれ以降をソート
+        const _sortHeaderExists = state.headerMode === "numbered" && state.data.length > 1;
+        const _sortHeader = _sortHeaderExists ? state.data[0] : null;
+        const _sortData = _sortHeaderExists ? state.data.slice(1) : state.data;
+        const _base = _sortHeaderExists ? 1 : 0;
+        const _indexed = _sortData.map((row, i) => ({ row, origIdx: _base + i }));
+        _indexed.sort((a, b) => {
           for (const { col: c, asc } of state.sortKeys) {
-            const va = a[c] ?? "",
-              vb = b[c] ?? "";
-            // 空セルは昇順・降順どちらでも常に末尾に並べる
+            const va = a.row[c] ?? "",
+              vb = b.row[c] ?? "";
             if (va === "" && vb === "") continue;
             if (va === "") return 1;
             if (vb === "") return -1;
@@ -3161,14 +3634,20 @@
           }
           return 0;
         });
+        _sortDataUpdateColors(_indexed, _sortHeaderExists);
+        if (_sortHeaderExists) state.data = [_sortHeader, ..._indexed.map(x => x.row)];
+        else state.data = _indexed.map(x => x.row);
         state.selected = null;
         state.range = null;
         state.anchor = null;
+        state._dupSet = null; // 行インデックスが変わるためクリア
+        clearMarkersOnSort();
         applyFilters();
         markDirty();
         renderHeader();
         state.forceRender = true;
         renderBody();
+        execSearch();
         const keyDesc = state.sortKeys
           .map((k) => `「${getDisplayHeader(k.col)}」${k.asc ? "▲" : "▼"}`)
           .join(", ");
@@ -3547,7 +4026,7 @@
           // コメントツールチップ（アイコンなし、ホバーで表示）
           const hasComment = !!comment;
           const tooltipHtml = hasComment ? `<div class="th-tooltip visible">${escHtml(comment)}</div>` : `<div class="th-tooltip" data-tooltip-col="${i}"></div>`;
-          html += `<th scope="col" style="${w}${freezeLeft}" data-col="${i}" aria-colindex="${i + 2}" class="${active} ${frozen} ${freezeBorder} ${hasComment ? 'has-comment' : ''}" aria-sort="${sortDir}" data-comment-col="${i}">
+          html += `<th scope="col" aria-label="${escHtml(displayH)}" style="${w}${freezeLeft}" data-col="${i}" aria-colindex="${i + 2}" class="${active} ${frozen} ${freezeBorder} ${hasComment ? 'has-comment' : ''}" aria-sort="${sortDir}" data-comment-col="${i}">
       <div class="th-inner">
         <span class="th-label" title="${escHtml(labelTitle)}">${escHtml(displayH)}</span>
         <div class="th-controls">
@@ -3578,6 +4057,9 @@
           "aria-colcount",
           String(state.headers.length),
         );
+
+        const totalW = 40 + visCols.reduce((sum, i) => sum + (state.colWidths[i] || 80), 0);
+        $("main-table").style.width = totalW + "px";
 
         // ヘッダーの動的要素はイベント委譲で処理（setupTheadDelegation で一度だけ設定）
       }
@@ -3809,6 +4291,20 @@
           ? state.headers.findIndex(h => h.trim() === "seat_type_area_cd")
           : -1;
 
+        // 価格連携: 参照列インデックスをキャッシュ
+        let priceRefCols = null;
+        if (state.priceRef) {
+          const cm = state.priceRef.colMap;
+          const fi = (name) => name ? state.headers.findIndex(h => h.trim() === name.trim()) : -1;
+          priceRefCols = {
+            ticketIdx: fi(cm.ticket_col),
+            advanceIdx: fi(cm.advance_price_col),
+            dayIdx: fi(cm.day_price_col),
+            upgradeAmountIdx: fi(cm.upgrade_amount_col),
+            upgradeToIdx: fi(cm.upgrade_to_col),
+          };
+        }
+
         for (let vi = start; vi < end; vi++) {
           const i = rows._direct ? vi : rows._indices[vi];
           const row = state.data[i];
@@ -3837,6 +4333,7 @@
               )
                 cls.push("current");
             }
+            if (isMarked(i, j)) cls.push("marked");
             if (state.conditionalHL) {
               const cv = row[j] ?? "";
               if (cv === "") cls.push("hl-empty");
@@ -3869,8 +4366,10 @@
                 fitStyle = `font-size:${fs}px;`;
               }
             }
+            const _cc = state.cellColors[i + "," + j];
             const style =
-              `width:${tdCw}px;min-width:${tdCw}px;max-width:${tdCw}px;${fitStyle}` + extraStyle;
+              `width:${tdCw}px;min-width:${tdCw}px;max-width:${tdCw}px;${fitStyle}` + extraStyle +
+              (_cc ? `background-color:${_cc};` : "");
             const isSelected =
               cls.includes("selected") || cls.includes("in-range");
             let displayVal = escHtml(cellVal);
@@ -3882,6 +4381,54 @@
                 if (nm) displayVal += `<span style="color:#2563eb;margin-left:6px;font-size:11px">▸ ${escHtml(nm)}</span>`;
               } else {
                 displayVal += `<span style="color:#dc2626;margin-left:6px;font-size:11px">▸ 未登録</span>`;
+              }
+            }
+            // 価格連携: 不一致セルをハイライト
+            if (priceRefCols) {
+              const { ticketIdx, advanceIdx, dayIdx, upgradeAmountIdx, upgradeToIdx } = priceRefCols;
+              if (j === advanceIdx || j === dayIdx || j === upgradeAmountIdx || j === upgradeToIdx) {
+                const ticketName = ticketIdx >= 0 ? (row[ticketIdx] ?? "").trim() : "";
+                const refRow = ticketName ? state.priceRef.lookup.get(ticketName) : null;
+                if (refRow) {
+                  let isMismatch = false, refDisp = "";
+                  if (j === advanceIdx) {
+                    const refVal = refRow.advance_price;
+                    refDisp = refVal != null ? String(refVal) : "販売なし";
+                    const cellNum = Number(cellVal.replace(/[^0-9]/g, ""));
+                    isMismatch = refVal != null
+                      ? (cellVal !== "" && cellNum !== refVal)
+                      : (cellVal !== "" && cellVal !== "―" && cellVal !== "9999999");
+                  } else if (j === dayIdx) {
+                    const refVal = refRow.day_price;
+                    refDisp = refVal != null ? String(refVal) : "販売なし";
+                    const cellNum = Number(cellVal.replace(/[^0-9]/g, ""));
+                    isMismatch = refVal != null
+                      ? (cellVal !== "" && cellNum !== refVal)
+                      : (cellVal !== "" && cellVal !== "―" && cellVal !== "9999999");
+                  } else if (j === upgradeToIdx) {
+                    const upgrades = refRow.upgrades || [];
+                    refDisp = upgrades.length ? upgrades.map(u => u.to).join(" / ") : "なし";
+                    isMismatch = upgrades.length === 0
+                      ? (cellVal !== "" && cellVal !== "―")
+                      : !upgrades.some(u => u.to.trim() === cellVal.trim());
+                  } else if (j === upgradeAmountIdx) {
+                    const upgrades = refRow.upgrades || [];
+                    const toVal = upgradeToIdx >= 0 ? (row[upgradeToIdx] ?? "").trim() : "";
+                    const matched = toVal ? upgrades.find(u => u.to.trim() === toVal) : upgrades[0];
+                    if (matched) {
+                      refDisp = String(matched.amount);
+                      const cellNum = Number(cellVal.replace(/[^0-9]/g, ""));
+                      isMismatch = cellVal !== "" && cellNum !== matched.amount;
+                    } else if (upgrades.length === 0) {
+                      refDisp = "なし";
+                      isMismatch = cellVal !== "" && cellVal !== "―";
+                    }
+                  }
+                  if (isMismatch) {
+                    cls.push("price-ng");
+                    displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px" title="参照値: ${escHtml(refDisp)}">▸ 参照:${escHtml(refDisp)}</span>`;
+                  }
+                }
               }
             }
             html += `<td role="gridcell" data-col="${j}" aria-colindex="${j + 2}" ${style ? `style="${style}"` : ""} class="${cls.join(" ")}" aria-selected="${isSelected}">${displayVal}</td>`;
@@ -4060,11 +4607,17 @@
           e.preventDefault();
           const c = parseInt(th.dataset.col),
             lastRow = state.data.length - 1;
-          state.selected = { row: 0, col: c };
-          state.anchor = { row: 0, col: c };
-          state.range = { r1: 0, c1: c, r2: lastRow, c2: c };
-          state.isDrag = true;
-          state._colDrag = true;
+          if (e.shiftKey && state.anchor) {
+            const anchorCol = state.anchor.col;
+            state.selected = { row: 0, col: c };
+            state.range = { r1: 0, c1: Math.min(anchorCol, c), r2: lastRow, c2: Math.max(anchorCol, c) };
+          } else {
+            state.selected = { row: 0, col: c };
+            state.anchor = { row: 0, col: c };
+            state.range = { r1: 0, c1: c, r2: lastRow, c2: c };
+            state.isDrag = true;
+            state._colDrag = true;
+          }
           state.forceRender = true;
           renderHeader();
           renderBody();
@@ -4107,35 +4660,32 @@
         if (!_dragScrollTimer) startDragAutoScroll();
       }
       function startDragAutoScroll() {
-        const EDGE = 30; // 端からのピクセル数
-        const SPEED = 8; // スクロール速度
+        const EDGE = 80;      // スクロール開始する端からの距離(px)
+        const MAX_SPEED = 24; // 最大スクロール速度(px/tick)
         _dragScrollTimer = setInterval(() => {
           if (!state.isDrag) {
             stopDragAutoScroll();
             return;
           }
           const rect = els.container.getBoundingClientRect();
+
+          // エッジからの食み出し量(0〜EDGE)をもとに速度を二乗カーブで計算
+          function calcSpeed(overshoot) {
+            const ratio = Math.min(overshoot / EDGE, 1);
+            return Math.ceil(ratio * ratio * MAX_SPEED);
+          }
+
           let scrolled = false;
-          // 下端
-          if (_dragMouseY > rect.bottom - EDGE) {
-            els.container.scrollTop += SPEED;
-            scrolled = true;
-          }
-          // 上端（コンテナの外に出ても継続してスクロール）
-          if (_dragMouseY < rect.top + EDGE) {
-            els.container.scrollTop -= SPEED;
-            scrolled = true;
-          }
-          // 右端
-          if (_dragMouseX > rect.right - EDGE) {
-            els.container.scrollLeft += SPEED;
-            scrolled = true;
-          }
-          // 左端（コンテナの外に出ても継続してスクロール）
-          if (_dragMouseX < rect.left + EDGE) {
-            els.container.scrollLeft -= SPEED;
-            scrolled = true;
-          }
+          const overBottom = _dragMouseY - (rect.bottom - EDGE);
+          const overTop    = (rect.top + EDGE) - _dragMouseY;
+          const overRight  = _dragMouseX - (rect.right - EDGE);
+          const overLeft   = (rect.left + EDGE) - _dragMouseX;
+
+          if (overBottom > 0) { els.container.scrollTop  += calcSpeed(overBottom); scrolled = true; }
+          if (overTop    > 0) { els.container.scrollTop  -= calcSpeed(overTop);    scrolled = true; }
+          if (overRight  > 0) { els.container.scrollLeft += calcSpeed(overRight);  scrolled = true; }
+          if (overLeft   > 0) { els.container.scrollLeft -= calcSpeed(overLeft);   scrolled = true; }
+
           if (scrolled) expandDragRange();
         }, 16); // ~60fps
       }
@@ -4257,11 +4807,10 @@
       function onDblClick(e) {
         const td = e.target.closest("td[data-col]");
         if (!td) return;
-        startEdit(
-          parseInt(td.parentNode.dataset.row),
-          parseInt(td.dataset.col),
-          td,
-        );
+        const row = parseInt(td.parentNode.dataset.row);
+        const col = parseInt(td.dataset.col);
+        if (state.markerMode) { toggleMarker(row, col); return; }
+        startEdit(row, col, td);
       }
 
       function startEdit(r, c, td, initVal) {
@@ -4325,6 +4874,7 @@
         };
         inp.onblur = () => finish();
         inp.onkeydown = (ev) => {
+          if (ev.isComposing) return; // IME入力確定前はナビゲーションキーを無視
           if (ev.key === "Enter") {
             ev.preventDefault();
             ev.stopPropagation();
@@ -4369,37 +4919,39 @@
       }
 
       function editHeaderComment(col) {
+        document.querySelector("._comment-edit-ov")?.remove();
         const origKey = state.headers[col]?.trim();
         const current = state.headerComments[origKey] || "";
         const displayName = getDisplayHeader(col);
 
         const overlay = document.createElement("div");
+        overlay.className = "_comment-edit-ov";
         overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:999;display:flex;align-items:center;justify-content:center;";
         const dlg = document.createElement("div");
         dlg.style.cssText = "background:#fff;border-radius:6px;padding:16px;width:90vw;max-width:400px;box-shadow:0 4px 20px rgba(0,0,0,0.3);";
         dlg.innerHTML = `
           <h3 style="margin:0 0 8px;font-size:13px;">「${escHtml(displayName)}」のメモ編集</h3>
           <p style="margin:0 0 6px;font-size:11px;color:#666;">${escHtml(origKey)}</p>
-          <textarea id="comment-edit-area" style="width:100%;height:120px;border:1px solid #ccc;border-radius:3px;padding:6px;font-size:12px;font-family:var(--font-ui);resize:vertical;">${escHtml(current)}</textarea>
+          <textarea class="_comment-edit-area" style="width:100%;height:120px;border:1px solid #ccc;border-radius:3px;padding:6px;font-size:12px;font-family:var(--font-ui);resize:vertical;">${escHtml(current)}</textarea>
           <div style="margin-top:8px;text-align:right;">
-            <button type="button" id="comment-cancel" style="padding:4px 12px;font-size:12px;cursor:pointer;margin-right:6px;">キャンセル</button>
-            <button type="button" id="comment-clear" style="padding:4px 12px;font-size:12px;cursor:pointer;color:#d33;margin-right:6px;">クリア</button>
-            <button type="button" id="comment-save" style="padding:4px 12px;font-size:12px;background:var(--accent);color:#fff;border:none;border-radius:3px;cursor:pointer;">保存</button>
+            <button type="button" class="_comment-cancel" style="padding:4px 12px;font-size:12px;cursor:pointer;margin-right:6px;">キャンセル</button>
+            <button type="button" class="_comment-clear" style="padding:4px 12px;font-size:12px;cursor:pointer;color:#d33;margin-right:6px;">クリア</button>
+            <button type="button" class="_comment-save" style="padding:4px 12px;font-size:12px;background:var(--accent);color:#fff;border:none;border-radius:3px;cursor:pointer;">保存</button>
           </div>`;
         overlay.appendChild(dlg);
         document.body.appendChild(overlay);
 
-        const textarea = dlg.querySelector("#comment-edit-area");
+        const textarea = dlg.querySelector("._comment-edit-area");
         textarea.focus();
         overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
-        dlg.querySelector("#comment-cancel").onclick = () => overlay.remove();
-        dlg.querySelector("#comment-clear").onclick = () => {
+        dlg.querySelector("._comment-cancel").onclick = () => overlay.remove();
+        dlg.querySelector("._comment-clear").onclick = () => {
           delete state.headerComments[origKey];
           saveHeaderMapSettings();
           renderHeader();
           overlay.remove();
         };
-        dlg.querySelector("#comment-save").onclick = () => {
+        dlg.querySelector("._comment-save").onclick = () => {
           const nv = textarea.value;
           if (nv) state.headerComments[origKey] = nv;
           else delete state.headerComments[origKey];
@@ -4420,6 +4972,7 @@
 
       // ===== 辞書エディター =====
       function openDictEditor() {
+        closeDictEditor();
         // 現在のヘッダーに関連するマッピングを表示
         const entries = [];
         const allKeys = new Set([...Object.keys(DEFAULT_HEADER_DICT), ...Object.keys(state.headerDict)]);
@@ -4485,6 +5038,8 @@
 
       // ===== キーボード =====
       function onKeyDown(e) {
+        // メモダイアログが開いている間はグリッド操作をブロック
+        if ($("debug-memo-dialog")?.classList.contains("show")) return;
         if (e.target.tagName === "INPUT" && e.target.closest("td.editing"))
           return;
         // ダイアログ内でもCtrl+C/Vはセル操作として処理する
@@ -4509,8 +5064,16 @@
 
         if (e.target === els.search) {
           if (e.key === "Enter") {
-            moveSearch(e.shiftKey ? -1 : 1);
             e.preventDefault();
+            if (els.search.value !== _lastSearched) {
+              // クエリが変わっており未検索：即実行（execSearch内でhit[0]へ移動）
+              // Shift+Enterの場合、execSearch()がmoveSearch(1)で先頭に移動した後に
+              // 末尾に移動するのが自然なので execSearch 後に再度後退は行わない
+              execSearch();
+            } else {
+              // 同クエリの繰り返しナビゲート
+              moveSearch(e.shiftKey ? -1 : 1);
+            }
           }
           if (e.key === "Escape") els.search.blur();
           return;
@@ -4589,6 +5152,115 @@
           duplicateRow();
           return;
         }
+        if (cmd && shiftKey && (key === "K" || key === "k")) {
+          e.preventDefault();
+          deleteSelectedRows();
+          return;
+        }
+        if (cmd && e.altKey && (key === "K" || key === "k")) {
+          e.preventDefault();
+          deleteSelectedCols();
+          return;
+        }
+        // 行を選択 (Shift+Space)
+        if (key === " " && shiftKey && !cmd && state.selected) {
+          e.preventDefault();
+          const r = state.selected.row;
+          state.anchor = { row: r, col: 0 };
+          state.selected = { row: r, col: 0 };
+          state.range = { r1: r, c1: 0, r2: r, c2: state.headers.length - 1 };
+          state.forceRender = true;
+          renderHeader();
+          renderBody();
+          updateHighlight();
+          return;
+        }
+        // 列を選択 (Ctrl+Space)
+        if (key === " " && cmd && !shiftKey && state.selected) {
+          e.preventDefault();
+          selectColumn(state.selected.col);
+          return;
+        }
+        // 上に行を挿入 (Alt+Shift+↑)
+        if (e.altKey && shiftKey && key === "ArrowUp" && state.selected) {
+          e.preventDefault();
+          saveUndo();
+          _shiftRowColors(state.selected.row, 1);
+          _shiftHiddenRows(state.selected.row, 1);
+          state._dupSet = null;
+          state.data.splice(state.selected.row, 0, new Array(state.headers.length).fill(""));
+          markDirty();
+          applyFilters();
+          state.forceRender = true;
+          renderBody();
+          return;
+        }
+        // 左に列を挿入 (Alt+Shift+←)
+        if (e.altKey && shiftKey && key === "ArrowLeft" && state.selected) {
+          e.preventDefault();
+          const c = state.selected.col;
+          saveUndo();
+          state.headers.splice(c, 0, "列" + (state.headers.length + 1));
+          state.data.forEach((r) => r.splice(c, 0, ""));
+          shiftColIndices(c, 1);
+          markDirty();
+          renderHeader();
+          state.forceRender = true;
+          renderBody();
+          return;
+        }
+        // 右に列を挿入 (Alt+Shift+→)
+        if (e.altKey && shiftKey && key === "ArrowRight" && state.selected) {
+          e.preventDefault();
+          const c = state.selected.col + 1;
+          saveUndo();
+          state.headers.splice(c, 0, "列" + (state.headers.length + 1));
+          state.data.forEach((r) => r.splice(c, 0, ""));
+          shiftColIndices(c, 1);
+          markDirty();
+          renderHeader();
+          state.forceRender = true;
+          renderBody();
+          return;
+        }
+        // 行を非表示 (Ctrl+Shift+H)
+        if (cmd && shiftKey && (key === "H" || key === "h")) {
+          e.preventDefault();
+          if (state.range) {
+            hideRows(Math.min(state.range.r1, state.range.r2), Math.max(state.range.r1, state.range.r2));
+          } else if (state.selected) {
+            hideRows(state.selected.row, state.selected.row);
+          }
+          return;
+        }
+        // 列を非表示 (Ctrl+Alt+H)
+        if (cmd && e.altKey && (key === "H" || key === "h")) {
+          e.preventDefault();
+          if (state.range) {
+            hideCols(Math.min(state.range.c1, state.range.c2), Math.max(state.range.c1, state.range.c2));
+          } else if (state.selected) {
+            hideCols(state.selected.col, state.selected.col);
+          }
+          return;
+        }
+        // 非表示行を再表示 (Ctrl+Shift+U)
+        if (cmd && shiftKey && (key === "U" || key === "u")) {
+          e.preventDefault();
+          showAllRows();
+          return;
+        }
+        // 非表示列を再表示 (Ctrl+Alt+U)
+        if (cmd && e.altKey && (key === "U" || key === "u")) {
+          e.preventDefault();
+          showAllCols();
+          return;
+        }
+        // この列までフリーズ (Ctrl+Shift+F)
+        if (cmd && shiftKey && (key === "F" || key === "f")) {
+          e.preventDefault();
+          toggleFreezeColumn();
+          return;
+        }
         if (e.altKey && (key === "r" || key === "R")) {
           e.preventDefault();
           toggleRegexMode();
@@ -4610,23 +5282,16 @@
 
         if (key === "Enter" && !cmd) {
           e.preventDefault();
-          if (!shiftKey && row >= state.data.length - 1) {
-            // 最終行でEnter → 新しい行を追加
+          if (!shiftKey && row >= lastVisibleRow()) {
+            // 最終可視行でEnter → 新しい行を追加
             saveUndo();
             state.data.push(new Array(state.headers.length).fill(""));
             markDirty();
             applyFilters();
             state.forceRender = true;
-            renderHeader();
             renderBody();
           }
-          moveTo(
-            Math.max(
-              0,
-              Math.min(state.data.length - 1, shiftKey ? row - 1 : row + 1),
-            ),
-            col,
-          );
+          moveTo(nextVisibleRow(row, shiftKey ? -1 : 1), col);
           return;
         }
         if (key === "F2") {
@@ -4636,6 +5301,7 @@
           return;
         }
         if (key === "Escape") {
+          if (state.markerMode) { toggleMarkerMode(); return; }
           hideManual();
           closeReplaceDialog();
           closeFilterDropdown();
@@ -4646,26 +5312,22 @@
         if (key === "Tab") {
           e.preventDefault();
           if (!shiftKey && col >= state.headers.length - 1) {
-            // 最終列でTab → 次の行の先頭へ（最終行なら新規追加）
-            const nextRow = row + 1;
-            if (nextRow >= state.data.length) {
+            // 最終列でTab → 次の可視行の先頭へ（最終可視行なら新規追加）
+            if (row >= lastVisibleRow()) {
               saveUndo();
               state.data.push(new Array(state.headers.length).fill(""));
               markDirty();
               applyFilters();
               state.forceRender = true;
-              renderHeader();
               renderBody();
             }
-            moveTo(Math.min(state.data.length - 1, nextRow), 0);
+            moveTo(nextVisibleRow(row, 1), 0);
           } else {
-            moveTo(
-              row,
-              Math.max(
-                0,
-                Math.min(state.headers.length - 1, col + (shiftKey ? -1 : 1)),
-              ),
-            );
+            // 次の可視列へ
+            let nextC = col + (shiftKey ? -1 : 1);
+            while (nextC >= 0 && nextC < state.headers.length && state.hiddenCols.has(nextC))
+              nextC += (shiftKey ? -1 : 1);
+            moveTo(row, Math.max(0, Math.min(state.headers.length - 1, nextC)));
           }
           return;
         }
@@ -4968,16 +5630,23 @@
             ? '"' + s.replace(/"/g, '""') + '"'
             : s;
         };
+        const htmlRows = [];
         for (let r = minR; r <= maxR; r++) {
-          if (state.hiddenRows.has(r)) continue; // 非表示行をスキップ
-          if (filteredSet && !filteredSet.has(r)) continue; // フィルター除外行をスキップ
+          if (state.hiddenRows.has(r)) continue;
+          if (filteredSet && !filteredSet.has(r)) continue;
           const row = [];
+          const htmlCells = [];
           for (let c = minC; c <= maxC; c++) {
-            if (state.hiddenCols.has(c)) continue; // 非表示列をスキップ
-            row.push(safeGet(r, c));
+            if (state.hiddenCols.has(c)) continue;
+            const val = safeGet(r, c);
+            row.push(val);
+            const bg = state.cellColors[r + "," + c];
+            const sty = bg ? ` style="background:${bg}"` : "";
+            htmlCells.push(`<td${sty}>${escHtml(val)}</td>`);
           }
           data2d.push(row);
           txt += row.map(copyEsc).join(copyDelim) + "\n";
+          htmlRows.push(`<tr>${htmlCells.join("")}</tr>`);
         }
         state.clipboard = {
           data2d,
@@ -4985,8 +5654,18 @@
           cols: data2d[0]?.length ?? 0,
         };
         const headerNote = minR === 0 ? " (ヘッダー含む)" : "";
+        const htmlTable = `<table><tbody>${htmlRows.join("")}</tbody></table>`;
         try {
-          await navigator.clipboard.writeText(txt);
+          if (typeof ClipboardItem !== "undefined") {
+            await navigator.clipboard.write([
+              new ClipboardItem({
+                "text/plain": new Blob([txt], { type: "text/plain" }),
+                "text/html": new Blob([htmlTable], { type: "text/html" }),
+              }),
+            ]);
+          } else {
+            await navigator.clipboard.writeText(txt);
+          }
           setStatus(
             `コピーしました (${data2d.length}行 × ${data2d[0]?.length ?? 0}列)${headerNote}`,
           );
@@ -4996,6 +5675,31 @@
       }
 
       // 単一行のCSV/TSVをクオート対応で分割する（ペースト用）
+      // セル内改行（quoted fields）を正しく扱う汎用パーサー
+      function parseDelimited(text, delim) {
+        const rows = [];
+        let row = [], cur = "", inQuote = false;
+        for (let i = 0; i < text.length; i++) {
+          const c = text[i], next = text[i + 1];
+          if (inQuote) {
+            if (c === '"' && next === '"') { cur += '"'; i++; }
+            else if (c === '"') inQuote = false;
+            else if (c === '\r') { cur += '\n'; if (next === '\n') i++; }
+            else cur += c;
+          } else {
+            if (c === '"') inQuote = true;
+            else if (c === delim) { row.push(cur); cur = ""; }
+            else if (c === "\r" || c === "\n") {
+              if (c === "\r" && next === "\n") i++;
+              row.push(cur); rows.push(row); row = []; cur = "";
+            } else cur += c;
+          }
+        }
+        if (cur || row.length) { row.push(cur); rows.push(row); }
+        while (rows.length > 0 && rows[rows.length - 1].every(c => c === "")) rows.pop();
+        return rows;
+      }
+
       function splitDelimited(line, delim) {
         const fields = [];
         let cur = "",
@@ -5088,19 +5792,11 @@
         let cb;
         try {
           const txt = await navigator.clipboard.readText();
-          const lines = txt.split(/\r?\n/);
-          while (lines.length > 0 && lines[lines.length - 1] === "")
-            lines.pop();
-          if (!lines.length) return;
-          const delim = txt.includes("\t")
-            ? "\t"
-            : txt.includes(",")
-              ? ","
-              : "\t";
-          const data2d = lines.map((l) => splitDelimited(l, delim));
-          // 末尾の全セル空行を除去（コピー時の末尾改行で空行ができる場合の対策）
-          while (data2d.length > 1 && data2d[data2d.length - 1].every(c => c === "")) data2d.pop();
-          cb = { data2d, rows: data2d.length, cols: data2d[0].length };
+          if (!txt) return;
+          const delim = txt.includes("\t") ? "\t" : txt.includes(",") ? "," : "\t";
+          const data2d = parseDelimited(txt, delim);
+          if (!data2d.length) return;
+          cb = { data2d, rows: data2d.length, cols: Math.max(...data2d.map(r => r.length)) };
           state.clipboard = cb;
         } catch {
           if (state.clipboard) {
@@ -5166,6 +5862,7 @@
         }
         markDirty();
         state.forceRender = true;
+        renderHeader();
         renderBody();
         setStatus("ペーストしました");
       }
@@ -5203,6 +5900,9 @@
         const insertAt = state.selected
           ? state.selected.row + 1
           : state.data.length;
+        _shiftRowColors(insertAt, state.copiedRows.length);
+        _shiftHiddenRows(insertAt, state.copiedRows.length);
+        state._dupSet = null;
         state.copiedRows.forEach((r, i) => {
           const row = [...r];
           while (row.length < state.headers.length) row.push("");
@@ -5341,11 +6041,16 @@
             }
           return false;
         };
+        const _ffSet = state.filteredIndices ? new Set(state.filteredIndices) : null;
         for (let r = startR; r <= maxR; r++) {
+          if (state.hiddenRows.has(r)) continue;
+          if (_ffSet && !_ffSet.has(r)) continue;
           if (check(r, r === startR ? startC : minC, maxC)) return;
         }
         // 先頭に戻って再検索（スコープ内で折り返し）
         for (let r = minR; r <= startR; r++) {
+          if (state.hiddenRows.has(r)) continue;
+          if (_ffSet && !_ffSet.has(r)) continue;
           if (check(r, minC, r === startR ? startC - 1 : maxC)) return;
         }
         setStatus("見つかりませんでした");
@@ -5398,18 +6103,23 @@
         }
         const useScope = $("replace-scope")?.checked;
         const scope = useScope ? getSearchScope() : null;
-        // フィルター中は可視行のみ、非表示行・非表示列はスキップ（置換ループと同条件）
-        const filteredSetRepl = state.filteredIndices ? new Set(state.filteredIndices) : null;
         // まず件数をカウント
+        const _scopeFilterSet = state.filteredIndices ? new Set(state.filteredIndices) : null;
         let cnt = 0;
         if (scope) {
-          for (let r = scope.r1; r <= scope.r2; r++)
-            for (let c = scope.c1; c <= scope.c2; c++)
+          for (let r = scope.r1; r <= scope.r2; r++) {
+            if (state.hiddenRows.has(r)) continue;
+            if (_scopeFilterSet && !_scopeFilterSet.has(r)) continue;
+            for (let c = scope.c1; c <= scope.c2; c++) {
+              if (state.hiddenCols.has(c)) continue;
               if (matchFn(safeGet(r, c))) cnt++;
+            }
+          }
         } else {
+          const filteredSetCnt = state.filteredIndices ? new Set(state.filteredIndices) : null;
           state.data.forEach((row, r) => {
             if (state.hiddenRows.has(r)) return;
-            if (filteredSetRepl && !filteredSetRepl.has(r)) return;
+            if (filteredSetCnt && !filteredSetCnt.has(r)) return;
             row.forEach((v, c) => {
               if (state.hiddenCols.has(c)) return;
               if (matchFn(v)) cnt++;
@@ -5425,13 +6135,18 @@
           return;
         saveUndo();
         if (scope) {
-          for (let r = scope.r1; r <= scope.r2; r++)
+          for (let r = scope.r1; r <= scope.r2; r++) {
+            if (state.hiddenRows.has(r)) continue;
+            if (_scopeFilterSet && !_scopeFilterSet.has(r)) continue;
             for (let c = scope.c1; c <= scope.c2; c++) {
+              if (state.hiddenCols.has(c)) continue;
               const old = safeGet(r, c);
               if (matchFn(old)) safeSet(r, c, old.replace(re, rep));
             }
+          }
         } else {
           // フィルター中は可視行のみ、非表示行はスキップ
+          const filteredSetRepl = state.filteredIndices ? new Set(state.filteredIndices) : null;
           state.data.forEach((row, r) => {
             if (state.hiddenRows.has(r)) return;
             if (filteredSetRepl && !filteredSetRepl.has(r)) return;
@@ -5445,9 +6160,31 @@
         state.forceRender = true;
         renderBody();
         setStatus(`${cnt}件を置換しました${scopeNote}`);
+        execSearch();
       }
       function escRe(s) {
         return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      }
+
+      function _applyCellColor(color) {
+        saveUndo();
+        const cells = [];
+        if (state.range) {
+          const r1 = Math.min(state.range.r1, state.range.r2);
+          const r2 = Math.max(state.range.r1, state.range.r2);
+          const c1 = Math.min(state.range.c1, state.range.c2);
+          const c2 = Math.max(state.range.c1, state.range.c2);
+          for (let r = r1; r <= r2; r++)
+            for (let c = c1; c <= c2; c++) cells.push([r, c]);
+        } else if (state.selected) {
+          cells.push([state.selected.row, state.selected.col]);
+        }
+        for (const [r, c] of cells) {
+          if (color) state.cellColors[r + "," + c] = color;
+          else delete state.cellColors[r + "," + c];
+        }
+        state.forceRender = true;
+        renderBody();
       }
 
       // ===== 右クリックメニュー =====
@@ -5502,6 +6239,7 @@
             children: [
               {
                 label: "セルを編集",
+                key: "Enter / F2",
                 action: () => {
                   const t = getSelTd();
                   if (t) startEdit(row, col, t);
@@ -5519,6 +6257,7 @@
             children: [
               {
                 label: "この行を選択",
+                key: "Shift+Space",
                 action: () => {
                   state.selected = { row, col: 0 };
                   state.anchor = { row, col: 0 };
@@ -5531,7 +6270,7 @@
                   updateHighlight();
                 },
               },
-              { label: "この列を選択", action: () => selectColumn(col) },
+              { label: "この列を選択", key: "Ctrl+Space", action: () => selectColumn(col) },
               { label: "全選択", key: "Ctrl+A", action: selectAll },
             ],
           },
@@ -5541,8 +6280,12 @@
             children: [
               {
                 label: "上に行を挿入",
+                key: "Alt+Shift+↑",
                 action: () => {
                   saveUndo();
+                  _shiftRowColors(row, 1);
+                  _shiftHiddenRows(row, 1);
+                  state._dupSet = null;
                   state.data.splice(
                     row,
                     0,
@@ -5556,8 +6299,12 @@
               },
               {
                 label: "下に行を挿入",
+                key: "Ctrl+Enter",
                 action: () => {
                   saveUndo();
+                  _shiftRowColors(row + 1, 1);
+                  _shiftHiddenRows(row + 1, 1);
+                  state._dupSet = null;
                   state.data.splice(
                     row + 1,
                     0,
@@ -5621,32 +6368,14 @@
                   }
                   return "この行を削除";
                 })(),
+                key: "Ctrl+Shift+K",
                 danger: true,
                 action: () => {
-                  // 削除する行の範囲を決定
-                  let r1, r2;
-                  if (state.range) {
-                    r1 = Math.min(state.range.r1, state.range.r2);
-                    r2 = Math.max(state.range.r1, state.range.r2);
-                  } else {
-                    r1 = r2 = row;
+                  if (!state.range) {
+                    state.selected = { row, col: state.selected?.col ?? 0 };
+                    state.anchor = { ...state.selected };
                   }
-                  const delCount = r2 - r1 + 1;
-                  if (state.data.length <= delCount) return;
-                  saveUndo();
-                  state.data.splice(r1, delCount);
-                  const maxRow = state.data.length - 1;
-                  state.selected = {
-                    row: Math.min(r1, maxRow),
-                    col: state.selected?.col ?? 0,
-                  };
-                  state.anchor = { ...state.selected };
-                  state.range = null;
-                  markDirty();
-                  applyFilters();
-                  state.forceRender = true;
-                  renderBody();
-                  setStatus(`${delCount}行を削除しました`);
+                  deleteSelectedRows();
                 },
               },
             ],
@@ -5657,6 +6386,7 @@
             children: [
               {
                 label: "左に列を挿入",
+                key: "Alt+Shift+←",
                 action: () => {
                   saveUndo();
                   state.headers.splice(
@@ -5674,6 +6404,7 @@
               },
               {
                 label: "右に列を挿入",
+                key: "Alt+Shift+→",
                 action: () => {
                   saveUndo();
                   state.headers.splice(
@@ -5697,26 +6428,32 @@
                   state.sortCol = col;
                   state.sortAsc = true;
                   state.sortKeys = [{ col, asc: true }];
-                  state.data.sort((a, b) => {
-                    const va = a[col] ?? "",
-                      vb = b[col] ?? "";
+                  const _ch1 = state.data.length > 1 ? state.data[0] : null;
+                  const _cd1 = _ch1 ? state.data.slice(1) : state.data;
+                  const _base1 = _ch1 ? 1 : 0;
+                  const _idx1 = _cd1.map((row, i) => ({ row, origIdx: _base1 + i }));
+                  _idx1.sort((a, b) => {
+                    const va = a.row[col] ?? "", vb = b.row[col] ?? "";
                     if (va === "" && vb === "") return 0;
                     if (va === "") return 1;
                     if (vb === "") return -1;
-                    const na = Number(va),
-                      nb = Number(vb);
-                    if (!isNaN(na) && !isNaN(nb))
-                      return na - nb;
+                    const na = Number(va), nb = Number(vb);
+                    if (!isNaN(na) && !isNaN(nb)) return na - nb;
                     return String(va).localeCompare(String(vb), "ja");
                   });
+                  _sortDataUpdateColors(_idx1, !!_ch1);
+                  if (_ch1) state.data = [_ch1, ..._idx1.map(x => x.row)];
+                  else state.data = _idx1.map(x => x.row);
                   state.selected = null;
                   state.range = null;
                   state.anchor = null;
+                  state._dupSet = null;
                   applyFilters();
                   markDirty();
                   renderHeader();
                   state.forceRender = true;
                   renderBody();
+                  execSearch();
                   setStatus(`「${getDisplayHeader(col)}」で昇順ソート`);
                 },
               },
@@ -5727,32 +6464,39 @@
                   state.sortCol = col;
                   state.sortAsc = false;
                   state.sortKeys = [{ col, asc: false }];
-                  state.data.sort((a, b) => {
-                    const va = a[col] ?? "",
-                      vb = b[col] ?? "";
+                  const _ch2 = state.data.length > 1 ? state.data[0] : null;
+                  const _cd2 = _ch2 ? state.data.slice(1) : state.data;
+                  const _base2 = _ch2 ? 1 : 0;
+                  const _idx2 = _cd2.map((row, i) => ({ row, origIdx: _base2 + i }));
+                  _idx2.sort((a, b) => {
+                    const va = a.row[col] ?? "", vb = b.row[col] ?? "";
                     if (va === "" && vb === "") return 0;
                     if (va === "") return 1;
                     if (vb === "") return -1;
-                    const na = Number(va),
-                      nb = Number(vb);
-                    if (!isNaN(na) && !isNaN(nb))
-                      return nb - na;
+                    const na = Number(va), nb = Number(vb);
+                    if (!isNaN(na) && !isNaN(nb)) return nb - na;
                     return String(vb).localeCompare(String(va), "ja");
                   });
+                  _sortDataUpdateColors(_idx2, !!_ch2);
+                  if (_ch2) state.data = [_ch2, ..._idx2.map(x => x.row)];
+                  else state.data = _idx2.map(x => x.row);
                   state.selected = null;
                   state.range = null;
                   state.anchor = null;
+                  state._dupSet = null;
                   applyFilters();
                   markDirty();
                   renderHeader();
                   state.forceRender = true;
                   renderBody();
+                  execSearch();
                   setStatus(`「${getDisplayHeader(col)}」で降順ソート`);
                 },
               },
               { sep: true },
               {
                 label: "この列までフリーズ",
+                key: "Ctrl+Shift+F",
                 action: () => {
                   state.selected = { row, col };
                   toggleFreezeColumn();
@@ -5772,48 +6516,14 @@
                   }
                   return "この列を削除";
                 })(),
+                key: "Ctrl+Alt+K",
                 danger: true,
                 action: () => {
-                  // 削除する列インデックスを収集（重複排除・昇順）
-                  let delCols;
-                  if (state.range) {
-                    const c1 = Math.min(state.range.c1, state.range.c2);
-                    const c2 = Math.max(state.range.c1, state.range.c2);
-                    delCols = [];
-                    for (let c = c1; c <= c2; c++) delCols.push(c);
-                  } else {
-                    delCols = [col];
+                  if (!state.range) {
+                    state.selected = { row: state.selected?.row ?? 0, col };
+                    state.anchor = { ...state.selected };
                   }
-                  if (state.headers.length <= delCols.length) return;
-                  // 削除前に名前を控えておく
-                  const delNames = delCols.map((c) => state.headers[c]);
-                  saveUndo();
-                  // 後ろのインデックスから削除してズレを防ぐ
-                  for (let i = delCols.length - 1; i >= 0; i--) {
-                    const c = delCols[i];
-                    state.headers.splice(c, 1);
-                    state.data.forEach((r) => r.splice(c, 1));
-                    shiftColIndices(c, -1);
-                  }
-                  const newCol = Math.min(
-                    delCols[0],
-                    state.headers.length - 1,
-                  );
-                  state.selected = {
-                    row: state.selected?.row ?? 0,
-                    col: newCol,
-                  };
-                  state.range = null;
-                  state.anchor = { ...state.selected };
-                  markDirty();
-                  renderHeader();
-                  state.forceRender = true;
-                  renderBody();
-                  setStatus(
-                    delCols.length > 1
-                      ? `${delCols.length}列を削除しました（${delNames.join("、")}）`
-                      : `列「${delNames[0]}」を削除しました`,
-                  );
+                  deleteSelectedCols();
                 },
               },
             ],
@@ -5822,7 +6532,11 @@
             group: "表示",
             icon: "⊙",
             children: [
-              { label: "この行を非表示", action: () => hideRows(row, row) },
+              {
+                label: "この行を非表示",
+                key: "Ctrl+Shift+H",
+                action: () => hideRows(row, row),
+              },
               {
                 label: (() => {
                   if (state.range) {
@@ -5831,6 +6545,7 @@
                   }
                   return "選択行を非表示";
                 })(),
+                key: "Ctrl+Shift+H",
                 action: () => {
                   if (state.range) {
                     hideRows(
@@ -5840,7 +6555,11 @@
                   } else hideRows(row, row);
                 },
               },
-              { label: "この列を非表示", action: () => hideCols(col, col) },
+              {
+                label: "この列を非表示",
+                key: "Ctrl+Alt+H",
+                action: () => hideCols(col, col),
+              },
               {
                 label: (() => {
                   if (state.range) {
@@ -5849,6 +6568,7 @@
                   }
                   return "選択列を非表示";
                 })(),
+                key: "Ctrl+Alt+H",
                 action: () => {
                   if (state.range) {
                     hideCols(
@@ -5863,6 +6583,7 @@
                     { sep: true },
                     {
                       label: `非表示行を再表示 (${state.hiddenRows.size}行)`,
+                      key: "Ctrl+Shift+U",
                       action: showAllRows,
                     },
                   ]
@@ -5871,6 +6592,7 @@
                 ? [
                     {
                       label: `非表示列を再表示 (${state.hiddenCols.size}列)`,
+                      key: "Ctrl+Alt+U",
                       action: showAllCols,
                     },
                   ]
@@ -5894,6 +6616,19 @@
               },
               { sep: true },
               { label: "重複行を削除", danger: true, action: deleteDuplicates },
+            ],
+          },
+          {
+            group: "書式",
+            icon: "🎨",
+            children: [
+              { label: "🟡 黄（確認中）", action: () => _applyCellColor("#FFF9C4") },
+              { label: "🟢 緑（完了）", action: () => _applyCellColor("#C8E6C9") },
+              { label: "🔴 赤（NG）", action: () => _applyCellColor("#FFCDD2") },
+              { label: "🔵 青（対応中）", action: () => _applyCellColor("#BBDEFB") },
+              { label: "🟠 橙（保留）", action: () => _applyCellColor("#FFE0B2") },
+              { label: "🟣 紫（メモ）", action: () => _applyCellColor("#E1BEE7") },
+              { label: "⬜ クリア", action: () => _applyCellColor(null) },
             ],
           },
         ];
@@ -5965,12 +6700,14 @@
               sub.classList.remove("open");
               const closeLabel = sub.previousElementSibling;
               if (closeLabel) closeLabel.setAttribute("aria-expanded", "false");
-            }, 120);
+            }, 200);
           };
           grp.addEventListener("mouseenter", openSub);
           grp.addEventListener("mouseleave", closeSub);
           sub.addEventListener("mouseenter", () => clearTimeout(_subTimer));
           sub.addEventListener("mouseleave", closeSub);
+          // コンテキストメニュー本体に戻った時も閉じタイマーをキャンセル
+          els.ctxMenu.addEventListener("mouseenter", () => clearTimeout(_subTimer));
         });
 
         // リーフアイテムのクリック・キーボードハンドラ
@@ -6059,13 +6796,24 @@
         state.wrapRows.clear();
         state.regexMode = false;
         state.conditionalHL = false;
+        state.priceRef = null;
         state._dupSet = null;
         state._dupCol = null;
         state.sejVirtualCols = null; // 仮想列情報は読み込みデータと不可分（残すと保存時に実列を誤除外）
+        state.cellColors = {};
+        state.newline = "lf";
+        state.newlineMixed = false;
+        state.markerMode = false;
+        state.markedCells.clear();
+        const _bm = $("btn-marker");
+        if (_bm) { _bm.classList.remove("active-state"); _bm.setAttribute("aria-pressed","false"); }
+        document.body.classList.remove("marker-mode");
         state.dirty = false;
         document.body.classList.remove("wrap-cells");
         $("btn-wrap").classList.remove("active-state");
         $("btn-wrap").setAttribute("aria-pressed", "false");
+        $("btn-price-ref").classList.remove("active-state");
+        $("btn-price-ref").textContent = "価格連携";
         _visibleRowsCache = null;
         _visibleRowsCacheKey = "";
         lastRenderKey = null;
@@ -6093,6 +6841,7 @@
         state.fileName = "Sheet" + (state.tabs.length + 1) + ".tsv";
         state.delimiter = "\t";
         state.headerMode = "firstRow";
+        state.encoding = "utf8";
         const tab = {
           fileName: state.fileName,
           headers: [...state.headers],
@@ -6103,7 +6852,10 @@
           sortAsc: true,
           sortKeys: [],
           headerMode: "firstRow",
+          encoding: "utf8",
           dirty: false,
+          cellColors: {},
+          _isBlankSheet: true,
         };
         state.tabs.push(tab);
         state.activeTab = state.tabs.length - 1;
@@ -6119,6 +6871,10 @@
       function addRowBelow() {
         saveUndo();
         const at = state.selected ? state.selected.row + 1 : state.data.length;
+        _shiftRowColors(at, 1);
+        _shiftHiddenRows(at, 1);
+        state._dupSet = null;
+        shiftMarkers(at, 1);
         state.data.splice(at, 0, Array(state.headers.length).fill(""));
         markDirty();
         applyFilters();
@@ -6126,6 +6882,77 @@
         renderBody();
         moveTo(at, state.selected?.col ?? 0);
         setStatus(`行 ${at + 1} を挿入しました`);
+      }
+
+      function deleteSelectedRows() {
+        let r1, r2;
+        if (state.range) {
+          r1 = Math.min(state.range.r1, state.range.r2);
+          r2 = Math.max(state.range.r1, state.range.r2);
+        } else if (state.selected) {
+          r1 = r2 = state.selected.row;
+        } else return;
+        const delCount = r2 - r1 + 1;
+        if (state.data.length <= delCount) return;
+        saveUndo();
+        state.data.splice(r1, delCount);
+        state._dupSet = null;
+        for (let _dr = 0; _dr < delCount; _dr++) shiftMarkers(r1, -1);
+        _deleteRangeHiddenRows(r1, r2);
+        // 削除行の色を除去し、後続行のインデックスをシフト
+        const newCC = {};
+        for (const [k, v] of Object.entries(state.cellColors)) {
+          const sep = k.indexOf(",");
+          const ri = parseInt(k.slice(0, sep));
+          const ci = k.slice(sep);
+          if (ri >= r1 && ri <= r2) continue;
+          const newRi = ri > r2 ? ri - delCount : ri;
+          newCC[newRi + ci] = v;
+        }
+        state.cellColors = newCC;
+        const maxRow = state.data.length - 1;
+        state.selected = { row: Math.min(r1, maxRow), col: state.selected?.col ?? 0 };
+        state.anchor = { ...state.selected };
+        state.range = null;
+        markDirty();
+        applyFilters();
+        state.forceRender = true;
+        renderBody();
+        setStatus(`${delCount}行を削除しました`);
+      }
+
+      function deleteSelectedCols() {
+        let c1, c2;
+        if (state.range) {
+          c1 = Math.min(state.range.c1, state.range.c2);
+          c2 = Math.max(state.range.c1, state.range.c2);
+        } else if (state.selected) {
+          c1 = c2 = state.selected.col;
+        } else return;
+        const delCols = [];
+        for (let c = c1; c <= c2; c++) delCols.push(c);
+        if (state.headers.length <= delCols.length) return;
+        const delNames = delCols.map((c) => getDisplayHeader(c));
+        saveUndo();
+        for (let i = delCols.length - 1; i >= 0; i--) {
+          const c = delCols[i];
+          state.headers.splice(c, 1);
+          state.data.forEach((r) => r.splice(c, 1));
+          shiftColIndices(c, -1);
+        }
+        const newCol = Math.min(c1, state.headers.length - 1);
+        state.selected = { row: state.selected?.row ?? 0, col: newCol };
+        state.range = null;
+        state.anchor = { ...state.selected };
+        markDirty();
+        renderHeader();
+        state.forceRender = true;
+        renderBody();
+        setStatus(
+          delCols.length > 1
+            ? `${delCols.length}列を削除しました（${delNames.join("、")}）`
+            : `列「${delNames[0]}」を削除しました`
+        );
       }
       // 列インデックスをシフトするヘルパー（挿入/削除時に使用）
       function shiftColIndices(insertedCol, delta) {
@@ -6185,6 +7012,124 @@
           if (state.range.c1 >= insertedCol) state.range.c1 += delta;
           if (state.range.c2 >= insertedCol) state.range.c2 += delta;
         }
+        // cellColors
+        const newCellColors = {};
+        for (const [k, v] of Object.entries(state.cellColors)) {
+          const sep = k.indexOf(",");
+          const ri = k.slice(0, sep);
+          const ci = parseInt(k.slice(sep + 1));
+          if (delta === -1 && ci === insertedCol) continue;
+          const newCi = ci >= insertedCol ? ci + delta : ci;
+          if (newCi >= 0) newCellColors[`${ri},${newCi}`] = v;
+        }
+        state.cellColors = newCellColors;
+        // sejVirtualCols.indices
+        if (state.sejVirtualCols) {
+          state.sejVirtualCols.indices = state.sejVirtualCols.indices
+            .filter(ci => !(delta === -1 && ci === insertedCol))
+            .map(ci => ci >= insertedCol ? ci + delta : ci)
+            .filter(ci => ci >= 0);
+          if (!state.sejVirtualCols.indices.length) state.sejVirtualCols = null;
+        }
+        // displayHeaders
+        if (state.displayHeaders) {
+          if (delta === 1) {
+            state.displayHeaders.splice(insertedCol, 0, null);
+          } else if (delta === -1) {
+            state.displayHeaders.splice(insertedCol, 1);
+          }
+        }
+      }
+      function _sortDataUpdateColors(sortedWithOrigIdx, sortHeaderExists) {
+        const base = sortHeaderExists ? 1 : 0;
+        const origToNew = new Map(sortedWithOrigIdx.map((x, ni) => [x.origIdx, base + ni]));
+        if (Object.keys(state.cellColors).length) {
+          const newCC = {};
+          for (const [k, v] of Object.entries(state.cellColors)) {
+            const sep = k.indexOf(",");
+            const ri = parseInt(k.slice(0, sep));
+            const ci = k.slice(sep);
+            if (sortHeaderExists && ri === 0) { newCC[k] = v; continue; }
+            const newRi = origToNew.get(ri);
+            if (newRi !== undefined) newCC[newRi + ci] = v;
+          }
+          state.cellColors = newCC;
+        }
+        const remapRowSet = (s) => {
+          if (!s.size) return s;
+          const ns = new Set();
+          for (const r of s) {
+            if (sortHeaderExists && r === 0) { ns.add(0); continue; }
+            const newR = origToNew.get(r);
+            if (newR !== undefined) ns.add(newR);
+          }
+          return ns;
+        };
+        state.hiddenRows = remapRowSet(state.hiddenRows);
+        state.wrapRows   = remapRowSet(state.wrapRows);
+      }
+
+      function _shiftRowColors(insertAt, count) {
+        // 行挿入: rows >= insertAt を +count シフト
+        const newCC = {};
+        for (const [k, v] of Object.entries(state.cellColors)) {
+          const sep = k.indexOf(",");
+          const ri = parseInt(k.slice(0, sep));
+          const ci = k.slice(sep);
+          const newRi = ri >= insertAt ? ri + count : ri;
+          newCC[newRi + ci] = v;
+        }
+        state.cellColors = newCC;
+      }
+      function _swapRowColors(r1, r2) {
+        // moveRowUp/Down: 2行の色を交換
+        const newCC = { ...state.cellColors };
+        const cols = new Set(
+          Object.keys(state.cellColors)
+            .map((k) => k.slice(k.indexOf(",")))
+        );
+        for (const ci of cols) {
+          const a = state.cellColors[r1 + ci];
+          const b = state.cellColors[r2 + ci];
+          if (a) newCC[r2 + ci] = a; else delete newCC[r2 + ci];
+          if (b) newCC[r1 + ci] = b; else delete newCC[r1 + ci];
+        }
+        state.cellColors = newCC;
+      }
+
+      function _shiftRowIndexedSet(s, insertAt, count) {
+        if (!s.size) return s;
+        const ns = new Set();
+        for (const r of s) ns.add(r >= insertAt ? r + count : r);
+        return ns;
+      }
+      function _shiftHiddenRows(insertAt, count) {
+        state.hiddenRows = _shiftRowIndexedSet(state.hiddenRows, insertAt, count);
+        state.wrapRows   = _shiftRowIndexedSet(state.wrapRows,   insertAt, count);
+      }
+      function _swapRowIndexedSet(s, r1, r2) {
+        const h1 = s.has(r1), h2 = s.has(r2);
+        if (h1 === h2) return;
+        if (h1) { s.delete(r1); s.add(r2); }
+        else    { s.delete(r2); s.add(r1); }
+      }
+      function _swapHiddenRows(r1, r2) {
+        _swapRowIndexedSet(state.hiddenRows, r1, r2);
+        _swapRowIndexedSet(state.wrapRows,   r1, r2);
+      }
+      function _deleteRangeRowIndexedSet(s, r1, r2) {
+        if (!s.size) return s;
+        const delCount = r2 - r1 + 1;
+        const ns = new Set();
+        for (const r of s) {
+          if (r >= r1 && r <= r2) continue;
+          ns.add(r > r2 ? r - delCount : r);
+        }
+        return ns;
+      }
+      function _deleteRangeHiddenRows(r1, r2) {
+        state.hiddenRows = _deleteRangeRowIndexedSet(state.hiddenRows, r1, r2);
+        state.wrapRows   = _deleteRangeRowIndexedSet(state.wrapRows,   r1, r2);
       }
 
       function cloneColumnFilters(cf) {
@@ -6212,7 +7157,9 @@
           columnFilters: cloneColumnFilters(state.columnFilters),
           hiddenRows: new Set(state.hiddenRows),
           hiddenCols: new Set(state.hiddenCols),
+          wrapRows: new Set(state.wrapRows),
           headerMode: state.headerMode,
+          cellColors: { ...state.cellColors },
           // SEJ仮想列はdata/headersと不可分（欠落するとundo後の保存で実列を誤除外）
           sejVirtualCols: state.sejVirtualCols
             ? { indices: [...state.sejVirtualCols.indices], keys: [...state.sejVirtualCols.keys] }
@@ -6230,7 +7177,9 @@
         state.columnFilters = s.columnFilters || {};
         state.hiddenRows = s.hiddenRows || new Set();
         state.hiddenCols = s.hiddenCols || new Set();
+        state.wrapRows = s.wrapRows ? new Set(s.wrapRows) : new Set();
         state.headerMode = s.headerMode || "firstRow";
+        state.cellColors = s.cellColors ? { ...s.cellColors } : {};
         state.sejVirtualCols = s.sejVirtualCols
           ? { indices: [...s.sejVirtualCols.indices], keys: [...s.sejVirtualCols.keys] }
           : null;
@@ -6253,8 +7202,10 @@
         if (!state.undoStack.length) return;
         state.redoStack.push(cloneState());
         restoreState(state.undoStack.pop());
+        state._dupSet = null; // 行インデックスが変わる可能性があるためクリア
         markDirty();
         applyFilters();
+        if (els.search.value) _refreshSearchHits();
         state.forceRender = true;
         renderHeader();
         renderBody();
@@ -6264,12 +7215,40 @@
         if (!state.redoStack.length) return;
         state.undoStack.push(cloneState());
         restoreState(state.redoStack.pop());
+        state._dupSet = null;
         markDirty();
         applyFilters();
+        if (els.search.value) _refreshSearchHits();
         state.forceRender = true;
         renderHeader();
         renderBody();
         updateHiddenStatus();
+      }
+      function _refreshSearchHits() {
+        // undo/redo後に検索ヒットをカーソル移動なしで再構築する
+        const q = els.search.value;
+        if (!q) { state.searchHits = []; state.searchIdx = -1; _hitSet.clear(); els.count.textContent = ""; return; }
+        const matcher = buildSearchMatcher(q);
+        if (!matcher) return;
+        state.searchHits = [];
+        const vr = getVisibleRows();
+        const iter = vr._direct
+          ? Array.from({ length: state.data.length }, (_, k) => k)
+          : vr._indices;
+        for (const r of iter)
+          for (let c = 0; c < state.headers.length; c++)
+            if (matcher(safeGet(r, c))) state.searchHits.push({ row: r, col: c });
+        rebuildHitSet();
+        // 現在の選択セルが依然ヒットに含まれていれば searchIdx を維持
+        if (state.selected) {
+          const idx = state.searchHits.findIndex(h => h.row === state.selected.row && h.col === state.selected.col);
+          state.searchIdx = idx >= 0 ? idx : (state.searchHits.length > 0 ? 0 : -1);
+        } else {
+          state.searchIdx = state.searchHits.length > 0 ? 0 : -1;
+        }
+        els.count.textContent = state.searchHits.length > 0
+          ? `${state.searchIdx + 1}/${state.searchHits.length}件`
+          : `${state.searchHits.length}件`;
       }
 
       function buildSearchMatcher(q) {
@@ -6288,6 +7267,7 @@
 
       function execSearch() {
         const q = els.search.value;
+        if (typeof _lastSearched !== 'undefined') _lastSearched = q;
         state.searchHits = [];
         state.searchIdx = -1;
         if (!q) {
@@ -6311,7 +7291,13 @@
         const maxR = scope ? scope.r2 : state.data.length - 1;
         const minC = scope ? scope.c1 : 0;
         const maxC = scope ? scope.c2 : state.headers.length - 1;
-        for (let r = minR; r <= maxR; r++) {
+        // フィルター中は可視行のみ検索（非表示行の結果はカーソルが消えるため）
+        const vr = getVisibleRows();
+        const rowsToSearch = vr._direct
+          ? null
+          : vr._indices.filter(r => r >= minR && r <= maxR);
+        const iter = rowsToSearch ?? Array.from({ length: maxR - minR + 1 }, (_, k) => minR + k);
+        for (const r of iter) {
           for (let c = minC; c <= maxC; c++) {
             const v = safeGet(r, c);
             if (matcher(v)) state.searchHits.push({ row: r, col: c });
@@ -6368,6 +7354,8 @@
           startW = th ? th.offsetWidth : 100;
         const minW = 20;
         const targetCols = getSelectedCols(col);
+        const origWidths = {};
+        targetCols.forEach((c) => { origWidths[c] = state.colWidths[c]; });
         document.body.classList.add("col-resizing");
         let _rafPending = false;
         const move = (em) => {
@@ -6400,13 +7388,24 @@
           document.body.classList.remove("col-resizing");
           document.removeEventListener("mousemove", move);
           document.removeEventListener("mouseup", up);
-          // ドラッグ終了時だけ完全再描画
+          document.removeEventListener("keydown", onKey);
           renderHeader();
           state.forceRender = true;
           renderBody();
         };
+        const onKey = (ek) => {
+          if (ek.key === "Escape") {
+            // Escapeでリサイズ中断: 元の幅に戻す
+            targetCols.forEach((c) => {
+              if (origWidths[c] === undefined) delete state.colWidths[c];
+              else state.colWidths[c] = origWidths[c];
+            });
+            up();
+          }
+        };
         document.addEventListener("mousemove", move);
         document.addEventListener("mouseup", up);
+        document.addEventListener("keydown", onKey);
       }
 
       let _canvasCtx = null;
@@ -6421,7 +7420,7 @@
         if (state.verticalHeader) {
           maxW = 20;
         } else {
-          maxW = measureText(state.headers[col] || "", "600 13px system-ui") + 60;
+          maxW = measureText(getDisplayHeader(col) || "", "600 13px system-ui") + 60;
         }
         const sample = Math.min(state.data.length, 300);
         for (let i = 0; i < sample; i++) {
@@ -6500,7 +7499,16 @@
           setStatus("有効な行番号を入力してください");
           return;
         }
-        const r = Math.min(n - 1, state.data.length - 1);
+        if (n > state.data.length) {
+          setStatus(`⚠ 行 ${n} は範囲外です（全 ${state.data.length} 行）`);
+          return;
+        }
+        const r = n - 1;
+        const vr = getVisibleRows();
+        if (!vr._direct && !vr._indices.includes(r)) {
+          setStatus(`⚠ 行 ${n} は非表示またはフィルターで除外されています`);
+          return;
+        }
         moveTo(r, state.selected?.col ?? 0);
         state.forceRender = true;
         renderBody();
@@ -6565,11 +7573,36 @@
       function deleteEmptyRows() {
         saveUndo();
         const before = state.data.length;
-        state.data = state.data.filter((row) =>
-          row.some((cell) => cell !== ""),
-        );
+        const keptIdx = [];
+        state.data = state.data.filter((row, origIdx) => {
+          if (row.some((cell) => cell !== "")) {
+            keptIdx.push(origIdx);
+            return true;
+          }
+          return false;
+        });
         if (!state.data.length)
           state.data = [new Array(state.headers.length).fill("")];
+        if (Object.keys(state.cellColors).length > 0) {
+          const origToNew = new Map(keptIdx.map((oi, ni) => [oi, ni]));
+          const newCC = {};
+          for (const [k, v] of Object.entries(state.cellColors)) {
+            const sep = k.indexOf(",");
+            const newRi = origToNew.get(parseInt(k.slice(0, sep)));
+            if (newRi !== undefined) newCC[newRi + k.slice(sep)] = v;
+          }
+          state.cellColors = newCC;
+        }
+        if (state.hiddenRows.size > 0 || state.wrapRows.size > 0) {
+          const origToNew = new Map(keptIdx.map((oi, ni) => [oi, ni]));
+          const remapSet = (s) => {
+            const ns = new Set();
+            for (const r of s) { const n = origToNew.get(r); if (n !== undefined) ns.add(n); }
+            return ns;
+          };
+          state.hiddenRows = remapSet(state.hiddenRows);
+          state.wrapRows   = remapSet(state.wrapRows);
+        }
         const removed = before - state.data.length;
         if (removed > 0) {
           markDirty();
@@ -6593,8 +7626,10 @@
             }
           }),
         );
+        const oldHeaders = [...state.headers];
         state.headers = state.headers.map((h) => String(h).trim());
-        if (count > 0) {
+        const headerChanged = state.headers.some((h, i) => h !== oldHeaders[i]);
+        if (count > 0 || headerChanged) {
           markDirty();
           state.forceRender = true;
           renderHeader();
@@ -6608,6 +7643,9 @@
         if (!state.selected || state.selected.row <= 0) return;
         const r = state.selected.row;
         saveUndo();
+        _swapRowColors(r - 1, r);
+        _swapHiddenRows(r - 1, r);
+        state._dupSet = null;
         [state.data[r - 1], state.data[r]] = [state.data[r], state.data[r - 1]];
         state.selected.row = r - 1;
         if (state.anchor) state.anchor.row = r - 1;
@@ -6621,6 +7659,9 @@
           return;
         const r = state.selected.row;
         saveUndo();
+        _swapRowColors(r, r + 1);
+        _swapHiddenRows(r, r + 1);
+        state._dupSet = null;
         [state.data[r], state.data[r + 1]] = [state.data[r + 1], state.data[r]];
         state.selected.row = r + 1;
         if (state.anchor) state.anchor.row = r + 1;
@@ -6635,6 +7676,10 @@
         if (!state.selected) return;
         const r = state.selected.row;
         saveUndo();
+        _shiftRowColors(r + 1, 1);
+        _shiftHiddenRows(r + 1, 1);
+        state._dupSet = null;
+        shiftMarkers(r + 1, 1);
         state.data.splice(r + 1, 0, [...state.data[r]]);
         state.selected.row = r + 1;
         markDirty();
@@ -6651,7 +7696,7 @@
           if (state.verticalHeader) {
             maxW = 30;
           } else {
-            maxW = measureText(state.headers[c] || "", "600 13px system-ui") + 60;
+            maxW = measureText(getDisplayHeader(c) || "", "600 13px system-ui") + 60;
           }
           const sample = Math.min(state.data.length, 300);
           for (let i = 0; i < sample; i++) {
@@ -6982,32 +8027,52 @@
         reader.readAsText(file, "utf-8");
       }
 
+      function _doSejDisconnect() {
+        // 仮想列を削除（末尾から削ることで他indexに影響しない）
+        if (state.sejVirtualCols && state.sejVirtualCols.indices.length) {
+          const sorted = [...state.sejVirtualCols.indices].sort((a, b) => b - a);
+          for (const vIdx of sorted) {
+            state.headers.splice(vIdx, 1);
+            state.data.forEach(row => row.splice(vIdx, 1));
+            // shiftColIndices で selected/range/cellColors/displayHeaders 等を更新
+            shiftColIndices(vIdx, -1);
+          }
+          state.sejVirtualCols = null;
+          applyFilters();
+        }
+        state.sejMaster = null;
+        $("btn-sej-link").classList.remove("active-state");
+        $("btn-sej-link").textContent = "SEJ連携";
+        state.forceRender = true;
+        renderHeader();
+        renderBody();
+        setStatus("SEJ連携を解除しました");
+        _ribSyncToggles();
+      }
+
       function toggleSejLink() {
         if (state.sejMaster) {
           const fn = state.sejMaster.fileName || "(不明)";
-          if (!confirm(`SEJ連携を解除しますか？\n\n現在読み込んでいる席種エリアマスタ:\n${fn}\n\n解除するとメモリ上のマスタデータは破棄されます。\n（再度連携するにはマスタファイルを再選択する必要があります）`)) return;
-          // 仮想列を削除（末尾から削ることで他indexに影響しない）
-          if (state.sejVirtualCols && state.sejVirtualCols.indices.length) {
-            const sorted = [...state.sejVirtualCols.indices].sort((a, b) => b - a);
-            for (const vIdx of sorted) {
-              state.headers.splice(vIdx, 1);
-              if (state.displayHeaders) state.displayHeaders.splice(vIdx, 1);
-              state.data.forEach(row => row.splice(vIdx, 1));
-              if (state.columnFilters && state.columnFilters[vIdx]) delete state.columnFilters[vIdx];
-              if (state.colWidths && state.colWidths[vIdx] != null) delete state.colWidths[vIdx];
-            }
-            state.sejVirtualCols = null;
-            applyFilters();
-          }
-          state.sejMaster = null;
-          $("btn-sej-link").classList.remove("active-state");
-          $("btn-sej-link").textContent = "SEJ連携";
-          state.forceRender = true;
-          renderHeader();
-          renderBody();
-          setStatus("SEJ連携を解除しました");
+          // confirm()はiframe内でブロックされる場合があるためカスタムモーダルを使用
+          document.querySelector("._sej-confirm-ov")?.remove();
+          const _ov = document.createElement("div");
+          _ov.className = "modal-overlay _sej-confirm-ov";
+          _ov.innerHTML = `<div class="modal-dialog">
+            <div class="modal-title">SEJ連携を解除しますか？</div>
+            <p style="font-size:13px;margin:8px 0 4px">現在のマスタ: <strong>${escHtml(fn)}</strong><br>解除するとマスタデータは破棄されます。</p>
+            <div class="modal-btns">
+              <button class="_sej-cancel btn-default">キャンセル</button>
+              <button class="_sej-ok btn-primary">解除する</button>
+            </div>
+          </div>`;
+          document.body.appendChild(_ov);
+          _ov.querySelector("._sej-cancel").onclick = () => _ov.remove();
+          _ov.querySelector("._sej-ok").onclick = () => { _ov.remove(); _doSejDisconnect(); };
+          _ov.onkeydown = (e) => { if (e.key === "Escape") _ov.remove(); };
+          _ov.querySelector("._sej-cancel").focus();
           return;
         }
+        setStatus("SEJマスタファイルを選択してください...");
         const input = document.createElement("input");
         input.type = "file";
         input.accept = ".tsv,.txt,text/plain";
@@ -7031,6 +8096,60 @@
       function isSejData() {
         const hs = state.headers.map(h => h.trim());
         return hs.includes("sej_template_cd") && hs.includes("word1");
+      }
+
+      // ===== 経路価格スケジュール連携 =====
+      function loadPriceRefFile(file) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const json = JSON.parse(reader.result);
+            if (!json.data || !Array.isArray(json.data)) {
+              setStatus("⚠ 参照JSONの形式が不正です（data配列が必要）");
+              return;
+            }
+            const colMap = json.column_map || {};
+            const lookup = new Map();
+            for (const row of json.data) {
+              const key = (row.ticket || "").trim();
+              if (key) lookup.set(key, row);
+            }
+            state.priceRef = { meta: json.meta || {}, colMap, lookup };
+            const cnt = lookup.size;
+            const raceName = json.meta?.race || file.name;
+            $("btn-price-ref").classList.add("active-state");
+            $("btn-price-ref").textContent = `価格連携中 (${cnt})`;
+            state.forceRender = true;
+            renderHeader();
+            renderBody();
+            setStatus(`価格連携: ${raceName} / ${cnt}券種を読み込みました`);
+          } catch (err) {
+            setStatus("⚠ 参照JSON読込失敗: " + err.message);
+          }
+        };
+        reader.readAsText(file, "utf-8");
+      }
+
+      function togglePriceRef() {
+        if (state.priceRef) {
+          const raceName = state.priceRef.meta?.race || "(不明)";
+          if (!confirm(`価格連携を解除しますか？\n\n現在の参照データ:\n${raceName}\n\n解除すると参照データは破棄されます。`)) return;
+          state.priceRef = null;
+          $("btn-price-ref").classList.remove("active-state");
+          $("btn-price-ref").textContent = "価格連携";
+          state.forceRender = true;
+          renderHeader();
+          renderBody();
+          setStatus("価格連携を解除しました");
+          return;
+        }
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".json,application/json";
+        input.onchange = () => {
+          if (input.files && input.files[0]) loadPriceRefFile(input.files[0]);
+        };
+        input.click();
       }
 
       // ===== SEJ HTML出力 =====
@@ -7282,7 +8401,18 @@
         }
 
         if (!colMap.length) {
-          setStatus("⚠ マスター列が見つかりません");
+          document.querySelector("._preview-err-ov")?.remove();
+          const _ov = document.createElement("div");
+          _ov.className = "modal-overlay _preview-err-ov";
+          _ov.innerHTML = `<div class="modal-dialog">
+            <div class="modal-title">⚠ マスター列が見つかりません</div>
+            <p style="font-size:13px;margin:8px 0 4px">HTML出力に必要な列が見つかりませんでした。<br>「ファイル → マスター読み込み」でマスターファイルを読み込んでください。</p>
+            <div class="modal-btns"><button class="_preview-err-ok btn-primary">閉じる</button></div>
+          </div>`;
+          document.body.appendChild(_ov);
+          _ov.querySelector("._preview-err-ok").onclick = () => _ov.remove();
+          _ov.onkeydown = (e) => { if (e.key === "Escape") _ov.remove(); };
+          _ov.querySelector("._preview-err-ok").focus();
           return;
         }
 
@@ -7524,6 +8654,11 @@
         state.filterVisible = false;
         els.filterClear.style.display = "none";
         els.filterExport.style.display = "none";
+        els.filterToggle.style.background = "";
+        els.filterToggle.style.borderColor = "";
+        els.filterToggle.style.color = "";
+        els.filterToggle.setAttribute("aria-pressed", "false");
+        els.filterToggle.setAttribute("aria-label", "フィルター行を表示");
         // ソート解除
         state.sortCol = -1;
         state.sortAsc = true;
@@ -7672,7 +8807,7 @@
         const dlg = $("dup-hl-dialog");
         const sel = $("dup-hl-col");
         sel.innerHTML = state.headers
-          .map((h, i) => `<option value="${i}">${escHtml(h)}</option>`)
+          .map((h, i) => `<option value="${i}">${escHtml(getDisplayHeader(i))}</option>`)
           .join("");
         // 現在の dupCol を復元
         if (state._dupCol != null) sel.value = state._dupCol;
@@ -7883,15 +9018,38 @@
         saveUndo();
         const seen = new Set();
         const before = state.data.length;
-        state.data = state.data.filter((row) => {
+        const keptIdx = [];
+        state.data = state.data.filter((row, origIdx) => {
           const key = row.join("\t");
           if (seen.has(key)) return false;
           seen.add(key);
+          keptIdx.push(origIdx);
           return true;
         });
         if (!state.data.length)
           state.data = [new Array(state.headers.length).fill("")];
+        if (Object.keys(state.cellColors).length > 0 || state.hiddenRows.size > 0 || state.wrapRows.size > 0) {
+          const origToNew = new Map(keptIdx.map((oi, ni) => [oi, ni]));
+          if (Object.keys(state.cellColors).length > 0) {
+            const newCC = {};
+            for (const [k, v] of Object.entries(state.cellColors)) {
+              const sep = k.indexOf(",");
+              const newRi = origToNew.get(parseInt(k.slice(0, sep)));
+              if (newRi !== undefined) newCC[newRi + k.slice(sep)] = v;
+            }
+            state.cellColors = newCC;
+          }
+          const remapSet = (s) => {
+            const ns = new Set();
+            for (const r of s) { const n = origToNew.get(r); if (n !== undefined) ns.add(n); }
+            return ns;
+          };
+          state.hiddenRows = remapSet(state.hiddenRows);
+          state.wrapRows   = remapSet(state.wrapRows);
+        }
         const removed = before - state.data.length;
+        state._dupSet = null;
+        state._dupCol = null;
         markDirty();
         applyFilters();
         state.forceRender = true;
@@ -7921,13 +9079,34 @@
         const nums = nonEmpty.map(Number).filter((v) => !isNaN(v));
         const unique = new Set(vals).size;
         const sum = nums.reduce((a, b) => a + b, 0);
-        let msg = `【${getDisplayHeader(col)}】統計\n`;
-        msg += `総数: ${vals.length}件 / 空白: ${vals.length - nonEmpty.length}件 / ユニーク: ${unique}種\n`;
+        const rows = [
+          ["総数", `${vals.length}件`],
+          ["空白", `${vals.length - nonEmpty.length}件`],
+          ["ユニーク", `${unique}種`],
+        ];
         if (nums.length > 0) {
-          msg += `数値: ${nums.length}件 / 合計: ${fmt(sum)} / 平均: ${fmt(sum / nums.length)}\n`;
-          msg += `最小: ${fmt(Math.min(...nums))} / 最大: ${fmt(Math.max(...nums))}`;
+          rows.push(["数値", `${nums.length}件`]);
+          rows.push(["合計", fmt(sum)]);
+          rows.push(["平均", fmt(sum / nums.length)]);
+          rows.push(["最小", fmt(Math.min(...nums))]);
+          rows.push(["最大", fmt(Math.max(...nums))]);
         }
-        alert(msg);
+        const tableHtml = rows.map(([k, v]) =>
+          `<tr><td style="padding:3px 10px 3px 0;color:#666;white-space:nowrap">${k}</td><td style="padding:3px 0;font-weight:600">${v}</td></tr>`
+        ).join("");
+        document.querySelector("._stats-ov")?.remove();
+        const ov = document.createElement("div");
+        ov.className = "modal-overlay show _stats-ov";
+        ov.innerHTML = `<div class="modal-dialog" style="min-width:220px">
+          <div class="modal-title">【${escHtml(getDisplayHeader(col))}】統計</div>
+          <table style="border-collapse:collapse;font-size:13px;margin:8px 0">${tableHtml}</table>
+          <div class="modal-btns"><button class="_stats-ok btn-primary">閉じる</button></div>
+        </div>`;
+        document.body.appendChild(ov);
+        const close = () => { ov.remove(); };
+        ov.querySelector("._stats-ok").onclick = close;
+        ov.onkeydown = (e) => { if (e.key === "Escape") close(); };
+        ov.querySelector("._stats-ok").focus();
       }
 
       // ===== 条件付きハイライト =====
@@ -7969,6 +9148,330 @@
           }
         });
       }
+
+      // ===== デバッグメモ機能 =====
+
+      // PAT helpers
+      function dbmGetPat() {
+        try { return atob(localStorage.getItem(DEBUG_MEMO_PAT_KEY) || ""); } catch { return ""; }
+      }
+      function dbmSavePat(pat) {
+        localStorage.setItem(DEBUG_MEMO_PAT_KEY, btoa(pat));
+      }
+      function dbmGetRepo() {
+        return localStorage.getItem(DEBUG_MEMO_REPO_KEY) || "shunjapanes/main";
+      }
+      function dbmGetBranch() {
+        return localStorage.getItem(DEBUG_MEMO_BRANCH_KEY) || "main";
+      }
+
+      // ダイアログ開く
+      function openDebugMemoDialog() {
+        const dlg = $("debug-memo-dialog");
+        const patSection = $("dbm-pat-section");
+        const pat = dbmGetPat();
+        patSection.style.display = pat ? "none" : "";
+
+        // 本文・タイトルリセット
+        $("debug-memo-title").value = "";
+        const body = $("debug-memo-body");
+        body.innerHTML = "";
+        $("debug-memo-images").innerHTML = "";
+        _dbmImages = [];
+
+        dlg.classList.add("show");
+        body.focus();
+
+        // 閉じるハンドラー
+        dlg.onkeydown = (e) => { if (e.key === "Escape") closeDebugMemoDialog(); };
+        $("dbm-cancel").onclick = closeDebugMemoDialog;
+
+        // PAT保存
+        $("dbm-save-pat").onclick = async () => {
+          const val = $("debug-memo-pat").value.trim();
+          if (!val) return;
+          $("dbm-save-pat").disabled = true;
+          $("dbm-save-pat").textContent = "確認中...";
+          const ok = await dbmValidatePat(val);
+          $("dbm-save-pat").disabled = false;
+          $("dbm-save-pat").textContent = "保存";
+          if (ok) {
+            dbmSavePat(val);
+            patSection.style.display = "none";
+            setStatus("✓ GitHub PATを保存しました");
+          } else {
+            setStatus("⚠ PATが無効か権限が足りません（repo スコープが必要）");
+          }
+        };
+
+        // 画像ペーストハンドラー
+        body.addEventListener("paste", dbmHandlePaste, { once: false });
+
+        // アップロードボタン
+        $("dbm-upload").onclick = dbmUpload;
+      }
+
+      function closeDebugMemoDialog() {
+        $("debug-memo-dialog").classList.remove("show");
+        $("debug-memo-body").removeEventListener("paste", dbmHandlePaste);
+      }
+
+      let _dbmImages = []; // [{ dataUrl, type }]
+
+      function dbmHandlePaste(e) {
+        const items = e.clipboardData?.items || [];
+        let hasImage = false;
+        for (const item of items) {
+          if (item.type.startsWith("image/")) {
+            hasImage = true;
+            e.preventDefault();
+            const blob = item.getAsFile();
+            const reader = new FileReader();
+            reader.onload = () => {
+              _dbmImages.push({ dataUrl: reader.result, type: item.type });
+              dbmRenderImagePreviews();
+            };
+            reader.readAsDataURL(blob);
+          }
+        }
+        // テキストペーストは通常通り（preventDefault しない）
+        _ = hasImage;
+      }
+
+      function dbmRenderImagePreviews() {
+        const container = $("debug-memo-images");
+        container.innerHTML = "";
+        _dbmImages.forEach((img, i) => {
+          const wrap = document.createElement("div");
+          wrap.className = "dbm-img-thumb";
+          const im = document.createElement("img");
+          im.src = img.dataUrl;
+          im.alt = `screenshot ${i + 1}`;
+          const del = document.createElement("button");
+          del.className = "dbm-img-del";
+          del.textContent = "✕";
+          del.title = "削除";
+          del.onclick = () => {
+            _dbmImages.splice(i, 1);
+            dbmRenderImagePreviews();
+          };
+          wrap.appendChild(im);
+          wrap.appendChild(del);
+          container.appendChild(wrap);
+        });
+      }
+
+      async function dbmValidatePat(pat) {
+        try {
+          const r = await fetch("https://api.github.com/user", {
+            headers: { Authorization: `Bearer ${pat}`, "X-GitHub-Api-Version": "2022-11-28" }
+          });
+          return r.ok;
+        } catch { return false; }
+      }
+
+      async function dbmGitHubPut(pat, repo, branch, path, message, base64Content) {
+        // 既存ファイルのSHAを取得（なければ新規）
+        let sha;
+        try {
+          const r = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
+            headers: { Authorization: `Bearer ${pat}`, "X-GitHub-Api-Version": "2022-11-28" }
+          });
+          if (r.ok) { const d = await r.json(); sha = d.sha; }
+        } catch {}
+        const body = { message, content: base64Content, branch };
+        if (sha) body.sha = sha;
+        const res = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${pat}`,
+            "Content-Type": "application/json",
+            "X-GitHub-Api-Version": "2022-11-28",
+          },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.message || `HTTP ${res.status}`);
+        }
+        return res;
+      }
+
+      async function dbmUpload() {
+        const btn = $("dbm-upload");
+        const pat = dbmGetPat();
+        if (!pat) {
+          $("dbm-pat-section").style.display = "";
+          $("debug-memo-pat").focus();
+          return;
+        }
+        const title = $("debug-memo-title").value.trim() || "デバッグメモ";
+        const bodyEl = $("debug-memo-body");
+        const bodyText = bodyEl.innerText.trim();
+        if (!bodyText && _dbmImages.length === 0) {
+          setStatus("⚠ 内容を入力してください");
+          return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = "アップロード中...";
+
+        const repo = dbmGetRepo();
+        const branch = dbmGetBranch();
+        const now = new Date();
+        const ts = [
+          now.getFullYear(),
+          String(now.getMonth() + 1).padStart(2, "0"),
+          String(now.getDate()).padStart(2, "0"),
+          "-",
+          String(now.getHours()).padStart(2, "0"),
+          String(now.getMinutes()).padStart(2, "0"),
+          String(now.getSeconds()).padStart(2, "0"),
+        ].join("").replace("-", "-");
+        const slug = title.replace(/[^\w぀-鿿]/g, "-").replace(/-+/g, "-").slice(0, 40);
+        const memoPath = `debug-memos/${ts}_${slug}.md`;
+
+        // 画像を先にアップロード
+        const imageRefs = [];
+        for (let i = 0; i < _dbmImages.length; i++) {
+          const img = _dbmImages[i];
+          const ext = img.type === "image/png" ? "png" : "jpg";
+          const imgPath = `debug-memos/images/${ts}_${i + 1}.${ext}`;
+          const base64 = img.dataUrl.split(",")[1];
+          try {
+            await dbmGitHubPut(pat, repo, branch, imgPath, `debug memo image: ${ts}`, base64);
+            imageRefs.push(`![screenshot ${i + 1}](images/${ts}_${i + 1}.${ext})`);
+          } catch (e) {
+            btn.disabled = false;
+            btn.textContent = "⬆ GitHubにアップロード";
+            setStatus(`⚠ 画像アップロード失敗: ${e.message}`);
+            return;
+          }
+        }
+
+        // Markdownファイルを生成
+        const dateStr = now.toLocaleString("ja-JP");
+        let md = `# ${title}\n\n`;
+        md += `- 日時: ${dateStr}\n`;
+        md += `- URL: ${location.href}\n\n`;
+        md += `## 内容\n\n${bodyText || "（内容なし）"}\n`;
+        if (imageRefs.length) {
+          md += `\n## スクリーンショット\n\n${imageRefs.join("\n")}\n`;
+        }
+
+        const mdBase64 = btoa(unescape(encodeURIComponent(md)));
+        try {
+          await dbmGitHubPut(pat, repo, branch, memoPath, `debug memo: ${title}`, mdBase64);
+          closeDebugMemoDialog();
+          setStatus(`✓ メモをアップロードしました → ${memoPath}`);
+        } catch (e) {
+          setStatus(`⚠ メモのアップロード失敗: ${e.message}`);
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "⬆ GitHubにアップロード";
+        }
+      }
+
+      // ===== lint / marker / statusbar =====
+
+      function detectNewline(text) {
+        const crlf = (text.match(/\r\n/g) || []).length;
+        const lf   = (text.match(/(?<!\r)\n/g) || []).length;
+        if (crlf > 0 && lf > 0) {
+          state.newlineMixed = true;
+          state.newline = crlf >= lf ? "crlf" : "lf";
+        } else {
+          state.newlineMixed = false;
+          state.newline = crlf > 0 ? "crlf" : "lf";
+        }
+      }
+
+      function updateEncodingStatus() {
+        if (!els.statusEncoding) return;
+        const enc = state.encoding === "utf8bom" ? "UTF-8 (BOM)" : "UTF-8";
+        const nl = state.newlineMixed ? "混在" : (state.newline === "crlf" ? "CRLF" : "LF");
+        const rows = state.data.length;
+        const cols = state.headers.length;
+        const markerCount = state.markedCells.size;
+        const markerPart = markerCount > 0 ? `  🔴 ${markerCount}` : "";
+        els.statusEncoding.textContent = `${enc} | ${nl} | ${rows.toLocaleString()}行 × ${cols}列${markerPart}`;
+      }
+
+      function runLint() {
+        const issues = [];
+        const expRe = /^[+-]?\d+(\.\d+)?[eE][+-]?\d+$/;
+        for (let r = 0; r < state.data.length; r++) {
+          const row = state.data[r];
+          const isEmpty = row.every(v => v === "" || v == null);
+          if (isEmpty) { issues.push({ type: "empty_row", row: r, msg: `行${r + 1}: 空行` }); continue; }
+          for (let c = 0; c < row.length; c++) {
+            const v = String(row[c] ?? "");
+            if (v !== v.trim()) issues.push({ type: "whitespace", row: r, col: c, msg: `行${r+1} 列${c+1}: 前後に空白「${v}」` });
+            if (expRe.test(v)) issues.push({ type: "exp_notation", row: r, col: c, msg: `行${r+1} 列${c+1}: 指数表記「${v}」` });
+          }
+        }
+        if (state.newlineMixed) issues.push({ type: "mixed_nl", msg: "改行コードが混在しています (LF/CRLF)" });
+        return issues;
+      }
+
+      function showLintDialog(issues, onSave) {
+        const dlg = $("lint-dialog");
+        const list = $("lint-issue-list");
+        list.innerHTML = "";
+        issues.forEach(iss => {
+          const div = document.createElement("div");
+          div.style.cssText = "background:var(--bg,#f8f9fa);border-radius:4px;padding:4px 8px;color:var(--text,#333)";
+          div.textContent = iss.msg;
+          list.appendChild(div);
+        });
+        dlg.style.display = "flex";
+        $("lint-save-anyway").onclick = () => { dlg.style.display = "none"; onSave(); };
+        $("lint-cancel").onclick = () => { dlg.style.display = "none"; };
+      }
+
+      function toggleMarkerMode() {
+        state.markerMode = !state.markerMode;
+        const btn = $("btn-marker");
+        btn.classList.toggle("active-state", state.markerMode);
+        btn.setAttribute("aria-pressed", String(state.markerMode));
+        document.body.classList.toggle("marker-mode", state.markerMode);
+      }
+
+      function isMarked(row, col) { return state.markedCells.has(`${row},${col}`); }
+
+      function toggleMarker(row, col) {
+        const key = `${row},${col}`;
+        if (state.markedCells.has(key)) state.markedCells.delete(key);
+        else state.markedCells.add(key);
+        updateEncodingStatus();
+        renderBody();
+      }
+
+      function clearAllMarkers() {
+        state.markedCells.clear();
+        updateEncodingStatus();
+        renderBody();
+      }
+
+      function shiftMarkers(atRow, delta) {
+        if (state.markedCells.size === 0) return;
+        const next = new Set();
+        for (const key of state.markedCells) {
+          const [r, c] = key.split(",").map(Number);
+          next.add(r >= atRow ? `${r + delta},${c}` : key);
+        }
+        state.markedCells = next;
+      }
+
+      function clearMarkersOnSort() { state.markedCells.clear(); }
+
+      // ボタン登録
+      const _btnMarker = $("btn-marker");
+      if (_btnMarker) _btnMarker.onclick = toggleMarkerMode;
+      const _btnMarkerClear = $("btn-marker-clear");
+      if (_btnMarkerClear) _btnMarkerClear.onclick = clearAllMarkers;
+
     </script>
+
   </body>
 </html>
