@@ -1377,6 +1377,109 @@
       body.wrap-cells tbody tr {
         height: 56px;
       }
+      /* ===マーカー=== */
+      td.marked {
+        background: rgba(255, 80, 160, 0.25) !important;
+      }
+      td.marked.selected {
+        background: rgba(255, 80, 160, 0.45) !important;
+      }
+      #btn-marker.active-state {
+        background: #fff0f6;
+        border-color: #f472b6;
+        color: #be185d;
+      }
+      body.marker-mode td[data-col] {
+        cursor: crosshair;
+      }
+
+      /* ===保存前リントダイアログ=== */
+      #lint-dialog {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.4);
+        z-index: 2000;
+        align-items: center;
+        justify-content: center;
+      }
+      #lint-dialog.show {
+        display: flex;
+      }
+      #lint-content {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        padding: 22px 26px;
+        width: min(520px, calc(100vw - 32px));
+        font-family: var(--font-ui);
+        max-height: 80vh;
+        display: flex;
+        flex-direction: column;
+      }
+      #lint-content h2 {
+        font-size: 14px;
+        font-weight: 700;
+        margin-bottom: 6px;
+      }
+      #lint-content p {
+        font-size: 12px;
+        color: var(--text-dim);
+        margin-bottom: 10px;
+      }
+      #lint-list {
+        overflow-y: auto;
+        flex: 1;
+        font-size: 12px;
+        border: 1px solid var(--border);
+        background: var(--surface2);
+        margin-bottom: 14px;
+        max-height: 280px;
+      }
+      .lint-row {
+        display: grid;
+        grid-template-columns: 100px 100px 1fr;
+        gap: 0;
+        border-bottom: 1px solid var(--border);
+        cursor: pointer;
+      }
+      .lint-row:last-child { border-bottom: none; }
+      .lint-row:hover { background: var(--accent-light); }
+      .lint-row > span {
+        padding: 4px 8px;
+        border-right: 1px solid var(--border);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .lint-row > span:last-child { border-right: none; }
+      .lint-header {
+        font-weight: 700;
+        font-size: 11px;
+        background: var(--header-bg);
+        color: var(--text-dim);
+        cursor: default;
+      }
+      .lint-header:hover { background: var(--header-bg); }
+      #lint-btns {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+      }
+      #lint-btns button {
+        padding: 7px 16px;
+        font-size: 12px;
+        border: 1px solid var(--border);
+        cursor: pointer;
+        background: var(--surface2);
+      }
+      #lint-btns button:hover { background: #e5e5e7; }
+      #lint-btns button.primary {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+      }
+      #lint-btns button.primary:hover { opacity: 0.88; }
+
       /* 個別行の折り返し */
       tr.wrap-row td {
         white-space: pre-wrap !important;

@@ -233,11 +233,13 @@
       function onDblClick(e) {
         const td = e.target.closest("td[data-col]");
         if (!td) return;
-        startEdit(
-          parseInt(td.parentNode.dataset.row),
-          parseInt(td.dataset.col),
-          td,
-        );
+        const row = parseInt(td.parentNode.dataset.row);
+        const col = parseInt(td.dataset.col);
+        if (state.markerMode) {
+          toggleMarker(row, col);
+          return;
+        }
+        startEdit(row, col, td);
       }
 
       function startEdit(r, c, td, initVal) {
@@ -616,6 +618,7 @@
           closeReplaceDialog();
           closeFilterDropdown();
           els.ctxMenu.style.display = "none";
+          if (state.markerMode) toggleMarkerMode();
           return;
         }
 

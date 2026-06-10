@@ -717,6 +717,7 @@
                   if (state.data.length <= delCount) return;
                   saveUndo();
                   state.data.splice(r1, delCount);
+                  for (let _dr = 0; _dr < delCount; _dr++) shiftMarkers(r1, -1);
                   const maxRow = state.data.length - 1;
                   state.selected = {
                     row: Math.min(r1, maxRow),

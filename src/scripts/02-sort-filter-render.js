@@ -41,6 +41,7 @@
         state.selected = null;
         state.range = null;
         state.anchor = null;
+        clearMarkersOnSort();
         applyFilters();
         markDirty();
         renderHeader();
@@ -714,6 +715,7 @@
               )
                 cls.push("current");
             }
+            if (isMarked(i, j)) cls.push("marked");
             if (state.conditionalHL) {
               const cv = row[j] ?? "";
               if (cv === "") cls.push("hl-empty");

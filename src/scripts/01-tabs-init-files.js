@@ -1,4 +1,4 @@
-      // ===== タブ管理 =====
+﻿      // ===== タブ管理 =====
       function saveCurrentTab() {
         if (state.activeTab < 0 || !state.tabs.length) return;
         const t = state.tabs[state.activeTab];
@@ -19,6 +19,9 @@
         t.sejVirtualCols = state.sejVirtualCols
           ? { indices: [...state.sejVirtualCols.indices], keys: [...state.sejVirtualCols.keys] }
           : null;
+        t.newline = state.newline;
+        t.newlineMixed = state.newlineMixed;
+        t.markedCells = new Set(state.markedCells);
       }
 
       function switchTab(idx) {
@@ -55,6 +58,10 @@
         state.sejVirtualCols = t.sejVirtualCols
           ? { indices: [...t.sejVirtualCols.indices], keys: [...t.sejVirtualCols.keys] }
           : null;
+        state.newline = t.newline || "lf";
+        state.newlineMixed = t.newlineMixed || false;
+        state.markedCells = t.markedCells ? new Set(t.markedCells) : new Set();
+        $("btn-marker-clear").style.display = state.markedCells.size > 0 ? "" : "none";
         applyHeaderMapping();
         if (state.dirty) {
           els.dirty.classList.add("show");
@@ -69,6 +76,7 @@
         state.forceRender = true;
         renderBody();
         showTable();
+        updateEncodingStatus();
       }
 
       function closeTab(idx) {
@@ -317,6 +325,11 @@
         $("btn-header-mode").onclick = toggleHeaderMode;
         $("btn-new-sheet").onclick = addNewSheet;
         $("btn-reset-view").onclick = resetView;
+        $("btn-marker").onclick = toggleMarkerMode;
+        $("btn-marker-clear").onclick = clearAllMarkers;
+        $("lint-save").onclick = () => hideLintDialog(true);
+        $("lint-cancel").onclick = () => hideLintDialog(false);
+        $("lint-dialog").onclick = (e) => { if (e.target === $("lint-dialog")) hideLintDialog(false); };
         $("btn-manual").onclick = showManual;
         $("btn-regex").onclick = toggleRegexMode;
         $("man-close").onclick = hideManual;
@@ -493,6 +506,7 @@
           setStatus(
             `ロード完了: ${state.data.length}行 × ${state.headers.length}列`,
           );
+          updateEncodingStatus();
         };
         reader.onerror = () => setStatus("ファイルの読み込みに失敗しました");
         reader.readAsText(file);
@@ -542,6 +556,8 @@
         } else {
           state.encoding = "utf8";
         }
+        // 改行コード検出（ステータスバー表示 & 保存時維持のため）
+        detectNewline(text);
         const rows = [];
         let row = [],
           cur = "",
@@ -823,13 +839,15 @@
         const rows = state.filteredIndices
           ? state.filteredIndices.map((i) => state.data[i])
           : state.data;
+        // 読込時の改行コードを維持して保存する
+        const nl = (state.newline === "crlf") ? "\r\n" : "\n";
         if (state.headerMode === "numbered") {
-          return rows.map((r) => filterCols(r).map(esc).join(d)).join("\n");
+          return rows.map((r) => filterCols(r).map(esc).join(d)).join(nl);
         }
         return (
           filterCols(state.headers).map(esc).join(d) +
-          "\n" +
-          rows.map((r) => filterCols(r).map(esc).join(d)).join("\n")
+          nl +
+          rows.map((r) => filterCols(r).map(esc).join(d)).join(nl)
         );
       }
 
@@ -904,8 +922,18 @@
             }
           }
         }
+        // 保存前リント（問題があればダイアログを表示して保存を保留）
+        const lintIssues = runLint();
+        if (lintIssues.length > 0) {
+          showLintDialog(lintIssues, () => doSaveFile());
+          return;
+        }
+        doSaveFile();
+      }
+
+      function doSaveFile() {
         const virtualNote = state.sejVirtualCols ? "（仮想列は除外）" : "";
-        const bom = state.encoding === "utf8bom" ? "\uFEFF" : "";
+        const bom = state.encoding === "utf8bom" ? "﻿" : "";
         const txt = bom + buildFileContent();
         const blob = new Blob([txt], { type: "text/plain" });
         const a = document.createElement("a");
@@ -917,5 +945,6 @@
         markClean();
         const savedRows = state.filteredIndices ? state.filteredIndices.length : state.data.length;
         setStatus(`保存しました（${savedRows}行${virtualNote}）`);
+        updateEncodingStatus();
       }
 

@@ -1388,6 +1388,109 @@
       body.wrap-cells tbody tr {
         height: 56px;
       }
+      /* ===マーカー=== */
+      td.marked {
+        background: rgba(255, 80, 160, 0.25) !important;
+      }
+      td.marked.selected {
+        background: rgba(255, 80, 160, 0.45) !important;
+      }
+      #btn-marker.active-state {
+        background: #fff0f6;
+        border-color: #f472b6;
+        color: #be185d;
+      }
+      body.marker-mode td[data-col] {
+        cursor: crosshair;
+      }
+
+      /* ===保存前リントダイアログ=== */
+      #lint-dialog {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.4);
+        z-index: 2000;
+        align-items: center;
+        justify-content: center;
+      }
+      #lint-dialog.show {
+        display: flex;
+      }
+      #lint-content {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        padding: 22px 26px;
+        width: min(520px, calc(100vw - 32px));
+        font-family: var(--font-ui);
+        max-height: 80vh;
+        display: flex;
+        flex-direction: column;
+      }
+      #lint-content h2 {
+        font-size: 14px;
+        font-weight: 700;
+        margin-bottom: 6px;
+      }
+      #lint-content p {
+        font-size: 12px;
+        color: var(--text-dim);
+        margin-bottom: 10px;
+      }
+      #lint-list {
+        overflow-y: auto;
+        flex: 1;
+        font-size: 12px;
+        border: 1px solid var(--border);
+        background: var(--surface2);
+        margin-bottom: 14px;
+        max-height: 280px;
+      }
+      .lint-row {
+        display: grid;
+        grid-template-columns: 100px 100px 1fr;
+        gap: 0;
+        border-bottom: 1px solid var(--border);
+        cursor: pointer;
+      }
+      .lint-row:last-child { border-bottom: none; }
+      .lint-row:hover { background: var(--accent-light); }
+      .lint-row > span {
+        padding: 4px 8px;
+        border-right: 1px solid var(--border);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .lint-row > span:last-child { border-right: none; }
+      .lint-header {
+        font-weight: 700;
+        font-size: 11px;
+        background: var(--header-bg);
+        color: var(--text-dim);
+        cursor: default;
+      }
+      .lint-header:hover { background: var(--header-bg); }
+      #lint-btns {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+      }
+      #lint-btns button {
+        padding: 7px 16px;
+        font-size: 12px;
+        border: 1px solid var(--border);
+        cursor: pointer;
+        background: var(--surface2);
+      }
+      #lint-btns button:hover { background: #e5e5e7; }
+      #lint-btns button.primary {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+      }
+      #lint-btns button.primary:hover { opacity: 0.88; }
+
       /* 個別行の折り返し */
       tr.wrap-row td {
         white-space: pre-wrap !important;
@@ -1599,6 +1702,27 @@
       <div class="toolbar-sep" role="separator" aria-hidden="true"></div>
       <button
         type="button"
+        class="btn"
+        id="btn-marker"
+        title="マーカーモード（チェック作業用）&#10;ON中にセルをダブルクリックでマーカーを付与/解除&#10;保存ファイルには影響しません"
+        aria-label="マーカーモードの切り替え"
+        aria-pressed="false"
+      >
+        マーカー
+      </button>
+      <button
+        type="button"
+        class="btn danger"
+        id="btn-marker-clear"
+        style="display:none"
+        title="マーカーをすべて解除"
+        aria-label="マーカーをすべてクリア"
+      >
+        M×
+      </button>
+      <div class="toolbar-sep" role="separator" aria-hidden="true"></div>
+      <button
+        type="button"
         class="btn danger"
         id="btn-reset-view"
         title="表示状態をすべてリセット&#10;フィルター・ソート・非表示列/行・&#10;選択範囲をすべて解除します"
@@ -1722,6 +1846,7 @@
       <span id="status-filter" aria-live="polite"></span>
       <span id="status-stats" aria-live="off"></span>
       <span id="status-pos" aria-live="off"></span>
+      <span id="status-encoding" aria-live="off" style="margin-left:auto;color:var(--text-dim);font-size:11px;padding-right:4px"></span>
     </div>
 
     <!-- 右クリックメニュー -->
@@ -1863,6 +1988,25 @@
           <button type="button" class="danger" id="reload-discard" aria-label="変更を破棄して続ける">
             変更を破棄して続ける
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 保存前リントダイアログ -->
+    <div
+      id="lint-dialog"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="lint-dialog-title"
+      aria-describedby="lint-dialog-desc"
+    >
+      <div id="lint-content">
+        <h2 id="lint-dialog-title">⚠ 保存前チェック</h2>
+        <p id="lint-dialog-desc">以下の項目が検出されました。確認してから保存することをお勧めします。</p>
+        <div id="lint-list"></div>
+        <div id="lint-btns">
+          <button type="button" class="primary" id="lint-save" aria-label="このまま保存する">このまま保存</button>
+          <button type="button" id="lint-cancel" aria-label="キャンセルして確認する">キャンセル（確認する）</button>
         </div>
       </div>
     </div>
@@ -2102,6 +2246,10 @@
 
         // 新機能
         encoding: "utf8", // 'utf8' | 'utf8bom'
+        newline: "lf",     // 'lf' | 'crlf' — 読込時に検出し保存時に維持
+        newlineMixed: false, // 読込時に LF/CRLF 混在フラグ
+        markerMode: false, // マーカーモード ON/OFF
+        markedCells: new Set(), // "row,col" 形式のキーセット（保存ファイルには影響しない）
         freezeCols: 0, // フリーズ列数
         conditionalHL: false, // 条件付きハイライト
         regexMode: false, // 正規表現検索モード
@@ -2145,6 +2293,7 @@
         filterToggle: $("btn-filter-toggle"),
         filterClear: $("btn-filter-clear"),
         filterExport: $("btn-export-filtered"),
+        statusEncoding: $("status-encoding"),
       };
 
       let ROW_H = 22;
@@ -2200,7 +2349,7 @@
           cap.textContent = `${state.fileName || "TSV/CSV"} データ編集グリッド`;
       }
 
-      // ===== タブ管理 =====
+﻿      // ===== タブ管理 =====
       function saveCurrentTab() {
         if (state.activeTab < 0 || !state.tabs.length) return;
         const t = state.tabs[state.activeTab];
@@ -2221,6 +2370,9 @@
         t.sejVirtualCols = state.sejVirtualCols
           ? { indices: [...state.sejVirtualCols.indices], keys: [...state.sejVirtualCols.keys] }
           : null;
+        t.newline = state.newline;
+        t.newlineMixed = state.newlineMixed;
+        t.markedCells = new Set(state.markedCells);
       }
 
       function switchTab(idx) {
@@ -2257,6 +2409,10 @@
         state.sejVirtualCols = t.sejVirtualCols
           ? { indices: [...t.sejVirtualCols.indices], keys: [...t.sejVirtualCols.keys] }
           : null;
+        state.newline = t.newline || "lf";
+        state.newlineMixed = t.newlineMixed || false;
+        state.markedCells = t.markedCells ? new Set(t.markedCells) : new Set();
+        $("btn-marker-clear").style.display = state.markedCells.size > 0 ? "" : "none";
         applyHeaderMapping();
         if (state.dirty) {
           els.dirty.classList.add("show");
@@ -2271,6 +2427,7 @@
         state.forceRender = true;
         renderBody();
         showTable();
+        updateEncodingStatus();
       }
 
       function closeTab(idx) {
@@ -2519,6 +2676,11 @@
         $("btn-header-mode").onclick = toggleHeaderMode;
         $("btn-new-sheet").onclick = addNewSheet;
         $("btn-reset-view").onclick = resetView;
+        $("btn-marker").onclick = toggleMarkerMode;
+        $("btn-marker-clear").onclick = clearAllMarkers;
+        $("lint-save").onclick = () => hideLintDialog(true);
+        $("lint-cancel").onclick = () => hideLintDialog(false);
+        $("lint-dialog").onclick = (e) => { if (e.target === $("lint-dialog")) hideLintDialog(false); };
         $("btn-manual").onclick = showManual;
         $("btn-regex").onclick = toggleRegexMode;
         $("man-close").onclick = hideManual;
@@ -2695,6 +2857,7 @@
           setStatus(
             `ロード完了: ${state.data.length}行 × ${state.headers.length}列`,
           );
+          updateEncodingStatus();
         };
         reader.onerror = () => setStatus("ファイルの読み込みに失敗しました");
         reader.readAsText(file);
@@ -2744,6 +2907,8 @@
         } else {
           state.encoding = "utf8";
         }
+        // 改行コード検出（ステータスバー表示 & 保存時維持のため）
+        detectNewline(text);
         const rows = [];
         let row = [],
           cur = "",
@@ -3025,13 +3190,15 @@
         const rows = state.filteredIndices
           ? state.filteredIndices.map((i) => state.data[i])
           : state.data;
+        // 読込時の改行コードを維持して保存する
+        const nl = (state.newline === "crlf") ? "\r\n" : "\n";
         if (state.headerMode === "numbered") {
-          return rows.map((r) => filterCols(r).map(esc).join(d)).join("\n");
+          return rows.map((r) => filterCols(r).map(esc).join(d)).join(nl);
         }
         return (
           filterCols(state.headers).map(esc).join(d) +
-          "\n" +
-          rows.map((r) => filterCols(r).map(esc).join(d)).join("\n")
+          nl +
+          rows.map((r) => filterCols(r).map(esc).join(d)).join(nl)
         );
       }
 
@@ -3106,8 +3273,18 @@
             }
           }
         }
+        // 保存前リント（問題があればダイアログを表示して保存を保留）
+        const lintIssues = runLint();
+        if (lintIssues.length > 0) {
+          showLintDialog(lintIssues, () => doSaveFile());
+          return;
+        }
+        doSaveFile();
+      }
+
+      function doSaveFile() {
         const virtualNote = state.sejVirtualCols ? "（仮想列は除外）" : "";
-        const bom = state.encoding === "utf8bom" ? "\uFEFF" : "";
+        const bom = state.encoding === "utf8bom" ? "﻿" : "";
         const txt = bom + buildFileContent();
         const blob = new Blob([txt], { type: "text/plain" });
         const a = document.createElement("a");
@@ -3119,6 +3296,7 @@
         markClean();
         const savedRows = state.filteredIndices ? state.filteredIndices.length : state.data.length;
         setStatus(`保存しました（${savedRows}行${virtualNote}）`);
+        updateEncodingStatus();
       }
 
       // ===== ソート =====
@@ -3164,6 +3342,7 @@
         state.selected = null;
         state.range = null;
         state.anchor = null;
+        clearMarkersOnSort();
         applyFilters();
         markDirty();
         renderHeader();
@@ -3837,6 +4016,7 @@
               )
                 cls.push("current");
             }
+            if (isMarked(i, j)) cls.push("marked");
             if (state.conditionalHL) {
               const cv = row[j] ?? "";
               if (cv === "") cls.push("hl-empty");
@@ -4257,11 +4437,13 @@
       function onDblClick(e) {
         const td = e.target.closest("td[data-col]");
         if (!td) return;
-        startEdit(
-          parseInt(td.parentNode.dataset.row),
-          parseInt(td.dataset.col),
-          td,
-        );
+        const row = parseInt(td.parentNode.dataset.row);
+        const col = parseInt(td.dataset.col);
+        if (state.markerMode) {
+          toggleMarker(row, col);
+          return;
+        }
+        startEdit(row, col, td);
       }
 
       function startEdit(r, c, td, initVal) {
@@ -4640,6 +4822,7 @@
           closeReplaceDialog();
           closeFilterDropdown();
           els.ctxMenu.style.display = "none";
+          if (state.markerMode) toggleMarkerMode();
           return;
         }
 
@@ -5635,6 +5818,7 @@
                   if (state.data.length <= delCount) return;
                   saveUndo();
                   state.data.splice(r1, delCount);
+                  for (let _dr = 0; _dr < delCount; _dr++) shiftMarkers(r1, -1);
                   const maxRow = state.data.length - 1;
                   state.selected = {
                     row: Math.min(r1, maxRow),
@@ -6063,6 +6247,10 @@
         state._dupCol = null;
         state.sejVirtualCols = null; // 仮想列情報は読み込みデータと不可分（残すと保存時に実列を誤除外）
         state.dirty = false;
+        state.newline = "lf";
+        state.newlineMixed = false;
+        state.markedCells = new Set();
+        state.markerMode = false;
         document.body.classList.remove("wrap-cells");
         $("btn-wrap").classList.remove("active-state");
         $("btn-wrap").setAttribute("aria-pressed", "false");
@@ -6079,6 +6267,11 @@
         els.filterToggle.style.color = "";
         els.dirty.classList.remove("show");
         document.title = "TSV/CSV Editor";
+        const markerBtn = $("btn-marker");
+        if (markerBtn) { markerBtn.classList.remove("active-state"); markerBtn.setAttribute("aria-pressed", "false"); }
+        document.body.classList.remove("marker-mode");
+        const markerClearBtn = $("btn-marker-clear");
+        if (markerClearBtn) markerClearBtn.style.display = "none";
       }
 
       function addNewSheet() {
@@ -6120,6 +6313,7 @@
         saveUndo();
         const at = state.selected ? state.selected.row + 1 : state.data.length;
         state.data.splice(at, 0, Array(state.headers.length).fill(""));
+        shiftMarkers(at, +1);
         markDirty();
         applyFilters();
         state.forceRender = true;
@@ -6636,6 +6830,7 @@
         const r = state.selected.row;
         saveUndo();
         state.data.splice(r + 1, 0, [...state.data[r]]);
+        shiftMarkers(r + 1, +1);
         state.selected.row = r + 1;
         markDirty();
         applyFilters();
@@ -7968,7 +8163,152 @@
             }
           }
         });
+      }      // ===== ステータスバー（エンコーディング/改行/行×列）=====
+      function updateEncodingStatus() {
+        if (!els.statusEncoding) return;
+        const rows = state.data.length;
+        const cols = state.headers.length;
+        const enc = state.encoding === "utf8bom" ? "UTF-8 (BOM)" : "UTF-8";
+        const nl = state.newlineMixed ? "混在" : (state.newline === "crlf" ? "CRLF" : "LF");
+        const markerCount = state.markedCells.size;
+        const markerPart = markerCount > 0 ? `  🔴 ${markerCount}` : "";
+        els.statusEncoding.textContent = `${enc} | ${nl} | ${rows.toLocaleString()}行 × ${cols}列${markerPart}`;
       }
+
+      // ===== 改行コード検出 =====
+      function detectNewline(text) {
+        const crlf = (text.match(/\r\n/g) || []).length;
+        const lf   = (text.match(/(?<!\r)\n/g) || []).length;
+        if (crlf > 0 && lf > 0) {
+          state.newlineMixed = true;
+          state.newline = crlf >= lf ? "crlf" : "lf";
+        } else {
+          state.newlineMixed = false;
+          state.newline = crlf > 0 ? "crlf" : "lf";
+        }
+      }
+
+      // ===== 保存前リント =====
+      function runLint() {
+        const issues = [];
+        const rows = state.filteredIndices
+          ? state.filteredIndices.map((i) => ({ ri: i, row: state.data[i] }))
+          : state.data.map((row, i) => ({ ri: i, row }));
+        const EXP_RE = /^[+-]?\d+(\.\d+)?[eE][+-]?\d+$/;
+
+        rows.forEach(({ ri, row }) => {
+          const allEmpty = row.every((v) => String(v ?? "").trim() === "");
+          if (allEmpty) {
+            issues.push({ type: "空行", rowNum: ri + 1, colName: "—", value: "" });
+            return;
+          }
+          row.forEach((v, ci) => {
+            const s = String(v ?? "");
+            if (s !== s.trim()) {
+              const preview = s.replace(/\t/g, "→").replace(/ /g, "·").replace(/　/g, "□");
+              issues.push({ type: "前後空白", rowNum: ri + 1, colName: state.headers[ci] || String(ci + 1), value: preview.slice(0, 40) });
+            }
+            if (EXP_RE.test(s)) {
+              issues.push({ type: "指数表記", rowNum: ri + 1, colName: state.headers[ci] || String(ci + 1), value: s.slice(0, 40) });
+            }
+          });
+        });
+        if (state.newlineMixed) {
+          issues.unshift({ type: "改行コード混在", rowNum: "—", colName: "—", value: "CRLF と LF が混在" });
+        }
+        return issues;
+      }
+
+      let _lintSaveCallback = null;
+      function showLintDialog(issues, onSave) {
+        _lintSaveCallback = onSave;
+        const list = $("lint-list");
+        let html = `<div class="lint-row lint-header"><span>種別</span><span>行 / 列</span><span>値</span></div>`;
+        issues.slice(0, 200).forEach((iss) => {
+          const rowCol = iss.rowNum === "—" ? "—" : `行${iss.rowNum} / ${iss.colName}`;
+          html += `<div class="lint-row" data-row="${iss.rowNum}" data-col="${iss.colName}">` +
+            `<span>${escHtml(iss.type)}</span>` +
+            `<span>${escHtml(rowCol)}</span>` +
+            `<span>${escHtml(iss.value)}</span>` +
+            `</div>`;
+        });
+        if (issues.length > 200) {
+          html += `<div style="padding:4px 8px;font-size:11px;color:var(--text-dim)">… 他 ${issues.length - 200} 件</div>`;
+        }
+        list.innerHTML = html;
+        // 行クリックでジャンプ
+        list.querySelectorAll(".lint-row:not(.lint-header)").forEach((row, idx) => {
+          row.addEventListener("click", () => {
+            const iss = issues[idx];
+            if (typeof iss.rowNum === "number") {
+              moveTo(iss.rowNum - 1, 0);
+            }
+            hideLintDialog(false);
+          });
+        });
+        $("lint-dialog").classList.add("show");
+      }
+      function hideLintDialog(doSave) {
+        $("lint-dialog").classList.remove("show");
+        if (doSave && _lintSaveCallback) _lintSaveCallback();
+        _lintSaveCallback = null;
+      }
+
+      // ===== マーカー =====
+      function toggleMarkerMode() {
+        state.markerMode = !state.markerMode;
+        const btn = $("btn-marker");
+        btn.classList.toggle("active-state", state.markerMode);
+        btn.setAttribute("aria-pressed", String(state.markerMode));
+        document.body.classList.toggle("marker-mode", state.markerMode);
+        setStatus(state.markerMode ? "マーカーモード ON — セルをダブルクリックでマーカーを付与/解除" : "マーカーモード OFF");
+      }
+      function toggleMarker(row, col) {
+        const key = row + "," + col;
+        if (state.markedCells.has(key)) {
+          state.markedCells.delete(key);
+        } else {
+          state.markedCells.add(key);
+        }
+        $("btn-marker-clear").style.display = state.markedCells.size > 0 ? "" : "none";
+        state.forceRender = true;
+        renderBody();
+        updateEncodingStatus();
+      }
+      function clearAllMarkers() {
+        state.markedCells.clear();
+        $("btn-marker-clear").style.display = "none";
+        state.forceRender = true;
+        renderBody();
+        updateEncodingStatus();
+        setStatus("マーカーをすべてクリアしました");
+      }
+      function isMarked(row, col) {
+        return state.markedCells.has(row + "," + col);
+      }
+
+      // ===== マーカー：行挿入/削除時のインデックスシフト =====
+      function shiftMarkers(atRow, delta) {
+        if (state.markedCells.size === 0) return;
+        const next = new Set();
+        state.markedCells.forEach((key) => {
+          const [r, c] = key.split(",").map(Number);
+          if (delta === -1 && r === atRow) return; // 削除行はドロップ
+          const nr = r >= atRow ? r + delta : r;
+          if (nr >= 0) next.add(nr + "," + c);
+        });
+        state.markedCells = next;
+        $("btn-marker-clear").style.display = state.markedCells.size > 0 ? "" : "none";
+      }
+
+      // マーカー：ソート後は行インデックスが変わるため既存マーカーをクリア
+      function clearMarkersOnSort() {
+        if (state.markedCells.size === 0) return;
+        state.markedCells.clear();
+        $("btn-marker-clear").style.display = "none";
+        updateEncodingStatus();
+      }
+
     </script>
   </body>
 </html>

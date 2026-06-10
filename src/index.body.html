@@ -192,6 +192,27 @@
       <div class="toolbar-sep" role="separator" aria-hidden="true"></div>
       <button
         type="button"
+        class="btn"
+        id="btn-marker"
+        title="マーカーモード（チェック作業用）&#10;ON中にセルをダブルクリックでマーカーを付与/解除&#10;保存ファイルには影響しません"
+        aria-label="マーカーモードの切り替え"
+        aria-pressed="false"
+      >
+        マーカー
+      </button>
+      <button
+        type="button"
+        class="btn danger"
+        id="btn-marker-clear"
+        style="display:none"
+        title="マーカーをすべて解除"
+        aria-label="マーカーをすべてクリア"
+      >
+        M×
+      </button>
+      <div class="toolbar-sep" role="separator" aria-hidden="true"></div>
+      <button
+        type="button"
         class="btn danger"
         id="btn-reset-view"
         title="表示状態をすべてリセット&#10;フィルター・ソート・非表示列/行・&#10;選択範囲をすべて解除します"
@@ -315,6 +336,7 @@
       <span id="status-filter" aria-live="polite"></span>
       <span id="status-stats" aria-live="off"></span>
       <span id="status-pos" aria-live="off"></span>
+      <span id="status-encoding" aria-live="off" style="margin-left:auto;color:var(--text-dim);font-size:11px;padding-right:4px"></span>
     </div>
 
     <!-- 右クリックメニュー -->
@@ -456,6 +478,25 @@
           <button type="button" class="danger" id="reload-discard" aria-label="変更を破棄して続ける">
             変更を破棄して続ける
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 保存前リントダイアログ -->
+    <div
+      id="lint-dialog"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="lint-dialog-title"
+      aria-describedby="lint-dialog-desc"
+    >
+      <div id="lint-content">
+        <h2 id="lint-dialog-title">⚠ 保存前チェック</h2>
+        <p id="lint-dialog-desc">以下の項目が検出されました。確認してから保存することをお勧めします。</p>
+        <div id="lint-list"></div>
+        <div id="lint-btns">
+          <button type="button" class="primary" id="lint-save" aria-label="このまま保存する">このまま保存</button>
+          <button type="button" id="lint-cancel" aria-label="キャンセルして確認する">キャンセル（確認する）</button>
         </div>
       </div>
     </div>

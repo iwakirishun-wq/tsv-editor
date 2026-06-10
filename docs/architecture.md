@@ -22,6 +22,7 @@
 - `05-utilities-resize-view.js`: 検索系ユーティリティ、リサイズ、非表示、行操作、表示補助。
 - `06-html-sej-export.js`: HTMLプレビュー/エクスポート、SEJ連携。
 - `07-view-options-recent-pwa.js`: 表示オプション、最近開いたファイル、フォーカス制御、マニュアル、PWA関連。
+- `08-lint-marker-statusbar.js`: 保存前リント（空行・前後空白・指数表記・改行混在の検出とダイアログ）、マーカー機能（チェック作業用セルハイライト）、ステータスバー更新（エンコーディング/改行コード/行×列の常時表示）。
 
 ## Build
 
@@ -37,6 +38,15 @@ python tools\build_single_html.py
 ```powershell
 python tools\build_single_html.py --output dist\index.html
 ```
+
+## New state fields (feature/lint-statusbar-marker)
+
+| field | type | 説明 |
+|---|---|---|
+| `newline` | `"lf" \| "crlf"` | 読込時に検出した改行コード。保存時に維持 |
+| `newlineMixed` | `boolean` | 読込時に LF/CRLF 混在を検出した場合 true。リントで警告 |
+| `markerMode` | `boolean` | マーカーモード ON/OFF。ON 中はダブルクリックでマーカー付与/解除 |
+| `markedCells` | `Set<string>` | `"row,col"` 形式のキーセット。タブごとに保持。保存ファイルには影響しない |
 
 ## Refactoring rules
 

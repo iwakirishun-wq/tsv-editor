@@ -55,6 +55,10 @@
 
         // 新機能
         encoding: "utf8", // 'utf8' | 'utf8bom'
+        newline: "lf",     // 'lf' | 'crlf' — 読込時に検出し保存時に維持
+        newlineMixed: false, // 読込時に LF/CRLF 混在フラグ
+        markerMode: false, // マーカーモード ON/OFF
+        markedCells: new Set(), // "row,col" 形式のキーセット（保存ファイルには影響しない）
         freezeCols: 0, // フリーズ列数
         conditionalHL: false, // 条件付きハイライト
         regexMode: false, // 正規表現検索モード
@@ -98,6 +102,7 @@
         filterToggle: $("btn-filter-toggle"),
         filterClear: $("btn-filter-clear"),
         filterExport: $("btn-export-filtered"),
+        statusEncoding: $("status-encoding"),
       };
 
       let ROW_H = 22;

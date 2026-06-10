@@ -31,6 +31,10 @@
         state._dupCol = null;
         state.sejVirtualCols = null; // 仮想列情報は読み込みデータと不可分（残すと保存時に実列を誤除外）
         state.dirty = false;
+        state.newline = "lf";
+        state.newlineMixed = false;
+        state.markedCells = new Set();
+        state.markerMode = false;
         document.body.classList.remove("wrap-cells");
         $("btn-wrap").classList.remove("active-state");
         $("btn-wrap").setAttribute("aria-pressed", "false");
@@ -47,6 +51,11 @@
         els.filterToggle.style.color = "";
         els.dirty.classList.remove("show");
         document.title = "TSV/CSV Editor";
+        const markerBtn = $("btn-marker");
+        if (markerBtn) { markerBtn.classList.remove("active-state"); markerBtn.setAttribute("aria-pressed", "false"); }
+        document.body.classList.remove("marker-mode");
+        const markerClearBtn = $("btn-marker-clear");
+        if (markerClearBtn) markerClearBtn.style.display = "none";
       }
 
       function addNewSheet() {
@@ -88,6 +97,7 @@
         saveUndo();
         const at = state.selected ? state.selected.row + 1 : state.data.length;
         state.data.splice(at, 0, Array(state.headers.length).fill(""));
+        shiftMarkers(at, +1);
         markDirty();
         applyFilters();
         state.forceRender = true;
@@ -604,6 +614,7 @@
         const r = state.selected.row;
         saveUndo();
         state.data.splice(r + 1, 0, [...state.data[r]]);
+        shiftMarkers(r + 1, +1);
         state.selected.row = r + 1;
         markDirty();
         applyFilters();
