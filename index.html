@@ -3049,7 +3049,9 @@
         state.fileName = file.name;
         const reader = new FileReader();
         reader.onload = (e) => {
-          const text = e.target.result;
+          // readAsText は BOM をデコード時に除去してしまい BOM 検出（charCodeAt(0)===0xFEFF）が
+          // 効かないため、ArrayBuffer で読んで ignoreBOM:true でデコードし BOM 文字を残す
+          const text = new TextDecoder("utf-8", { ignoreBOM: true }).decode(e.target.result);
           state.delimiter = detectDelimiter(text, file.name);
           parseData(text);
           clearAutoDropColumns();
@@ -3123,7 +3125,7 @@
           updateEncodingStatus();
         };
         reader.onerror = () => setStatus("ファイルの読み込みに失敗しました");
-        reader.readAsText(file);
+        reader.readAsArrayBuffer(file);
       }
 
       // 非アクティブタブを復元（遅延ロード）
@@ -3238,7 +3240,11 @@
         }
         if (!state.data.length)
           state.data = [new Array(state.headers.length).fill("")];
+        // resetState は newline/newlineMixed を既定値に戻すため、検出結果を退避して復元する
+        const _nl = state.newline, _nlMixed = state.newlineMixed;
         resetState();
+        state.newline = _nl;
+        state.newlineMixed = _nlMixed;
       }
 
       // ===== ヘッダー自動変換（席種エリアマスター対応）=====
