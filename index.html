@@ -95,24 +95,195 @@
         background: transparent;
       }
 
-      /* ===ツールバー=== */
-      #toolbar {
-        height: 40px;
-        background: var(--toolbar-bg);
-        border-bottom: 1px solid var(--border);
-        display: flex;
-        align-items: center;
-        gap: 2px;
-        padding: 0 12px;
+      /* === RIBBON CSS === */
+      :root {
+        --rb-bg-base: #fafafa;
+        --rb-bg-hover: #f5f5f5;
+        --rb-border: #e5e5e5;
+        --rb-text: #171717;
+        --rb-dim: #737373;
+        --rb-accent: #217346;
+      }
+      .rb-ribbon {
+        background: var(--rb-bg-base);
+        border-bottom: 1px solid var(--rb-border);
         flex-shrink: 0;
         user-select: none;
       }
-      .toolbar-sep {
-        width: 1px;
-        height: 18px;
-        background: var(--border);
-        margin: 0 6px;
+      .rb-tabbar {
+        display: flex;
+        align-items: center;
+        height: 28px;
+        padding: 0 12px;
+        background: var(--rb-bg-base);
+        border-bottom: 1px solid var(--rb-border);
+        gap: 2px;
       }
+      .rb-tab {
+        padding: 0 16px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+        font-size: 13px;
+        color: var(--rb-text);
+        border: none;
+        background: transparent;
+        border-bottom: 3px solid transparent;
+        transition: background-color 0.2s, border-bottom-color 0.2s;
+        font-family: var(--font-ui);
+      }
+      .rb-tab:hover { background: var(--rb-bg-hover); }
+      .rb-tab.rb-tab-active {
+        border-bottom-color: var(--rb-accent);
+        background: var(--rb-bg-hover);
+      }
+      .rb-tab-spacer { flex: 1; }
+      .rb-content {
+        display: none;
+        padding: 6px 12px;
+        background: var(--rb-bg-base);
+        min-height: 80px;
+        border-bottom: 1px solid var(--rb-border);
+      }
+      .rb-content.rb-content-active {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 0;
+      }
+      .rb-group {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        border-right: 1px solid var(--rb-border);
+        padding-right: 8px;
+        margin-right: 8px;
+      }
+      .rb-group:last-child {
+        border-right: none;
+        margin-right: 0;
+        padding-right: 0;
+      }
+      .rb-buttons {
+        display: flex;
+        gap: 4px;
+        align-items: flex-start;
+        margin-bottom: 4px;
+      }
+      .rb-group-label {
+        font-size: 11px;
+        color: var(--rb-dim);
+        text-align: center;
+        margin-top: 2px;
+        line-height: 1.2;
+        white-space: normal;
+        max-width: 70px;
+      }
+      .rb-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        width: 64px;
+        height: 70px;
+        padding: 4px;
+        border: 1px solid transparent;
+        background: transparent;
+        cursor: pointer;
+        border-radius: 2px;
+        transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+        font-size: 11px;
+        color: var(--rb-text);
+        text-align: center;
+        line-height: 1.3;
+        word-break: break-word;
+        overflow: hidden;
+        font-family: var(--font-ui);
+      }
+      .rb-btn:hover {
+        background: var(--rb-bg-hover);
+        border-color: var(--rb-border);
+      }
+      .rb-btn:focus-visible {
+        outline: 2px solid var(--rb-accent);
+        outline-offset: -1px;
+      }
+      .rb-btn:active { background: #ebebeb; }
+      .rb-btn.active-state {
+        background: var(--rb-accent);
+        color: #fff;
+        border-color: var(--rb-accent);
+      }
+      .rb-btn.active-state .rb-icon svg { color: #fff; }
+      .rb-icon {
+        width: 24px;
+        height: 24px;
+        margin-bottom: 2px;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .rb-icon svg {
+        width: 100%;
+        height: 100%;
+        display: block;
+        color: var(--rb-text);
+      }
+      .rb-btn:hover .rb-icon svg { color: var(--rb-accent); }
+      .rb-btn.active-state:hover .rb-icon svg { color: #fff; }
+      .rb-input-btn {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        height: 32px;
+        width: 160px;
+        padding: 4px 8px;
+        border: 1px solid var(--rb-border);
+        background: #fff;
+        border-radius: 2px;
+        font-size: 12px;
+        gap: 4px;
+      }
+      .rb-input-btn input {
+        flex: 1;
+        border: none;
+        outline: none;
+        background: transparent;
+        font-size: 12px;
+        color: var(--rb-text);
+        font-family: var(--font-ui);
+      }
+      .rb-input-btn input::placeholder { color: var(--rb-dim); }
+      .rb-input-btn:focus-within {
+        border-color: var(--rb-accent);
+        box-shadow: 0 0 0 1px var(--rb-accent);
+      }
+      .rb-input-btn .rb-icon {
+        width: 16px;
+        height: 16px;
+        margin-bottom: 0;
+        flex-shrink: 0;
+      }
+      #dirty-indicator {
+        display: none;
+        width: 6px;
+        height: 6px;
+        background: #ef4444;
+        border-radius: 50%;
+        margin-left: 2px;
+        flex-shrink: 0;
+        vertical-align: middle;
+      }
+      #dirty-indicator.show { display: inline-block; }
+      #search-count {
+        font-size: 11px;
+        color: var(--rb-dim);
+        min-width: 40px;
+        white-space: nowrap;
+      }
+      /* ツールバー旧スタイル不要 — .toolbar-sep は削除 */
       #custom-tooltip {
         position: fixed;
         z-index: 99999;
@@ -169,24 +340,6 @@
         background: var(--accent);
         color: #fff;
         border-color: var(--accent);
-      }
-      #dirty-indicator {
-        display: none;
-        width: 6px;
-        height: 6px;
-        background: #ef4444;
-        border-radius: 50%;
-        margin-left: 2px;
-        flex-shrink: 0;
-      }
-      #dirty-indicator.show {
-        display: inline-block;
-      }
-      #search-area {
-        margin-left: auto;
-        display: flex;
-        gap: 2px;
-        align-items: center;
       }
       input.ui-input {
         height: 26px;
@@ -1387,272 +1540,194 @@
   </head>
   <body>
     <div id="custom-tooltip" role="tooltip" aria-hidden="true"></div>
-    <div
-      id="toolbar"
-      role="toolbar"
-      aria-label="メインツールバー"
-      style="position: relative"
-    >
-      <button
-        type="button"
-        class="btn"
-        id="btn-open"
-        title="TSV/CSVファイルを開く&#10;ドラッグ&ドロップでも読み込めます"
-        aria-label="ファイルを開く"
-      >
-        開く
-      </button>
-      <button
-        type="button"
-        class="btn"
-        id="btn-open-recent"
-        title="最近開いたファイルの一覧を表示&#10;クリックで再度開けます"
-        aria-label="最近開いたファイル"
-        aria-haspopup="menu"
-        aria-expanded="false"
-        aria-controls="recent-menu"
-        style="padding: 0 4px; font-size: 10px"
-      >
-        ▾
-      </button>
-      <div id="recent-menu" role="menu" aria-label="最近開いたファイル"></div>
-      <button
-        type="button"
-        class="btn"
-        id="btn-save"
-        title="現在のデータをファイルとして保存&#10;ショートカット: Ctrl+S"
-        aria-label="ファイルを保存"
-      >
-        保存
-      </button>
-      <span
-        id="dirty-indicator"
-        role="status"
-        aria-label="未保存の変更があります"
-        title="未保存の変更があります&#10;保存ボタンまたはCtrl+Sで保存してください"
-      ></span>
-      <div class="toolbar-sep" role="separator" aria-hidden="true"></div>
-      <button
-        type="button"
-        class="btn"
-        id="btn-undo"
-        title="直前の操作を元に戻す&#10;ショートカット: Ctrl+Z"
-        aria-label="元に戻す"
-      >
-        ↩
-      </button>
-      <button
-        type="button"
-        class="btn"
-        id="btn-redo"
-        title="元に戻した操作をやり直す&#10;ショートカット: Ctrl+Y / Ctrl+Shift+Z"
-        aria-label="やり直し"
-      >
-        ↪
-      </button>
-      <div class="toolbar-sep" role="separator" aria-hidden="true"></div>
-      <button
-        type="button"
-        class="btn"
-        id="btn-filter-toggle"
-        title="各列のフィルター入力行を表示/非表示&#10;テキスト入力で行を絞り込めます"
-        aria-label="フィルター行を表示"
-        aria-pressed="false"
-      >
-        フィルター
-      </button>
-      <button
-        type="button"
-        class="btn danger"
-        id="btn-filter-clear"
-        style="display: none"
-        title="現在設定されているフィルターをすべて解除&#10;非表示の行も再表示されます"
-        aria-label="フィルターをクリア"
-      >
-        クリア
-      </button>
-      <button
-        type="button"
-        class="btn"
-        id="btn-export-filtered"
-        style="display: none"
-        title="フィルターで絞り込んだ行だけを&#10;新しいファイルとして保存します"
-        aria-label="フィルター結果のみを保存"
-      >
-        絞込保存
-      </button>
-      <button
-        type="button"
-        class="btn"
-        id="btn-row-height"
-        title="行の高さを順番に切り替え&#10;（22px → 30px → 40px → 22px）&#10;データが多い場合は高くすると見やすくなります"
-        aria-label="行の高さを変更"
-      >
-        行高
-      </button>
-      <button
-        type="button"
-        class="btn"
-        id="btn-autofit-all"
-        title="全列の幅をデータの内容に合わせて自動調整&#10;列ヘッダーのダブルクリックで個別調整も可能"
-        aria-label="全列幅を自動調整"
-      >
-        自動幅
-      </button>
-      <button
-        type="button"
-        class="btn"
-        id="btn-wrap"
-        title="セル内の長いテキストを折り返して表示&#10;OFFの場合は1行で省略表示されます&#10;選択範囲がある場合はその行だけ切り替え"
-        aria-label="セル折り返し表示の切り替え"
-        aria-pressed="false"
-      >
-        折返
-      </button>
-      <button
-        type="button"
-        class="btn"
-        id="btn-html-export"
-        title="SEJ設定をHTMLページとして出力&#10;新しいタブで開き、席種設定の詳細を確認できます&#10;フィルター中は絞り込んだ行のみ出力"
-        aria-label="SEJ HTML出力"
-      >
-        HTML出力
-      </button>
-      <button
-        type="button"
-        class="btn"
-        id="btn-header-mode"
-        title="ヘッダーモードを切り替え&#10;「1行目」: ファイルの1行目をヘッダーとして使用&#10;「連番」: 1, 2, 3...の連番ヘッダー（全行がデータ）"
-        aria-label="ヘッダーモード切り替え"
-        aria-pressed="true"
-        class="btn active-state"
-      >
-        H: 1行目
-      </button>
-      <div class="toolbar-sep" role="separator" aria-hidden="true"></div>
-      <button
-        type="button"
-        class="btn"
-        id="btn-new-sheet"
-        title="新しい空のシートタブを追加&#10;複数ファイルをタブで切り替えて編集できます"
-        aria-label="新しいシートを追加"
-      >
-        ＋
-      </button>
-      <button
-        type="button"
-        class="btn"
-        id="btn-apply-dict"
-        title="辞書を使ってヘッダーを日本語に変換&#10;50%以上のヘッダーが辞書と一致する場合に適用&#10;保存時は元の英語ヘッダーに戻ります&#10;&#10;Shift+クリックで辞書編集画面を開きます"
-        aria-label="辞書を適用してヘッダーを変換"
-      >
-        変換
-      </button>
-      <button
-        type="button"
-        class="btn"
-        id="btn-sej-link"
-        title="SEJデータに席種エリアマスタを連携&#10;クリック: マスタファイル(TSV)を選択&#10;席種エリアコードをキーに席種名を画面表示&#10;（保存時は元データのまま）&#10;&#10;もう一度押すと連携解除"
-        aria-label="SEJマスタ連携"
-      >
-        SEJ連携
-      </button>
-      <button
-        type="button"
-        class="btn"
-        id="btn-price-ref"
-        title="経路価格スケジュール参照JSONを連携&#10;クリック: 参照JSONファイルを選択&#10;チケット名をキーに価格・アップグレード情報を照合&#10;不一致セルを赤ハイライト表示&#10;&#10;もう一度押すと連携解除"
-        aria-label="経路価格スケジュール連携"
-      >
-        価格連携
-      </button>
-      <div class="toolbar-sep" role="separator" aria-hidden="true"></div>
-      <button
-        type="button"
-        class="btn"
-        id="btn-marker"
-        title="マーカーモード (M)&#10;ON中: ダブルクリックでセルにマーカーを付与/解除&#10;チェック作業・レビュー用"
-        aria-label="マーカーモードの切り替え"
-        aria-pressed="false"
-      >
-        🔴 M
-      </button>
-      <button
-        type="button"
-        class="btn"
-        id="btn-marker-clear"
-        title="マーカーをすべてクリア"
-        aria-label="マーカーをすべてクリア"
-      >
-        M×
-      </button>
-      <div class="toolbar-sep" role="separator" aria-hidden="true"></div>
-      <button
-        type="button"
-        class="btn danger"
-        id="btn-reset-view"
-        title="表示状態をすべてリセット&#10;フィルター・ソート・非表示列/行・&#10;選択範囲をすべて解除します"
-        aria-label="表示をすべてリセット"
-      >
-        リセット
-      </button>
-      <button
-        type="button"
-        class="btn"
-        id="btn-manual"
-        title="操作ヘルプを表示（?キーでも開けます）&#10;&#10;【ツールバー機能一覧】&#10;開く: TSV/CSVファイルを開く（ドラッグ&amp;ドロップ可）&#10;▾: 最近開いたファイル履歴&#10;保存: 編集中のファイルを保存（Ctrl+S）&#10;↩/↪: 元に戻す/やり直し（Ctrl+Z / Ctrl+Y）&#10;フィルター: 列ヘッダー右クリックでフィルター設定&#10;クリア: フィルターを全解除&#10;絞込保存: フィルター結果のみ保存&#10;行高: 行の高さを切り替え（22→30→40px）&#10;自動幅: 全列幅をデータに合わせて自動調整&#10;折返: セル内テキストの折り返し表示&#10;HTML出力: SEJ設定をHTML形式で出力&#10;H:1行目: ヘッダーモード切替（1行目/連番）&#10;＋: 新しいシートタブを追加&#10;変換: 辞書でヘッダーを日本語に変換（Shift+クリックで辞書編集）&#10;リセット: フィルター・ソート等を全解除"
-        aria-label="ヘルプを開く"
-      >
-        ?
-      </button>
+    <!-- === RIBBON HTML START === -->
+    <div class="rb-ribbon" role="toolbar" aria-label="リボンメニュー">
+      <!-- Tab Bar -->
+      <div class="rb-tabbar">
+        <button class="rb-tab" data-tab="file" aria-selected="false">ファイル</button>
+        <button class="rb-tab rb-tab-active" data-tab="home" aria-selected="true">ホーム</button>
+        <button class="rb-tab" data-tab="data" aria-selected="false">データ</button>
+        <button class="rb-tab" data-tab="ticket" aria-selected="false">チケット</button>
+        <button class="rb-tab" data-tab="view" aria-selected="false">表示</button>
+        <div class="rb-tab-spacer"></div>
+        <button class="rb-tab" id="btn-manual" data-tab="help" title="操作ヘルプを表示（?キーでも開けます）" aria-label="ヘルプを開く">ヘルプ</button>
+      </div>
 
-      <div id="search-area" role="search">
-        <input
-          type="text"
-          id="goto-input"
-          class="ui-input"
-          placeholder="行番号..."
-          style="width: 70px"
-          title="行番号ジャンプ (Ctrl+G)"
-          aria-label="行番号ジャンプ"
-        />
-        <div class="toolbar-sep" role="separator" aria-hidden="true"></div>
-        <input
-          type="text"
-          id="search-input"
-          class="ui-input"
-          placeholder="検索..."
-          style="width: 150px"
-          aria-label="セルを検索"
-          aria-controls="search-count"
-          aria-describedby="search-count"
-        />
-        <span
-          id="search-count"
-          role="status"
-          aria-live="polite"
-          style="font-size: 11px; color: var(--text-dim); min-width: 44px"
-        ></span>
-        <button
-          type="button"
-          class="btn"
-          id="btn-prev"
-          title="前の検索結果"
-          aria-label="前の検索結果へ"
-        >
-          ▲
-        </button>
-        <button
-          type="button"
-          class="btn"
-          id="btn-next"
-          title="次の検索結果"
-          aria-label="次の検索結果へ"
-        >
-          ▼
-        </button>
+      <!-- Content Pane: ファイル -->
+      <div class="rb-content" id="rb-pane-file" role="group" aria-label="ファイル操作">
+        <div class="rb-group">
+          <div class="rb-buttons">
+            <button class="rb-btn" id="btn-open" title="TSV/CSVファイルを開く&#10;ドラッグ&amp;ドロップでも読み込めます" aria-label="ファイルを開く">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline><path d="M9 12h6M9 16h6"></path></svg></span>
+              <span>開く</span>
+            </button>
+            <button class="rb-btn" id="btn-open-recent" title="最近開いたファイルの一覧を表示&#10;クリックで再度開けます" aria-label="最近開いたファイル" aria-haspopup="menu" aria-expanded="false" aria-controls="recent-menu">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></span>
+              <span>最近</span>
+            </button>
+            <button class="rb-btn" id="btn-save" title="現在のデータをファイルとして保存&#10;ショートカット: Ctrl+S" aria-label="ファイルを保存">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg></span>
+              <span>保存 <span id="dirty-indicator" role="status" aria-label="未保存の変更があります"></span></span>
+            </button>
+            <button class="rb-btn" id="btn-export-filtered" style="display:none" title="フィルターで絞り込んだ行だけを&#10;新しいファイルとして保存します" aria-label="フィルター結果のみを保存">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="13" x2="12" y2="19"></line><polyline points="9 16 12 13 15 16"></polyline></svg></span>
+              <span>絞込保存</span>
+            </button>
+            <button class="rb-btn" id="btn-new-sheet" title="新しい空のシートタブを追加&#10;複数ファイルをタブで切り替えて編集できます" aria-label="新しいシートを追加">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg></span>
+              <span>新規シート</span>
+            </button>
+          </div>
+          <span class="rb-group-label">ファイル</span>
+        </div>
+        <div id="recent-menu" role="menu" aria-label="最近開いたファイル"></div>
+      </div>
+
+      <!-- Content Pane: ホーム (default active) -->
+      <div class="rb-content rb-content-active" id="rb-pane-home" role="group" aria-label="ホーム">
+        <!-- Group: 元に戻す -->
+        <div class="rb-group">
+          <div class="rb-buttons">
+            <button class="rb-btn" id="btn-undo" title="直前の操作を元に戻す&#10;ショートカット: Ctrl+Z" aria-label="元に戻す">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg></span>
+              <span>戻す</span>
+            </button>
+            <button class="rb-btn" id="btn-redo" title="元に戻した操作をやり直す&#10;ショートカット: Ctrl+Y / Ctrl+Shift+Z" aria-label="やり直し">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 7v6h-6"></path><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"></path></svg></span>
+              <span>進む</span>
+            </button>
+          </div>
+          <span class="rb-group-label">元に戻す</span>
+        </div>
+        <!-- Group: 検索 -->
+        <div class="rb-group">
+          <div class="rb-buttons">
+            <div class="rb-input-btn">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg></span>
+              <input id="search-input" type="text" placeholder="検索..." title="テキスト検索 (Ctrl+F)" aria-label="セルを検索" aria-controls="search-count" aria-describedby="search-count">
+            </div>
+            <button class="rb-btn" id="btn-prev" title="前の検索結果" aria-label="前の検索結果へ">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="15 18 9 12 15 6"></polyline></svg></span>
+              <span>前へ</span>
+            </button>
+            <button class="rb-btn" id="btn-next" title="次の検索結果" aria-label="次の検索結果へ">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="9 18 15 12 9 6"></polyline></svg></span>
+              <span>次へ</span>
+            </button>
+            <button class="rb-btn" id="btn-replace" title="置換 (Ctrl+H)" aria-label="置換ダイアログを開く">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="3"></circle><path d="M7 10v4M17 3h-4m4 0l-4 4m4-4l4 4"></path><circle cx="17" cy="17" r="3"></circle></svg></span>
+              <span>置換</span>
+            </button>
+            <div class="rb-input-btn">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="12 3 12 21"></polyline><polyline points="3 12 12 3 21 12"></polyline></svg></span>
+              <input id="goto-input" type="number" placeholder="行#" title="行番号ジャンプ (Ctrl+G)" aria-label="行番号ジャンプ">
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;">
+            <span id="search-count" role="status" aria-live="polite"></span>
+          </div>
+          <span class="rb-group-label">検索</span>
+        </div>
+      </div>
+
+      <!-- Content Pane: データ -->
+      <div class="rb-content" id="rb-pane-data" role="group" aria-label="データ操作">
+        <!-- Group: 絞り込み -->
+        <div class="rb-group">
+          <div class="rb-buttons">
+            <button class="rb-btn" id="btn-filter-toggle" title="各列のフィルター入力行を表示/非表示&#10;テキスト入力で行を絞り込めます" aria-label="フィルター行を表示" aria-pressed="false">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg></span>
+              <span>フィルター</span>
+            </button>
+            <button class="rb-btn" id="btn-filter-clear" style="display:none" title="現在設定されているフィルターをすべて解除&#10;非表示の行も再表示されます" aria-label="フィルターをクリア">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 6L6 18M6 6l12 12"></path></svg></span>
+              <span>解除</span>
+            </button>
+            <button class="rb-btn" id="btn-reset-view" title="表示状態をすべてリセット&#10;フィルター・ソート・非表示列/行・選択範囲をすべて解除します" aria-label="表示をすべてリセット">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg></span>
+              <span>リセット</span>
+            </button>
+          </div>
+          <span class="rb-group-label">絞り込み</span>
+        </div>
+        <!-- Group: 検品 -->
+        <div class="rb-group">
+          <div class="rb-buttons">
+            <button class="rb-btn" id="btn-duphl" title="重複行をハイライト（列指定）" aria-label="重複ハイライトダイアログを開く">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><circle cx="12" cy="12" r="1.5" fill="currentColor"></circle></svg></span>
+              <span>重複HL</span>
+            </button>
+            <button class="rb-btn" id="btn-marker" title="マーカーモード (M)&#10;ON中: ダブルクリックでセルにマーカーを付与/解除&#10;チェック作業・レビュー用" aria-label="マーカーモードの切り替え" aria-pressed="false">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg></span>
+              <span>マーカー</span>
+            </button>
+            <button class="rb-btn" id="btn-marker-clear" title="マーカーをすべてクリア" aria-label="マーカーをすべてクリア">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 5H9l-7 7 7 7h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2z"></path><line x1="18" y1="9" x2="12" y2="15"></line><line x1="12" y1="9" x2="18" y2="15"></line></svg></span>
+              <span>消去</span>
+            </button>
+          </div>
+          <span class="rb-group-label">検品</span>
+        </div>
+      </div>
+
+      <!-- Content Pane: チケット -->
+      <div class="rb-content" id="rb-pane-ticket" role="group" aria-label="チケット操作">
+        <!-- Group: マスタ連携 -->
+        <div class="rb-group">
+          <div class="rb-buttons">
+            <button class="rb-btn" id="btn-sej-link" title="SEJデータに席種エリアマスタを連携&#10;クリック: マスタファイル(TSV)を選択&#10;もう一度押すと連携解除" aria-label="SEJマスタ連携">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></span>
+              <span>SEJ読込</span>
+            </button>
+            <button class="rb-btn" id="btn-price-ref" title="経路価格スケジュール参照JSONを連携&#10;クリック: 参照JSONファイルを選択&#10;もう一度押すと連携解除" aria-label="経路価格スケジュール連携">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg></span>
+              <span>価格照合</span>
+            </button>
+          </div>
+          <span class="rb-group-label">マスタ連携</span>
+        </div>
+        <!-- Group: 変換・出力 -->
+        <div class="rb-group">
+          <div class="rb-buttons">
+            <button class="rb-btn" id="btn-apply-dict" title="辞書を使ってヘッダーを日本語に変換&#10;Shift+クリックで辞書編集画面を開きます" aria-label="辞書を適用してヘッダーを変換">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 7V4h16v3"></path><path d="M9 20h6"></path><path d="M12 4v16"></path></svg></span>
+              <span>日本語化</span>
+            </button>
+            <button class="rb-btn" id="btn-html-export" title="SEJ設定をHTMLページとして出力&#10;新しいタブで開き、席種設定の詳細を確認できます&#10;フィルター中は絞り込んだ行のみ出力" aria-label="SEJ HTML出力">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M12 13H8M12 17H8"></path><path d="M16 13l2 2-2 2"></path></svg></span>
+              <span>HTML出力</span>
+            </button>
+          </div>
+          <span class="rb-group-label">変換・出力</span>
+        </div>
+      </div>
+
+      <!-- Content Pane: 表示 -->
+      <div class="rb-content" id="rb-pane-view" role="group" aria-label="表示設定">
+        <div class="rb-group">
+          <div class="rb-buttons">
+            <button class="rb-btn" id="btn-row-height" title="行の高さを順番に切り替え&#10;（22px → 30px → 40px → 22px）" aria-label="行の高さを変更">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="5" y1="6" x2="19" y2="6"></line><line x1="5" y1="12" x2="19" y2="12"></line><line x1="5" y1="18" x2="19" y2="18"></line><polyline points="2 3 2 21"></polyline><polyline points="22 3 22 21"></polyline></svg></span>
+              <span>行高さ</span>
+            </button>
+            <button class="rb-btn" id="btn-wrap" title="セル内の長いテキストを折り返して表示&#10;選択範囲がある場合はその行だけ切り替え" aria-label="セル折り返し表示の切り替え" aria-pressed="false">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6h18M3 12h18M3 18h12"></path><polyline points="18 14 20 12 18 10"></polyline></svg></span>
+              <span>折り返し</span>
+            </button>
+            <button class="rb-btn" id="btn-autofit-all" title="全列の幅をデータの内容に合わせて自動調整&#10;列ヘッダーのダブルクリックで個別調整も可能" aria-label="全列幅を自動調整">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line></svg></span>
+              <span>列自動</span>
+            </button>
+            <button class="rb-btn" id="btn-header-mode" title="ヘッダーモードを切り替え&#10;「1行目」: ファイルの1行目をヘッダーとして使用&#10;「連番」: 1, 2, 3...の連番ヘッダー" aria-label="ヘッダーモード切り替え" aria-pressed="true">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18"></rect><rect x="3" y="3" width="18" height="6" fill="currentColor" opacity="0.15"></rect><line x1="3" y1="9" x2="21" y2="9"></line></svg></span>
+              <span>ヘッダー</span>
+            </button>
+          </div>
+          <span class="rb-group-label">表示</span>
+        </div>
       </div>
     </div>
+    <!-- === RIBBON HTML END === -->
 
     <div id="tab-bar"></div>
 
@@ -2123,6 +2198,23 @@
 
       // ===== DOM =====
       const $ = (id) => document.getElementById(id);
+
+      // === RIBBON JS: タブ切替 ===
+      document.querySelectorAll(".rb-tab[data-tab]").forEach((tab) => {
+        if (tab.id === "btn-manual") return; // ヘルプはダイアログを開く既存ハンドラに任せる
+        tab.addEventListener("click", () => {
+          document.querySelectorAll(".rb-tab[data-tab]").forEach((t) => {
+            if (t.id === "btn-manual") return;
+            const active = t === tab;
+            t.classList.toggle("rb-tab-active", active);
+            t.setAttribute("aria-selected", String(active));
+          });
+          document.querySelectorAll(".rb-content").forEach((pane) => {
+            pane.classList.toggle("rb-content-active", pane.id === "rb-pane-" + tab.dataset.tab);
+          });
+        });
+      });
+      // === RIBBON JS END ===
       function debounce(fn, ms) {
         let t;
         return (...a) => {

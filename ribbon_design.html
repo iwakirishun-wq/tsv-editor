@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TSV Editor - Ribbon UI Design Mock</title>
+    <style>
+/* === RIBBON CSS START === */
+
+:root {
+    --rb-bg-base: #fafafa;
+    --rb-bg-hover: #f5f5f5;
+    --rb-border: #e5e5e5;
+    --rb-text: #171717;
+    --rb-dim: #737373;
+    --rb-accent: #217346;
+    --rb-active-border: 3px solid var(--rb-accent);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+    margin: 0;
+    padding: 0;
+    background: #fff;
+    color: var(--rb-text);
+}
+
+/* Ribbon container */
+.rb-ribbon {
+    background: var(--rb-bg-base);
+    border-bottom: 1px solid var(--rb-border);
+}
+
+/* Tab bar (ファイル / ホーム / データ / チケット / 表示 / ヘルプ) */
+.rb-tabbar {
+    display: flex;
+    align-items: center;
+    height: 28px;
+    padding: 0 12px;
+    background: var(--rb-bg-base);
+    border-bottom: 1px solid var(--rb-border);
+    gap: 2px;
+}
+
+.rb-tab {
+    padding: 0 16px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--rb-text);
+    border: none;
+    background: transparent;
+    border-bottom: 3px solid transparent;
+    transition: background-color 0.2s, border-bottom-color 0.2s;
+}
+
+.rb-tab:hover {
+    background: var(--rb-bg-hover);
+}
+
+.rb-tab.rb-tab-active {
+    border-bottom-color: var(--rb-accent);
+    background: var(--rb-bg-hover);
+}
+
+.rb-tab-spacer {
+    flex: 1;
+}
+
+.rb-tab-help {
+    margin-left: auto;
+    padding-right: 12px;
+}
+
+/* Content area (buttons) */
+.rb-content {
+    display: none;
+    padding: 6px 12px;
+    background: var(--rb-bg-base);
+    min-height: 80px;
+    border-bottom: 1px solid var(--rb-border);
+}
+
+.rb-content.rb-content-active {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0;
+}
+
+/* Button groups */
+.rb-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-right: 1px;
+    border-right: 1px solid var(--rb-border);
+    padding-right: 8px;
+    margin-right: 8px;
+}
+
+.rb-group:last-child {
+    border-right: none;
+    margin-right: 0;
+    padding-right: 0;
+}
+
+.rb-buttons {
+    display: flex;
+    gap: 4px;
+    align-items: flex-start;
+    margin-bottom: 4px;
+}
+
+.rb-group-label {
+    font-size: 11px;
+    color: var(--rb-dim);
+    text-align: center;
+    margin-top: 2px;
+    line-height: 1.2;
+    white-space: normal;
+    max-width: 70px;
+}
+
+/* Button styling */
+.rb-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 70px;
+    padding: 4px;
+    border: 1px solid transparent;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+    font-size: 11px;
+    color: var(--rb-text);
+    text-align: center;
+    line-height: 1.3;
+    word-break: break-word;
+    overflow: hidden;
+}
+
+.rb-btn:hover {
+    background: var(--rb-bg-hover);
+    border-color: var(--rb-border);
+}
+
+.rb-btn:focus-visible {
+    outline: 2px solid var(--rb-accent);
+    outline-offset: -1px;
+}
+
+.rb-btn:active {
+    background: #ebebeb;
+}
+
+/* Icon in button */
+.rb-icon {
+    width: 24px;
+    height: 24px;
+    margin-bottom: 2px;
+    flex-shrink: 0;
+}
+
+.rb-icon svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    color: var(--rb-text);
+}
+
+.rb-btn:hover .rb-icon svg {
+    color: var(--rb-accent);
+}
+
+/* Special input buttons (search, goto) */
+.rb-input-btn {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    height: 32px;
+    width: 180px;
+    padding: 4px 8px;
+    border: 1px solid var(--rb-border);
+    background: #fff;
+    border-radius: 2px;
+    font-size: 12px;
+}
+
+.rb-input-btn input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 12px;
+    color: var(--rb-text);
+}
+
+.rb-input-btn input::placeholder {
+    color: var(--rb-dim);
+}
+
+.rb-input-btn:focus-within {
+    border-color: var(--rb-accent);
+    box-shadow: 0 0 0 1px var(--rb-accent);
+}
+
+/* Grid placeholder */
+.rb-grid-placeholder {
+    background: #f0f0f0;
+    border: 1px solid var(--rb-border);
+    margin: 0;
+    padding: 40px;
+    text-align: center;
+    color: var(--rb-dim);
+    font-size: 14px;
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* === RIBBON CSS END === */
+    </style>
+</head>
+<body>
+
+<!-- === RIBBON HTML START === -->
+<div class="rb-ribbon">
+    <!-- Tab Bar -->
+    <div class="rb-tabbar">
+        <button class="rb-tab rb-tab-active" data-tab="file">ファイル</button>
+        <button class="rb-tab" data-tab="home">ホーム</button>
+        <button class="rb-tab" data-tab="data">データ</button>
+        <button class="rb-tab" data-tab="ticket">チケット</button>
+        <button class="rb-tab" data-tab="view">表示</button>
+        <div class="rb-tab-spacer"></div>
+        <button class="rb-tab rb-tab-help" id="btn-manual" data-tab="help">ヘルプ</button>
+    </div>
+
+    <!-- Content Pane: ファイル -->
+    <div class="rb-content rb-content-active" id="rb-pane-file">
+        <div class="rb-group">
+            <div class="rb-buttons">
+                <button class="rb-btn" id="btn-open" title="TSV/CSVファイルを開く">
+                    <span class="rb-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+                            <polyline points="13 2 13 9 20 9"></polyline>
+                            <path d="M9 12h6M9 16h6"></path>
+                        </svg>
+                    </span>
+                    <span>開く</span>
+                </button>
+                <button class="rb-btn" id="btn-open-recent" title="最近使ったファイル">
+                    <span class="rb-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                    </span>
+                    <span>最近</span>
+                </button>
+                <button class="rb-btn" id="btn-save" title="ファイルを保存">
+                    <span class="rb-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                            <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                            <polyline points="7 3 7 8 15 8"></polyline>
+                        </svg>
+                    </span>
+                    <span>保存</span>
+                </button>
+                <button class="rb-btn" id="btn-export-filtered" title="絞り込み結果を別名保存">
+                    <span class="rb-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="12" y1="13" x2="12" y2="19"></line>
+                            <polyline points="9 16 12 13 15 16"></polyline>
+                        </svg>
+                    </span>
+                    <span>絞込保存</span>
+                </button>
+            </div>
+            <span class="rb-group-label">ファイル</span>
+        </div>
+    </div>
+
+    <!-- Content Pane: ホーム -->
+    <div class="rb-content" id="rb-pane-home">
+        <!-- Group: 元に戻す -->
+        <div class="rb-group">
+            <div class="rb-buttons">
+                <button class="rb-btn" id="btn-undo" title="元に戻す (Ctrl+Z)">
+                    <span class="rb-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M3 7v6h6"></path>
+                            <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
+                        </svg>
+                    </span>
+                    <span>戻す</span>
+                </button>
+                <button class="rb-btn" id="btn-redo" title="やり直す (Ctrl+Y)">
+                    <span class="rb-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M21 7v6h-6"></path>
+                            <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"></path>
+                        </svg>
+                    </span>
+                    <span>進む</span>
+                </button>
+            </div>
+            <span class="rb-group-label">元に戻す</span>
+        </div>
+
+        <!-- Group: 検索 -->
+        <div class="rb-group">
+            <div class="rb-buttons">
+                <div class="rb-input-btn">
+                    <svg class="rb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.35-4.35"></path>
+                    </svg>
+                    <input id="search-input" type="text" placeholder="検索" title="テキスト検索">
+                </div>
+                <button class="rb-btn" id="btn-prev" title="前の検索結果">
+                    <span class="rb-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <polyline points="15 18 9 12 15 6"></polyline>
+                        </svg>
+                    </span>
+                    <span>前へ</span>
+                </button>
+                <button class="rb-btn" id="btn-next" title="次の検索結果">
+                    <span class="rb-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </span>
+                    <span>次へ</span>
+                </button>
+                <button class="rb-btn" id="btn-replace" title="置換">
+                    <span class="rb-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <circle cx="7" cy="7" r="3"></circle>
+                            <path d="M7 10v4M17 3h-4m4 0l-4 4m4-4l4 4"></path>
+                            <circle cx="17" cy="17" r="3"></circle>
+                        </svg>
+                    </span>
+                    <span>置換</span>
+                </button>
+                <div class="rb-input-btn">
+                    <svg class="rb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <polyline points="12 3 12 21"></polyline>
+                        <polyline points="3 12 12 3 21 12"></polyline>
+                    </svg>
+                    <input id="goto-input" type="number" placeholder="行#" title="指定行へジャンプ">
+                </div>
+            </div>
+            <span class="rb-group-label">検索</span>
+        </div>
+    </div>
+
+    <!-- Content Pane: データ -->
+    <div class="rb-content" id="rb-pane-data">
+        <!-- Group: 絞り込み -->
+        <div class="rb-group">
+            <div class="rb-buttons">
+                <button class="rb-btn" id="btn-filter-toggle" title="フィルター表示">
+                    <span class="rb-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                        </svg>
+                    </span>
+                    <span>フィルター</span>
+                </button>
+                <button class="rb-btn" id="btn-filter-clear" title="フィルター解除">
+                    <span class="rb-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M18 6L6 18M6 6l12 12"></path>
+                        </svg>
+                    </span>
+                    <span>解除</span>
+                </button>
+                <button class="rb-btn" id="btn-reset-view" title="ソート・フィルターをリセット">
+                    <span class="rb-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                            <path d="M3 3v5h5"></path>
+                        </svg>
+                    </span>
+                    <span>リセット</span>
+                </button>
+            </div>
+            <span class="rb-group-label">絞り込み</span>
+        </div>
+
+        <!-- Group: 検品 -->
+        <div class="rb-group">
+            <div class="rb-buttons">
+                <button class="rb-btn" id="btn-duphl" title="重複行をハイライト">
+                    <span class="rb-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <rect x="3" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="14" width="7" height="7"></rect>
+                            <rect x="3" y="14" width="7" height="7"></rect>
+                            <circle cx="12" cy="12" r="1.5" fill="currentColor"></circle>
+                        </svg>
+                    </span>
+                    <span>重複HL</span>
+                </button>
+                <button class="rb-btn" id="btn-marker" title="マーカーを追加">
+                    <span class="rb-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M17.5 3.5l3 3m-21 6l9 9 12-12-3-3-9 9-9-9v9h-3v3h3v3h3v-3"></path>
+                        </svg>
+                    </span>
+                    <span>マーカー</span>
+                </button>
+                <button class="rb-btn" id="btn-marker-clear" title="マーカーをクリア">
+                    <span class="rb-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M22 11v11H2V11"></path>
+                            <path d="M2 7h20M8 3h8a2 2 0 0 1 2 2H6a2 2 0 0 1 2-2z"></path>
+                            <line x1="10" y1="12" x2="10" y2="17"></line>
+                            <line x1="14" y1="12" x2="14" y2="17"></line>
+                        </svg>
+                    </span>
+                    <span>消去</span>
+                </button>
+            </div>
+            <span class="rb-group-label">検品</span>
+        </div>
+    </div>
+
+    <!-- Content Pane: チケット -->
+    <div class="rb-content" id="rb-pane-ticket">
+        <!-- Group: マスタ連携 -->
+        <div class="rb-group">
+            <div class="rb-buttons">
+                <button class="rb-btn" id="btn-sej-link" title="SEJ席種マスタを読み込む">
+                    <span class="rb-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                        </svg>
+                    </span>
+                    <span>SEJ読込</span>
+                </button>
+                <button class="rb-btn" id="btn-price-ref" title="価格表と照合">
+                    <span class="rb-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <line x1="12" y1="1" x2="12" y2="23"></line>
+                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                        </svg>
+                    </span>
+                    <span>価格照合</span>
+                </button>
+            </div>
+            <span class="rb-group-label">マスタ連携</span>
+        </div>
+
+        <!-- Group: 変換・出力 -->
+        <div class="rb-group">
+            <div class="rb-buttons">
+                <button class="rb-btn" id="btn-apply-dict" title="列名を日本語化">
+                    <span class="rb-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
+                        </svg>
+                    </span>
+                    <span>日本語化</span>
+                </button>
+                <button class="rb-btn" id="btn-sej-html" title="SEJ確認用HTML出力">
+                    <span class="rb-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <path d="M12 13H8M12 17H8"></path>
+                            <path d="M16 13l2 2-2 2"></path>
+                        </svg>
+                    </span>
+                    <span>HTML出力</span>
+                </button>
+            </div>
+            <span class="rb-group-label">変換・出力</span>
+        </div>
+    </div>
+
+    <!-- Content Pane: 表示 -->
+    <div class="rb-content" id="rb-pane-view">
+        <!-- Group: 表示 -->
+        <div class="rb-group">
+            <div class="rb-buttons">
+                <button class="rb-btn" id="btn-row-height" title="行の高さを変更">
+                    <span class="rb-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <line x1="5" y1="6" x2="19" y2="6"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <line x1="5" y1="18" x2="19" y2="18"></line>
+                            <polyline points="2 3 2 21"></polyline>
+                            <polyline points="22 3 22 21"></polyline>
+                        </svg>
+                    </span>
+                    <span>行高さ</span>
+                </button>
+                <button class="rb-btn" id="btn-wrap" title="テキスト折り返し">
+                    <span class="rb-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M3 6h18M3 12h18M3 18h12"></path>
+                            <polyline points="18 14 20 12 18 10"></polyline>
+                        </svg>
+                    </span>
+                    <span>折り返し</span>
+                </button>
+                <button class="rb-btn" id="btn-autofit-all" title="全列幅を自動調整">
+                    <span class="rb-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <rect x="3" y="3" width="18" height="18"></rect>
+                            <line x1="3" y1="9" x2="21" y2="9"></line>
+                            <line x1="9" y1="3" x2="9" y2="21"></line>
+                            <line x1="15" y1="3" x2="15" y2="21"></line>
+                        </svg>
+                    </span>
+                    <span>列自動</span>
+                </button>
+                <button class="rb-btn" id="btn-header-mode" title="1行目をヘッダーに">
+                    <span class="rb-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <rect x="3" y="3" width="18" height="18"></rect>
+                            <rect x="3" y="3" width="18" height="6" fill="currentColor" opacity="0.1"></rect>
+                            <line x1="3" y1="9" x2="21" y2="9"></line>
+                        </svg>
+                    </span>
+                    <span>ヘッダー</span>
+                </button>
+            </div>
+            <span class="rb-group-label">表示</span>
+        </div>
+    </div>
+
+</div>
+
+<!-- Grid placeholder -->
+<div class="rb-grid-placeholder">
+    （グリッド領域）
+</div>
+
+<!-- === RIBBON HTML END === -->
+
+<!-- === RIBBON JS START === -->
+<script>
+// Tab switching logic
+document.querySelectorAll('.rb-tab').forEach(tab => {
+    tab.addEventListener('click', function(e) {
+        const tabName = this.getAttribute('data-tab');
+
+        // Remove active state from all tabs
+        document.querySelectorAll('.rb-tab').forEach(t => {
+            t.classList.remove('rb-tab-active');
+        });
+
+        // Add active state to clicked tab
+        this.classList.add('rb-tab-active');
+
+        // Hide all content panes
+        document.querySelectorAll('.rb-content').forEach(pane => {
+            pane.classList.remove('rb-content-active');
+        });
+
+        // Show selected content pane (unless it's help, which is just a button)
+        if (tabName !== 'help') {
+            const paneId = 'rb-pane-' + tabName;
+            const pane = document.getElementById(paneId);
+            if (pane) {
+                pane.classList.add('rb-content-active');
+            }
+        }
+    });
+});
+
+// Button click handlers (placeholder console logging for demo)
+const buttonActions = {
+    'btn-open': () => console.log('Open file'),
+    'btn-open-recent': () => console.log('Open recent'),
+    'btn-save': () => console.log('Save file'),
+    'btn-export-filtered': () => console.log('Save filtered rows'),
+    'btn-undo': () => console.log('Undo'),
+    'btn-redo': () => console.log('Redo'),
+    'btn-prev': () => console.log('Find previous'),
+    'btn-next': () => console.log('Find next'),
+    'btn-replace': () => console.log('Replace'),
+    'btn-filter-toggle': () => console.log('Toggle filter'),
+    'btn-filter-clear': () => console.log('Clear filter'),
+    'btn-reset-view': () => console.log('Reset view'),
+    'btn-duphl': () => console.log('Highlight duplicates'),
+    'btn-marker': () => console.log('Add marker'),
+    'btn-marker-clear': () => console.log('Clear markers'),
+    'btn-sej-link': () => console.log('Link SEJ master'),
+    'btn-price-ref': () => console.log('Price reference'),
+    'btn-apply-dict': () => console.log('Apply dictionary'),
+    'btn-sej-html': () => console.log('Export SEJ HTML'),
+    'btn-row-height': () => console.log('Row height'),
+    'btn-wrap': () => console.log('Toggle wrap'),
+    'btn-autofit-all': () => console.log('Autofit all columns'),
+    'btn-header-mode': () => console.log('Toggle header mode'),
+    'btn-manual': () => console.log('Help')
+};
+
+Object.entries(buttonActions).forEach(([id, action]) => {
+    const btn = document.getElementById(id);
+    if (btn) {
+        btn.addEventListener('click', action);
+    }
+});
+</script>
+<!-- === RIBBON JS END === -->
+
+</body>
+</html>
