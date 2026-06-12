@@ -1984,7 +1984,7 @@
           <div class="man-btn-row"><span class="man-btn-label">SEJ読込</span><span class="man-btn-desc">席種エリアマスタTSVを連携。席種エリアコード・購入限定席種1〜3などのコード列に席種名を併記し、「グループ名」列を仮想追加。SEJデータ（word列）には備考差分も表示（下記）。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">日本語化</span><span class="man-btn-desc">英語の列名を日本語に変換。保存時は元の英語に戻ります。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">辞書編集</span><span class="man-btn-desc">日本語化の辞書とヘッダーメモを編集。今開いているファイルの列が一覧の先頭に出ます。新しい列名の追加も可能。ブラウザに保存されるため、オフラインHTML運用でもそのまま使えます。</span></div>
-          <div class="man-btn-row"><span class="man-btn-label">HTML出力</span><span class="man-btn-desc">確認用HTMLを新しいタブに出力。席種エリアマスタは備考・カラー・フラグ検証付き一覧、SEJデータはマスタ照合カードで出力。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">HTML出力</span><span class="man-btn-desc">確認用HTMLを新しいタブに出力。開いているファイルに応じて自動切替: 席種エリアマスタ→検証付き一覧 / SEJデータ→マスタ照合カード / <b>経路価格スケジュール→価格マトリクス</b>（通常価格表とUG差額マトリクスを販売条件ごとに表示。セルにマウスで販売期間）。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">価格チェック表</span><span class="man-btn-desc">経路価格スケジュール（BO-F-21030）を開いた状態で押すと、販売期間・席種・年齢区分・金額・UG元/差額を一覧化した参照シートを別タブに生成。会員ランクや販売区分はフィルターで絞り込み。元データはそのまま残ります。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">カラー表示</span><span class="man-btn-desc">表示カラーコード列の色をセル背景でプレビュー（切替）。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">ゲート表示</span><span class="man-btn-desc">ゲート用公演種別の番号にゲート名を併記。対応表は列ヘッダーのコメントから読み取り（切替）。</span></div>
@@ -2319,7 +2319,8 @@
           ugSeat: idx("アップグレード元席種エリア名"), ugAge: idx("アップグレード元券種名"),
         };
         const v = (row, i) => (i === -1 ? "" : String(row[i] ?? "").trim());
-        const headers = ["販売開始日時", "販売終了日時", "販売区分", "会員ランク", "販売経路", "席種", "年齢区分", "前売価格", "当日価格", "UG", "元席種", "元年齢区分", "UG差額"];
+        // UG行は元データの前売価格/当日価格がそのまま差額（前売差額/当日差額）
+        const headers = ["販売開始日時", "販売終了日時", "販売区分", "会員ランク", "販売経路", "席種", "年齢区分", "前売価格(UG行=差額)", "当日価格(UG行=差額)", "UG", "元席種", "元年齢区分"];
         const data = state.data.map((row) => {
           const flag = v(row, cols.ugFlag);
           const isUg = flag === "該当" || flag === "1";
@@ -2327,10 +2328,9 @@
             v(row, cols.start), v(row, cols.end),
             v(row, cols.kbn), v(row, cols.rank), v(row, cols.route),
             v(row, cols.seat), v(row, cols.age),
-            isUg ? "" : v(row, cols.adv), isUg ? "" : v(row, cols.day),
+            v(row, cols.adv), v(row, cols.day),
             isUg ? "◯" : "",
             isUg ? v(row, cols.ugSeat) : "", isUg ? v(row, cols.ugAge) : "",
-            isUg ? v(row, cols.adv) : "",
           ];
         });
         const srcName = state.fileName.replace(/\.[^.]+$/, "");
@@ -8363,6 +8363,136 @@
         return escHtml(v);
       }
 
+      // ===== 経路価格スケジュール → マトリクスHTML出力 =====
+      // 通常価格表（席種×年齢区分）とUGマトリクス（元席種×先席種）を
+      // 販売条件（販売区分×会員ランク×販売経路）ごとに出力する
+      function exportPriceMatrixHtml(rowIndices, isFiltered) {
+        const H = state.headers.map(h => String(h).trim());
+        const ix = (n) => H.indexOf(n);
+        const c = {
+          kbn: ix("販売価格区分"), rank: ix("会員ランク名"), route: ix("販売経路区分"),
+          seatCd: ix("席種エリアコード"), seat: ix("席種エリア名"),
+          age: ix("券種名"),
+          start: ix("販売開始日時"), end: ix("販売終了日時"),
+          adv: ix("前売価格"), day: ix("当日価格"),
+          ugFlag: ix("アップグレード該当フラグ"),
+          ugSeat: ix("アップグレード元席種エリア名"), ugAge: ix("アップグレード元券種名"),
+        };
+        const v = (r, i) => (i === -1 ? "" : String(r[i] ?? "").trim());
+        const fmt = (s) => {
+          if (!s) return "";
+          const n = Number(String(s).replace(/,/g, ""));
+          return isNaN(n) ? s : n.toLocaleString("ja-JP");
+        };
+        const period = (o) => `${o.start} 〜 ${o.end}`;
+
+        // 販売条件ごとにグループ化
+        const combos = new Map();
+        for (const ri of rowIndices) {
+          const row = state.data[ri];
+          if (!row) continue;
+          const key = [v(row, c.kbn) || "(区分なし)", v(row, c.rank) || "(ランクなし)", v(row, c.route) || "(経路なし)"].join("　×　");
+          if (!combos.has(key)) combos.set(key, []);
+          combos.get(key).push(row);
+        }
+
+        let body = "";
+        for (const [key, rows] of combos) {
+          // 通常価格と UG 行を分離し、出現順で軸を作る
+          const seats = [], ages = [];
+          const priceMap = new Map();
+          const ugRows = [];
+          for (const row of rows) {
+            const flag = v(row, c.ugFlag);
+            if (flag === "該当" || flag === "1") { ugRows.push(row); continue; }
+            const s = v(row, c.seat), a = v(row, c.age);
+            if (!s) continue;
+            if (!seats.includes(s)) seats.push(s);
+            if (a && !ages.includes(a)) ages.push(a);
+            priceMap.set(s + "||" + a, { adv: v(row, c.adv), day: v(row, c.day), start: v(row, c.start), end: v(row, c.end) });
+          }
+          const fromKeys = [], toKeys = [];
+          const ugMap = new Map();
+          for (const row of ugRows) {
+            const f = escHtml(v(row, c.ugSeat) || "?") + '<br><span class="sub">' + escHtml(v(row, c.ugAge) || "") + "</span>";
+            const to = escHtml(v(row, c.seat) || "?") + '<br><span class="sub">' + escHtml(v(row, c.age) || "") + "</span>";
+            if (!fromKeys.includes(f)) fromKeys.push(f);
+            if (!toKeys.includes(to)) toKeys.push(to);
+            ugMap.set(f + "=>" + to, { adv: v(row, c.adv), day: v(row, c.day), start: v(row, c.start), end: v(row, c.end) });
+          }
+
+          body += `<h2>${escHtml(key)}</h2>`;
+
+          if (priceMap.size) {
+            body += `<h3>通常価格（席種 × 年齢区分）　<span class="note">上段: 前売 / 下段: 当日　セルにマウスで販売期間</span></h3><div class="scroll"><table><tr><th class="corner">席種＼年齢</th>`;
+            for (const a of ages) body += `<th>${escHtml(a)}</th>`;
+            body += `</tr>`;
+            for (const s of seats) {
+              body += `<tr><th class="rowh">${escHtml(s)}</th>`;
+              for (const a of ages) {
+                const o = priceMap.get(s + "||" + a);
+                body += o
+                  ? `<td title="${escHtml(period(o))}"><div class="adv">${escHtml(fmt(o.adv))}</div><div class="day">${escHtml(fmt(o.day))}</div></td>`
+                  : `<td class="na">—</td>`;
+              }
+              body += `</tr>`;
+            }
+            body += `</table></div>`;
+          }
+
+          if (ugMap.size) {
+            body += `<h3>アップグレード差額マトリクス（元席種 → 先席種）　<span class="note">上段: 前売差額 / 下段: 当日差額</span></h3><div class="scroll"><table><tr><th class="corner">元＼先</th>`;
+            for (const to of toKeys) body += `<th>${to}</th>`;
+            body += `</tr>`;
+            for (const f of fromKeys) {
+              body += `<tr><th class="rowh">${f}</th>`;
+              for (const to of toKeys) {
+                const o = ugMap.get(f + "=>" + to);
+                body += o
+                  ? `<td class="ug" title="${escHtml(period(o))}"><div class="adv">${escHtml(fmt(o.adv))}</div><div class="day">${escHtml(fmt(o.day))}</div></td>`
+                  : `<td class="na">—</td>`;
+              }
+              body += `</tr>`;
+            }
+            body += `</table></div>`;
+          }
+        }
+
+        const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
+<title>${escHtml(state.fileName)} - 価格マトリクス</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, "Hiragino Kaku Gothic ProN", "Yu Gothic UI", sans-serif; background: #f8f9fa; color: #333; padding: 20px; }
+.header { background: #fff; padding: 14px 22px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.1); margin-bottom: 18px; }
+.header h1 { font-size: 17px; }
+.header .meta { font-size: 12px; color: #666; margin-top: 3px; }
+h2 { font-size: 15px; margin: 22px 0 6px; padding: 6px 12px; background: #217346; color: #fff; border-radius: 6px; }
+h3 { font-size: 13px; margin: 12px 0 6px; color: #1a1a1a; }
+.note { font-size: 11px; color: #888; font-weight: 400; }
+.scroll { overflow-x: auto; background: #fff; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,.08); padding: 2px; }
+table { border-collapse: collapse; font-size: 12px; min-width: 480px; }
+th, td { border: 1px solid #d8dde4; padding: 5px 9px; text-align: center; white-space: nowrap; }
+th { background: #eef2f6; font-weight: 600; }
+th.corner { background: #e2e8ee; }
+th.rowh { text-align: left; position: sticky; left: 0; background: #eef2f6; z-index: 1; }
+td .adv { font-weight: 600; color: #1d4ed8; }
+td .day { font-size: 11px; color: #b45309; }
+td.ug .adv { color: #be185d; }
+td.na { color: #ccc; background: #fafafa; }
+.sub { font-size: 10px; color: #888; font-weight: 400; }
+</style></head><body>
+<div class="header"><h1>💴 ${escHtml(state.fileName)} <span style="font-size:12px;color:#666;font-weight:400">価格マトリクス</span></h1>
+<div class="meta">${rowIndices.length}件${isFiltered ? `（フィルター適用中）` : ""} — ${new Date().toLocaleString("ja-JP")}　|　販売条件 ${combos.size} パターン　|　セルにマウスを乗せると販売期間を表示</div></div>
+${body}
+</body></html>`;
+
+        const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        window.open(url, "_blank", "noopener");
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        setStatus(`価格マトリクスHTMLを出力しました（${combos.size}条件）`);
+      }
+
       function exportHtmlPreview() {
         if (state.headerMode === "numbered") {
           alert("ヘッダーが連番モードのため、列名を認識できません。\n\n「表示」タブの「ヘッダー」ボタンで 1行目モード に切り替えてから出力してください。");
@@ -8389,6 +8519,15 @@
         if (isSejData()) {
           exportSejHtml(rowIndices, isFiltered);
           return;
+        }
+
+        // 経路価格スケジュール（BO-F-21030）の場合はマトリクス表で出力
+        {
+          const _H = state.headers.map(h => String(h).trim());
+          if (_H.includes("販売開始日時") && _H.includes("席種エリア名") && _H.includes("アップグレード該当フラグ")) {
+            exportPriceMatrixHtml(rowIndices, isFiltered);
+            return;
+          }
         }
 
         // 使用可能な列を抽出（ヘッダーに存在するもののみ）
