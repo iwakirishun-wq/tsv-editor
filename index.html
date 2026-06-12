@@ -146,6 +146,10 @@
         min-height: 80px;
         border-bottom: 1px solid var(--rb-border);
       }
+      /* ホームタブは検索系を中央配置してバランスを取る */
+      #rb-pane-home.rb-content-active {
+        justify-content: center;
+      }
       .rb-content.rb-content-active {
         display: flex;
         flex-wrap: wrap;
@@ -1207,6 +1211,35 @@
       .freeze-border {
         border-right: 2px solid var(--accent) !important;
       }
+      /* フリーズ列は半透明ハイライトだと下のスクロール文字が透けるため、不透明色で塗る */
+      td.frozen-col.selected { background: #e2e2e2 !important; }
+      td.frozen-col.in-range { background: #ececec !important; }
+      td.frozen-col.col-highlight { background: #f3f3f3 !important; }
+      td.frozen-col.search-hit { background: #fdf0b8 !important; }
+      td.frozen-col.marked { background: color-mix(in srgb, var(--marker-color, #facc15) 35%, #ffffff) !important; }
+      td.frozen-col.cell-ng { background: #fbe5e5 !important; }
+      td.frozen-col.cell-warn { background: #fcecdc !important; }
+      td.frozen-col.cell-diff { background: #fae3ee !important; }
+      td.frozen-col.hl-empty { background: #f5f5f5 !important; }
+
+      /* ===縦書きヘッダー（列幅節約）=== */
+      body.vertical-headers thead tr:first-child th { height: 120px; vertical-align: bottom; }
+      body.vertical-headers thead tr:first-child .th-inner {
+        flex-direction: column-reverse;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 3px;
+        height: 100%;
+      }
+      body.vertical-headers thead tr:first-child .th-label {
+        writing-mode: vertical-rl;
+        text-orientation: mixed;
+        max-height: 92px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        flex: 1;
+      }
 
       /* ===マニュアルダイアログ=== */
       #manual-dialog {
@@ -1635,9 +1668,13 @@
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M9 17V7h4a3 3 0 0 1 0 6H9"></path></svg></span>
               <span>駐車券検査</span>
             </button>
-            <button class="rb-btn" id="btn-kana-check" title="全角カナ・ひらがなを含むセルをマーカー表示します&#10;（システム取込は半角カナが必要なため）（切り替え）" aria-label="半角カナ検査の切り替え" aria-pressed="false">
+            <button class="rb-btn" id="btn-kana-check" title="全角カタカナを含むセルをマーカー表示します&#10;（システム取込は半角カナが必要なため）（切り替え）" aria-label="半角カナ検査の切り替え" aria-pressed="false">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 6h8M8 6v12"></path><path d="M14 18l3.5-10L21 18"></path><path d="M15.5 14h4"></path></svg></span>
               <span>カナ検査</span>
+            </button>
+            <button class="rb-btn" id="btn-box-check" title="区画席（席種名に「（〇名）」がある行）の設定検査&#10;エリアコード6桁目=E / BOX席フラグ=1 / 席数2以上 をチェックし、&#10;OK・NGどちらも表示します（切り替え）" aria-label="区画席検査の切り替え" aria-pressed="false">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="3" y1="12" x2="21" y2="12"></line><line x1="12" y1="3" x2="12" y2="21"></line><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor"></circle><circle cx="16.5" cy="7.5" r="1.2" fill="currentColor"></circle><circle cx="7.5" cy="16.5" r="1.2" fill="currentColor"></circle><circle cx="16.5" cy="16.5" r="1.2" fill="currentColor"></circle></svg></span>
+              <span>区画席検査</span>
             </button>
           </div>
           <span class="rb-group-label">検品表示</span>
@@ -1645,9 +1682,13 @@
         <!-- Group: 変換・出力 -->
         <div class="rb-group">
           <div class="rb-buttons">
-            <button class="rb-btn" id="btn-apply-dict" title="辞書を使ってヘッダーを日本語に変換&#10;Shift+クリックで辞書編集画面を開きます" aria-label="辞書を適用してヘッダーを変換">
+            <button class="rb-btn" id="btn-apply-dict" title="辞書を使ってヘッダーを日本語に変換&#10;Shift+クリックでも辞書編集画面を開けます" aria-label="辞書を適用してヘッダーを変換">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 7V4h16v3"></path><path d="M9 20h6"></path><path d="M12 4v16"></path></svg></span>
               <span>日本語化</span>
+            </button>
+            <button class="rb-btn" id="btn-dict-edit" title="辞書とヘッダーメモを編集&#10;新しい列名の追加もここから（ブラウザに保存されます）" aria-label="辞書・ヘッダーメモを編集">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path><path d="M9 7h6M9 11h4"></path></svg></span>
+              <span>辞書編集</span>
             </button>
             <button class="rb-btn" id="btn-html-export" title="SEJ設定をHTMLページとして出力&#10;新しいタブで開き、席種設定の詳細を確認できます&#10;フィルター中は絞り込んだ行のみ出力" aria-label="SEJ HTML出力">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M12 13H8M12 17H8"></path><path d="M16 13l2 2-2 2"></path></svg></span>
@@ -1673,6 +1714,10 @@
             <button class="rb-btn" id="btn-autofit-all" title="全列の幅をデータの内容に合わせて自動調整&#10;列ヘッダーのダブルクリックで個別調整も可能" aria-label="全列幅を自動調整">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line></svg></span>
               <span>列自動</span>
+            </button>
+            <button class="rb-btn" id="btn-vertical-header" title="ヘッダーを縦書きにして列幅を節約します（切り替え）&#10;コード系の細い列が多いマスタTSVで便利です" aria-label="縦書きヘッダーの切り替え" aria-pressed="false">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="1"></rect><line x1="3" y1="13" x2="21" y2="13"></line><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line><path d="M6 5v6M12 5v6M18 5v6" stroke-width="2"></path></svg></span>
+              <span>縦ヘッダー</span>
             </button>
             <button class="rb-btn" id="btn-header-mode" title="ヘッダーモードを切り替え&#10;「1行目」: ファイルの1行目をヘッダーとして使用&#10;「連番」: 1, 2, 3...の連番ヘッダー" aria-label="ヘッダーモード切り替え" aria-pressed="true">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18"></rect><rect x="3" y="3" width="18" height="6" fill="currentColor" opacity="0.15"></rect><line x1="3" y1="9" x2="21" y2="9"></line></svg></span>
@@ -1889,86 +1934,58 @@
         >
           ×
         </button>
-        <h1 id="manual-dialog-title">TSV/CSV エディター ヘルプ</h1>
+        <h1 id="manual-dialog-title">チケットTSVエディター ヘルプ</h1>
         <p style="font-size: 12px; color: var(--text-dim); margin-bottom: 4px">
-          高速・軽量なTSV/CSVファイルエディター　|　Escキーで閉じる
+          席種エリアマスタ・SEJ設定TSVの編集と検品に特化したエディター　|　Escキーで閉じる
         </p>
 
-        <h2>ツールバーボタン</h2>
+        <h2>📁 ファイルタブ</h2>
         <div class="man-btn-section">
-          <div class="man-btn-row">
-            <span class="man-btn-label">開く / 最近</span
-            ><span class="man-btn-desc"
-              >TSV・CSV・TXTファイルを開く。ドラッグ&amp;ドロップでも可。「最近」で過去に開いたファイル一覧を表示。</span
-            >
-          </div>
-          <div class="man-btn-row">
-            <span class="man-btn-label">保存</span
-            ><span class="man-btn-desc"
-              >現在のデータをファイルに保存。赤い●は未保存の変更あり（Ctrl+S）。</span
-            >
-          </div>
-          <div class="man-btn-row">
-            <span class="man-btn-label">↩ / ↪</span
-            ><span class="man-btn-desc"
-              >元に戻す（Ctrl+Z）/ やり直し（Ctrl+Y）。最大50ステップ。</span
-            >
-          </div>
-          <div class="man-btn-row">
-            <span class="man-btn-label">絞込 / ×絞込 / 絞込保存</span
-            ><span class="man-btn-desc"
-              >各列にフィルター入力欄を表示。テキスト・値選択・数値範囲で絞り込み。▼ドロップダウンでも操作可能。「絞込保存」で絞り込み結果だけを別ファイルに保存。</span
-            >
-          </div>
-          <div class="man-btn-row">
-            <span class="man-btn-label">行高</span
-            ><span class="man-btn-desc"
-              >行の高さを切り替え（22px → 30px → 40px）。データの視認性を調整。</span
-            >
-          </div>
-          <div class="man-btn-row">
-            <span class="man-btn-label">自動幅</span
-            ><span class="man-btn-desc"
-              >全列の幅をデータ内容に合わせて自動調整。列の境界線ダブルクリックで個別調整も可。</span
-            >
-          </div>
-          <div class="man-btn-row">
-            <span class="man-btn-label">折返</span
-            ><span class="man-btn-desc"
-              >セルの文字を折り返して表示（最大2〜3行分）。長いテキストの確認に便利。</span
-            >
-          </div>
-          <div class="man-btn-row">
-            <span class="man-btn-label">H: 1行目 / H: 連番</span
-            ><span class="man-btn-desc"
-              >ヘッダーモード切り替え。「H: 1行目」は1行目をヘッダーに、「H: 連番」は列番号（1,2,3…）を自動生成。</span
-            >
-          </div>
-          <div class="man-btn-row">
-            <span class="man-btn-label">＋</span
-            ><span class="man-btn-desc"
-              >新しい空のシートをタブとして追加。</span
-            >
-          </div>
-          <div class="man-btn-row">
-            <span class="man-btn-label">変換</span
-            ><span class="man-btn-desc"
-              >辞書を使ってヘッダーを日本語に変換。50%以上一致で適用。保存時は元の英語に戻ります。</span
-            >
-          </div>
-          <div class="man-btn-row">
-            <span class="man-btn-label">リセット</span
-            ><span class="man-btn-desc"
-              >フィルター・ソート・非表示行/列・フリーズ・選択・検索・ハイライトをすべて一括解除。</span
-            >
-          </div>
-          <div class="man-btn-row">
-            <span class="man-btn-label">?</span
-            ><span class="man-btn-desc"
-              >このヘルプを表示。</span
-            >
-          </div>
+          <div class="man-btn-row"><span class="man-btn-label">開く / 最近</span><span class="man-btn-desc">TSV・CSV・TXTを開く。画面へのドラッグ&amp;ドロップでも可。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">保存</span><span class="man-btn-desc">上書き保存（Ctrl+S）。タブの赤い●は未保存の印。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">絞込保存</span><span class="man-btn-desc">フィルターで絞り込んだ行だけを別ファイルに保存。</span></div>
         </div>
+
+        <h2>🏠 ホームタブ</h2>
+        <div class="man-btn-section">
+          <div class="man-btn-row"><span class="man-btn-label">戻す / 進む</span><span class="man-btn-desc">元に戻す（Ctrl+Z）/ やり直し（Ctrl+Y）。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">検索ボックス</span><span class="man-btn-desc">全セルから検索（Ctrl+F）。「前へ」「次へ」で移動、「置換」で一括置換（Ctrl+H）。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">行# ボックス</span><span class="man-btn-desc">行番号を入れてEnterでジャンプ（Ctrl+G）。</span></div>
+        </div>
+
+        <h2>📊 データタブ</h2>
+        <div class="man-btn-section">
+          <div class="man-btn-row"><span class="man-btn-label">フィルター</span><span class="man-btn-desc">各列に絞り込み欄を表示。テキスト・値選択・数値範囲で絞り込み。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">マーカー</span><span class="man-btn-desc">ONにしてセルをダブルクリックすると目印を付け外し（検品チェック用）。<b>範囲選択してからマーカーボタンを押すと一括で付け外し</b>。「マーカー色」で色を変更可能。「消去」は確認のうえ全消去。</span></div>
+        </div>
+
+        <h2>🎫 チケットタブ</h2>
+        <div class="man-btn-section">
+          <div class="man-btn-row"><span class="man-btn-label">SEJ読込</span><span class="man-btn-desc">席種エリアマスタTSVを連携。席種エリアコード・購入限定席種1〜3などのコード列に席種名を併記し、「グループ名」列を仮想追加。SEJデータ（word列）には備考差分も表示（下記）。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">日本語化</span><span class="man-btn-desc">英語の列名を日本語に変換。保存時は元の英語に戻ります。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">辞書編集</span><span class="man-btn-desc">日本語化の辞書とヘッダーメモを編集。今開いているファイルの列が一覧の先頭に出ます。新しい列名の追加も可能。ブラウザに保存されるため、オフラインHTML運用でもそのまま使えます。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">HTML出力</span><span class="man-btn-desc">確認用HTMLを新しいタブに出力。席種エリアマスタは備考・カラー・フラグ検証付き一覧、SEJデータはマスタ照合カードで出力。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">カラー表示</span><span class="man-btn-desc">表示カラーコード列の色をセル背景でプレビュー（切替）。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">ゲート表示</span><span class="man-btn-desc">ゲート用公演種別の番号にゲート名を併記。対応表は列ヘッダーのコメントから読み取り（切替）。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">駐車券検査</span><span class="man-btn-desc">エリアコード6桁目P ⇔ 駐車券フラグ1 を検査。✓OK / ✗NG どちらも表示（切替）。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">カナ検査</span><span class="man-btn-desc">全角カタカナが残っているセルをオレンジ表示。システム取込は半角ｶﾅ必須のため（切替）。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">区画席検査</span><span class="man-btn-desc">席種名に「（〇名）」がある行は、6桁目E・BOX席フラグ1・席数2以上が揃っているか検査。✓OK / ✗不足項目を表示（切替）。</span></div>
+        </div>
+
+        <h2>👁 表示タブ</h2>
+        <div class="man-btn-section">
+          <div class="man-btn-row"><span class="man-btn-label">行高さ / 折り返し / 列自動</span><span class="man-btn-desc">行の高さ切替、セル内折り返し、全列幅の自動調整。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">縦ヘッダー</span><span class="man-btn-desc">列名を縦書きにして列幅を節約。コード系の細い列が多いときに（切替）。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">ヘッダー</span><span class="man-btn-desc">「1行目」モード（通常）と「連番」モードの切替。連番中は日本語化・HTML出力・検品が使えません。</span></div>
+        </div>
+
+        <h2>🔍 SEJ備考差分の見かた</h2>
+        <p style="font-size: 12px; color: var(--text-dim); line-height: 1.7">
+          SEJ読込中は、word1〜7のセルにマスタ備考（&lt;br&gt;区切りのN番目）との比較結果が表示されます。<br>
+          ・<span style="color:#16a34a">✓</span> = マスタと完全一致<br>
+          ・ピンク色のセル = 不一致。セル内に「マスタ: …」と正しい値が併記され、<b style="color:#dc2626;background:#fde3e3">違う部分が赤く強調</b>されます（濁点抜け・全角半角違いもわかります）<br>
+          ・セルを編集しても変わるのは現データ（SEJ側）だけで、マスタには影響しません
+        </p>
 
         <h2>キーボードショートカット</h2>
         <div class="man-grid">
@@ -1984,6 +2001,7 @@
             <div class="man-row"><span>行コピー</span><span class="man-key">Ctrl+Shift+C</span></div>
             <div class="man-row"><span>コピー行をペースト</span><span class="man-key">Ctrl+Shift+V</span></div>
             <div class="man-row"><span>セル編集開始</span><span class="man-key">Enter / F2</span></div>
+            <div class="man-row"><span>直前の操作を繰り返す</span><span class="man-key">F4</span></div>
             <div class="man-row"><span>セルをクリア</span><span class="man-key">Delete / Backspace</span></div>
           </div>
           <div>
@@ -2035,19 +2053,12 @@
           <div class="man-row"><span>列の挿入・削除</span><span class="man-key">左/右に挿入、削除（複数列一括も可）</span></div>
           <div class="man-row"><span>行・列の非表示</span><span class="man-key">再表示も同メニューから</span></div>
           <div class="man-row"><span>列のフリーズ</span><span class="man-key">指定列まで固定表示（横スクロール時に固定）</span></div>
-          <div class="man-row"><span>重複行をハイライト</span><span class="man-key">完全一致行を紫色で表示</span></div>
           <div class="man-row"><span>条件付きハイライト</span><span class="man-key">空セル・正数・負数を色分け表示</span></div>
         </div>
 
-        <h2>ファイルタブ</h2>
+        <h2>シートタブ</h2>
         <p style="font-size: 12px; color: var(--text-dim)">
-          複数のファイルを同時に開いてタブで切り替えられます。タブの × で閉じます（未保存の場合は確認あり）。「＋」ボタンで空の新規シートを追加。
-        </p>
-
-        <h2>席種エリアマスター対応</h2>
-        <p style="font-size: 12px; color: var(--text-dim)">
-          ・辞書で英語カラム名を日本語に自動変換、列ヘッダーにコメント表示<br>
-          ・HTMLボタンで備考欄(nte)の&lt;br&gt;等を実際の表示にプレビュー
+          複数のファイルを同時に開いてタブで切り替えられます。タブの × で閉じます（未保存の場合は確認あり）。
         </p>
       </div>
     </div>
@@ -2107,8 +2118,11 @@
         colorView: false,    // disp_color_cd をセル背景色で表示
         gateView: false,     // gate_stage_typ1 にゲート名を併記
         parkingCheck: false, // 席種エリアコード6桁目P ⇔ 駐車券フラグ1 の検査
-        kanaCheck: false,    // 全角カナ・ひらがな検出
+        kanaCheck: false,    // 全角カタカナ検出（半角カナ必須フィールド用）
+        boxCheck: false,     // 区画席（（〇名）席種）の設定検査
+        verticalHeader: false, // ヘッダー縦書き表示
         markerColor: "#facc15", // マーカー色（localStorageに保存）
+        _lastAction: null,   // F4 繰り返し用 { type, payload }
 
         // ズーム
         zoomLevel: 100, // パーセント
@@ -2198,13 +2212,83 @@
         if (inp) inp.value = c;
       }
 
-      // SEJ備考の分割（<br>・改行区切り、タグ除去）— グリッド仮想列とHTML出力で共用
+      // SEJ備考の分割（<br>・改行区切り、タグ除去）— グリッド表示とHTML出力で共用
       function sejSplitNte(s) {
         if (!s) return [];
         return s
           .split(/<br\s*\/?>|\r?\n/i)
           .map(x => x.replace(/<[^>]+>/g, "").replace(/&nbsp;/gi, " ").trim())
           .filter(x => x);
+      }
+
+      // マスタ値の差分箇所を赤太字で強調したHTMLを返す（共通の前後を除いた中央部を強調）
+      function diffEmphasis(current, master) {
+        const cur = String(current || ""), mas = String(master || "");
+        if (!mas) return '<span style="color:#dc2626">（マスタは空）</span>';
+        let p = 0;
+        while (p < cur.length && p < mas.length && cur[p] === mas[p]) p++;
+        let s = 0;
+        while (s < cur.length - p && s < mas.length - p && cur[cur.length - 1 - s] === mas[mas.length - 1 - s]) s++;
+        const pre = escHtml(mas.slice(0, p));
+        const mid = escHtml(mas.slice(p, mas.length - s));
+        const suf = escHtml(mas.slice(mas.length - s));
+        return pre + (mid
+          ? `<b style="color:#dc2626;background:#fde3e3;border-radius:2px;padding:0 1px">${mid}</b>`
+          : `<b style="color:#dc2626">［この位置に余分な文字］</b>`) + suf;
+      }
+
+      // 縦書きヘッダー切り替え（列幅節約）
+      function toggleVerticalHeader() {
+        state.verticalHeader = !state.verticalHeader;
+        document.body.classList.toggle("vertical-headers", state.verticalHeader);
+        const btn = $("btn-vertical-header");
+        if (btn) {
+          btn.classList.toggle("active-state", state.verticalHeader);
+          btn.setAttribute("aria-pressed", String(state.verticalHeader));
+        }
+        state.forceRender = true;
+        renderHeader();
+        renderBody();
+        setStatus(`縦書きヘッダー: ${state.verticalHeader ? "ON（列幅自動で詰められます）" : "OFF"}`);
+      }
+
+      // F4: 直前の操作を繰り返す（Excel同様）
+      function recordAction(type, payload) {
+        state._lastAction = { type, payload };
+      }
+      function repeatLastAction() {
+        const a = state._lastAction;
+        if (!a) { setStatus("繰り返せる操作がまだありません"); return; }
+        const sel = state.selected;
+        if (a.type === "editCell") {
+          if (!sel) { setStatus("セルを選択してください"); return; }
+          saveUndo();
+          if (state.range) {
+            const { r1, r2, c1, c2 } = state.range;
+            for (let r = Math.min(r1, r2); r <= Math.max(r1, r2); r++)
+              for (let c = Math.min(c1, c2); c <= Math.max(c1, c2); c++)
+                state.data[r][c] = a.payload.value;
+          } else {
+            state.data[sel.row][sel.col] = a.payload.value;
+          }
+          markDirty();
+          applyFilters();
+          state.forceRender = true;
+          renderBody();
+          setStatus(`F4: 「${a.payload.value}」を再入力しました`);
+        } else if (a.type === "marker") {
+          if (!sel) { setStatus("セルを選択してください"); return; }
+          toggleMarker(sel.row, sel.col);
+          setStatus("F4: マーカーを繰り返しました");
+        } else if (a.type === "hideRow") {
+          if (!sel) return;
+          hideRows(sel.row, sel.row);
+          setStatus("F4: 行を非表示にしました");
+        } else if (a.type === "hideCol") {
+          if (!sel) return;
+          hideCols(sel.col, sel.col);
+          setStatus("F4: 列を非表示にしました");
+        }
       }
 
       // === RIBBON JS: タブ切替 ===
@@ -2714,6 +2798,11 @@
         $("btn-gate-view").onclick = () => toggleInspect("gateView", "btn-gate-view", "ゲート名表示");
         $("btn-parking-check").onclick = () => toggleInspect("parkingCheck", "btn-parking-check", "駐車券フラグ検査");
         $("btn-kana-check").onclick = () => toggleInspect("kanaCheck", "btn-kana-check", "半角カナ検査");
+        $("btn-box-check").onclick = () => toggleInspect("boxCheck", "btn-box-check", "区画席検査");
+        // 辞書・ヘッダーメモ編集
+        $("btn-dict-edit").onclick = openDictEditor;
+        // 縦書きヘッダー
+        $("btn-vertical-header").onclick = toggleVerticalHeader;
         // マーカー色
         $("marker-color").oninput = (e) => setMarkerColor(e.target.value);
         loadMarkerColor();
@@ -3221,7 +3310,8 @@
       function autoFitAllColumnsQuiet() {
         for (let c = 0; c < state.headers.length; c++) {
           const displayH = getDisplayHeader(c);
-          let maxW = measureText(displayH || "", "600 13px system-ui") + 60;
+          // 縦ヘッダー時はヘッダー文字幅を列幅に含めない（列幅節約）
+          let maxW = state.verticalHeader ? 40 : measureText(displayH || "", "600 13px system-ui") + 60;
           const sample = Math.min(state.data.length, 300);
           for (let i = 0; i < sample; i++) {
             const v = safeGet(i, c);
@@ -4083,6 +4173,17 @@
         const sejCodeColIdx = state.sejMaster
           ? state.headers.findIndex(h => h.trim() === "seat_type_area_cd")
           : -1;
+        // SEJ連携: 席種コードを参照する追加列（席種一括設定の購入限定席種1〜3など）
+        const sejExtraCodeCols = new Set();
+        if (state.sejMaster) {
+          state.headers.forEach((h, hi) => {
+            if (hi === sejCodeColIdx) return;
+            const ht = String(h).trim();
+            if (/限定席種/.test(ht) || /^(purchase|buy)_?limit/i.test(ht) || /^limit_?seat/i.test(ht) || /^seat_type_area_cd[1-9]$/.test(ht)) {
+              sejExtraCodeCols.add(hi);
+            }
+          });
+        }
 
         // 検品表示: 対象列インデックスをキャッシュ
         const _hIdx = (name) => state.headers.findIndex(h => h.trim() === name);
@@ -4091,13 +4192,20 @@
         const gateMap = gateColIdx !== -1 ? getGateMap() : null;
         const parkCodeIdx = state.parkingCheck ? _hIdx("seat_type_area_cd") : -1;
         const parkFlagIdx = state.parkingCheck ? _hIdx("parking_ticket_flg") : -1;
-        // SEJ備考差分: wordN列 → マスタ備考N仮想列 の対応表
-        let nteDiffMap = null;
-        if (state.sejMaster && state.sejVirtualCols && state.sejVirtualCols.nteCols) {
-          nteDiffMap = {};
-          for (const [wordIdx, nteIdx] of state.sejVirtualCols.nteCols) {
-            nteDiffMap[wordIdx] = nteIdx;
-          }
+        // 区画席検査: 席種名（〇名）行の設定チェック
+        const boxNmIdx = state.boxCheck ? (_hIdx("seat_type_area_disp_nm") !== -1 ? _hIdx("seat_type_area_disp_nm") : _hIdx("seat_type_area_control_nm")) : -1;
+        const boxCodeIdx = state.boxCheck ? _hIdx("seat_type_area_cd") : -1;
+        const boxFlgIdx = state.boxCheck ? _hIdx("box_seat_flg") : -1;
+        const boxCntIdx = state.boxCheck ? _hIdx("seat_cnt") : -1;
+        // SEJ備考差分: wordN列とマスタnteのN番目項目をセル内で比較表示
+        let nteWordCols = null;
+        if (state.sejMaster && sejCodeColIdx !== -1) {
+          nteWordCols = {};
+          state.headers.forEach((h, hi) => {
+            const m = String(h).trim().match(/^word([1-9])$/);
+            if (m) nteWordCols[hi] = parseInt(m[1]);
+          });
+          if (!Object.keys(nteWordCols).length) nteWordCols = null;
         }
 
         for (let vi = start; vi < end; vi++) {
@@ -4156,8 +4264,8 @@
             const isSelected =
               cls.includes("selected") || cls.includes("in-range");
             let displayVal = escHtml(cellVal);
-            // SEJ連携: 席種エリアコード列に席種名を併記
-            if (j === sejCodeColIdx && cellVal) {
+            // SEJ連携: 席種エリアコード列・購入限定席種列に席種名を併記
+            if ((j === sejCodeColIdx || sejExtraCodeCols.has(j)) && cellVal) {
               const m = state.sejMaster.byCode[cellVal.trim()];
               if (m) {
                 const nm = m.seat_type_area_disp_nm || m.seat_type_area_control_nm || "";
@@ -4185,28 +4293,58 @@
                 displayVal += `<span style="color:#dc2626;margin-left:6px;font-size:11px">▸ 対応表になし</span>`;
               }
             }
-            // 駐車券フラグ検査: コード6桁目P ⇔ フラグ1
+            // 駐車券フラグ検査: コード6桁目P ⇔ フラグ1（OK/NGどちらも表示）
             if (j === parkFlagIdx && parkCodeIdx !== -1) {
               const code = (row[parkCodeIdx] ?? "").trim();
               const isP = code.length >= 6 && code[5].toUpperCase() === "P";
               const flagIs1 = cellVal.trim() === "1";
-              if (isP && !flagIs1) {
+              if (isP && flagIs1) {
+                displayVal += `<span style="color:#16a34a;margin-left:5px;font-size:10px">✓ 駐車券OK</span>`;
+              } else if (isP && !flagIs1) {
                 cls.push("cell-ng");
-                displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">▸ 駐車券(P)は1必須</span>`;
+                displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">✗ 駐車券(P)は1必須</span>`;
               } else if (!isP && flagIs1) {
                 cls.push("cell-warn");
-                displayVal += `<span style="color:#ea580c;margin-left:5px;font-size:10px">▸ Pでないのに1</span>`;
+                displayVal += `<span style="color:#ea580c;margin-left:5px;font-size:10px">✗ Pでないのに1</span>`;
               }
             }
-            // 半角カナ検査: 全角カナ・ひらがなを含むセルを警告表示
-            if (state.kanaCheck && cellVal && /[ぁ-ゟァ-ヿ]/.test(cellVal)) {
+            // 半角カナ検査: 全角カタカナを含むセルを警告表示（半角ｶﾅ必須フィールド用）
+            if (state.kanaCheck && cellVal && /[ァ-ヶー]/.test(cellVal)) {
               cls.push("cell-warn");
+              displayVal += `<span style="color:#ea580c;margin-left:5px;font-size:10px">✗ 全角カナ</span>`;
             }
-            // SEJ備考差分: wordN列とマスタ備考N仮想列の完全一致チェック
-            if (nteDiffMap && nteDiffMap[j] !== undefined) {
-              const masterVal = (row[nteDiffMap[j]] ?? "").trim();
-              if ((cellVal || masterVal) && cellVal.trim() !== masterVal) {
-                cls.push("cell-diff");
+            // 区画席検査: 席種名に「（〇名）」がある行は E + BOXフラグ1 + 席数2以上 が必要
+            if (j === boxNmIdx && boxNmIdx !== -1 && /[（(]\s*\d+\s*名\s*[）)]/.test(cellVal)) {
+              const code = boxCodeIdx !== -1 ? (row[boxCodeIdx] ?? "").trim() : "";
+              const isE = code.length >= 6 && code[5].toUpperCase() === "E";
+              const flg = boxFlgIdx !== -1 ? (row[boxFlgIdx] ?? "").trim() === "1" : false;
+              const cnt = boxCntIdx !== -1 ? parseInt((row[boxCntIdx] ?? "").trim()) : NaN;
+              const cntOk = !isNaN(cnt) && cnt >= 2;
+              if (isE && flg && cntOk) {
+                displayVal += `<span style="color:#16a34a;margin-left:5px;font-size:10px">✓ 区画席OK</span>`;
+              } else {
+                cls.push("cell-ng");
+                const ng = [];
+                if (!isE) ng.push("6桁目E");
+                if (!flg) ng.push("BOXフラグ1");
+                if (!cntOk) ng.push("席数2以上");
+                displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">✗ ${ng.join("・")}が必要</span>`;
+              }
+            }
+            // SEJ備考差分: wordN列にマスタnteのN番目項目を併記し、差分を強調表示
+            if (nteWordCols && nteWordCols[j] !== undefined) {
+              const code = (row[sejCodeColIdx] ?? "").trim();
+              const m = code ? state.sejMaster.byCode[code] : null;
+              if (m) {
+                const parts = sejSplitNte(m.nte || "");
+                const masterVal = parts[nteWordCols[j] - 1] || "";
+                const cur = cellVal.trim();
+                if (cur === masterVal.trim()) {
+                  if (cur) displayVal += `<span style="color:#16a34a;margin-left:5px;font-size:10px">✓</span>`;
+                } else {
+                  cls.push("cell-diff");
+                  displayVal += `<br><span style="color:#888;font-size:10px">マスタ:</span> <span style="font-size:11px">${diffEmphasis(cur, masterVal)}</span>`;
+                }
               }
             }
             const style =
@@ -4614,6 +4752,7 @@
             saveUndo();
             safeSet(r, c, nv);
             markDirty();
+            recordAction("editCell", { value: nv });
           }
           td.classList.remove("editing");
           state.isEditing = false;
@@ -4754,21 +4893,34 @@
       // ===== 辞書エディター =====
       function openDictEditor() {
         closeDictEditor();
-        // 現在のヘッダーに関連するマッピングを表示
+        // 既存辞書 + 現在開いているファイルのヘッダーをすべて表示（未登録列もここから登録できる）
         const entries = [];
         const allKeys = new Set([...Object.keys(DEFAULT_HEADER_DICT), ...Object.keys(state.headerDict)]);
+        if (state.headerMode !== "numbered") {
+          state.headers.forEach(h => {
+            const key = String(h || "").trim();
+            // 数字だけ・空・仮想列（日本語名）は対象外
+            if (key && !/^\d+$/.test(key) && /^[\x21-\x7e]+$/.test(key)) allKeys.add(key);
+          });
+        }
         allKeys.forEach(key => {
-          entries.push({ key, display: state.headerDict[key] || DEFAULT_HEADER_DICT[key] || key, comment: state.headerComments[key] || "" });
+          entries.push({ key, display: state.headerDict[key] || DEFAULT_HEADER_DICT[key] || "", comment: state.headerComments[key] || "" });
         });
-        let html = '<div style="max-height:70vh;overflow:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;">';
-        html += '<tr style="background:#f0f0f0;position:sticky;top:0;"><th style="padding:4px;border:1px solid #ccc;width:30%">元ヘッダー</th><th style="padding:4px;border:1px solid #ccc;width:30%">表示名</th><th style="padding:4px;border:1px solid #ccc;width:40%">コメント</th></tr>';
-        entries.forEach(e => {
-          html += `<tr>
-            <td style="padding:3px;border:1px solid #ddd;font-family:monospace;font-size:11px;">${escHtml(e.key)}</td>
-            <td style="padding:2px;border:1px solid #ddd;"><input type="text" data-dict-key="${escHtml(e.key)}" value="${escHtml(e.display)}" style="width:100%;border:1px solid #ccc;padding:2px 4px;font-size:11px;border-radius:2px;"></td>
-            <td style="padding:2px;border:1px solid #ddd;"><textarea data-comment-key="${escHtml(e.key)}" style="width:100%;height:40px;border:1px solid #ccc;padding:2px 4px;font-size:11px;border-radius:2px;resize:vertical;font-family:var(--font-ui);" placeholder="コメント">${escHtml(e.comment)}</textarea></td>
+        // 現在のファイルにある列を先頭に並べる
+        const curSet = new Set(state.headers.map(h => String(h || "").trim()));
+        entries.sort((a, b) => (curSet.has(b.key) ? 1 : 0) - (curSet.has(a.key) ? 1 : 0));
+        const rowHtml = (e) => `<tr>
+            <td style="padding:3px;border:1px solid #ddd;font-family:monospace;font-size:11px;">${escHtml(e.key)}${curSet.has(e.key) ? ' <span style="color:#16a34a;font-size:10px">●現在</span>' : ''}</td>
+            <td style="padding:2px;border:1px solid #ddd;"><input type="text" data-dict-key="${escHtml(e.key)}" value="${escHtml(e.display)}" placeholder="日本語名" style="width:100%;border:1px solid #ccc;padding:2px 4px;font-size:11px;border-radius:2px;"></td>
+            <td style="padding:2px;border:1px solid #ddd;"><textarea data-comment-key="${escHtml(e.key)}" style="width:100%;height:40px;border:1px solid #ccc;padding:2px 4px;font-size:11px;border-radius:2px;resize:vertical;font-family:var(--font-ui);" placeholder="ヘッダーメモ（列のホバーで表示）">${escHtml(e.comment)}</textarea></td>
           </tr>`;
-        });
+        let html = '<div style="display:flex;gap:6px;margin-bottom:8px;align-items:center">'
+          + '<input type="text" id="dict-new-key" placeholder="新しい列名（例: new_column_cd）" style="flex:1;border:1px solid #ccc;padding:4px 8px;font-size:12px;border-radius:3px;font-family:monospace">'
+          + '<button type="button" id="dict-add-btn" style="padding:4px 14px;font-size:12px;border:1px solid #16a34a;color:#16a34a;background:#fff;border-radius:3px;cursor:pointer">＋ 行を追加</button>'
+          + '</div>';
+        html += '<div id="dict-table-wrap" style="max-height:62vh;overflow:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;">';
+        html += '<tr style="background:#f0f0f0;position:sticky;top:0;"><th style="padding:4px;border:1px solid #ccc;width:30%">元ヘッダー</th><th style="padding:4px;border:1px solid #ccc;width:30%">表示名（日本語化で使用）</th><th style="padding:4px;border:1px solid #ccc;width:40%">ヘッダーメモ</th></tr>';
+        entries.forEach(e => { html += rowHtml(e); });
         html += '</table></div>';
         html += '<div style="margin-top:8px;text-align:right;"><button type="button" id="dict-reset-btn" style="margin-right:auto;padding:4px 12px;font-size:12px;cursor:pointer;color:#d33;">リセット</button><button type="button" id="dict-cancel-btn" style="padding:4px 12px;margin-right:6px;font-size:12px;cursor:pointer;">キャンセル</button><button type="button" id="dict-save-btn" style="padding:4px 12px;font-size:12px;background:var(--accent);color:#fff;border:none;border-radius:3px;cursor:pointer;">保存</button></div>';
 
@@ -4783,6 +4935,26 @@
 
         overlay.onclick = (e) => { if (e.target === overlay) closeDictEditor(); };
         dlg.querySelector("#dict-cancel-btn").onclick = closeDictEditor;
+        // 新しい列名の行を追加
+        dlg.querySelector("#dict-add-btn").onclick = () => {
+          const keyInp = dlg.querySelector("#dict-new-key");
+          const key = (keyInp.value || "").trim();
+          if (!key) { keyInp.focus(); return; }
+          if (dlg.querySelector(`input[data-dict-key="${CSS.escape(key)}"]`)) {
+            alert("その列名はすでに一覧にあります。");
+            return;
+          }
+          const table = dlg.querySelector("#dict-table-wrap table");
+          const tbody = table.tBodies[0] || table;
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td style="padding:3px;border:1px solid #ddd;font-family:monospace;font-size:11px;">${escHtml(key)} <span style="color:#2563eb;font-size:10px">●新規</span></td>
+            <td style="padding:2px;border:1px solid #ddd;"><input type="text" data-dict-key="${escHtml(key)}" placeholder="日本語名" style="width:100%;border:1px solid #ccc;padding:2px 4px;font-size:11px;border-radius:2px;"></td>
+            <td style="padding:2px;border:1px solid #ddd;"><textarea data-comment-key="${escHtml(key)}" style="width:100%;height:40px;border:1px solid #ccc;padding:2px 4px;font-size:11px;border-radius:2px;resize:vertical;font-family:var(--font-ui);" placeholder="ヘッダーメモ"></textarea></td>`;
+          tbody.insertBefore(tr, tbody.rows[1] || null);
+          keyInp.value = "";
+          tr.querySelector("input[data-dict-key]").focus();
+        };
         dlg.querySelector("#dict-reset-btn").onclick = () => {
           if (!confirm("辞書・コメントをデフォルトに戻しますか？")) return;
           state.headerDict = { ...DEFAULT_HEADER_DICT };
@@ -4821,6 +4993,12 @@
       function onKeyDown(e) {
         if (e.target.tagName === "INPUT" && e.target.closest("td.editing"))
           return;
+        // F4: 直前の操作を繰り返す（Excel同様）
+        if (e.key === "F4" && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+          e.preventDefault();
+          repeatLastAction();
+          return;
+        }
         // ダイアログ内でもCtrl+C/Vはセル操作として処理する
         const cmd = e.ctrlKey || e.metaKey;
         if (
@@ -6875,11 +7053,7 @@
           cellColors: { ...state.cellColors },
           // SEJ仮想列はdata/headersと不可分（欠落するとundo後の保存で実列を誤除外）
           sejVirtualCols: state.sejVirtualCols
-            ? {
-                indices: [...state.sejVirtualCols.indices],
-                keys: [...state.sejVirtualCols.keys],
-                nteCols: state.sejVirtualCols.nteCols ? state.sejVirtualCols.nteCols.map(p => [...p]) : undefined,
-              }
+            ? { indices: [...state.sejVirtualCols.indices], keys: [...state.sejVirtualCols.keys] }
             : null,
         };
       }
@@ -6898,11 +7072,7 @@
         state.headerMode = s.headerMode || "firstRow";
         state.cellColors = s.cellColors ? { ...s.cellColors } : {};
         state.sejVirtualCols = s.sejVirtualCols
-          ? {
-              indices: [...s.sejVirtualCols.indices],
-              keys: [...s.sejVirtualCols.keys],
-              nteCols: s.sejVirtualCols.nteCols ? s.sejVirtualCols.nteCols.map(p => [...p]) : undefined,
-            }
+          ? { indices: [...s.sejVirtualCols.indices], keys: [...s.sejVirtualCols.keys] }
           : null;
         applyHeaderMapping();
         updateHeaderModeBtn();
@@ -7137,7 +7307,7 @@
         return _canvasCtx.measureText(text).width;
       }
       function autoFitColumn(col) {
-        let maxW = measureText(getDisplayHeader(col) || "", "600 13px system-ui") + 60;
+        let maxW = state.verticalHeader ? 40 : measureText(getDisplayHeader(col) || "", "600 13px system-ui") + 60;
         const sample = Math.min(state.data.length, 300);
         for (let i = 0; i < sample; i++) {
           const v = safeGet(i, col);
@@ -7164,6 +7334,7 @@
       // ===== 非表示 =====
       function hideRows(r1, r2) {
         for (let r = r1; r <= r2; r++) state.hiddenRows.add(r);
+        recordAction("hideRow", {});
         state.forceRender = true;
         renderBody();
         updateHiddenStatus();
@@ -7171,6 +7342,7 @@
       }
       function hideCols(c1, c2) {
         for (let c = c1; c <= c2; c++) state.hiddenCols.add(c);
+        recordAction("hideCol", {});
         state.forceRender = true;
         renderHeader();
         renderBody();
@@ -7407,7 +7579,7 @@
       // ===== 全列の自動幅調整 =====
       function autoFitAllColumns() {
         for (let c = 0; c < state.headers.length; c++) {
-          let maxW = measureText(getDisplayHeader(c) || "", "600 13px system-ui") + 60;
+          let maxW = state.verticalHeader ? 40 : measureText(getDisplayHeader(c) || "", "600 13px system-ui") + 60;
           const sample = Math.min(state.data.length, 300);
           for (let i = 0; i < sample; i++) {
             const v = safeGet(i, c);
@@ -7535,41 +7707,7 @@
             } else if (state.sejVirtualCols) {
               console.warn("[SEJ] 既に仮想列が存在するためスキップ:", state.sejVirtualCols);
             }
-            // 仮想列「マスタ備考N」を追加（SEJのwordN列とマスタnteの<br>区切り項目を横並び比較）
-            const nteKeyIdx = normHeaders.indexOf("nte");
-            const wordCols = [];
-            state.headers.forEach((h, hi) => {
-              const m = String(h).trim().match(/^word([1-9])$/);
-              if (m) wordCols.push({ n: parseInt(m[1]), idx: hi });
-            });
-            if (curCodeIdx !== -1 && nteKeyIdx !== -1 && wordCols.length && state.sejVirtualCols && !state.sejVirtualCols.nteCols) {
-              const nteKey = headers[nteKeyIdx];
-              // マスタ備考の最大項目数（word列数と比較して大きい方、最大9）
-              let maxParts = 0;
-              for (const cd of Object.keys(byCode)) {
-                const parts = sejSplitNte(byCode[cd][nteKey] || "");
-                if (parts.length > maxParts) maxParts = parts.length;
-              }
-              maxParts = Math.min(Math.max(maxParts, wordCols.length), 9);
-              const nteCols = [];
-              for (let k = 1; k <= maxParts; k++) {
-                const vIdx = state.headers.length;
-                state.headers.push(`マスタ備考${k}`);
-                state.data.forEach(row => {
-                  const cd = (row[curCodeIdx] ?? "").trim();
-                  const m = byCode[cd];
-                  const parts = m ? sejSplitNte(m[nteKey] || "") : [];
-                  row.push(parts[k - 1] || "");
-                });
-                state.sejVirtualCols.indices.push(vIdx);
-                state.sejVirtualCols.keys.push(`_nte${k}`);
-                if (state.displayHeaders) state.displayHeaders.push(`マスタ備考${k}`);
-                const w = wordCols.find(wc => wc.n === k);
-                if (w) nteCols.push([w.idx, vIdx]);
-              }
-              state.sejVirtualCols.nteCols = nteCols;
-              console.log("[SEJ] マスタ備考仮想列を追加:", maxParts, "列 / word対応:", nteCols);
-            }
+            // 備考(nte)の差分は wordN セル内に併記する方式（renderBody側で処理）
             $("btn-sej-link").classList.add("active-state");
             setRbLabel("btn-sej-link", `SEJ:${cnt}件`);
             // 席種エリアコード列を自動で広く取る（席種名が併記されるため）
@@ -7902,6 +8040,7 @@
         { key: "nte", label: "備考", group: "備考", isHtml: true },
         { key: "rsve_unrsve_kbn", label: "指定/自由席", group: "区分" },
         { key: "grp_nm", label: "グループ名", group: "区分" },
+        { key: "disp_color_cd", label: "表示カラー", group: "区分", isColor: true },
         { key: "qr_code_issue_presence_flg", label: "QR発行", group: "フラグ", isFlag: true },
         { key: "enter_possible_flg", label: "入場可能", group: "フラグ", isFlag: true },
         { key: "box_seat_flg", label: "BOX席", group: "フラグ", isFlag: true },
@@ -8754,6 +8893,31 @@
       }
 
       function toggleMarkerMode() {
+        // 範囲選択中はモード切替ではなく、選択範囲にマーカーを一括適用する
+        if (state.range) {
+          const r1 = Math.min(state.range.r1, state.range.r2);
+          const r2 = Math.max(state.range.r1, state.range.r2);
+          const c1 = Math.min(state.range.c1, state.range.c2);
+          const c2 = Math.max(state.range.c1, state.range.c2);
+          // 全セルがマーク済みなら解除、それ以外は付与
+          let allMarked = true;
+          for (let r = r1; r <= r2 && allMarked; r++)
+            for (let c = c1; c <= c2; c++)
+              if (!state.markedCells.has(`${r},${c}`)) { allMarked = false; break; }
+          for (let r = r1; r <= r2; r++)
+            for (let c = c1; c <= c2; c++) {
+              const key = `${r},${c}`;
+              if (allMarked) state.markedCells.delete(key);
+              else state.markedCells.add(key);
+            }
+          recordAction("marker", {});
+          updateEncodingStatus();
+          state.forceRender = true;
+          renderBody();
+          const n = (r2 - r1 + 1) * (c2 - c1 + 1);
+          setStatus(allMarked ? `選択範囲のマーカーを解除しました（${n}セル）` : `選択範囲にマーカーを付けました（${n}セル）`);
+          return;
+        }
         state.markerMode = !state.markerMode;
         const btn = $("btn-marker");
         btn.classList.toggle("active-state", state.markerMode);
@@ -8767,12 +8931,18 @@
         const key = `${row},${col}`;
         if (state.markedCells.has(key)) state.markedCells.delete(key);
         else state.markedCells.add(key);
+        recordAction("marker", {});
         updateEncodingStatus();
         state.forceRender = true;
         renderBody();
       }
 
       function clearAllMarkers() {
+        if (state.markedCells.size === 0) {
+          setStatus("マーカーはありません");
+          return;
+        }
+        if (!confirm(`マーカーを ${state.markedCells.size} 個すべて消去します。\nよろしいですか？`)) return;
         state.markedCells.clear();
         updateEncodingStatus();
         state.forceRender = true;
