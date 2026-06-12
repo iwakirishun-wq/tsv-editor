@@ -1,0 +1,21 @@
+{
+  "name": "チケットTSVエディター",
+  "short_name": "TSV編集",
+  "description": "席種エリアマスタ・SEJ設定TSVの編集と検品に特化したエディター",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "orientation": "landscape",
+  "background_color": "#fafafa",
+  "theme_color": "#fafafa",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

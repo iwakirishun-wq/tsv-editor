@@ -3,6 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- セキュリティ: 外部スクリプト/外部接続を遮断（単一ファイル・完全ローカル動作のため自己完結） -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'" />
+    <meta name="referrer" content="no-referrer" />
     <title>TSV/CSV Editor</title>
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
     <link rel="manifest" href="./manifest.json" />
@@ -8199,7 +8202,7 @@
 
         const blob = new Blob([html], { type: "text/html;charset=utf-8" });
         const url = URL.createObjectURL(blob);
-        window.open(url, "_blank");
+        window.open(url, "_blank", "noopener");
         setTimeout(() => URL.revokeObjectURL(url), 60000);
         setStatus(`SEJ HTML出力完了（${filteredRows}件）`);
       }
@@ -8591,7 +8594,7 @@
         // 新しいウィンドウで開く
         const blob = new Blob([html], { type: "text/html;charset=utf-8" });
         const url = URL.createObjectURL(blob);
-        window.open(url, "_blank");
+        window.open(url, "_blank", "noopener");
         setTimeout(() => URL.revokeObjectURL(url), 60000);
         setStatus(`HTML出力完了（${filteredRows}件）`);
       }
