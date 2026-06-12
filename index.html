@@ -513,23 +513,28 @@
         line-height: 1;
       }
       .sort-arrow {
-        font-size: 10px;
-        color: var(--border);
+        font-size: 14px;
+        color: #b0b0b0;
         cursor: pointer;
         flex-shrink: 0;
-        padding: 0 2px;
+        padding: 3px 5px;
+        border-radius: 3px;
       }
       .sort-arrow:hover,
       .sort-arrow.active {
         color: var(--accent);
+        background: rgba(0, 0, 0, 0.06);
       }
       .filter-btn {
-        font-size: 10px;
-        color: var(--border);
+        font-size: 12px;
+        color: #b0b0b0;
         cursor: pointer;
-        padding: 0 2px;
+        padding: 3px 5px;
         flex-shrink: 0;
-        border-radius: 2px;
+        border-radius: 3px;
+      }
+      .filter-btn:hover {
+        background: rgba(0, 0, 0, 0.06);
       }
       .filter-btn:hover,
       .filter-btn.active {
@@ -1169,10 +1174,20 @@
         background: rgba(168, 85, 247, 0.1) !important;
       }
 
-      /* ===価格連携チェック=== */
-      td.price-ng {
+      /* ===検品表示（駐車券/カナ/SEJ備考差分）=== */
+      td.cell-ng {
         background: rgba(220, 38, 38, 0.10) !important;
         outline: 1px solid rgba(220, 38, 38, 0.35);
+        outline-offset: -1px;
+      }
+      td.cell-warn {
+        background: rgba(234, 88, 12, 0.12) !important;
+        outline: 1px solid rgba(234, 88, 12, 0.35);
+        outline-offset: -1px;
+      }
+      td.cell-diff {
+        background: rgba(219, 39, 119, 0.10) !important;
+        outline: 1px solid rgba(219, 39, 119, 0.35);
         outline-offset: -1px;
       }
 
@@ -1427,83 +1442,6 @@
         color: #ef4444;
       }
 
-      /* ===重複ハイライトダイアログ=== */
-      #dup-hl-dialog {
-        display: none;
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.4);
-        z-index: 1500;
-        align-items: center;
-        justify-content: center;
-      }
-      #dup-hl-dialog.show {
-        display: flex;
-      }
-      #dup-hl-content {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        padding: 22px 26px;
-        width: min(340px, calc(100vw - 32px));
-        font-family: var(--font-ui);
-      }
-      #dup-hl-content h2 {
-        font-size: 14px;
-        font-weight: 700;
-        margin-bottom: 14px;
-      }
-      #dup-hl-content label {
-        font-size: 11px;
-        font-weight: 600;
-        color: var(--text-dim);
-        display: block;
-        margin-bottom: 5px;
-      }
-      #dup-hl-col {
-        width: 100%;
-        padding: 5px 8px;
-        font-size: 12px;
-        border: 1px solid var(--border);
-        background: var(--surface2);
-        color: var(--text);
-        outline: none;
-        margin-bottom: 16px;
-      }
-      #dup-hl-col:focus {
-        border-color: var(--accent);
-      }
-      .dup-hl-btns {
-        display: flex;
-        gap: 8px;
-        justify-content: flex-end;
-      }
-      .dup-hl-btns button {
-        padding: 6px 16px;
-        font-size: 12px;
-        border: 1px solid var(--border);
-        cursor: pointer;
-      }
-      #dup-hl-run {
-        background: #a855f7;
-        color: #fff;
-      }
-      #dup-hl-run:hover {
-        opacity: 0.88;
-      }
-      #dup-hl-clear {
-        background: var(--surface2);
-      }
-      #dup-hl-clear:hover {
-        background: #e5e5e7;
-      }
-      #dup-hl-close {
-        background: transparent;
-        color: var(--text-dim);
-      }
-      #dup-hl-close:hover {
-        background: var(--surface2);
-      }
-
       /* ===セル折り返し=== */
       body.wrap-cells tbody td {
         white-space: pre-wrap;
@@ -1532,7 +1470,7 @@
       }
 
       /* マーカー機能 */
-      td.marked { background: rgba(255, 80, 160, 0.25) !important; }
+      td.marked { background: color-mix(in srgb, var(--marker-color, #facc15) 35%, transparent) !important; }
       #btn-marker.active-state { background: #fff0f6; border-color: #f472b6; color: #be185d; }
       body.marker-mode td[data-col] { cursor: crosshair; }
 
@@ -1653,10 +1591,6 @@
         <!-- Group: 検品 -->
         <div class="rb-group">
           <div class="rb-buttons">
-            <button class="rb-btn" id="btn-duphl" title="重複行をハイライト（列指定）" aria-label="重複ハイライトダイアログを開く">
-              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><circle cx="12" cy="12" r="1.5" fill="currentColor"></circle></svg></span>
-              <span>重複HL</span>
-            </button>
             <button class="rb-btn" id="btn-marker" title="マーカーモード (M)&#10;ON中: ダブルクリックでセルにマーカーを付与/解除&#10;チェック作業・レビュー用" aria-label="マーカーモードの切り替え" aria-pressed="false">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg></span>
               <span>マーカー</span>
@@ -1665,6 +1599,10 @@
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 5H9l-7 7 7 7h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2z"></path><line x1="18" y1="9" x2="12" y2="15"></line><line x1="12" y1="9" x2="18" y2="15"></line></svg></span>
               <span>消去</span>
             </button>
+            <label class="rb-btn" id="marker-color-wrap" title="マーカーの色を変更&#10;以降に付けるマーカーと既存マーカーすべてに適用されます" style="cursor:pointer">
+              <span class="rb-icon"><input type="color" id="marker-color" value="#facc15" aria-label="マーカーの色" style="width:24px;height:24px;border:none;padding:0;background:none;cursor:pointer"></span>
+              <span>マーカー色</span>
+            </label>
           </div>
           <span class="rb-group-label">検品</span>
         </div>
@@ -1679,12 +1617,30 @@
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></span>
               <span>SEJ読込</span>
             </button>
-            <button class="rb-btn" id="btn-price-ref" title="経路価格スケジュール参照JSONを連携&#10;クリック: 参照JSONファイルを選択&#10;もう一度押すと連携解除" aria-label="経路価格スケジュール連携">
-              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg></span>
-              <span>価格照合</span>
-            </button>
           </div>
           <span class="rb-group-label">マスタ連携</span>
+        </div>
+        <!-- Group: 検品表示（トグル） -->
+        <div class="rb-group">
+          <div class="rb-buttons">
+            <button class="rb-btn" id="btn-color-view" title="表示カラーコード(disp_color_cd)列のカラーコードを&#10;セルの背景色として表示します（切り替え）" aria-label="カラーコード表示の切り替え" aria-pressed="false">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"></circle><path d="M12 3a9 9 0 0 0 0 18c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16a5 5 0 0 0 5-5c0-4.42-4.03-8-9-8z"></path><circle cx="7.5" cy="11.5" r="1" fill="currentColor"></circle><circle cx="11" cy="7.5" r="1" fill="currentColor"></circle><circle cx="15.5" cy="8.5" r="1" fill="currentColor"></circle></svg></span>
+              <span>カラー表示</span>
+            </button>
+            <button class="rb-btn" id="btn-gate-view" title="ゲート用公演種別(gate_stage_typ1)の番号を&#10;ヘッダーコメントの対応表と照合してゲート名を併記します（切り替え）" aria-label="ゲート名表示の切り替え" aria-pressed="false">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 21V8l9-5 9 5v13"></path><path d="M9 21v-8h6v8"></path><line x1="3" y1="21" x2="21" y2="21"></line></svg></span>
+              <span>ゲート表示</span>
+            </button>
+            <button class="rb-btn" id="btn-parking-check" title="席種エリアコード6桁目が P（駐車券）の行で&#10;駐車券フラグが 1 になっているか検査し、&#10;不一致セルをマーカー表示します（切り替え）" aria-label="駐車券フラグ検査の切り替え" aria-pressed="false">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M9 17V7h4a3 3 0 0 1 0 6H9"></path></svg></span>
+              <span>駐車券検査</span>
+            </button>
+            <button class="rb-btn" id="btn-kana-check" title="全角カナ・ひらがなを含むセルをマーカー表示します&#10;（システム取込は半角カナが必要なため）（切り替え）" aria-label="半角カナ検査の切り替え" aria-pressed="false">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 6h8M8 6v12"></path><path d="M14 18l3.5-10L21 18"></path><path d="M15.5 14h4"></path></svg></span>
+              <span>カナ検査</span>
+            </button>
+          </div>
+          <span class="rb-group-label">検品表示</span>
         </div>
         <!-- Group: 変換・出力 -->
         <div class="rb-group">
@@ -1888,27 +1844,6 @@
       aria-label="TSV/CSVファイルを開く"
       style="display: none"
     />
-
-    <!-- 重複ハイライトダイアログ -->
-    <div
-      id="dup-hl-dialog"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="dup-hl-title"
-    >
-      <div id="dup-hl-content">
-        <h2 id="dup-hl-title">重複ハイライト（列指定）</h2>
-        <label for="dup-hl-col"
-          >対象列（この列の値が重複している行を紫でハイライト）</label
-        >
-        <select id="dup-hl-col" aria-label="ハイライト対象の列を選択"></select>
-        <div class="dup-hl-btns">
-          <button type="button" id="dup-hl-close" aria-label="重複ハイライトダイアログを閉じる">閉じる</button>
-          <button type="button" id="dup-hl-clear" aria-label="重複ハイライトをクリア">クリア</button>
-          <button type="button" id="dup-hl-run" aria-label="重複ハイライトを実行">ハイライト</button>
-        </div>
-      </div>
-    </div>
 
     <!-- リロード警告ダイアログ -->
     <div
@@ -2169,7 +2104,11 @@
         // SEJ連携用: 席種エリアマスタ
         sejMaster: null, // { byCode: { "MMTGPE25021": { disp_nm, control_nm, nte, ... } }, fileName }
         sejVirtualCols: null, // { indices: [i1, i2, ...], keys: ["grp_nm", ...] } 保存時除外する仮想列
-        priceRef: null, // 経路価格スケジュール参照 { meta, colMap, lookup: Map<ticket→row> }
+        colorView: false,    // disp_color_cd をセル背景色で表示
+        gateView: false,     // gate_stage_typ1 にゲート名を併記
+        parkingCheck: false, // 席種エリアコード6桁目P ⇔ 駐車券フラグ1 の検査
+        kanaCheck: false,    // 全角カナ・ひらがな検出
+        markerColor: "#facc15", // マーカー色（localStorageに保存）
 
         // ズーム
         zoomLevel: 100, // パーセント
@@ -2198,6 +2137,75 @@
 
       // ===== DOM =====
       const $ = (id) => document.getElementById(id);
+
+      // リボンボタンのラベルspanだけを更新する（SVGアイコンを壊さない）
+      function setRbLabel(id, text) {
+        const btn = typeof id === "string" ? $(id) : id;
+        if (!btn) return;
+        const label = btn.querySelector(".rb-icon + span") || btn.querySelector("span:last-of-type");
+        if (label && !label.classList.contains("rb-icon")) label.textContent = text;
+        else btn.textContent = text;
+      }
+      // リボンボタンの説明を更新する（title は初期化時に data-tip へ退避済みのため data-tip を直接更新）
+      function setRbTip(id, text) {
+        const btn = typeof id === "string" ? $(id) : id;
+        if (!btn) return;
+        btn.setAttribute("data-tip", text);
+        btn.removeAttribute("title");
+      }
+
+      // 検品表示トグル共通処理（カラー表示/ゲート表示/駐車券検査/カナ検査）
+      function toggleInspect(stateKey, btnId, label) {
+        state[stateKey] = !state[stateKey];
+        const btn = $(btnId);
+        if (btn) {
+          btn.classList.toggle("active-state", state[stateKey]);
+          btn.setAttribute("aria-pressed", String(state[stateKey]));
+        }
+        state.forceRender = true;
+        renderBody();
+        setStatus(`${label}: ${state[stateKey] ? "ON" : "OFF"}`);
+      }
+
+      // ゲート用公演種別: ヘッダーコメントの「名称：番号」行から 番号→名称 の対応表を作る
+      let _gateMapCache = null, _gateMapSrc = null;
+      function getGateMap() {
+        const src = (state.headerComments && state.headerComments["gate_stage_typ1"]) || "";
+        if (_gateMapSrc === src) return _gateMapCache;
+        _gateMapSrc = src;
+        const map = {};
+        src.split(/\r?\n/).forEach((line) => {
+          const m = line.match(/^(.+?)[：:]\s*(\d+)\s*$/);
+          if (m) map[m[2]] = m[1].trim();
+        });
+        _gateMapCache = map;
+        return map;
+      }
+
+      // マーカー色（localStorageに保存、全マーカー共通）
+      const MARKER_COLOR_KEY = "tsv-editor-marker-color";
+      function setMarkerColor(color) {
+        state.markerColor = color;
+        document.documentElement.style.setProperty("--marker-color", color);
+        try { localStorage.setItem(MARKER_COLOR_KEY, color); } catch (e) {}
+      }
+      function loadMarkerColor() {
+        let c = "#facc15";
+        try { c = localStorage.getItem(MARKER_COLOR_KEY) || c; } catch (e) {}
+        state.markerColor = c;
+        document.documentElement.style.setProperty("--marker-color", c);
+        const inp = $("marker-color");
+        if (inp) inp.value = c;
+      }
+
+      // SEJ備考の分割（<br>・改行区切り、タグ除去）— グリッド仮想列とHTML出力で共用
+      function sejSplitNte(s) {
+        if (!s) return [];
+        return s
+          .split(/<br\s*\/?>|\r?\n/i)
+          .map(x => x.replace(/<[^>]+>/g, "").replace(/&nbsp;/gi, " ").trim())
+          .filter(x => x);
+      }
 
       // === RIBBON JS: タブ切替 ===
       document.querySelectorAll(".rb-tab[data-tab]").forEach((tab) => {
@@ -2580,7 +2588,7 @@
             el.removeAttribute("title");
           }
         };
-        document.querySelectorAll("#toolbar [title], #search-area [title]").forEach(stash);
+        document.querySelectorAll(".rb-ribbon [title]").forEach(stash);
 
         let hoverTarget = null;
         let hoverTimer = null;
@@ -2688,7 +2696,7 @@
         $("btn-row-height").onclick = cycleRowHeight;
         $("btn-autofit-all").onclick = autoFitAllColumns;
         $("btn-wrap").onclick = toggleWrapCells;
-        $("btn-html-export").onclick = exportSejHtmlWrapper;
+        $("btn-html-export").onclick = exportHtmlPreview;
         $("btn-sej-link").onclick = toggleSejLink;
         // ドラッグ&ドロップでSEJマスタを読込
         const sejBtn = $("btn-sej-link");
@@ -2701,18 +2709,14 @@
             loadSejMasterFile(e.dataTransfer.files[0]);
           }
         });
-        $("btn-price-ref").onclick = togglePriceRef;
-        // ドラッグ&ドロップで価格参照JSONを読込
-        const priceRefBtn = $("btn-price-ref");
-        priceRefBtn.addEventListener("dragover", (e) => { e.preventDefault(); priceRefBtn.classList.add("drag-over"); });
-        priceRefBtn.addEventListener("dragleave", () => priceRefBtn.classList.remove("drag-over"));
-        priceRefBtn.addEventListener("drop", (e) => {
-          e.preventDefault();
-          priceRefBtn.classList.remove("drag-over");
-          if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-            loadPriceRefFile(e.dataTransfer.files[0]);
-          }
-        });
+        // 検品表示トグル（チケットタブ）
+        $("btn-color-view").onclick = () => toggleInspect("colorView", "btn-color-view", "カラーコード表示");
+        $("btn-gate-view").onclick = () => toggleInspect("gateView", "btn-gate-view", "ゲート名表示");
+        $("btn-parking-check").onclick = () => toggleInspect("parkingCheck", "btn-parking-check", "駐車券フラグ検査");
+        $("btn-kana-check").onclick = () => toggleInspect("kanaCheck", "btn-kana-check", "半角カナ検査");
+        // マーカー色
+        $("marker-color").oninput = (e) => setMarkerColor(e.target.value);
+        loadMarkerColor();
         $("btn-header-mode").onclick = toggleHeaderMode;
         $("btn-new-sheet").onclick = addNewSheet;
         $("btn-reset-view").onclick = resetView;
@@ -2725,6 +2729,10 @@
         // 辞書・変換ボタン（Shift+クリックで辞書編集）
         $("btn-apply-dict").onclick = (e) => {
           if (e.shiftKey) { openDictEditor(); return; }
+          if (state.headerMode === "numbered") {
+            alert("ヘッダーが連番モードのため日本語化できません。\n\n「表示」タブの「ヘッダー」ボタンで 1行目モード に切り替えてください。");
+            return;
+          }
           applyHeaderMapping();
           renderHeader();
           state.forceRender = true;
@@ -2747,20 +2755,6 @@
             !e.target.closest("#btn-open-recent")
           )
             closeRecentMenu();
-        });
-
-        // 重複ハイライトダイアログ
-        $("dup-hl-run").onclick = runDupHlByCol;
-        $("dup-hl-clear").onclick = clearDupHl;
-        $("dup-hl-close").onclick = closeDupHlDialog;
-        $("dup-hl-dialog").onclick = (e) => {
-          if (e.target === $("dup-hl-dialog")) closeDupHlDialog();
-        };
-        $("dup-hl-dialog").addEventListener("keydown", (e) => {
-          if (e.key === "Escape") {
-            e.preventDefault();
-            closeDupHlDialog();
-          }
         });
 
         els.fileInput.onchange = (e) => {
@@ -3273,12 +3267,12 @@
         const btn = $("btn-header-mode");
         if (!btn) return;
         const isFirstRow = state.headerMode === "firstRow";
-        btn.textContent = isFirstRow ? "H: 1行目" : "H: 連番";
+        setRbLabel(btn, isFirstRow ? "ヘッダー:1行目" : "ヘッダー:連番");
         btn.classList.toggle("active-state", isFirstRow);
         btn.setAttribute("aria-pressed", String(isFirstRow));
-        btn.title = isFirstRow
-          ? "ヘッダー: 1行目を使用中 → クリックで連番に切替"
-          : "ヘッダー: 連番を使用中 → クリックで1行目に切替";
+        setRbTip(btn, isFirstRow
+          ? "ヘッダー: 1行目を使用中\nクリックすると連番（1,2,3...）に切り替わります"
+          : "ヘッダー: 連番を使用中\nクリックするとファイルの1行目をヘッダーとして使用します\n※連番モードでは日本語化・HTML出力が使えません");
       }
 
       function toggleHeaderMode() {
@@ -4090,18 +4084,20 @@
           ? state.headers.findIndex(h => h.trim() === "seat_type_area_cd")
           : -1;
 
-        // 価格連携: 参照列インデックスをキャッシュ
-        let priceRefCols = null;
-        if (state.priceRef) {
-          const cm = state.priceRef.colMap;
-          const fi = (name) => name ? state.headers.findIndex(h => h.trim() === name.trim()) : -1;
-          priceRefCols = {
-            ticketIdx: fi(cm.ticket_col),
-            advanceIdx: fi(cm.advance_price_col),
-            dayIdx: fi(cm.day_price_col),
-            upgradeAmountIdx: fi(cm.upgrade_amount_col),
-            upgradeToIdx: fi(cm.upgrade_to_col),
-          };
+        // 検品表示: 対象列インデックスをキャッシュ
+        const _hIdx = (name) => state.headers.findIndex(h => h.trim() === name);
+        const colorColIdx = state.colorView ? _hIdx("disp_color_cd") : -1;
+        const gateColIdx = state.gateView ? _hIdx("gate_stage_typ1") : -1;
+        const gateMap = gateColIdx !== -1 ? getGateMap() : null;
+        const parkCodeIdx = state.parkingCheck ? _hIdx("seat_type_area_cd") : -1;
+        const parkFlagIdx = state.parkingCheck ? _hIdx("parking_ticket_flg") : -1;
+        // SEJ備考差分: wordN列 → マスタ備考N仮想列 の対応表
+        let nteDiffMap = null;
+        if (state.sejMaster && state.sejVirtualCols && state.sejVirtualCols.nteCols) {
+          nteDiffMap = {};
+          for (const [wordIdx, nteIdx] of state.sejVirtualCols.nteCols) {
+            nteDiffMap[wordIdx] = nteIdx;
+          }
         }
 
         for (let vi = start; vi < end; vi++) {
@@ -4157,9 +4153,6 @@
             const tdCw = state.colWidths[j] || 80;
             const cellVal = safeGet(i, j);
             const _cc = state.cellColors[i + "," + j];
-            const style =
-              `width:${tdCw}px;min-width:${tdCw}px;max-width:${tdCw}px;` + extraStyle +
-              (_cc ? `background-color:${_cc};` : "");
             const isSelected =
               cls.includes("selected") || cls.includes("in-range");
             let displayVal = escHtml(cellVal);
@@ -4173,54 +4166,52 @@
                 displayVal += `<span style="color:#dc2626;margin-left:6px;font-size:11px">▸ 未登録</span>`;
               }
             }
-            // 価格連携: 不一致セルをハイライト
-            if (priceRefCols) {
-              const { ticketIdx, advanceIdx, dayIdx, upgradeAmountIdx, upgradeToIdx } = priceRefCols;
-              if (j === advanceIdx || j === dayIdx || j === upgradeAmountIdx || j === upgradeToIdx) {
-                const ticketName = ticketIdx >= 0 ? (row[ticketIdx] ?? "").trim() : "";
-                const refRow = ticketName ? state.priceRef.lookup.get(ticketName) : null;
-                if (refRow) {
-                  let isMismatch = false, refDisp = "";
-                  if (j === advanceIdx) {
-                    const refVal = refRow.advance_price;
-                    refDisp = refVal != null ? String(refVal) : "販売なし";
-                    const cellNum = Number(cellVal.replace(/[^0-9]/g, ""));
-                    isMismatch = refVal != null
-                      ? (cellVal !== "" && cellNum !== refVal)
-                      : (cellVal !== "" && cellVal !== "―" && cellVal !== "9999999");
-                  } else if (j === dayIdx) {
-                    const refVal = refRow.day_price;
-                    refDisp = refVal != null ? String(refVal) : "販売なし";
-                    const cellNum = Number(cellVal.replace(/[^0-9]/g, ""));
-                    isMismatch = refVal != null
-                      ? (cellVal !== "" && cellNum !== refVal)
-                      : (cellVal !== "" && cellVal !== "―" && cellVal !== "9999999");
-                  } else if (j === upgradeToIdx) {
-                    const upgrades = refRow.upgrades || [];
-                    refDisp = upgrades.length ? upgrades.map(u => u.to).join(" / ") : "なし";
-                    isMismatch = upgrades.length === 0
-                      ? (cellVal !== "" && cellVal !== "―")
-                      : !upgrades.some(u => u.to.trim() === cellVal.trim());
-                  } else if (j === upgradeAmountIdx) {
-                    const upgrades = refRow.upgrades || [];
-                    const toVal = upgradeToIdx >= 0 ? (row[upgradeToIdx] ?? "").trim() : "";
-                    const matched = toVal ? upgrades.find(u => u.to.trim() === toVal) : upgrades[0];
-                    if (matched) {
-                      refDisp = String(matched.amount);
-                      const cellNum = Number(cellVal.replace(/[^0-9]/g, ""));
-                      isMismatch = cellVal !== "" && cellNum !== matched.amount;
-                    } else if (upgrades.length === 0) {
-                      refDisp = "なし";
-                      isMismatch = cellVal !== "" && cellVal !== "―";
-                    }
-                  }
-                  if (isMismatch) {
-                    cls.push("price-ng");
-                    displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px" title="参照値: ${escHtml(refDisp)}">▸ 参照:${escHtml(refDisp)}</span>`;
-                  }
-                }
+            // カラーコード表示: disp_color_cd 列のセル背景をコード色にする
+            if (j === colorColIdx && cellVal) {
+              const hex = cellVal.trim().replace(/^#/, "");
+              if (/^[0-9A-Fa-f]{6}$/.test(hex)) {
+                // 輝度で文字色を自動切り替え
+                const r = parseInt(hex.slice(0, 2), 16), g = parseInt(hex.slice(2, 4), 16), b = parseInt(hex.slice(4, 6), 16);
+                const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+                extraStyle += `background-color:#${hex};color:${lum > 145 ? "#171717" : "#ffffff"};`;
               }
             }
+            // ゲート名表示: gate_stage_typ1 の番号にゲート名を併記
+            if (j === gateColIdx && gateMap && cellVal.trim()) {
+              const gname = gateMap[cellVal.trim()];
+              if (gname) {
+                displayVal += `<span style="color:#2563eb;margin-left:6px;font-size:11px">▸ ${escHtml(gname)}</span>`;
+              } else {
+                displayVal += `<span style="color:#dc2626;margin-left:6px;font-size:11px">▸ 対応表になし</span>`;
+              }
+            }
+            // 駐車券フラグ検査: コード6桁目P ⇔ フラグ1
+            if (j === parkFlagIdx && parkCodeIdx !== -1) {
+              const code = (row[parkCodeIdx] ?? "").trim();
+              const isP = code.length >= 6 && code[5].toUpperCase() === "P";
+              const flagIs1 = cellVal.trim() === "1";
+              if (isP && !flagIs1) {
+                cls.push("cell-ng");
+                displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">▸ 駐車券(P)は1必須</span>`;
+              } else if (!isP && flagIs1) {
+                cls.push("cell-warn");
+                displayVal += `<span style="color:#ea580c;margin-left:5px;font-size:10px">▸ Pでないのに1</span>`;
+              }
+            }
+            // 半角カナ検査: 全角カナ・ひらがなを含むセルを警告表示
+            if (state.kanaCheck && cellVal && /[ぁ-ゟァ-ヿ]/.test(cellVal)) {
+              cls.push("cell-warn");
+            }
+            // SEJ備考差分: wordN列とマスタ備考N仮想列の完全一致チェック
+            if (nteDiffMap && nteDiffMap[j] !== undefined) {
+              const masterVal = (row[nteDiffMap[j]] ?? "").trim();
+              if ((cellVal || masterVal) && cellVal.trim() !== masterVal) {
+                cls.push("cell-diff");
+              }
+            }
+            const style =
+              `width:${tdCw}px;min-width:${tdCw}px;max-width:${tdCw}px;` + extraStyle +
+              (_cc ? `background-color:${_cc};` : "");
             html += `<td role="gridcell" data-col="${j}" aria-colindex="${j + 2}" ${style ? `style="${style}"` : ""} class="${cls.join(" ")}" aria-selected="${isSelected}">${displayVal}</td>`;
           }
           html += `</tr>`;
@@ -5954,26 +5945,6 @@
         return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       }
 
-      function _applyCellColor(color) {
-        saveUndo();
-        const cells = [];
-        if (state.range) {
-          const r1 = Math.min(state.range.r1, state.range.r2);
-          const r2 = Math.max(state.range.r1, state.range.r2);
-          const c1 = Math.min(state.range.c1, state.range.c2);
-          const c2 = Math.max(state.range.c1, state.range.c2);
-          for (let r = r1; r <= r2; r++)
-            for (let c = c1; c <= c2; c++) cells.push([r, c]);
-        } else if (state.selected) {
-          cells.push([state.selected.row, state.selected.col]);
-        }
-        for (const [r, c] of cells) {
-          if (color) state.cellColors[r + "," + c] = color;
-          else delete state.cellColors[r + "," + c];
-        }
-        state.forceRender = true;
-        renderBody();
-      }
 
       // ===== 右クリックメニュー =====
       function onContextMenu(e) {
@@ -6037,29 +6008,6 @@
               { label: "切り取り", key: "Ctrl+X", action: cutToClipboard },
               { label: "ペースト", key: "Ctrl+V", action: pasteFromClipboard },
               { label: "検索と置換", key: "Ctrl+H", action: openReplaceDialog },
-            ],
-          },
-          {
-            group: "選択",
-            icon: "▣",
-            children: [
-              {
-                label: "この行を選択",
-                key: "Shift+Space",
-                action: () => {
-                  state.selected = { row, col: 0 };
-                  state.anchor = { row, col: 0 };
-                  state.range = {
-                    r1: row,
-                    c1: 0,
-                    r2: row,
-                    c2: state.headers.length - 1,
-                  };
-                  updateHighlight();
-                },
-              },
-              { label: "この列を選択", key: "Ctrl+Space", action: () => selectColumn(col) },
-              { label: "全選択", key: "Ctrl+A", action: selectAll },
             ],
           },
           {
@@ -6290,10 +6238,6 @@
                   toggleFreezeColumn();
                 },
               },
-              {
-                label: `「${getDisplayHeader(col)}」の統計情報`,
-                action: () => showColStats(col),
-              },
               { sep: true },
               {
                 label: (() => {
@@ -6393,9 +6337,6 @@
             children: [
               { label: "空行を一括削除", action: deleteEmptyRows },
               { label: "前後空白をトリム", action: trimAllCells },
-              { sep: true },
-              { label: "重複ハイライト（全列）", action: highlightDuplicates },
-              { label: "重複ハイライト（列指定）", action: openDupHlDialog },
               {
                 label: state.conditionalHL
                   ? "条件付きハイライト OFF"
@@ -6404,19 +6345,6 @@
               },
               { sep: true },
               { label: "重複行を削除", danger: true, action: deleteDuplicates },
-            ],
-          },
-          {
-            group: "書式",
-            icon: "🎨",
-            children: [
-              { label: "🟡 黄（確認中）", action: () => _applyCellColor("#FFF9C4") },
-              { label: "🟢 緑（完了）", action: () => _applyCellColor("#C8E6C9") },
-              { label: "🔴 赤（NG）", action: () => _applyCellColor("#FFCDD2") },
-              { label: "🔵 青（対応中）", action: () => _applyCellColor("#BBDEFB") },
-              { label: "🟠 橙（保留）", action: () => _applyCellColor("#FFE0B2") },
-              { label: "🟣 紫（メモ）", action: () => _applyCellColor("#E1BEE7") },
-              { label: "⬜ クリア", action: () => _applyCellColor(null) },
             ],
           },
         ];
@@ -6584,7 +6512,6 @@
         state.wrapRows.clear();
         state.regexMode = false;
         state.conditionalHL = false;
-        state.priceRef = null;
         state._dupSet = null;
         state._dupCol = null;
         state.sejVirtualCols = null; // 仮想列情報は読み込みデータと不可分（残すと保存時に実列を誤除外）
@@ -6600,8 +6527,6 @@
         document.body.classList.remove("wrap-cells");
         $("btn-wrap").classList.remove("active-state");
         $("btn-wrap").setAttribute("aria-pressed", "false");
-        $("btn-price-ref").classList.remove("active-state");
-        $("btn-price-ref").textContent = "価格連携";
         _visibleRowsCache = null;
         _visibleRowsCacheKey = "";
         lastRenderKey = null;
@@ -6950,7 +6875,11 @@
           cellColors: { ...state.cellColors },
           // SEJ仮想列はdata/headersと不可分（欠落するとundo後の保存で実列を誤除外）
           sejVirtualCols: state.sejVirtualCols
-            ? { indices: [...state.sejVirtualCols.indices], keys: [...state.sejVirtualCols.keys] }
+            ? {
+                indices: [...state.sejVirtualCols.indices],
+                keys: [...state.sejVirtualCols.keys],
+                nteCols: state.sejVirtualCols.nteCols ? state.sejVirtualCols.nteCols.map(p => [...p]) : undefined,
+              }
             : null,
         };
       }
@@ -6969,7 +6898,11 @@
         state.headerMode = s.headerMode || "firstRow";
         state.cellColors = s.cellColors ? { ...s.cellColors } : {};
         state.sejVirtualCols = s.sejVirtualCols
-          ? { indices: [...s.sejVirtualCols.indices], keys: [...s.sejVirtualCols.keys] }
+          ? {
+              indices: [...s.sejVirtualCols.indices],
+              keys: [...s.sejVirtualCols.keys],
+              nteCols: s.sejVirtualCols.nteCols ? s.sejVirtualCols.nteCols.map(p => [...p]) : undefined,
+            }
           : null;
         applyHeaderMapping();
         updateHeaderModeBtn();
@@ -7497,8 +7430,7 @@
         const idx = ROW_H_OPTIONS.indexOf(ROW_H);
         ROW_H = ROW_H_OPTIONS[(idx + 1) % ROW_H_OPTIONS.length];
         document.documentElement.style.setProperty("--row-h", ROW_H + "px");
-        const btn = $("btn-row-height");
-        btn.textContent = `行${ROW_H}`;
+        setRbLabel("btn-row-height", `行高:${ROW_H}`);
         state.forceRender = true;
         renderBody();
         setStatus(`行の高さ: ${ROW_H}px`);
@@ -7528,19 +7460,26 @@
         return rows;
       }
 
-      function loadSejMasterFile(file) {
+      function loadSejMasterFile(file, _encoding) {
         const reader = new FileReader();
         reader.onload = () => {
           try {
             const text = reader.result;
+            // UTF-8で読んで文字化け（置換文字）があれば Shift_JIS で読み直す
+            if (!_encoding && text.includes("�")) {
+              loadSejMasterFile(file, "shift_jis");
+              return;
+            }
             const rows = parseTsvText(text);
             if (rows.length < 2) {
+              alert("マスタファイルにデータ行がありません。\nファイル: " + file.name);
               setStatus("⚠ マスタファイルにデータがありません");
               return;
             }
             const headers = rows[0].map(h => h.trim());
             const codeIdx = headers.indexOf("seat_type_area_cd");
             if (codeIdx === -1) {
+              alert("seat_type_area_cd 列が見つかりません。\n席種エリアマスタTSVを選択してください。\n\n1行目: " + rows[0].slice(0, 5).join(", ") + " ...");
               setStatus("⚠ seat_type_area_cd 列が見つかりません");
               return;
             }
@@ -7596,8 +7535,43 @@
             } else if (state.sejVirtualCols) {
               console.warn("[SEJ] 既に仮想列が存在するためスキップ:", state.sejVirtualCols);
             }
+            // 仮想列「マスタ備考N」を追加（SEJのwordN列とマスタnteの<br>区切り項目を横並び比較）
+            const nteKeyIdx = normHeaders.indexOf("nte");
+            const wordCols = [];
+            state.headers.forEach((h, hi) => {
+              const m = String(h).trim().match(/^word([1-9])$/);
+              if (m) wordCols.push({ n: parseInt(m[1]), idx: hi });
+            });
+            if (curCodeIdx !== -1 && nteKeyIdx !== -1 && wordCols.length && state.sejVirtualCols && !state.sejVirtualCols.nteCols) {
+              const nteKey = headers[nteKeyIdx];
+              // マスタ備考の最大項目数（word列数と比較して大きい方、最大9）
+              let maxParts = 0;
+              for (const cd of Object.keys(byCode)) {
+                const parts = sejSplitNte(byCode[cd][nteKey] || "");
+                if (parts.length > maxParts) maxParts = parts.length;
+              }
+              maxParts = Math.min(Math.max(maxParts, wordCols.length), 9);
+              const nteCols = [];
+              for (let k = 1; k <= maxParts; k++) {
+                const vIdx = state.headers.length;
+                state.headers.push(`マスタ備考${k}`);
+                state.data.forEach(row => {
+                  const cd = (row[curCodeIdx] ?? "").trim();
+                  const m = byCode[cd];
+                  const parts = m ? sejSplitNte(m[nteKey] || "") : [];
+                  row.push(parts[k - 1] || "");
+                });
+                state.sejVirtualCols.indices.push(vIdx);
+                state.sejVirtualCols.keys.push(`_nte${k}`);
+                if (state.displayHeaders) state.displayHeaders.push(`マスタ備考${k}`);
+                const w = wordCols.find(wc => wc.n === k);
+                if (w) nteCols.push([w.idx, vIdx]);
+              }
+              state.sejVirtualCols.nteCols = nteCols;
+              console.log("[SEJ] マスタ備考仮想列を追加:", maxParts, "列 / word対応:", nteCols);
+            }
             $("btn-sej-link").classList.add("active-state");
-            $("btn-sej-link").textContent = `SEJ連携中 (${cnt})`;
+            setRbLabel("btn-sej-link", `SEJ:${cnt}件`);
             // 席種エリアコード列を自動で広く取る（席種名が併記されるため）
             if (curCodeIdx !== -1) {
               let maxLen = 12;
@@ -7627,10 +7601,11 @@
             renderBody();
             setStatus(`SEJマスタ連携: ${file.name} / マスタ${cnt}件 / 現データヒット${hitCnt}件 未登録${missCnt}件`);
           } catch (err) {
+            alert("マスタ読込に失敗しました: " + err.message);
             setStatus("⚠ マスタ読込失敗: " + err.message);
           }
         };
-        reader.readAsText(file, "utf-8");
+        reader.readAsText(file, _encoding || "utf-8");
       }
 
       function _doSejDisconnect() {
@@ -7648,12 +7623,11 @@
         }
         state.sejMaster = null;
         $("btn-sej-link").classList.remove("active-state");
-        $("btn-sej-link").textContent = "SEJ連携";
+        setRbLabel("btn-sej-link", "SEJ読込");
         state.forceRender = true;
         renderHeader();
         renderBody();
         setStatus("SEJ連携を解除しました");
-        _ribSyncToggles();
       }
 
       function toggleSejLink() {
@@ -7704,59 +7678,7 @@
         return hs.includes("sej_template_cd") && hs.includes("word1");
       }
 
-      // ===== 経路価格スケジュール連携 =====
-      function loadPriceRefFile(file) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          try {
-            const json = JSON.parse(reader.result);
-            if (!json.data || !Array.isArray(json.data)) {
-              setStatus("⚠ 参照JSONの形式が不正です（data配列が必要）");
-              return;
-            }
-            const colMap = json.column_map || {};
-            const lookup = new Map();
-            for (const row of json.data) {
-              const key = (row.ticket || "").trim();
-              if (key) lookup.set(key, row);
-            }
-            state.priceRef = { meta: json.meta || {}, colMap, lookup };
-            const cnt = lookup.size;
-            const raceName = json.meta?.race || file.name;
-            $("btn-price-ref").classList.add("active-state");
-            $("btn-price-ref").textContent = `価格連携中 (${cnt})`;
-            state.forceRender = true;
-            renderHeader();
-            renderBody();
-            setStatus(`価格連携: ${raceName} / ${cnt}券種を読み込みました`);
-          } catch (err) {
-            setStatus("⚠ 参照JSON読込失敗: " + err.message);
-          }
-        };
-        reader.readAsText(file, "utf-8");
-      }
 
-      function togglePriceRef() {
-        if (state.priceRef) {
-          const raceName = state.priceRef.meta?.race || "(不明)";
-          if (!confirm(`価格連携を解除しますか？\n\n現在の参照データ:\n${raceName}\n\n解除すると参照データは破棄されます。`)) return;
-          state.priceRef = null;
-          $("btn-price-ref").classList.remove("active-state");
-          $("btn-price-ref").textContent = "価格連携";
-          state.forceRender = true;
-          renderHeader();
-          renderBody();
-          setStatus("価格連携を解除しました");
-          return;
-        }
-        const input = document.createElement("input");
-        input.type = "file";
-        input.accept = ".json,application/json";
-        input.onchange = () => {
-          if (input.files && input.files[0]) loadPriceRefFile(input.files[0]);
-        };
-        input.click();
-      }
 
       // ===== SEJ HTML出力 =====
       function exportSejHtml(rowIndices, isFiltered) {
@@ -7848,13 +7770,7 @@
           if (tplMatch) tplOk++; else tplNg++;
 
           // マスタ備考を <br> / 改行で分割し、HTMLタグを除いた純テキストとして項目化
-          const splitNte = (s) => {
-            if (!s) return [];
-            return s
-              .split(/<br\s*\/?>|\r?\n/i)
-              .map(x => x.replace(/<[^>]+>/g, "").replace(/&nbsp;/gi, " ").trim())
-              .filter(x => x);
-          };
+          const splitNte = sejSplitNte;
           const masterItems = splitNte(masterNte);
           // 比較用: 正規化（全角スペース・制御文字・連続空白を除去）
           const norm = (s) => s.replace(/[\u3000\s]+/g, "").replace(/[\u200B-\u200F\uFEFF]/g, "");
@@ -7975,23 +7891,397 @@
         setStatus(`SEJ HTML出力完了（${filteredRows}件）`);
       }
 
-      // ===== HTML出力（SEJ専用） =====
-      function exportSejHtmlWrapper() {
+      // ===== HTML出力（席種エリアマスタ用プレビュー / SEJデータは自動でSEJ出力） =====
+      const HTML_EXPORT_COLS = [
+        { key: "seat_type_area_cd", label: "席種エリアコード", group: "基本" },
+        { key: "seat_type_area_control_nm", label: "管理名", group: "基本" },
+        { key: "seat_type_area_disp_nm", label: "表示名", group: "基本" },
+        { key: "disp_abb", label: "表示略称", group: "名称" },
+        { key: "seat_type_grp_nm1", label: "グループ名1", group: "名称" },
+        { key: "seat_type_grp_nm2", label: "グループ名2", group: "名称" },
+        { key: "nte", label: "備考", group: "備考", isHtml: true },
+        { key: "rsve_unrsve_kbn", label: "指定/自由席", group: "区分" },
+        { key: "grp_nm", label: "グループ名", group: "区分" },
+        { key: "qr_code_issue_presence_flg", label: "QR発行", group: "フラグ", isFlag: true },
+        { key: "enter_possible_flg", label: "入場可能", group: "フラグ", isFlag: true },
+        { key: "box_seat_flg", label: "BOX席", group: "フラグ", isFlag: true },
+        { key: "seat_cnt", label: "席数", group: "フラグ" },
+        { key: "presence_flg", label: "有効", group: "フラグ", isFlag: true },
+        { key: "parking_ticket_flg", label: "駐車券", group: "フラグ", isFlag: true },
+        { key: "place_type", label: "位置種別", group: "その他" },
+        { key: "seattype_stock_control_typ", label: "在庫管理種別", group: "その他" },
+        { key: "privilege_flg", label: "特典", group: "その他", isFlag: true },
+        { key: "seattype_sn", label: "席種連番", group: "その他" },
+        { key: "external_stock_cond_disp_tgt_flg", label: "外部在庫表示", group: "その他", isFlag: true },
+        { key: "external_stock_cond_disp_sort_order", label: "外部在庫並び順", group: "その他" },
+        { key: "lic_plate_reg_flg", label: "車両番号登録", group: "その他", isFlag: true },
+        { key: "parking_ticket_fed_flg", label: "駐車券連携", group: "その他", isFlag: true },
+        { key: "entrance_gate_area", label: "入場ゲートエリア", group: "その他" },
+        { key: "gate_stage_typ1", label: "ゲート用公演種別", group: "その他" },
+        { key: "front_pay_disp_flg", label: "フロント決済表示", group: "その他", isFlag: true },
+        { key: "single_day_admission_flg", label: "単日入場", group: "その他", isFlag: true },
+      ];
+
+      function validateMasterRow(row, colMap) {
+        const byKey = {}; // { colKey: [{ok, rule}], ... }
+        const add = (key, ok, rule) => {
+          if (!byKey[key]) byKey[key] = [];
+          byKey[key].push({ ok, rule });
+        };
+        const get = (key) => {
+          const c = colMap.find(x => x.key === key);
+          return c ? (row[c.idx] ?? "").trim() : "";
+        };
+
+        const cd = get("seat_type_area_cd");
+        const char6 = cd.length >= 6 ? cd[5].toUpperCase() : "";
+        const enterFlg = get("enter_possible_flg");
+        const parkingFlg = get("parking_ticket_flg");
+        const boxFlg = get("box_seat_flg");
+        const seatCnt = parseInt(get("seat_cnt"), 10) || 0;
+        const rsveKbn = get("rsve_unrsve_kbn");
+        const stockTyp = get("seattype_stock_control_typ");
+        const dispNm = get("seat_type_area_disp_nm");
+        const controlNm = get("seat_type_area_control_nm");
+        const dispAbb = get("disp_abb");
+        const nameTexts = [dispNm, controlNm, dispAbb].join(" ");
+
+        const hasArrow = /→/.test(nameTexts);
+        const isMultiPerson = /[0-9０-９]+名/.test(nameTexts) ||
+          /ボックス|BOX|box|テーブル|ラウンジ|スイート|ルーム|パーティ/i.test(nameTexts);
+        const isReserved = /指定席|指定/.test(nameTexts) || isMultiPerson;
+        const isAreaSeat = /エリア|自由席|自由|立見|芝生|広場/.test(nameTexts);
+
+        // 6桁目P → 駐車券=1
+        if (char6 === "P") {
+          add("parking_ticket_flg", parkingFlg === "1", "6桁目P → 駐車券=1");
+        }
+        // 6桁目E → 入場可能=1
+        if (char6 === "E" && !hasArrow) {
+          add("enter_possible_flg", enterFlg === "1", "6桁目E → 入場可能=1");
+        }
+        // 6桁目U → 入場可能=0
+        if (char6 === "U" && !hasArrow) {
+          add("enter_possible_flg", enterFlg === "0", "6桁目U → 入場可能=0");
+        }
+        // 6桁目O → 入場可能=1（端末読込あり）
+        if (char6 === "O" && !hasArrow) {
+          add("enter_possible_flg", enterFlg === "1", "6桁目O → 入場可能=1");
+        }
+        // 複数名利用 → BOX席=1, 席数>=2
+        if (isMultiPerson) {
+          add("box_seat_flg", boxFlg === "1", "複数名利用 → BOX席=1");
+          add("seat_cnt", seatCnt >= 2, "複数名利用 → 席数2以上");
+        }
+        // →付き → 入場可能=0, 指定自由区分=2, 在庫管理種別=2
+        if (hasArrow) {
+          add("enter_possible_flg", enterFlg === "0", "→付き → 入場可能=0");
+          add("rsve_unrsve_kbn", rsveKbn === "2", "→付き → 指定/自由区分=2");
+          add("seattype_stock_control_typ", stockTyp === "2", "→付き → 在庫管理種別=2");
+        } else {
+          if (isReserved && !isAreaSeat) {
+            add("rsve_unrsve_kbn", rsveKbn === "1", "指定席 → 指定/自由区分=1");
+            add("seattype_stock_control_typ", stockTyp === "1", "指定席 → 在庫管理種別=1");
+          }
+          if (isAreaSeat && !isReserved) {
+            add("rsve_unrsve_kbn", rsveKbn === "2", "エリア席 → 指定/自由区分=2");
+            add("seattype_stock_control_typ", stockTyp === "2", "エリア席 → 在庫管理種別=2");
+          }
+        }
+
+        return byKey;
+      }
+
+      function renderHtmlValue(val, colDef) {
+        const v = String(val ?? "").trim();
+        if (!v) return '<span style="color:#aaa">—</span>';
+
+        if (colDef.isColor) {
+          const color = normalizeColorCode(v);
+          if (color) {
+            return `<span style="display:inline-block;width:16px;height:16px;border-radius:3px;background:${escHtml(color)};vertical-align:middle;border:1px solid #ccc;margin-right:4px"></span><code>${escHtml(v)}</code>`;
+          }
+          return `<code>${escHtml(v)}</code>`;
+        }
+
+        if (colDef.isFlag) {
+          const num = parseInt(v, 10);
+          if (!isNaN(num) && num >= 1) {
+            return `<span style="color:#2563eb;font-weight:600">${escHtml(v)}</span>`;
+          }
+          return escHtml(v);
+        }
+
+        if (colDef.isHtml) {
+          // 備考欄: <br>, HTMLタグ, リンクを忠実に再現
+          let html = escHtml(v);
+          // <br> / <br/> / <br />
+          html = html.replace(/&lt;br\s*\/?&gt;/gi, "<br>");
+          // <a href=URL target=...>テキスト</a> → クリック可能リンク（青字）
+          // ※ http/https 以外のスキーム（javascript: 等）はリンク化せずエスケープ済みテキストのまま表示
+          html = html.replace(/&lt;a\s+href\s*=\s*(?:&quot;([^&]*)&quot;|([^\s&>]+))(?:\s[^&]*?)?&gt;(.*?)&lt;\/a&gt;/gi,
+            (m, q, nq, text) => {
+              const url = (q || nq || "").trim();
+              if (!/^https?:\/\//i.test(url)) return m;
+              return `<a href="${escHtml(url)}" target="_blank" rel="noopener" style="color:#2563eb;text-decoration:underline">${text}</a>`;
+            });
+          // <font color="red">...</font> → 赤字表示
+          html = html.replace(/&lt;font\s+color\s*=\s*(?:&quot;([^&]*)&quot;|([^\s&>]+))\s*&gt;/gi,
+            (_, q, nq) => `<span style="color:${escHtml(q || nq || "")}">`);
+          html = html.replace(/&lt;\/font&gt;/gi, "</span>");
+          // <b>, <i>, <u>, <s>, <strong>, <em>
+          const tags = ["b", "i", "u", "s", "strong", "em"];
+          for (const t of tags) {
+            html = html.replace(new RegExp(`&lt;${t}&gt;`, "gi"), `<${t}>`);
+            html = html.replace(new RegExp(`&lt;/${t}&gt;`, "gi"), `</${t}>`);
+          }
+          // 生のURL（既にリンク化されたものは除く）→ クリック可能リンク
+          html = html.replace(/(?<![">])(https?:\/\/[^\s<"]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:#2563eb;text-decoration:underline">$1</a>');
+          return html;
+        }
+
+        // 通常値
+        return escHtml(v);
+      }
+
+      function exportHtmlPreview() {
+        if (state.headerMode === "numbered") {
+          alert("ヘッダーが連番モードのため、列名を認識できません。\n\n「表示」タブの「ヘッダー」ボタンで 1行目モード に切り替えてから出力してください。");
+          return;
+        }
+        // 対象行を決定（フィルター/表示行のみ）
         const vr = getVisibleRows();
         const rowIndices = vr._direct
           ? Array.from({ length: state.data.length }, (_, i) => i)
           : [...vr._indices];
+
         if (!rowIndices.length) {
           setStatus("⚠ 表示する行がありません");
           return;
         }
+
         const isFiltered = rowIndices.length < state.data.length;
         const msg = isFiltered
           ? `フィルター適用中の ${rowIndices.length} 件（全${state.data.length}件中）をHTML出力します。\nよろしいですか？`
           : `全 ${rowIndices.length} 件をHTML出力します。\nよろしいですか？`;
         if (!confirm(msg)) return;
-        exportSejHtml(rowIndices, isFiltered);
+
+        // SEJデータの場合は専用レイアウトで出力
+        if (isSejData()) {
+          exportSejHtml(rowIndices, isFiltered);
+          return;
+        }
+
+        // 使用可能な列を抽出（ヘッダーに存在するもののみ）
+        const colMap = [];
+        for (const def of HTML_EXPORT_COLS) {
+          const idx = state.headers.findIndex(h => h.trim() === def.key);
+          if (idx !== -1) colMap.push({ ...def, idx });
+        }
+
+        if (!colMap.length) {
+          document.querySelector("._preview-err-ov")?.remove();
+          const _ov = document.createElement("div");
+          _ov.className = "modal-overlay _preview-err-ov";
+          _ov.innerHTML = `<div class="modal-dialog">
+            <div class="modal-title">⚠ マスター列が見つかりません</div>
+            <p style="font-size:13px;margin:8px 0 4px">HTML出力に必要な列が見つかりませんでした。<br>「ファイル → マスター読み込み」でマスターファイルを読み込んでください。</p>
+            <div class="modal-btns"><button class="_preview-err-ok btn-primary">閉じる</button></div>
+          </div>`;
+          document.body.appendChild(_ov);
+          _ov.querySelector("._preview-err-ok").onclick = () => _ov.remove();
+          _ov.onkeydown = (e) => { if (e.key === "Escape") _ov.remove(); };
+          _ov.querySelector("._preview-err-ok").focus();
+          return;
+        }
+
+        // コメントデータ取得
+        const comments = {};
+        for (const c of colMap) {
+          const comment = state.headerComments[c.key] || "";
+          if (comment) comments[c.key] = comment;
+        }
+
+        // グループ分け
+        const groups = {};
+        for (const c of colMap) {
+          if (!groups[c.group]) groups[c.group] = [];
+          groups[c.group].push(c);
+        }
+
+        const fileName = state.fileName || "data";
+        const totalRows = state.data.length;
+        const filteredRows = rowIndices.length;
+
+        let html = `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>${escHtml(fileName)} - マスターデータプレビュー</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "Hiragino Kaku Gothic ProN", "Yu Gothic UI", sans-serif; background: #f8f9fa; color: #333; padding: 20px; }
+  .header { background: #fff; padding: 16px 24px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; }
+  .header h1 { font-size: 18px; font-weight: 600; }
+  .header .meta { font-size: 12px; color: #666; margin-top: 4px; }
+  .card { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 12px; overflow: hidden; }
+  .card-head { background: #f5f5f5; padding: 10px 16px; border-bottom: 1px solid #e5e5e5; display: flex; align-items: center; gap: 8px; }
+  .card-head .code { font-family: monospace; font-size: 15px; font-weight: 600; color: #1a1a1a; }
+  .card-head .name { font-size: 15px; color: #555; }
+  .card-head .ctrl-nm { font-size: 12px; color: #888; }
+  .card-body { padding: 12px 16px; }
+  .group-label { font-size: 10px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: 0.5px; margin: 8px 0 4px; }
+  .group-label:first-child { margin-top: 0; }
+  .fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 4px 16px; }
+  .field { display: flex; flex-direction: column; padding: 3px 0; position: relative; }
+  .field-label { font-size: 10px; color: #888; cursor: help; border-bottom: 1px dotted #ccc; display: inline-block; width: fit-content; }
+  .field-label:hover { color: #333; }
+  .field-value { font-size: 15px; line-height: 1.5; word-break: break-all; }
+  .field-value a { color: #2563eb; text-decoration: underline; }
+  .field-value code { background: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-size: 14px; }
+  .nte-field { grid-column: 1 / -1; }
+  .nte-value { background: #fafafa; border: 1px solid #eee; border-radius: 4px; padding: 8px 10px; font-size: 15px; line-height: 1.7; min-height: 24px; color: #dc2626; }
+  .flag-ok { color: #16a34a; font-weight: 600; }
+  .flag-off { color: #9ca3af; }
+  .flag-warn { color: #dc2626; font-weight: 600; }
+  #floating-tooltip { display: none; position: fixed; z-index: 9999; background: #1a1a1a; color: #f0f0f0; font-size: 12px; padding: 10px 14px; border-radius: 6px; white-space: pre-wrap; max-width: 480px; min-width: 120px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); line-height: 1.6; pointer-events: none; word-break: break-word; }
+  .vbadge { display: inline-block; font-size: 12px; margin-left: 6px; padding: 1px 6px; border-radius: 4px; vertical-align: middle; white-space: nowrap; }
+  .vbadge-ok { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+  .vbadge-ng { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; font-weight: 600; }
+  .validation-summary { background: #fff; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; }
+  .validation-summary h2 { font-size: 16px; margin-bottom: 8px; }
+  .summary-stats { display: flex; gap: 16px; font-size: 14px; }
+  .summary-stats .stat-ok { color: #16a34a; font-weight: 600; }
+  .summary-stats .stat-ng { color: #dc2626; font-weight: 600; }
+  .filter-note { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 4px; padding: 8px 12px; font-size: 12px; color: #1d4ed8; margin-bottom: 16px; }
+  @media print { body { background: #fff; padding: 10px; } .card { break-inside: avoid; box-shadow: none; border: 1px solid #ddd; } }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>📋 ${escHtml(fileName)}</h1>
+  <div class="meta">${filteredRows}件${isFiltered ? ` / 全${totalRows}件（フィルター適用中）` : ""} — ${new Date().toLocaleString("ja-JP")}</div>
+</div>
+`;
+
+        if (isFiltered) {
+          html += `<div class="filter-note">🔍 フィルターが適用されています。表示中の ${filteredRows} 件のみ出力しています。</div>\n`;
+        }
+
+        html += "<!-- VALIDATION_SUMMARY -->\n";
+        let totalOk = 0, totalNg = 0, totalSkip = 0;
+
+        for (const ri of rowIndices) {
+          const row = state.data[ri];
+          if (!row) continue;
+
+          // カード見出し: エリアコード、表示名、管理名
+          const cdVal = row[colMap.find(c => c.key === "seat_type_area_cd")?.idx] ?? "";
+          const dispNm = row[colMap.find(c => c.key === "seat_type_area_disp_nm")?.idx] ?? "";
+          const ctrlNm = row[colMap.find(c => c.key === "seat_type_area_control_nm")?.idx] ?? "";
+
+          html += `<div class="card">
+  <div class="card-head">`;
+          html += `<span class="code">${escHtml(cdVal)}</span>`;
+          if (dispNm) html += `<span class="name">${escHtml(dispNm)}</span>`;
+          if (ctrlNm) html += `<span class="ctrl-nm">${escHtml(ctrlNm)}</span>`;
+          html += `</div>
+  <div class="card-body">`;
+
+          // バリデーション結果を取得（カラムキー別）
+          const vByKey = validateMasterRow(row, colMap);
+          const hasAnyRule = Object.keys(vByKey).length > 0;
+          if (hasAnyRule) {
+            const hasErr = Object.values(vByKey).some(arr => arr.some(r => !r.ok));
+            if (hasErr) totalNg++;
+            else totalOk++;
+          } else {
+            totalSkip++;
+          }
+
+          // グループ別に出力
+          for (const [gName, cols] of Object.entries(groups)) {
+            const showCols = cols.filter(c => c.key !== "seat_type_area_cd" && c.key !== "seat_type_area_control_nm");
+            if (!showCols.length) continue;
+
+            html += `<div class="group-label">${escHtml(gName)}</div><div class="fields">`;
+
+            for (const col of showCols) {
+              const val = row[col.idx] ?? "";
+              const rendered = renderHtmlValue(val, col);
+              const tooltipContent = comments[col.key] ? escHtml(comments[col.key]) : "";
+              const isNte = col.key === "nte";
+
+              // この列に対するバリデーション結果
+              const colVals = vByKey[col.key] || [];
+              let badges = "";
+              for (const r of colVals) {
+                badges += r.ok
+                  ? ` <span class="vbadge vbadge-ok" title="${escHtml(r.rule)}">⭕${escHtml(r.rule)}</span>`
+                  : ` <span class="vbadge vbadge-ng" title="${escHtml(r.rule)}">❌${escHtml(r.rule)}</span>`;
+              }
+
+              html += `<div class="field${isNte ? " nte-field" : ""}">`;
+              html += `<span class="field-label"${tooltipContent ? ` data-comment="${tooltipContent}"` : ""}>${escHtml(col.label)}${tooltipContent ? " 💬" : ""}</span>`;
+              if (isNte) {
+                html += `<div class="nte-value">${rendered}</div>`;
+              } else {
+                html += `<div class="field-value">${rendered}${badges}</div>`;
+              }
+              html += `</div>`;
+            }
+            html += `</div>`;
+          }
+
+          html += `</div></div>\n`;
+        }
+
+        // サマリーをヘッダー直後に挿入
+        let summaryHtml = `<div class="validation-summary"><h2>🔍 データ検証サマリー</h2><div class="summary-stats">`;
+        summaryHtml += `<span class="stat-ok">⭕ 正常: ${totalOk}件</span>`;
+        summaryHtml += `<span class="stat-ng">❌ エラー: ${totalNg}件</span>`;
+        summaryHtml += `<span>— 判定対象外: ${totalSkip}件</span>`;
+        summaryHtml += `</div></div>\n`;
+        html = html.replace("<!-- VALIDATION_SUMMARY -->", summaryHtml);
+
+        html += `<div id="floating-tooltip"></div>`;
+        html += "<" + "script>" +
+`(function(){
+  var tip = document.getElementById('floating-tooltip');
+  document.addEventListener('mouseover', function(e) {
+    var label = e.target.closest('.field-label[data-comment]');
+    if (!label) { tip.style.display = 'none'; return; }
+    var text = label.getAttribute('data-comment');
+    if (!text) { tip.style.display = 'none'; return; }
+    tip.textContent = text;
+    tip.style.display = 'block';
+    var rect = label.getBoundingClientRect();
+    var left = rect.left;
+    var top = rect.bottom + 6;
+    if (left + tip.offsetWidth > window.innerWidth - 12) {
+      left = window.innerWidth - tip.offsetWidth - 12;
+    }
+    if (left < 4) left = 4;
+    if (top + tip.offsetHeight > window.innerHeight - 12) {
+      top = rect.top - tip.offsetHeight - 6;
+    }
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
+  });
+  document.addEventListener('mouseout', function(e) {
+    if (e.target.closest('.field-label[data-comment]')) tip.style.display = 'none';
+  });
+})();` + "</" + "script>" +
+        `</body></html>`;
+
+        // 新しいウィンドウで開く
+        const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        window.open(url, "_blank");
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        setStatus(`HTML出力完了（${filteredRows}件）`);
       }
+
 
       // ===== セル折り返し =====
       function toggleWrapCells() {
@@ -8160,54 +8450,6 @@
         setStatus(`絞込保存: ${indices.length}行をエクスポートしました`);
       }
 
-      // ===== 重複ハイライト（列指定） =====
-      function openDupHlDialog() {
-        const dlg = $("dup-hl-dialog");
-        const sel = $("dup-hl-col");
-        sel.innerHTML = state.headers
-          .map((h, i) => `<option value="${i}">${escHtml(getDisplayHeader(i))}</option>`)
-          .join("");
-        // 現在の dupCol を復元
-        if (state._dupCol != null) sel.value = state._dupCol;
-        dlg.classList.add("show");
-        trapFocus(dlg);
-      }
-      function closeDupHlDialog() {
-        const dlg = $("dup-hl-dialog");
-        releaseFocus(dlg);
-        dlg.classList.remove("show");
-      }
-      function runDupHlByCol() {
-        const col = parseInt($("dup-hl-col").value);
-        if (isNaN(col)) return;
-        state._dupCol = col;
-        const keyMap = new Map();
-        state.data.forEach((row, idx) => {
-          const key = String(row[col] ?? "");
-          if (!keyMap.has(key)) keyMap.set(key, []);
-          keyMap.get(key).push(idx);
-        });
-        const dupIndices = new Set();
-        keyMap.forEach((indices) => {
-          if (indices.length > 1) indices.forEach((i) => dupIndices.add(i));
-        });
-        state._dupSet = dupIndices;
-        state.forceRender = true;
-        renderBody();
-        closeDupHlDialog();
-        setStatus(
-          `「${getDisplayHeader(col)}」列: ${dupIndices.size}行の重複をハイライトしました`,
-        );
-      }
-      function clearDupHl() {
-        state._dupSet = null;
-        state._dupCol = null;
-        state.forceRender = true;
-        renderBody();
-        closeDupHlDialog();
-        setStatus("重複ハイライトをクリアしました");
-      }
-
       // ===== 最近開いたファイル =====
       const RECENT_KEY = "tsv-editor-recent-files";
       const RECENT_MAX = 8;
@@ -8354,23 +8596,6 @@
         dlg.classList.remove("show");
       }
 
-      // ===== 重複行のハイライト/削除 =====
-      function highlightDuplicates() {
-        const keyMap = new Map();
-        state.data.forEach((row, idx) => {
-          const key = row.join("\t");
-          if (!keyMap.has(key)) keyMap.set(key, []);
-          keyMap.get(key).push(idx);
-        });
-        const dupIndices = new Set();
-        keyMap.forEach((indices) => {
-          if (indices.length > 1) indices.forEach((i) => dupIndices.add(i));
-        });
-        state._dupSet = dupIndices;
-        state.forceRender = true;
-        renderBody();
-        setStatus(`${dupIndices.size}行の重複を検出しました`);
-      }
 
       function deleteDuplicates() {
         saveUndo();
@@ -8430,42 +8655,6 @@
         );
       }
 
-      // ===== 列統計 =====
-      function showColStats(col) {
-        const vals = state.data.map((r) => r[col] ?? "");
-        const nonEmpty = vals.filter((v) => v !== "");
-        const nums = nonEmpty.map(Number).filter((v) => !isNaN(v));
-        const unique = new Set(vals).size;
-        const sum = nums.reduce((a, b) => a + b, 0);
-        const rows = [
-          ["総数", `${vals.length}件`],
-          ["空白", `${vals.length - nonEmpty.length}件`],
-          ["ユニーク", `${unique}種`],
-        ];
-        if (nums.length > 0) {
-          rows.push(["数値", `${nums.length}件`]);
-          rows.push(["合計", fmt(sum)]);
-          rows.push(["平均", fmt(sum / nums.length)]);
-          rows.push(["最小", fmt(Math.min(...nums))]);
-          rows.push(["最大", fmt(Math.max(...nums))]);
-        }
-        const tableHtml = rows.map(([k, v]) =>
-          `<tr><td style="padding:3px 10px 3px 0;color:#666;white-space:nowrap">${k}</td><td style="padding:3px 0;font-weight:600">${v}</td></tr>`
-        ).join("");
-        document.querySelector("._stats-ov")?.remove();
-        const ov = document.createElement("div");
-        ov.className = "modal-overlay show _stats-ov";
-        ov.innerHTML = `<div class="modal-dialog" style="min-width:220px">
-          <div class="modal-title">【${escHtml(getDisplayHeader(col))}】統計</div>
-          <table style="border-collapse:collapse;font-size:13px;margin:8px 0">${tableHtml}</table>
-          <div class="modal-btns"><button class="_stats-ok btn-primary">閉じる</button></div>
-        </div>`;
-        document.body.appendChild(ov);
-        const close = () => { ov.remove(); };
-        ov.querySelector("._stats-ok").onclick = close;
-        ov.onkeydown = (e) => { if (e.key === "Escape") close(); };
-        ov.querySelector("._stats-ok").focus();
-      }
 
       // ===== 条件付きハイライト =====
       function toggleConditionalHL() {
@@ -8579,12 +8768,14 @@
         if (state.markedCells.has(key)) state.markedCells.delete(key);
         else state.markedCells.add(key);
         updateEncodingStatus();
+        state.forceRender = true;
         renderBody();
       }
 
       function clearAllMarkers() {
         state.markedCells.clear();
         updateEncodingStatus();
+        state.forceRender = true;
         renderBody();
       }
 
