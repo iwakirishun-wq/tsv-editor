@@ -1707,6 +1707,10 @@
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M12 13H8M12 17H8"></path><path d="M16 13l2 2-2 2"></path></svg></span>
               <span>HTML出力</span>
             </button>
+            <button class="rb-btn" id="btn-price-sheet" title="経路価格スケジュール（BO-F-21030）をチェックしやすい形に変換し、&#10;別タブの参照シートとして生成します&#10;販売期間・席種・年齢区分・金額・UG元/差額を一覧化&#10;会員ランクや販売区分はフィルターで絞り込めます" aria-label="価格スケジュールチェック表を生成">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="17" rx="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="8" y1="4" x2="8" y2="2"></line><line x1="16" y1="4" x2="16" y2="2"></line><path d="M7 13h4M7 17h7"></path><circle cx="16.5" cy="15" r="2.5"></circle><path d="M16.5 14v1l.8.8"></path></svg></span>
+              <span>価格チェック表</span>
+            </button>
           </div>
           <span class="rb-group-label">変換・出力</span>
         </div>
@@ -1978,6 +1982,7 @@
           <div class="man-btn-row"><span class="man-btn-label">日本語化</span><span class="man-btn-desc">英語の列名を日本語に変換。保存時は元の英語に戻ります。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">辞書編集</span><span class="man-btn-desc">日本語化の辞書とヘッダーメモを編集。今開いているファイルの列が一覧の先頭に出ます。新しい列名の追加も可能。ブラウザに保存されるため、オフラインHTML運用でもそのまま使えます。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">HTML出力</span><span class="man-btn-desc">確認用HTMLを新しいタブに出力。席種エリアマスタは備考・カラー・フラグ検証付き一覧、SEJデータはマスタ照合カードで出力。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">価格チェック表</span><span class="man-btn-desc">経路価格スケジュール（BO-F-21030）を開いた状態で押すと、販売期間・席種・年齢区分・金額・UG元/差額を一覧化した参照シートを別タブに生成。会員ランクや販売区分はフィルターで絞り込み。元データはそのまま残ります。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">カラー表示</span><span class="man-btn-desc">表示カラーコード列の色をセル背景でプレビュー（切替）。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">ゲート表示</span><span class="man-btn-desc">ゲート用公演種別の番号にゲート名を併記。対応表は列ヘッダーのコメントから読み取り（切替）。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">駐車券検査</span><span class="man-btn-desc">エリアコード6桁目P ⇔ 駐車券フラグ1 を検査。✓OK / ✗NG どちらも表示（切替）。</span></div>
@@ -1998,7 +2003,7 @@
           ・<span style="color:#16a34a">✓</span> = マスタと完全一致<br>
           ・ピンク色のセル = 不一致。セル内に「マスタ: …」と正しい値が併記され、<b style="color:#dc2626;background:#fde3e3">違う部分が赤く強調</b>されます（濁点抜け・全角半角違いもわかります）<br>
           ・セルを編集しても変わるのは現データ（SEJ側）だけで、マスタには影響しません<br>
-          ・<b>マスタ未使用コード</b>: マスタに登録があるのに現データに無いコードは、最終行にグレーのゴースト行として表示されます（ソート後も常に最後）。セブン発券対象の漏れがないか目視確認できます。ゴースト行は保存されません
+          ・<b>マスタ未使用（ゴースト行）</b>: 現データで使われている席種と<b>同じグループ名</b>のマスタ登録のうち、現データに無いものだけを最終行にグレー表示します（例: もてぎMTGPのSEJを開いていれば、もてぎMTGPグループの未使用席種だけ）。別イベントの席種は表示しません。ゴースト行は保存されません
         </p>
 
         <h2>キーボードショートカット</h2>
@@ -2252,6 +2257,116 @@
           : `<b style="color:#dc2626">［この位置に余分な文字］</b>`) + suf;
       }
 
+      // SEJゴースト行リスト（キャッシュ付き）
+      // 現データで使われている席種のグループ名を集め、同じグループのマスタ未使用コードだけを返す
+      let _ghostCache = { key: null, list: [] };
+      function getSejGhostList(sejCodeColIdx) {
+        if (!state.sejMaster) return [];
+        const key = state.sejMaster.fileName + "|" + state.data.length + "|" + _dataVersion + "|" + sejCodeColIdx;
+        if (_ghostCache.key === key) return _ghostCache.list;
+        const byCode = state.sejMaster.byCode;
+        const grpOf = (m) => ((m.grp_nm || m.seat_type_grp_nm1 || "") + "").trim();
+        const usedCodes = new Set();
+        const usedGroups = new Set();
+        for (const r of state.data) {
+          const cd = (r[sejCodeColIdx] ?? "").trim();
+          if (!cd) continue;
+          usedCodes.add(cd);
+          const m = byCode[cd];
+          if (m) {
+            const g = grpOf(m);
+            if (g) usedGroups.add(g);
+          }
+        }
+        const list = [];
+        if (usedGroups.size) {
+          for (const cd of Object.keys(byCode)) {
+            if (usedCodes.has(cd)) continue;
+            const m = byCode[cd];
+            const g = grpOf(m);
+            if (!g || !usedGroups.has(g)) continue;
+            list.push({
+              cd,
+              nm: m.seat_type_area_disp_nm || m.seat_type_area_control_nm || cd,
+              grp: g,
+            });
+          }
+        }
+        _ghostCache = { key, list };
+        return list;
+      }
+
+      // 経路価格スケジュール（BO-F-21030）→ チェック用参照シートを別タブに生成
+      // 形式参考: 原紙［販売価格スケジュール］チェックシート
+      function buildPriceCheckSheet() {
+        const H = state.headers.map(h => String(h).trim());
+        const idx = (name) => H.indexOf(name);
+        const required = ["販売開始日時", "販売終了日時", "席種エリア名", "券種名", "前売価格", "アップグレード該当フラグ"];
+        const missingCols = required.filter(n => idx(n) === -1);
+        if (missingCols.length) {
+          alert("経路価格スケジュール形式ではありません。\n不足列: " + missingCols.join(", ") + "\n\nBO-F-21030（経路別価格スケジュール）のTSVを開いてから実行してください。");
+          return;
+        }
+        const cols = {
+          start: idx("販売開始日時"), end: idx("販売終了日時"),
+          kbn: idx("販売価格区分"), rank: idx("会員ランク名"), route: idx("販売経路区分"),
+          seat: idx("席種エリア名"), age: idx("券種名"),
+          adv: idx("前売価格"), day: idx("当日価格"),
+          ugFlag: idx("アップグレード該当フラグ"),
+          ugSeat: idx("アップグレード元席種エリア名"), ugAge: idx("アップグレード元券種名"),
+        };
+        const v = (row, i) => (i === -1 ? "" : String(row[i] ?? "").trim());
+        const headers = ["販売開始日時", "販売終了日時", "販売区分", "会員ランク", "販売経路", "席種", "年齢区分", "前売価格", "当日価格", "UG", "元席種", "元年齢区分", "UG差額"];
+        const data = state.data.map((row) => {
+          const flag = v(row, cols.ugFlag);
+          const isUg = flag === "該当" || flag === "1";
+          return [
+            v(row, cols.start), v(row, cols.end),
+            v(row, cols.kbn), v(row, cols.rank), v(row, cols.route),
+            v(row, cols.seat), v(row, cols.age),
+            isUg ? "" : v(row, cols.adv), isUg ? "" : v(row, cols.day),
+            isUg ? "◯" : "",
+            isUg ? v(row, cols.ugSeat) : "", isUg ? v(row, cols.ugAge) : "",
+            isUg ? v(row, cols.adv) : "",
+          ];
+        });
+        const srcName = state.fileName.replace(/\.[^.]+$/, "");
+        saveCurrentTab();
+        resetState();
+        state.headers = headers;
+        state.data = data;
+        state.fileName = srcName + "_チェック表.tsv";
+        state.delimiter = "\t";
+        state.headerMode = "firstRow";
+        state.encoding = "utf8";
+        const tab = {
+          fileName: state.fileName,
+          headers: [...state.headers],
+          data: state.data,
+          delimiter: "\t",
+          colWidths: {},
+          sortCol: -1,
+          sortAsc: true,
+          sortKeys: [],
+          headerMode: "firstRow",
+          encoding: "utf8",
+          dirty: false,
+          cellColors: {},
+        };
+        state.tabs.push(tab);
+        state.activeTab = state.tabs.length - 1;
+        updateHeaderModeBtn();
+        renderTabBar();
+        autoFitAllColumnsQuiet();
+        state.tabs[state.activeTab].colWidths = { ...state.colWidths };
+        renderHeader();
+        state.forceRender = true;
+        renderBody();
+        showTable();
+        markClean();
+        setStatus(`価格チェック表を生成しました: ${data.length}行（元データは別タブに残っています）`);
+      }
+
       // 縦書きヘッダー切り替え（列幅節約）
       function toggleVerticalHeader() {
         state.verticalHeader = !state.verticalHeader;
@@ -2375,8 +2490,10 @@
       }
 
       // ===== 未保存管理 =====
+      let _dataVersion = 0; // ゴースト行キャッシュなどの無効化用
       function markDirty() {
         state.dirty = true;
+        _dataVersion++;
         els.dirty.classList.add("show");
         document.title = "● TSV/CSV Editor";
         if (state.activeTab >= 0 && state.tabs[state.activeTab]) {
@@ -2387,6 +2504,7 @@
       }
       function markClean() {
         state.dirty = false;
+        _dataVersion++;
         els.dirty.classList.remove("show");
         document.title = "TSV/CSV Editor";
         if (state.activeTab >= 0 && state.tabs[state.activeTab]) {
@@ -2815,6 +2933,8 @@
         $("btn-box-check").onclick = () => toggleInspect("boxCheck", "btn-box-check", "区画席検査");
         // 辞書・ヘッダーメモ編集
         $("btn-dict-edit").onclick = openDictEditor;
+        // 価格スケジュールチェック表
+        $("btn-price-sheet").onclick = buildPriceCheckSheet;
         // 縦書きヘッダー
         $("btn-vertical-header").onclick = toggleVerticalHeader;
         // マーカー色
@@ -4379,30 +4499,21 @@
         if (end < rows.length)
           html += `<tr style="height:${(rows.length - end) * rowH}px"><td colspan="${colSpan}"></td></tr>`;
 
-        // SEJゴースト行: マスタに登録があるのに現データに無い席種を常に最終行に表示
-        // （セブン発券対象の漏れ確認用。基本は発券不要チケットのはずなので目視確認のみ）
-        // ソートやスクロール位置に関係なく、表の末尾に席種名＋グループ名で表示（コードはホバーで確認）
+        // SEJゴースト行: 現データと同じグループのマスタ登録のうち、現データに無い席種だけを最終行に表示
+        // （セブン発券対象の漏れ確認用。別イベント・別グループの席種は対象外なので表示しない）
         if (state.sejMaster && sejCodeColIdx !== -1) {
-          const usedCodes = new Set();
-          for (const r of state.data) {
-            const cd = (r[sejCodeColIdx] ?? "").trim();
-            if (cd) usedCodes.add(cd);
-          }
-          const missing = Object.keys(state.sejMaster.byCode).filter(cd => !usedCodes.has(cd));
+          const missing = getSejGhostList(sejCodeColIdx);
           if (missing.length) {
-            html += `<tr class="ghost-sep"><td colspan="${colSpan}">▼ マスタ未使用 ${missing.length}件（現データに無い＝セブン発券していない席種。漏れがないか確認）</td></tr>`;
-            for (const cd of missing) {
-              const m = state.sejMaster.byCode[cd];
-              const nm = m.seat_type_area_disp_nm || m.seat_type_area_control_nm || cd;
-              const grp = m.grp_nm || m.seat_type_grp_nm1 || "";
-              html += `<tr class="ghost-row" title="${escHtml(cd)}"><td class="row-num">−</td>`;
+            html += `<tr class="ghost-sep"><td colspan="${colSpan}">▼ 同グループのマスタ未使用 ${missing.length}件（現データに無い＝セブン発券していない席種。漏れがないか確認）</td></tr>`;
+            for (const g of missing) {
+              html += `<tr class="ghost-row" title="${escHtml(g.cd)}"><td class="row-num">−</td>`;
               for (const j of visCols) {
                 const tdCw = state.colWidths[j] || 80;
                 let v = "";
                 if (j === sejCodeColIdx) {
-                  v = escHtml(nm);
+                  v = escHtml(g.nm);
                 } else if (state.sejVirtualCols && state.sejVirtualCols.indices.includes(j)) {
-                  v = escHtml(grp);
+                  v = escHtml(g.grp);
                 }
                 html += `<td style="width:${tdCw}px;min-width:${tdCw}px;max-width:${tdCw}px">${v}</td>`;
               }
