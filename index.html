@@ -2867,10 +2867,12 @@
         window.ondrop = (e) => {
           e.preventDefault();
           els.dropZone.classList.remove("drag-over");
+          if (els.container.style.display === "block") els.dropZone.classList.add("hidden");
           const file = e.dataTransfer.files[0];
           if (!file) return;
-          if (state.dirty) showReloadDialog(() => loadFile(file));
-          else loadFile(file);
+          // タブ化以降、ファイルを開いても現在タブは保持されるため未保存確認は不要
+          // （編集中タブはそのまま残り、新しいファイルは別タブで開く）
+          loadFile(file);
         };
 
         loadHeaderMapSettings();
