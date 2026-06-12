@@ -95,24 +95,195 @@
         background: transparent;
       }
 
-      /* ===ツールバー=== */
-      #toolbar {
-        height: 40px;
-        background: var(--toolbar-bg);
-        border-bottom: 1px solid var(--border);
-        display: flex;
-        align-items: center;
-        gap: 2px;
-        padding: 0 12px;
+      /* === RIBBON CSS === */
+      :root {
+        --rb-bg-base: #fafafa;
+        --rb-bg-hover: #f5f5f5;
+        --rb-border: #e5e5e5;
+        --rb-text: #171717;
+        --rb-dim: #737373;
+        --rb-accent: #217346;
+      }
+      .rb-ribbon {
+        background: var(--rb-bg-base);
+        border-bottom: 1px solid var(--rb-border);
         flex-shrink: 0;
         user-select: none;
       }
-      .toolbar-sep {
-        width: 1px;
-        height: 18px;
-        background: var(--border);
-        margin: 0 6px;
+      .rb-tabbar {
+        display: flex;
+        align-items: center;
+        height: 28px;
+        padding: 0 12px;
+        background: var(--rb-bg-base);
+        border-bottom: 1px solid var(--rb-border);
+        gap: 2px;
       }
+      .rb-tab {
+        padding: 0 16px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+        font-size: 13px;
+        color: var(--rb-text);
+        border: none;
+        background: transparent;
+        border-bottom: 3px solid transparent;
+        transition: background-color 0.2s, border-bottom-color 0.2s;
+        font-family: var(--font-ui);
+      }
+      .rb-tab:hover { background: var(--rb-bg-hover); }
+      .rb-tab.rb-tab-active {
+        border-bottom-color: var(--rb-accent);
+        background: var(--rb-bg-hover);
+      }
+      .rb-tab-spacer { flex: 1; }
+      .rb-content {
+        display: none;
+        padding: 6px 12px;
+        background: var(--rb-bg-base);
+        min-height: 80px;
+        border-bottom: 1px solid var(--rb-border);
+      }
+      .rb-content.rb-content-active {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 0;
+      }
+      .rb-group {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        border-right: 1px solid var(--rb-border);
+        padding-right: 8px;
+        margin-right: 8px;
+      }
+      .rb-group:last-child {
+        border-right: none;
+        margin-right: 0;
+        padding-right: 0;
+      }
+      .rb-buttons {
+        display: flex;
+        gap: 4px;
+        align-items: flex-start;
+        margin-bottom: 4px;
+      }
+      .rb-group-label {
+        font-size: 11px;
+        color: var(--rb-dim);
+        text-align: center;
+        margin-top: 2px;
+        line-height: 1.2;
+        white-space: normal;
+        max-width: 70px;
+      }
+      .rb-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        width: 64px;
+        height: 70px;
+        padding: 4px;
+        border: 1px solid transparent;
+        background: transparent;
+        cursor: pointer;
+        border-radius: 2px;
+        transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+        font-size: 11px;
+        color: var(--rb-text);
+        text-align: center;
+        line-height: 1.3;
+        word-break: break-word;
+        overflow: hidden;
+        font-family: var(--font-ui);
+      }
+      .rb-btn:hover {
+        background: var(--rb-bg-hover);
+        border-color: var(--rb-border);
+      }
+      .rb-btn:focus-visible {
+        outline: 2px solid var(--rb-accent);
+        outline-offset: -1px;
+      }
+      .rb-btn:active { background: #ebebeb; }
+      .rb-btn.active-state {
+        background: var(--rb-accent);
+        color: #fff;
+        border-color: var(--rb-accent);
+      }
+      .rb-btn.active-state .rb-icon svg { color: #fff; }
+      .rb-icon {
+        width: 24px;
+        height: 24px;
+        margin-bottom: 2px;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .rb-icon svg {
+        width: 100%;
+        height: 100%;
+        display: block;
+        color: var(--rb-text);
+      }
+      .rb-btn:hover .rb-icon svg { color: var(--rb-accent); }
+      .rb-btn.active-state:hover .rb-icon svg { color: #fff; }
+      .rb-input-btn {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        height: 32px;
+        width: 160px;
+        padding: 4px 8px;
+        border: 1px solid var(--rb-border);
+        background: #fff;
+        border-radius: 2px;
+        font-size: 12px;
+        gap: 4px;
+      }
+      .rb-input-btn input {
+        flex: 1;
+        border: none;
+        outline: none;
+        background: transparent;
+        font-size: 12px;
+        color: var(--rb-text);
+        font-family: var(--font-ui);
+      }
+      .rb-input-btn input::placeholder { color: var(--rb-dim); }
+      .rb-input-btn:focus-within {
+        border-color: var(--rb-accent);
+        box-shadow: 0 0 0 1px var(--rb-accent);
+      }
+      .rb-input-btn .rb-icon {
+        width: 16px;
+        height: 16px;
+        margin-bottom: 0;
+        flex-shrink: 0;
+      }
+      #dirty-indicator {
+        display: none;
+        width: 6px;
+        height: 6px;
+        background: #ef4444;
+        border-radius: 50%;
+        margin-left: 2px;
+        flex-shrink: 0;
+        vertical-align: middle;
+      }
+      #dirty-indicator.show { display: inline-block; }
+      #search-count {
+        font-size: 11px;
+        color: var(--rb-dim);
+        min-width: 40px;
+        white-space: nowrap;
+      }
+      /* ツールバー旧スタイル不要 — .toolbar-sep は削除 */
       #custom-tooltip {
         position: fixed;
         z-index: 99999;
@@ -169,24 +340,6 @@
         background: var(--accent);
         color: #fff;
         border-color: var(--accent);
-      }
-      #dirty-indicator {
-        display: none;
-        width: 6px;
-        height: 6px;
-        background: #ef4444;
-        border-radius: 50%;
-        margin-left: 2px;
-        flex-shrink: 0;
-      }
-      #dirty-indicator.show {
-        display: inline-block;
-      }
-      #search-area {
-        margin-left: auto;
-        display: flex;
-        gap: 2px;
-        align-items: center;
       }
       input.ui-input {
         height: 26px;
@@ -360,23 +513,28 @@
         line-height: 1;
       }
       .sort-arrow {
-        font-size: 10px;
-        color: var(--border);
+        font-size: 14px;
+        color: #b0b0b0;
         cursor: pointer;
         flex-shrink: 0;
-        padding: 0 2px;
+        padding: 3px 5px;
+        border-radius: 3px;
       }
       .sort-arrow:hover,
       .sort-arrow.active {
         color: var(--accent);
+        background: rgba(0, 0, 0, 0.06);
       }
       .filter-btn {
-        font-size: 10px;
-        color: var(--border);
+        font-size: 12px;
+        color: #b0b0b0;
         cursor: pointer;
-        padding: 0 2px;
+        padding: 3px 5px;
         flex-shrink: 0;
-        border-radius: 2px;
+        border-radius: 3px;
+      }
+      .filter-btn:hover {
+        background: rgba(0, 0, 0, 0.06);
       }
       .filter-btn:hover,
       .filter-btn.active {
@@ -395,40 +553,6 @@
         background: var(--accent);
       }
 
-      /* ===ヘッダー縦書き=== */
-      .vertical-headers th {
-        height: auto;
-        padding: 4px 2px 2px;
-        min-width: 28px;
-      }
-      .vertical-headers .th-inner {
-        min-height: 60px;
-        max-height: 140px;
-        align-items: center;
-      }
-      .vertical-headers .th-label {
-        writing-mode: vertical-rl;
-        text-orientation: mixed;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        max-height: 120px;
-        line-height: 1.1;
-        font-size: 10.5px;
-        letter-spacing: 0.5px;
-        margin: 0 auto;
-      }
-      .vertical-headers .th-controls {
-        justify-content: center;
-        gap: 1px;
-        flex-wrap: nowrap;
-      }
-      .vertical-headers .th-controls .sort-arrow,
-      .vertical-headers .th-controls .filter-btn,
-      .vertical-headers .th-controls .memo-icon {
-        font-size: 9px;
-        padding: 0 1px;
-      }
 
       /* ===フィルター行=== */
       #filter-row th {
@@ -478,16 +602,6 @@
         height: var(--row-h, 22px);
       }
 
-      /* 縦書きヘッダー時のセル最適化 */
-      .vertical-headers tbody td {
-        padding: 0 4px;
-      }
-
-      /* ===セル全体表示=== */
-      body.fit-text tbody td {
-        overflow: visible;
-        text-overflow: clip;
-      }
 
       /* ===行番号=== */
       .row-num,
@@ -1060,10 +1174,20 @@
         background: rgba(168, 85, 247, 0.1) !important;
       }
 
-      /* ===価格連携チェック=== */
-      td.price-ng {
+      /* ===検品表示（駐車券/カナ/SEJ備考差分）=== */
+      td.cell-ng {
         background: rgba(220, 38, 38, 0.10) !important;
         outline: 1px solid rgba(220, 38, 38, 0.35);
+        outline-offset: -1px;
+      }
+      td.cell-warn {
+        background: rgba(234, 88, 12, 0.12) !important;
+        outline: 1px solid rgba(234, 88, 12, 0.35);
+        outline-offset: -1px;
+      }
+      td.cell-diff {
+        background: rgba(219, 39, 119, 0.10) !important;
+        outline: 1px solid rgba(219, 39, 119, 0.35);
         outline-offset: -1px;
       }
 
@@ -1098,137 +1222,6 @@
         display: flex;
       }
 
-      /* ===デバッグメモダイアログ=== */
-      #debug-memo-dialog {
-        display: none;
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.4);
-        z-index: 1300;
-        align-items: center;
-        justify-content: center;
-      }
-      #debug-memo-dialog.show {
-        display: flex;
-      }
-      #debug-memo-inner {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        padding: 20px 24px;
-        width: min(560px, calc(100vw - 24px));
-        max-height: 90vh;
-        overflow-y: auto;
-        position: relative;
-        font-family: var(--font-ui);
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-      }
-      #debug-memo-inner h2 {
-        font-size: 14px;
-        font-weight: 600;
-        margin: 0 0 4px;
-      }
-      .dbm-label {
-        font-size: 11px;
-        color: var(--text-dim);
-        margin-bottom: 3px;
-      }
-      #debug-memo-title {
-        width: 100%;
-        padding: 5px 8px;
-        border: 1px solid var(--border);
-        background: var(--surface2);
-        font-size: 12px;
-        font-family: var(--font-ui);
-        outline: none;
-        box-sizing: border-box;
-      }
-      #debug-memo-title:focus { border-color: var(--accent); }
-      #debug-memo-body {
-        min-height: 120px;
-        max-height: 260px;
-        overflow-y: auto;
-        padding: 7px 9px;
-        border: 1px solid var(--border);
-        background: var(--surface2);
-        font-size: 12px;
-        font-family: var(--font-ui);
-        line-height: 1.6;
-        outline: none;
-        white-space: pre-wrap;
-        word-break: break-word;
-      }
-      #debug-memo-body:focus { border-color: var(--accent); }
-      #debug-memo-body[data-placeholder]:empty::before {
-        content: attr(data-placeholder);
-        color: var(--text-dim);
-        pointer-events: none;
-      }
-      #debug-memo-images {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-      }
-      .dbm-img-thumb {
-        position: relative;
-        border: 1px solid var(--border);
-      }
-      .dbm-img-thumb img {
-        display: block;
-        max-width: 140px;
-        max-height: 100px;
-        object-fit: contain;
-      }
-      .dbm-img-del {
-        position: absolute;
-        top: 1px;
-        right: 1px;
-        background: rgba(0,0,0,0.55);
-        color: #fff;
-        border: none;
-        font-size: 11px;
-        cursor: pointer;
-        padding: 1px 4px;
-        line-height: 1.4;
-      }
-      .dbm-pat-row {
-        display: flex;
-        gap: 6px;
-        align-items: center;
-      }
-      #debug-memo-pat {
-        flex: 1;
-        padding: 5px 8px;
-        border: 1px solid var(--border);
-        background: var(--surface2);
-        font-size: 12px;
-        font-family: var(--font-mono);
-        outline: none;
-      }
-      #debug-memo-pat:focus { border-color: var(--accent); }
-      .dbm-btns {
-        display: flex;
-        gap: 8px;
-        justify-content: flex-end;
-        margin-top: 4px;
-      }
-      .dbm-btns button {
-        padding: 6px 14px;
-        font-size: 12px;
-        border: 1px solid var(--border);
-        cursor: pointer;
-        background: var(--surface2);
-        font-family: var(--font-ui);
-      }
-      .dbm-btns button:hover { background: #e5e5e7; }
-      .dbm-btns button.primary {
-        background: var(--accent);
-        color: #fff;
-        border-color: var(--accent);
-      }
-      .dbm-btns button.primary:hover { opacity: 0.88; }
-      .dbm-btns button:disabled { opacity: 0.5; cursor: default; }
       #manual-content {
         background: var(--surface);
         border: 1px solid var(--border);
@@ -1449,83 +1442,6 @@
         color: #ef4444;
       }
 
-      /* ===重複ハイライトダイアログ=== */
-      #dup-hl-dialog {
-        display: none;
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.4);
-        z-index: 1500;
-        align-items: center;
-        justify-content: center;
-      }
-      #dup-hl-dialog.show {
-        display: flex;
-      }
-      #dup-hl-content {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        padding: 22px 26px;
-        width: min(340px, calc(100vw - 32px));
-        font-family: var(--font-ui);
-      }
-      #dup-hl-content h2 {
-        font-size: 14px;
-        font-weight: 700;
-        margin-bottom: 14px;
-      }
-      #dup-hl-content label {
-        font-size: 11px;
-        font-weight: 600;
-        color: var(--text-dim);
-        display: block;
-        margin-bottom: 5px;
-      }
-      #dup-hl-col {
-        width: 100%;
-        padding: 5px 8px;
-        font-size: 12px;
-        border: 1px solid var(--border);
-        background: var(--surface2);
-        color: var(--text);
-        outline: none;
-        margin-bottom: 16px;
-      }
-      #dup-hl-col:focus {
-        border-color: var(--accent);
-      }
-      .dup-hl-btns {
-        display: flex;
-        gap: 8px;
-        justify-content: flex-end;
-      }
-      .dup-hl-btns button {
-        padding: 6px 16px;
-        font-size: 12px;
-        border: 1px solid var(--border);
-        cursor: pointer;
-      }
-      #dup-hl-run {
-        background: #a855f7;
-        color: #fff;
-      }
-      #dup-hl-run:hover {
-        opacity: 0.88;
-      }
-      #dup-hl-clear {
-        background: var(--surface2);
-      }
-      #dup-hl-clear:hover {
-        background: #e5e5e7;
-      }
-      #dup-hl-close {
-        background: transparent;
-        color: var(--text-dim);
-      }
-      #dup-hl-close:hover {
-        background: var(--surface2);
-      }
-
       /* ===セル折り返し=== */
       body.wrap-cells tbody td {
         white-space: pre-wrap;
@@ -1554,319 +1470,220 @@
       }
 
       /* マーカー機能 */
-      td.marked { background: rgba(255, 80, 160, 0.25) !important; }
+      td.marked { background: color-mix(in srgb, var(--marker-color, #facc15) 35%, transparent) !important; }
       #btn-marker.active-state { background: #fff0f6; border-color: #f472b6; color: #be185d; }
       body.marker-mode td[data-col] { cursor: crosshair; }
 
     </style>
   </head>
-  <body class="vertical-headers">
+  <body>
     <div id="custom-tooltip" role="tooltip" aria-hidden="true"></div>
-    <div
-      id="toolbar"
-      role="toolbar"
-      aria-label="メインツールバー"
-      style="position: relative"
-    >
-      <button
-        type="button"
-        class="btn"
-        id="btn-open"
-        title="TSV/CSVファイルを開く&#10;ドラッグ&ドロップでも読み込めます"
-        aria-label="ファイルを開く"
-      >
-        開く
-      </button>
-      <button
-        type="button"
-        class="btn"
-        id="btn-open-recent"
-        title="最近開いたファイルの一覧を表示&#10;クリックで再度開けます"
-        aria-label="最近開いたファイル"
-        aria-haspopup="menu"
-        aria-expanded="false"
-        aria-controls="recent-menu"
-        style="padding: 0 4px; font-size: 10px"
-      >
-        ▾
-      </button>
-      <div id="recent-menu" role="menu" aria-label="最近開いたファイル"></div>
-      <button
-        type="button"
-        class="btn"
-        id="btn-save"
-        title="現在のデータをファイルとして保存&#10;ショートカット: Ctrl+S"
-        aria-label="ファイルを保存"
-      >
-        保存
-      </button>
-      <span
-        id="dirty-indicator"
-        role="status"
-        aria-label="未保存の変更があります"
-        title="未保存の変更があります&#10;保存ボタンまたはCtrl+Sで保存してください"
-      ></span>
-      <div class="toolbar-sep" role="separator" aria-hidden="true"></div>
-      <button
-        type="button"
-        class="btn"
-        id="btn-undo"
-        title="直前の操作を元に戻す&#10;ショートカット: Ctrl+Z"
-        aria-label="元に戻す"
-      >
-        ↩
-      </button>
-      <button
-        type="button"
-        class="btn"
-        id="btn-redo"
-        title="元に戻した操作をやり直す&#10;ショートカット: Ctrl+Y / Ctrl+Shift+Z"
-        aria-label="やり直し"
-      >
-        ↪
-      </button>
-      <div class="toolbar-sep" role="separator" aria-hidden="true"></div>
-      <button
-        type="button"
-        class="btn"
-        id="btn-filter-toggle"
-        title="各列のフィルター入力行を表示/非表示&#10;テキスト入力で行を絞り込めます"
-        aria-label="フィルター行を表示"
-        aria-pressed="false"
-      >
-        フィルター
-      </button>
-      <button
-        type="button"
-        class="btn danger"
-        id="btn-filter-clear"
-        style="display: none"
-        title="現在設定されているフィルターをすべて解除&#10;非表示の行も再表示されます"
-        aria-label="フィルターをクリア"
-      >
-        クリア
-      </button>
-      <button
-        type="button"
-        class="btn"
-        id="btn-export-filtered"
-        style="display: none"
-        title="フィルターで絞り込んだ行だけを&#10;新しいファイルとして保存します"
-        aria-label="フィルター結果のみを保存"
-      >
-        絞込保存
-      </button>
-      <button
-        type="button"
-        class="btn"
-        id="btn-row-height"
-        title="行の高さを順番に切り替え&#10;（22px → 30px → 40px → 22px）&#10;データが多い場合は高くすると見やすくなります"
-        aria-label="行の高さを変更"
-      >
-        行高
-      </button>
-      <button
-        type="button"
-        class="btn"
-        id="btn-autofit-all"
-        title="全列の幅をデータの内容に合わせて自動調整&#10;列ヘッダーのダブルクリックで個別調整も可能"
-        aria-label="全列幅を自動調整"
-      >
-        自動幅
-      </button>
-      <button
-        type="button"
-        class="btn"
-        id="btn-wrap"
-        title="セル内の長いテキストを折り返して表示&#10;OFFの場合は1行で省略表示されます&#10;選択範囲がある場合はその行だけ切り替え"
-        aria-label="セル折り返し表示の切り替え"
-        aria-pressed="false"
-      >
-        折返
-      </button>
-      <button
-        type="button"
-        class="btn"
-        id="btn-fit-text"
-        title="セルの幅に合わせて文字サイズを自動縮小&#10;列幅が狭くても全文が見えるようになります"
-        aria-label="セル全体表示の切り替え"
-        aria-pressed="false"
-      >
-        全表示
-      </button>
-      <button
-        type="button"
-        class="btn"
-        id="btn-html-export"
-        title="マスターデータをHTMLページとして出力&#10;新しいタブで開き、備考欄のHTML・リンク・&#10;カラーコード等を実際の見た目で確認できます&#10;フィルター中は絞り込んだ行のみ出力"
-        aria-label="HTMLプレビュー出力"
-      >
-        HTML出力
-      </button>
-      <button
-        type="button"
-        class="btn"
-        id="btn-vertical-header"
-        title="ヘッダーを縦書き表示に切り替え&#10;列幅がコンパクトになり&#10;多くの列を一度に表示できます"
-        aria-label="ヘッダー縦書き表示の切り替え"
-        aria-pressed="true"
-      >
-        縦H
-      </button>
-      <button
-        type="button"
-        class="btn"
-        id="btn-header-mode"
-        title="ヘッダーモードを切り替え&#10;「1行目」: ファイルの1行目をヘッダーとして使用&#10;「連番」: 1, 2, 3...の連番ヘッダー（全行がデータ）"
-        aria-label="ヘッダーモード切り替え"
-        aria-pressed="true"
-        class="btn active-state"
-      >
-        H: 1行目
-      </button>
-      <div class="toolbar-sep" role="separator" aria-hidden="true"></div>
-      <button
-        type="button"
-        class="btn"
-        id="btn-new-sheet"
-        title="新しい空のシートタブを追加&#10;複数ファイルをタブで切り替えて編集できます"
-        aria-label="新しいシートを追加"
-      >
-        ＋
-      </button>
-      <button
-        type="button"
-        class="btn"
-        id="btn-apply-dict"
-        title="辞書を使ってヘッダーを日本語に変換&#10;50%以上のヘッダーが辞書と一致する場合に適用&#10;保存時は元の英語ヘッダーに戻ります&#10;&#10;Shift+クリックで辞書編集画面を開きます"
-        aria-label="辞書を適用してヘッダーを変換"
-      >
-        変換
-      </button>
-      <button
-        type="button"
-        class="btn"
-        id="btn-sej-link"
-        title="SEJデータに席種エリアマスタを連携&#10;クリック: マスタファイル(TSV)を選択&#10;席種エリアコードをキーに席種名を画面表示&#10;（保存時は元データのまま）&#10;&#10;もう一度押すと連携解除"
-        aria-label="SEJマスタ連携"
-      >
-        SEJ連携
-      </button>
-      <button
-        type="button"
-        class="btn"
-        id="btn-price-ref"
-        title="経路価格スケジュール参照JSONを連携&#10;クリック: 参照JSONファイルを選択&#10;チケット名をキーに価格・アップグレード情報を照合&#10;不一致セルを赤ハイライト表示&#10;&#10;もう一度押すと連携解除"
-        aria-label="経路価格スケジュール連携"
-      >
-        価格連携
-      </button>
-      <div class="toolbar-sep" role="separator" aria-hidden="true"></div>
-      <button
-        type="button"
-        class="btn"
-        id="btn-marker"
-        title="マーカーモード (M)&#10;ON中: ダブルクリックでセルにマーカーを付与/解除&#10;チェック作業・レビュー用"
-        aria-label="マーカーモードの切り替え"
-        aria-pressed="false"
-      >
-        🔴 M
-      </button>
-      <button
-        type="button"
-        class="btn"
-        id="btn-marker-clear"
-        title="マーカーをすべてクリア"
-        aria-label="マーカーをすべてクリア"
-      >
-        M×
-      </button>
-      <div class="toolbar-sep" role="separator" aria-hidden="true"></div>
-      <button
-        type="button"
-        class="btn danger"
-        id="btn-reset-view"
-        title="表示状態をすべてリセット&#10;フィルター・ソート・非表示列/行・&#10;選択範囲をすべて解除します"
-        aria-label="表示をすべてリセット"
-      >
-        リセット
-      </button>
-      <button
-        type="button"
-        class="btn"
-        id="btn-manual"
-        title="操作ヘルプを表示（?キーでも開けます）&#10;&#10;【ツールバー機能一覧】&#10;開く: TSV/CSVファイルを開く（ドラッグ&amp;ドロップ可）&#10;▾: 最近開いたファイル履歴&#10;保存: 編集中のファイルを保存（Ctrl+S）&#10;↩/↪: 元に戻す/やり直し（Ctrl+Z / Ctrl+Y）&#10;フィルター: 列ヘッダー右クリックでフィルター設定&#10;クリア: フィルターを全解除&#10;絞込保存: フィルター結果のみ保存&#10;行高: 行の高さを切り替え（22→30→40px）&#10;自動幅: 全列幅をデータに合わせて自動調整&#10;折返: セル内テキストの折り返し表示&#10;全表示: 文字サイズを自動縮小して全文表示&#10;HTML出力: マスターデータをHTML形式でプレビュー&#10;縦H: ヘッダーを縦書き表示に切替&#10;H:1行目: ヘッダーモード切替（1行目/連番）&#10;＋: 新しいシートタブを追加&#10;変換: 辞書でヘッダーを日本語に変換（Shift+クリックで辞書編集）&#10;リセット: フィルター・ソート等を全解除"
-        aria-label="ヘルプを開く"
-      >
-        ?
-      </button>
-      <button
-        type="button"
-        class="btn"
-        id="btn-debug-memo"
-        title="デバッグメモを書いてGitHubに送信&#10;バグ・改善点をメモしてアップロード&#10;スクリーンショットも貼り付け可能&#10;&#10;蓄積したメモは /fixmemos コマンドで一括処理"
-        aria-label="デバッグメモを書いてGitHubに送信"
-      >
-        🐛 メモ
-      </button>
+    <!-- === RIBBON HTML START === -->
+    <div class="rb-ribbon" role="toolbar" aria-label="リボンメニュー">
+      <!-- Tab Bar -->
+      <div class="rb-tabbar">
+        <button class="rb-tab" data-tab="file" aria-selected="false">ファイル</button>
+        <button class="rb-tab rb-tab-active" data-tab="home" aria-selected="true">ホーム</button>
+        <button class="rb-tab" data-tab="data" aria-selected="false">データ</button>
+        <button class="rb-tab" data-tab="ticket" aria-selected="false">チケット</button>
+        <button class="rb-tab" data-tab="view" aria-selected="false">表示</button>
+        <div class="rb-tab-spacer"></div>
+        <button class="rb-tab" id="btn-manual" data-tab="help" title="操作ヘルプを表示（?キーでも開けます）" aria-label="ヘルプを開く">ヘルプ</button>
+      </div>
 
-      <div id="search-area" role="search">
-        <input
-          type="text"
-          id="goto-input"
-          class="ui-input"
-          placeholder="行番号..."
-          style="width: 70px"
-          title="行番号ジャンプ (Ctrl+G)"
-          aria-label="行番号ジャンプ"
-        />
-        <div class="toolbar-sep" role="separator" aria-hidden="true"></div>
-        <input
-          type="text"
-          id="search-input"
-          class="ui-input"
-          placeholder="検索..."
-          style="width: 150px"
-          aria-label="セルを検索"
-          aria-controls="search-count"
-          aria-describedby="search-count"
-        />
-        <button
-          type="button"
-          class="btn"
-          id="btn-regex"
-          title="正規表現 (Alt+R)"
-          aria-label="正規表現モードの切り替え"
-          aria-pressed="false"
-        >
-          .*
-        </button>
-        <span
-          id="search-count"
-          role="status"
-          aria-live="polite"
-          style="font-size: 11px; color: var(--text-dim); min-width: 44px"
-        ></span>
-        <button
-          type="button"
-          class="btn"
-          id="btn-prev"
-          title="前の検索結果"
-          aria-label="前の検索結果へ"
-        >
-          ▲
-        </button>
-        <button
-          type="button"
-          class="btn"
-          id="btn-next"
-          title="次の検索結果"
-          aria-label="次の検索結果へ"
-        >
-          ▼
-        </button>
+      <!-- Content Pane: ファイル -->
+      <div class="rb-content" id="rb-pane-file" role="group" aria-label="ファイル操作">
+        <div class="rb-group">
+          <div class="rb-buttons">
+            <button class="rb-btn" id="btn-open" title="TSV/CSVファイルを開く&#10;ドラッグ&amp;ドロップでも読み込めます" aria-label="ファイルを開く">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline><path d="M9 12h6M9 16h6"></path></svg></span>
+              <span>開く</span>
+            </button>
+            <button class="rb-btn" id="btn-open-recent" title="最近開いたファイルの一覧を表示&#10;クリックで再度開けます" aria-label="最近開いたファイル" aria-haspopup="menu" aria-expanded="false" aria-controls="recent-menu">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></span>
+              <span>最近</span>
+            </button>
+            <button class="rb-btn" id="btn-save" title="現在のデータをファイルとして保存&#10;ショートカット: Ctrl+S" aria-label="ファイルを保存">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg></span>
+              <span>保存 <span id="dirty-indicator" role="status" aria-label="未保存の変更があります"></span></span>
+            </button>
+            <button class="rb-btn" id="btn-export-filtered" style="display:none" title="フィルターで絞り込んだ行だけを&#10;新しいファイルとして保存します" aria-label="フィルター結果のみを保存">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="13" x2="12" y2="19"></line><polyline points="9 16 12 13 15 16"></polyline></svg></span>
+              <span>絞込保存</span>
+            </button>
+            <button class="rb-btn" id="btn-new-sheet" title="新しい空のシートタブを追加&#10;複数ファイルをタブで切り替えて編集できます" aria-label="新しいシートを追加">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg></span>
+              <span>新規シート</span>
+            </button>
+          </div>
+          <span class="rb-group-label">ファイル</span>
+        </div>
+        <div id="recent-menu" role="menu" aria-label="最近開いたファイル"></div>
+      </div>
+
+      <!-- Content Pane: ホーム (default active) -->
+      <div class="rb-content rb-content-active" id="rb-pane-home" role="group" aria-label="ホーム">
+        <!-- Group: 元に戻す -->
+        <div class="rb-group">
+          <div class="rb-buttons">
+            <button class="rb-btn" id="btn-undo" title="直前の操作を元に戻す&#10;ショートカット: Ctrl+Z" aria-label="元に戻す">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg></span>
+              <span>戻す</span>
+            </button>
+            <button class="rb-btn" id="btn-redo" title="元に戻した操作をやり直す&#10;ショートカット: Ctrl+Y / Ctrl+Shift+Z" aria-label="やり直し">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 7v6h-6"></path><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"></path></svg></span>
+              <span>進む</span>
+            </button>
+          </div>
+          <span class="rb-group-label">元に戻す</span>
+        </div>
+        <!-- Group: 検索 -->
+        <div class="rb-group">
+          <div class="rb-buttons">
+            <div class="rb-input-btn">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg></span>
+              <input id="search-input" type="text" placeholder="検索..." title="テキスト検索 (Ctrl+F)" aria-label="セルを検索" aria-controls="search-count" aria-describedby="search-count">
+            </div>
+            <button class="rb-btn" id="btn-prev" title="前の検索結果" aria-label="前の検索結果へ">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="15 18 9 12 15 6"></polyline></svg></span>
+              <span>前へ</span>
+            </button>
+            <button class="rb-btn" id="btn-next" title="次の検索結果" aria-label="次の検索結果へ">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="9 18 15 12 9 6"></polyline></svg></span>
+              <span>次へ</span>
+            </button>
+            <button class="rb-btn" id="btn-replace" title="置換 (Ctrl+H)" aria-label="置換ダイアログを開く">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="3"></circle><path d="M7 10v4M17 3h-4m4 0l-4 4m4-4l4 4"></path><circle cx="17" cy="17" r="3"></circle></svg></span>
+              <span>置換</span>
+            </button>
+            <div class="rb-input-btn">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="12 3 12 21"></polyline><polyline points="3 12 12 3 21 12"></polyline></svg></span>
+              <input id="goto-input" type="number" placeholder="行#" title="行番号ジャンプ (Ctrl+G)" aria-label="行番号ジャンプ">
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;">
+            <span id="search-count" role="status" aria-live="polite"></span>
+          </div>
+          <span class="rb-group-label">検索</span>
+        </div>
+      </div>
+
+      <!-- Content Pane: データ -->
+      <div class="rb-content" id="rb-pane-data" role="group" aria-label="データ操作">
+        <!-- Group: 絞り込み -->
+        <div class="rb-group">
+          <div class="rb-buttons">
+            <button class="rb-btn" id="btn-filter-toggle" title="各列のフィルター入力行を表示/非表示&#10;テキスト入力で行を絞り込めます" aria-label="フィルター行を表示" aria-pressed="false">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg></span>
+              <span>フィルター</span>
+            </button>
+            <button class="rb-btn" id="btn-filter-clear" style="display:none" title="現在設定されているフィルターをすべて解除&#10;非表示の行も再表示されます" aria-label="フィルターをクリア">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 6L6 18M6 6l12 12"></path></svg></span>
+              <span>解除</span>
+            </button>
+            <button class="rb-btn" id="btn-reset-view" title="表示状態をすべてリセット&#10;フィルター・ソート・非表示列/行・選択範囲をすべて解除します" aria-label="表示をすべてリセット">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg></span>
+              <span>リセット</span>
+            </button>
+          </div>
+          <span class="rb-group-label">絞り込み</span>
+        </div>
+        <!-- Group: 検品 -->
+        <div class="rb-group">
+          <div class="rb-buttons">
+            <button class="rb-btn" id="btn-marker" title="マーカーモード (M)&#10;ON中: ダブルクリックでセルにマーカーを付与/解除&#10;チェック作業・レビュー用" aria-label="マーカーモードの切り替え" aria-pressed="false">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg></span>
+              <span>マーカー</span>
+            </button>
+            <button class="rb-btn" id="btn-marker-clear" title="マーカーをすべてクリア" aria-label="マーカーをすべてクリア">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 5H9l-7 7 7 7h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2z"></path><line x1="18" y1="9" x2="12" y2="15"></line><line x1="12" y1="9" x2="18" y2="15"></line></svg></span>
+              <span>消去</span>
+            </button>
+            <label class="rb-btn" id="marker-color-wrap" title="マーカーの色を変更&#10;以降に付けるマーカーと既存マーカーすべてに適用されます" style="cursor:pointer">
+              <span class="rb-icon"><input type="color" id="marker-color" value="#facc15" aria-label="マーカーの色" style="width:24px;height:24px;border:none;padding:0;background:none;cursor:pointer"></span>
+              <span>マーカー色</span>
+            </label>
+          </div>
+          <span class="rb-group-label">検品</span>
+        </div>
+      </div>
+
+      <!-- Content Pane: チケット -->
+      <div class="rb-content" id="rb-pane-ticket" role="group" aria-label="チケット操作">
+        <!-- Group: マスタ連携 -->
+        <div class="rb-group">
+          <div class="rb-buttons">
+            <button class="rb-btn" id="btn-sej-link" title="SEJデータに席種エリアマスタを連携&#10;クリック: マスタファイル(TSV)を選択&#10;もう一度押すと連携解除" aria-label="SEJマスタ連携">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></span>
+              <span>SEJ読込</span>
+            </button>
+          </div>
+          <span class="rb-group-label">マスタ連携</span>
+        </div>
+        <!-- Group: 検品表示（トグル） -->
+        <div class="rb-group">
+          <div class="rb-buttons">
+            <button class="rb-btn" id="btn-color-view" title="表示カラーコード(disp_color_cd)列のカラーコードを&#10;セルの背景色として表示します（切り替え）" aria-label="カラーコード表示の切り替え" aria-pressed="false">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"></circle><path d="M12 3a9 9 0 0 0 0 18c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16a5 5 0 0 0 5-5c0-4.42-4.03-8-9-8z"></path><circle cx="7.5" cy="11.5" r="1" fill="currentColor"></circle><circle cx="11" cy="7.5" r="1" fill="currentColor"></circle><circle cx="15.5" cy="8.5" r="1" fill="currentColor"></circle></svg></span>
+              <span>カラー表示</span>
+            </button>
+            <button class="rb-btn" id="btn-gate-view" title="ゲート用公演種別(gate_stage_typ1)の番号を&#10;ヘッダーコメントの対応表と照合してゲート名を併記します（切り替え）" aria-label="ゲート名表示の切り替え" aria-pressed="false">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 21V8l9-5 9 5v13"></path><path d="M9 21v-8h6v8"></path><line x1="3" y1="21" x2="21" y2="21"></line></svg></span>
+              <span>ゲート表示</span>
+            </button>
+            <button class="rb-btn" id="btn-parking-check" title="席種エリアコード6桁目が P（駐車券）の行で&#10;駐車券フラグが 1 になっているか検査し、&#10;不一致セルをマーカー表示します（切り替え）" aria-label="駐車券フラグ検査の切り替え" aria-pressed="false">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M9 17V7h4a3 3 0 0 1 0 6H9"></path></svg></span>
+              <span>駐車券検査</span>
+            </button>
+            <button class="rb-btn" id="btn-kana-check" title="全角カナ・ひらがなを含むセルをマーカー表示します&#10;（システム取込は半角カナが必要なため）（切り替え）" aria-label="半角カナ検査の切り替え" aria-pressed="false">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 6h8M8 6v12"></path><path d="M14 18l3.5-10L21 18"></path><path d="M15.5 14h4"></path></svg></span>
+              <span>カナ検査</span>
+            </button>
+          </div>
+          <span class="rb-group-label">検品表示</span>
+        </div>
+        <!-- Group: 変換・出力 -->
+        <div class="rb-group">
+          <div class="rb-buttons">
+            <button class="rb-btn" id="btn-apply-dict" title="辞書を使ってヘッダーを日本語に変換&#10;Shift+クリックで辞書編集画面を開きます" aria-label="辞書を適用してヘッダーを変換">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 7V4h16v3"></path><path d="M9 20h6"></path><path d="M12 4v16"></path></svg></span>
+              <span>日本語化</span>
+            </button>
+            <button class="rb-btn" id="btn-html-export" title="SEJ設定をHTMLページとして出力&#10;新しいタブで開き、席種設定の詳細を確認できます&#10;フィルター中は絞り込んだ行のみ出力" aria-label="SEJ HTML出力">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M12 13H8M12 17H8"></path><path d="M16 13l2 2-2 2"></path></svg></span>
+              <span>HTML出力</span>
+            </button>
+          </div>
+          <span class="rb-group-label">変換・出力</span>
+        </div>
+      </div>
+
+      <!-- Content Pane: 表示 -->
+      <div class="rb-content" id="rb-pane-view" role="group" aria-label="表示設定">
+        <div class="rb-group">
+          <div class="rb-buttons">
+            <button class="rb-btn" id="btn-row-height" title="行の高さを順番に切り替え&#10;（22px → 30px → 40px → 22px）" aria-label="行の高さを変更">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="5" y1="6" x2="19" y2="6"></line><line x1="5" y1="12" x2="19" y2="12"></line><line x1="5" y1="18" x2="19" y2="18"></line><polyline points="2 3 2 21"></polyline><polyline points="22 3 22 21"></polyline></svg></span>
+              <span>行高さ</span>
+            </button>
+            <button class="rb-btn" id="btn-wrap" title="セル内の長いテキストを折り返して表示&#10;選択範囲がある場合はその行だけ切り替え" aria-label="セル折り返し表示の切り替え" aria-pressed="false">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6h18M3 12h18M3 18h12"></path><polyline points="18 14 20 12 18 10"></polyline></svg></span>
+              <span>折り返し</span>
+            </button>
+            <button class="rb-btn" id="btn-autofit-all" title="全列の幅をデータの内容に合わせて自動調整&#10;列ヘッダーのダブルクリックで個別調整も可能" aria-label="全列幅を自動調整">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line></svg></span>
+              <span>列自動</span>
+            </button>
+            <button class="rb-btn" id="btn-header-mode" title="ヘッダーモードを切り替え&#10;「1行目」: ファイルの1行目をヘッダーとして使用&#10;「連番」: 1, 2, 3...の連番ヘッダー" aria-label="ヘッダーモード切り替え" aria-pressed="true">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18"></rect><rect x="3" y="3" width="18" height="6" fill="currentColor" opacity="0.15"></rect><line x1="3" y1="9" x2="21" y2="9"></line></svg></span>
+              <span>ヘッダー</span>
+            </button>
+          </div>
+          <span class="rb-group-label">表示</span>
+        </div>
       </div>
     </div>
+    <!-- === RIBBON HTML END === -->
 
     <div id="tab-bar"></div>
 
@@ -2028,27 +1845,6 @@
       style="display: none"
     />
 
-    <!-- 重複ハイライトダイアログ -->
-    <div
-      id="dup-hl-dialog"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="dup-hl-title"
-    >
-      <div id="dup-hl-content">
-        <h2 id="dup-hl-title">重複ハイライト（列指定）</h2>
-        <label for="dup-hl-col"
-          >対象列（この列の値が重複している行を紫でハイライト）</label
-        >
-        <select id="dup-hl-col" aria-label="ハイライト対象の列を選択"></select>
-        <div class="dup-hl-btns">
-          <button type="button" id="dup-hl-close" aria-label="重複ハイライトダイアログを閉じる">閉じる</button>
-          <button type="button" id="dup-hl-clear" aria-label="重複ハイライトをクリア">クリア</button>
-          <button type="button" id="dup-hl-run" aria-label="重複ハイライトを実行">ハイライト</button>
-        </div>
-      </div>
-    </div>
-
     <!-- リロード警告ダイアログ -->
     <div
       id="reload-dialog"
@@ -2073,51 +1869,6 @@
           <button type="button" class="danger" id="reload-discard" aria-label="変更を破棄して続ける">
             変更を破棄して続ける
           </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- デバッグメモダイアログ -->
-    <div id="debug-memo-dialog" role="dialog" aria-modal="true" aria-labelledby="dbm-title">
-      <div id="debug-memo-inner">
-        <h2 id="dbm-title">🐛 デバッグメモ</h2>
-
-        <!-- PAT未設定時のみ表示 -->
-        <div id="dbm-pat-section" style="display:none">
-          <div class="dbm-label">GitHub Personal Access Token（初回のみ）
-            <a href="https://github.com/settings/tokens/new?scopes=repo&description=tsv-editor-debug-memo"
-               target="_blank" rel="noopener" style="margin-left:6px;color:var(--accent);font-size:10px">
-              ↗ 発行ページ（repo スコープ）
-            </a>
-          </div>
-          <div class="dbm-pat-row">
-            <input type="password" id="debug-memo-pat" placeholder="ghp_xxxxx..." autocomplete="off" />
-            <button type="button" id="dbm-save-pat" class="primary"
-                    style="padding:5px 10px;font-size:12px;border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer;font-family:var(--font-ui)">
-              保存
-            </button>
-          </div>
-          <div style="font-size:10px;color:var(--text-dim);margin-top:3px">
-            localStorageに保存されます。必要最小限スコープ: <code>public_repo</code>
-          </div>
-        </div>
-
-        <div>
-          <div class="dbm-label">タイトル（任意）</div>
-          <input type="text" id="debug-memo-title" placeholder="例: 検索後にUndoが効かない" maxlength="80" />
-        </div>
-
-        <div>
-          <div class="dbm-label">内容（スクリーンショットは Ctrl+V / Cmd+V でペースト可）</div>
-          <div id="debug-memo-body" contenteditable="true" role="textbox" aria-multiline="true"
-               data-placeholder="バグの再現手順・期待動作・実際の動作などを書いてください..."></div>
-        </div>
-
-        <div id="debug-memo-images"></div>
-
-        <div class="dbm-btns">
-          <button type="button" id="dbm-cancel">キャンセル</button>
-          <button type="button" id="dbm-upload" class="primary">⬆ GitHubにアップロード</button>
         </div>
       </div>
     </div>
@@ -2185,18 +1936,6 @@
             <span class="man-btn-label">折返</span
             ><span class="man-btn-desc"
               >セルの文字を折り返して表示（最大2〜3行分）。長いテキストの確認に便利。</span
-            >
-          </div>
-          <div class="man-btn-row">
-            <span class="man-btn-label">全表示</span
-            ><span class="man-btn-desc"
-              >セル幅に合わせて文字サイズを自動縮小し、内容を全て表示。フラグ列など狭い列でも値が読める。</span
-            >
-          </div>
-          <div class="man-btn-row">
-            <span class="man-btn-label">縦H</span
-            ><span class="man-btn-desc"
-              >ヘッダーを縦書き表示にして列幅をコンパクトに。列数の多いデータで一画面に多く表示可能（デフォルトON）。</span
             >
           </div>
           <div class="man-btn-row">
@@ -2365,7 +2104,11 @@
         // SEJ連携用: 席種エリアマスタ
         sejMaster: null, // { byCode: { "MMTGPE25021": { disp_nm, control_nm, nte, ... } }, fileName }
         sejVirtualCols: null, // { indices: [i1, i2, ...], keys: ["grp_nm", ...] } 保存時除外する仮想列
-        priceRef: null, // 経路価格スケジュール参照 { meta, colMap, lookup: Map<ticket→row> }
+        colorView: false,    // disp_color_cd をセル背景色で表示
+        gateView: false,     // gate_stage_typ1 にゲート名を併記
+        parkingCheck: false, // 席種エリアコード6桁目P ⇔ 駐車券フラグ1 の検査
+        kanaCheck: false,    // 全角カナ・ひらがな検出
+        markerColor: "#facc15", // マーカー色（localStorageに保存）
 
         // ズーム
         zoomLevel: 100, // パーセント
@@ -2377,10 +2120,6 @@
         regexMode: false, // 正規表現検索モード
         wrapCells: false, // セル折り返し表示（全体）
         wrapRows: new Set(), // 個別折り返し行
-        verticalHeader: true, // ヘッダー縦書き表示（デフォルトON）
-        fitText: false, // セル全体表示（文字サイズ自動調整）
-        htmlPreview: false, // 備考欄HTMLプレビュー
-        htmlPreviewCol: -1, // HTMLプレビュー対象列インデックス
         colorPreview: false, // カラーコード列の背景色プレビュー
         colorPreviewCol: -1, // カラーコード列インデックス
         headerMode: "firstRow", // "firstRow" | "numbered"
@@ -2398,6 +2137,92 @@
 
       // ===== DOM =====
       const $ = (id) => document.getElementById(id);
+
+      // リボンボタンのラベルspanだけを更新する（SVGアイコンを壊さない）
+      function setRbLabel(id, text) {
+        const btn = typeof id === "string" ? $(id) : id;
+        if (!btn) return;
+        const label = btn.querySelector(".rb-icon + span") || btn.querySelector("span:last-of-type");
+        if (label && !label.classList.contains("rb-icon")) label.textContent = text;
+        else btn.textContent = text;
+      }
+      // リボンボタンの説明を更新する（title は初期化時に data-tip へ退避済みのため data-tip を直接更新）
+      function setRbTip(id, text) {
+        const btn = typeof id === "string" ? $(id) : id;
+        if (!btn) return;
+        btn.setAttribute("data-tip", text);
+        btn.removeAttribute("title");
+      }
+
+      // 検品表示トグル共通処理（カラー表示/ゲート表示/駐車券検査/カナ検査）
+      function toggleInspect(stateKey, btnId, label) {
+        state[stateKey] = !state[stateKey];
+        const btn = $(btnId);
+        if (btn) {
+          btn.classList.toggle("active-state", state[stateKey]);
+          btn.setAttribute("aria-pressed", String(state[stateKey]));
+        }
+        state.forceRender = true;
+        renderBody();
+        setStatus(`${label}: ${state[stateKey] ? "ON" : "OFF"}`);
+      }
+
+      // ゲート用公演種別: ヘッダーコメントの「名称：番号」行から 番号→名称 の対応表を作る
+      let _gateMapCache = null, _gateMapSrc = null;
+      function getGateMap() {
+        const src = (state.headerComments && state.headerComments["gate_stage_typ1"]) || "";
+        if (_gateMapSrc === src) return _gateMapCache;
+        _gateMapSrc = src;
+        const map = {};
+        src.split(/\r?\n/).forEach((line) => {
+          const m = line.match(/^(.+?)[：:]\s*(\d+)\s*$/);
+          if (m) map[m[2]] = m[1].trim();
+        });
+        _gateMapCache = map;
+        return map;
+      }
+
+      // マーカー色（localStorageに保存、全マーカー共通）
+      const MARKER_COLOR_KEY = "tsv-editor-marker-color";
+      function setMarkerColor(color) {
+        state.markerColor = color;
+        document.documentElement.style.setProperty("--marker-color", color);
+        try { localStorage.setItem(MARKER_COLOR_KEY, color); } catch (e) {}
+      }
+      function loadMarkerColor() {
+        let c = "#facc15";
+        try { c = localStorage.getItem(MARKER_COLOR_KEY) || c; } catch (e) {}
+        state.markerColor = c;
+        document.documentElement.style.setProperty("--marker-color", c);
+        const inp = $("marker-color");
+        if (inp) inp.value = c;
+      }
+
+      // SEJ備考の分割（<br>・改行区切り、タグ除去）— グリッド仮想列とHTML出力で共用
+      function sejSplitNte(s) {
+        if (!s) return [];
+        return s
+          .split(/<br\s*\/?>|\r?\n/i)
+          .map(x => x.replace(/<[^>]+>/g, "").replace(/&nbsp;/gi, " ").trim())
+          .filter(x => x);
+      }
+
+      // === RIBBON JS: タブ切替 ===
+      document.querySelectorAll(".rb-tab[data-tab]").forEach((tab) => {
+        if (tab.id === "btn-manual") return; // ヘルプはダイアログを開く既存ハンドラに任せる
+        tab.addEventListener("click", () => {
+          document.querySelectorAll(".rb-tab[data-tab]").forEach((t) => {
+            if (t.id === "btn-manual") return;
+            const active = t === tab;
+            t.classList.toggle("rb-tab-active", active);
+            t.setAttribute("aria-selected", String(active));
+          });
+          document.querySelectorAll(".rb-content").forEach((pane) => {
+            pane.classList.toggle("rb-content-active", pane.id === "rb-pane-" + tab.dataset.tab);
+          });
+        });
+      });
+      // === RIBBON JS END ===
       function debounce(fn, ms) {
         let t;
         return (...a) => {
@@ -2763,7 +2588,7 @@
             el.removeAttribute("title");
           }
         };
-        document.querySelectorAll("#toolbar [title], #search-area [title]").forEach(stash);
+        document.querySelectorAll(".rb-ribbon [title]").forEach(stash);
 
         let hoverTarget = null;
         let hoverTimer = null;
@@ -2871,7 +2696,6 @@
         $("btn-row-height").onclick = cycleRowHeight;
         $("btn-autofit-all").onclick = autoFitAllColumns;
         $("btn-wrap").onclick = toggleWrapCells;
-        $("btn-fit-text").onclick = toggleFitText;
         $("btn-html-export").onclick = exportHtmlPreview;
         $("btn-sej-link").onclick = toggleSejLink;
         // ドラッグ&ドロップでSEJマスタを読込
@@ -2885,26 +2709,18 @@
             loadSejMasterFile(e.dataTransfer.files[0]);
           }
         });
-        $("btn-price-ref").onclick = togglePriceRef;
-        // ドラッグ&ドロップで価格参照JSONを読込
-        const priceRefBtn = $("btn-price-ref");
-        priceRefBtn.addEventListener("dragover", (e) => { e.preventDefault(); priceRefBtn.classList.add("drag-over"); });
-        priceRefBtn.addEventListener("dragleave", () => priceRefBtn.classList.remove("drag-over"));
-        priceRefBtn.addEventListener("drop", (e) => {
-          e.preventDefault();
-          priceRefBtn.classList.remove("drag-over");
-          if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-            loadPriceRefFile(e.dataTransfer.files[0]);
-          }
-        });
-        $("btn-vertical-header").onclick = toggleVerticalHeader;
-        if (state.verticalHeader) $("btn-vertical-header").classList.add("active-state");
+        // 検品表示トグル（チケットタブ）
+        $("btn-color-view").onclick = () => toggleInspect("colorView", "btn-color-view", "カラーコード表示");
+        $("btn-gate-view").onclick = () => toggleInspect("gateView", "btn-gate-view", "ゲート名表示");
+        $("btn-parking-check").onclick = () => toggleInspect("parkingCheck", "btn-parking-check", "駐車券フラグ検査");
+        $("btn-kana-check").onclick = () => toggleInspect("kanaCheck", "btn-kana-check", "半角カナ検査");
+        // マーカー色
+        $("marker-color").oninput = (e) => setMarkerColor(e.target.value);
+        loadMarkerColor();
         $("btn-header-mode").onclick = toggleHeaderMode;
         $("btn-new-sheet").onclick = addNewSheet;
         $("btn-reset-view").onclick = resetView;
         $("btn-manual").onclick = showManual;
-        $("btn-debug-memo").onclick = openDebugMemoDialog;
-        $("btn-regex").onclick = toggleRegexMode;
         $("man-close").onclick = hideManual;
         $("manual-dialog").onclick = (e) => {
           if (e.target === $("manual-dialog")) hideManual();
@@ -2913,6 +2729,10 @@
         // 辞書・変換ボタン（Shift+クリックで辞書編集）
         $("btn-apply-dict").onclick = (e) => {
           if (e.shiftKey) { openDictEditor(); return; }
+          if (state.headerMode === "numbered") {
+            alert("ヘッダーが連番モードのため日本語化できません。\n\n「表示」タブの「ヘッダー」ボタンで 1行目モード に切り替えてください。");
+            return;
+          }
           applyHeaderMapping();
           renderHeader();
           state.forceRender = true;
@@ -2935,20 +2755,6 @@
             !e.target.closest("#btn-open-recent")
           )
             closeRecentMenu();
-        });
-
-        // 重複ハイライトダイアログ
-        $("dup-hl-run").onclick = runDupHlByCol;
-        $("dup-hl-clear").onclick = clearDupHl;
-        $("dup-hl-close").onclick = closeDupHlDialog;
-        $("dup-hl-dialog").onclick = (e) => {
-          if (e.target === $("dup-hl-dialog")) closeDupHlDialog();
-        };
-        $("dup-hl-dialog").addEventListener("keydown", (e) => {
-          if (e.key === "Escape") {
-            e.preventDefault();
-            closeDupHlDialog();
-          }
         });
 
         els.fileInput.onchange = (e) => {
@@ -3241,9 +3047,6 @@
       }
 
       // ===== ヘッダー自動変換（席種エリアマスター対応）=====
-      const DEBUG_MEMO_PAT_KEY    = "tsv-editor-debug-memo-pat";
-      const DEBUG_MEMO_REPO_KEY   = "tsv-editor-debug-memo-repo";
-      const DEBUG_MEMO_BRANCH_KEY = "tsv-editor-debug-memo-branch";
       const HEADER_MAP_STORAGE_KEY = "tsv-editor-header-map";
       const HEADER_COMMENTS_STORAGE_KEY = "tsv-editor-header-comments";
 
@@ -3417,13 +3220,8 @@
       // ステータス表示なしの自動幅調整（ロード時用）
       function autoFitAllColumnsQuiet() {
         for (let c = 0; c < state.headers.length; c++) {
-          let maxW;
-          if (state.verticalHeader) {
-            maxW = 20; // 縦書き時はヘッダー幅を無視、最小幅から開始
-          } else {
-            const displayH = getDisplayHeader(c);
-            maxW = measureText(displayH || "", "600 13px system-ui") + 60;
-          }
+          const displayH = getDisplayHeader(c);
+          let maxW = measureText(displayH || "", "600 13px system-ui") + 60;
           const sample = Math.min(state.data.length, 300);
           for (let i = 0; i < sample; i++) {
             const v = safeGet(i, c);
@@ -3432,8 +3230,7 @@
               if (w > maxW) maxW = w;
             }
           }
-          const minW = state.verticalHeader ? 28 : 40;
-          state.colWidths[c] = Math.max(minW, Math.min(maxW, 400));
+          state.colWidths[c] = Math.max(40, Math.min(maxW, 400));
         }
       }
 
@@ -3470,12 +3267,12 @@
         const btn = $("btn-header-mode");
         if (!btn) return;
         const isFirstRow = state.headerMode === "firstRow";
-        btn.textContent = isFirstRow ? "H: 1行目" : "H: 連番";
+        setRbLabel(btn, isFirstRow ? "ヘッダー:1行目" : "ヘッダー:連番");
         btn.classList.toggle("active-state", isFirstRow);
         btn.setAttribute("aria-pressed", String(isFirstRow));
-        btn.title = isFirstRow
-          ? "ヘッダー: 1行目を使用中 → クリックで連番に切替"
-          : "ヘッダー: 連番を使用中 → クリックで1行目に切替";
+        setRbTip(btn, isFirstRow
+          ? "ヘッダー: 1行目を使用中\nクリックすると連番（1,2,3...）に切り替わります"
+          : "ヘッダー: 連番を使用中\nクリックするとファイルの1行目をヘッダーとして使用します\n※連番モードでは日本語化・HTML出力が使えません");
       }
 
       function toggleHeaderMode() {
@@ -4247,15 +4044,11 @@
         return cols;
       }
 
-      let _fitFont = null;
       function renderBody() {
         const rows = getVisibleRows();
         const scrollTop = els.container.scrollTop;
         const viewH = els.container.clientHeight;
         const rowH = state.wrapCells ? 56 : ROW_H;
-        if (state.fitText && !_fitFont) {
-          _fitFont = "12px " + getComputedStyle(document.body).fontFamily;
-        }
         const start = Math.max(0, Math.floor(scrollTop / rowH) - BUFFER);
         const end = Math.min(
           rows.length,
@@ -4291,18 +4084,20 @@
           ? state.headers.findIndex(h => h.trim() === "seat_type_area_cd")
           : -1;
 
-        // 価格連携: 参照列インデックスをキャッシュ
-        let priceRefCols = null;
-        if (state.priceRef) {
-          const cm = state.priceRef.colMap;
-          const fi = (name) => name ? state.headers.findIndex(h => h.trim() === name.trim()) : -1;
-          priceRefCols = {
-            ticketIdx: fi(cm.ticket_col),
-            advanceIdx: fi(cm.advance_price_col),
-            dayIdx: fi(cm.day_price_col),
-            upgradeAmountIdx: fi(cm.upgrade_amount_col),
-            upgradeToIdx: fi(cm.upgrade_to_col),
-          };
+        // 検品表示: 対象列インデックスをキャッシュ
+        const _hIdx = (name) => state.headers.findIndex(h => h.trim() === name);
+        const colorColIdx = state.colorView ? _hIdx("disp_color_cd") : -1;
+        const gateColIdx = state.gateView ? _hIdx("gate_stage_typ1") : -1;
+        const gateMap = gateColIdx !== -1 ? getGateMap() : null;
+        const parkCodeIdx = state.parkingCheck ? _hIdx("seat_type_area_cd") : -1;
+        const parkFlagIdx = state.parkingCheck ? _hIdx("parking_ticket_flg") : -1;
+        // SEJ備考差分: wordN列 → マスタ備考N仮想列 の対応表
+        let nteDiffMap = null;
+        if (state.sejMaster && state.sejVirtualCols && state.sejVirtualCols.nteCols) {
+          nteDiffMap = {};
+          for (const [wordIdx, nteIdx] of state.sejVirtualCols.nteCols) {
+            nteDiffMap[wordIdx] = nteIdx;
+          }
         }
 
         for (let vi = start; vi < end; vi++) {
@@ -4357,19 +4152,7 @@
             }
             const tdCw = state.colWidths[j] || 80;
             const cellVal = safeGet(i, j);
-            let fitStyle = "";
-            if (state.fitText && cellVal) {
-              const textW = measureText(cellVal, _fitFont);
-              const avail = tdCw - 12; // padding分
-              if (textW > avail && avail > 0) {
-                const fs = Math.max(6, Math.floor(12 * avail / textW));
-                fitStyle = `font-size:${fs}px;`;
-              }
-            }
             const _cc = state.cellColors[i + "," + j];
-            const style =
-              `width:${tdCw}px;min-width:${tdCw}px;max-width:${tdCw}px;${fitStyle}` + extraStyle +
-              (_cc ? `background-color:${_cc};` : "");
             const isSelected =
               cls.includes("selected") || cls.includes("in-range");
             let displayVal = escHtml(cellVal);
@@ -4383,54 +4166,52 @@
                 displayVal += `<span style="color:#dc2626;margin-left:6px;font-size:11px">▸ 未登録</span>`;
               }
             }
-            // 価格連携: 不一致セルをハイライト
-            if (priceRefCols) {
-              const { ticketIdx, advanceIdx, dayIdx, upgradeAmountIdx, upgradeToIdx } = priceRefCols;
-              if (j === advanceIdx || j === dayIdx || j === upgradeAmountIdx || j === upgradeToIdx) {
-                const ticketName = ticketIdx >= 0 ? (row[ticketIdx] ?? "").trim() : "";
-                const refRow = ticketName ? state.priceRef.lookup.get(ticketName) : null;
-                if (refRow) {
-                  let isMismatch = false, refDisp = "";
-                  if (j === advanceIdx) {
-                    const refVal = refRow.advance_price;
-                    refDisp = refVal != null ? String(refVal) : "販売なし";
-                    const cellNum = Number(cellVal.replace(/[^0-9]/g, ""));
-                    isMismatch = refVal != null
-                      ? (cellVal !== "" && cellNum !== refVal)
-                      : (cellVal !== "" && cellVal !== "―" && cellVal !== "9999999");
-                  } else if (j === dayIdx) {
-                    const refVal = refRow.day_price;
-                    refDisp = refVal != null ? String(refVal) : "販売なし";
-                    const cellNum = Number(cellVal.replace(/[^0-9]/g, ""));
-                    isMismatch = refVal != null
-                      ? (cellVal !== "" && cellNum !== refVal)
-                      : (cellVal !== "" && cellVal !== "―" && cellVal !== "9999999");
-                  } else if (j === upgradeToIdx) {
-                    const upgrades = refRow.upgrades || [];
-                    refDisp = upgrades.length ? upgrades.map(u => u.to).join(" / ") : "なし";
-                    isMismatch = upgrades.length === 0
-                      ? (cellVal !== "" && cellVal !== "―")
-                      : !upgrades.some(u => u.to.trim() === cellVal.trim());
-                  } else if (j === upgradeAmountIdx) {
-                    const upgrades = refRow.upgrades || [];
-                    const toVal = upgradeToIdx >= 0 ? (row[upgradeToIdx] ?? "").trim() : "";
-                    const matched = toVal ? upgrades.find(u => u.to.trim() === toVal) : upgrades[0];
-                    if (matched) {
-                      refDisp = String(matched.amount);
-                      const cellNum = Number(cellVal.replace(/[^0-9]/g, ""));
-                      isMismatch = cellVal !== "" && cellNum !== matched.amount;
-                    } else if (upgrades.length === 0) {
-                      refDisp = "なし";
-                      isMismatch = cellVal !== "" && cellVal !== "―";
-                    }
-                  }
-                  if (isMismatch) {
-                    cls.push("price-ng");
-                    displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px" title="参照値: ${escHtml(refDisp)}">▸ 参照:${escHtml(refDisp)}</span>`;
-                  }
-                }
+            // カラーコード表示: disp_color_cd 列のセル背景をコード色にする
+            if (j === colorColIdx && cellVal) {
+              const hex = cellVal.trim().replace(/^#/, "");
+              if (/^[0-9A-Fa-f]{6}$/.test(hex)) {
+                // 輝度で文字色を自動切り替え
+                const r = parseInt(hex.slice(0, 2), 16), g = parseInt(hex.slice(2, 4), 16), b = parseInt(hex.slice(4, 6), 16);
+                const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+                extraStyle += `background-color:#${hex};color:${lum > 145 ? "#171717" : "#ffffff"};`;
               }
             }
+            // ゲート名表示: gate_stage_typ1 の番号にゲート名を併記
+            if (j === gateColIdx && gateMap && cellVal.trim()) {
+              const gname = gateMap[cellVal.trim()];
+              if (gname) {
+                displayVal += `<span style="color:#2563eb;margin-left:6px;font-size:11px">▸ ${escHtml(gname)}</span>`;
+              } else {
+                displayVal += `<span style="color:#dc2626;margin-left:6px;font-size:11px">▸ 対応表になし</span>`;
+              }
+            }
+            // 駐車券フラグ検査: コード6桁目P ⇔ フラグ1
+            if (j === parkFlagIdx && parkCodeIdx !== -1) {
+              const code = (row[parkCodeIdx] ?? "").trim();
+              const isP = code.length >= 6 && code[5].toUpperCase() === "P";
+              const flagIs1 = cellVal.trim() === "1";
+              if (isP && !flagIs1) {
+                cls.push("cell-ng");
+                displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">▸ 駐車券(P)は1必須</span>`;
+              } else if (!isP && flagIs1) {
+                cls.push("cell-warn");
+                displayVal += `<span style="color:#ea580c;margin-left:5px;font-size:10px">▸ Pでないのに1</span>`;
+              }
+            }
+            // 半角カナ検査: 全角カナ・ひらがなを含むセルを警告表示
+            if (state.kanaCheck && cellVal && /[ぁ-ゟァ-ヿ]/.test(cellVal)) {
+              cls.push("cell-warn");
+            }
+            // SEJ備考差分: wordN列とマスタ備考N仮想列の完全一致チェック
+            if (nteDiffMap && nteDiffMap[j] !== undefined) {
+              const masterVal = (row[nteDiffMap[j]] ?? "").trim();
+              if ((cellVal || masterVal) && cellVal.trim() !== masterVal) {
+                cls.push("cell-diff");
+              }
+            }
+            const style =
+              `width:${tdCw}px;min-width:${tdCw}px;max-width:${tdCw}px;` + extraStyle +
+              (_cc ? `background-color:${_cc};` : "");
             html += `<td role="gridcell" data-col="${j}" aria-colindex="${j + 2}" ${style ? `style="${style}"` : ""} class="${cls.join(" ")}" aria-selected="${isSelected}">${displayVal}</td>`;
           }
           html += `</tr>`;
@@ -5038,8 +4819,6 @@
 
       // ===== キーボード =====
       function onKeyDown(e) {
-        // メモダイアログが開いている間はグリッド操作をブロック
-        if ($("debug-memo-dialog")?.classList.contains("show")) return;
         if (e.target.tagName === "INPUT" && e.target.closest("td.editing"))
           return;
         // ダイアログ内でもCtrl+C/Vはセル操作として処理する
@@ -6166,26 +5945,6 @@
         return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       }
 
-      function _applyCellColor(color) {
-        saveUndo();
-        const cells = [];
-        if (state.range) {
-          const r1 = Math.min(state.range.r1, state.range.r2);
-          const r2 = Math.max(state.range.r1, state.range.r2);
-          const c1 = Math.min(state.range.c1, state.range.c2);
-          const c2 = Math.max(state.range.c1, state.range.c2);
-          for (let r = r1; r <= r2; r++)
-            for (let c = c1; c <= c2; c++) cells.push([r, c]);
-        } else if (state.selected) {
-          cells.push([state.selected.row, state.selected.col]);
-        }
-        for (const [r, c] of cells) {
-          if (color) state.cellColors[r + "," + c] = color;
-          else delete state.cellColors[r + "," + c];
-        }
-        state.forceRender = true;
-        renderBody();
-      }
 
       // ===== 右クリックメニュー =====
       function onContextMenu(e) {
@@ -6249,29 +6008,6 @@
               { label: "切り取り", key: "Ctrl+X", action: cutToClipboard },
               { label: "ペースト", key: "Ctrl+V", action: pasteFromClipboard },
               { label: "検索と置換", key: "Ctrl+H", action: openReplaceDialog },
-            ],
-          },
-          {
-            group: "選択",
-            icon: "▣",
-            children: [
-              {
-                label: "この行を選択",
-                key: "Shift+Space",
-                action: () => {
-                  state.selected = { row, col: 0 };
-                  state.anchor = { row, col: 0 };
-                  state.range = {
-                    r1: row,
-                    c1: 0,
-                    r2: row,
-                    c2: state.headers.length - 1,
-                  };
-                  updateHighlight();
-                },
-              },
-              { label: "この列を選択", key: "Ctrl+Space", action: () => selectColumn(col) },
-              { label: "全選択", key: "Ctrl+A", action: selectAll },
             ],
           },
           {
@@ -6502,10 +6238,6 @@
                   toggleFreezeColumn();
                 },
               },
-              {
-                label: `「${getDisplayHeader(col)}」の統計情報`,
-                action: () => showColStats(col),
-              },
               { sep: true },
               {
                 label: (() => {
@@ -6605,9 +6337,6 @@
             children: [
               { label: "空行を一括削除", action: deleteEmptyRows },
               { label: "前後空白をトリム", action: trimAllCells },
-              { sep: true },
-              { label: "重複ハイライト（全列）", action: highlightDuplicates },
-              { label: "重複ハイライト（列指定）", action: openDupHlDialog },
               {
                 label: state.conditionalHL
                   ? "条件付きハイライト OFF"
@@ -6616,19 +6345,6 @@
               },
               { sep: true },
               { label: "重複行を削除", danger: true, action: deleteDuplicates },
-            ],
-          },
-          {
-            group: "書式",
-            icon: "🎨",
-            children: [
-              { label: "🟡 黄（確認中）", action: () => _applyCellColor("#FFF9C4") },
-              { label: "🟢 緑（完了）", action: () => _applyCellColor("#C8E6C9") },
-              { label: "🔴 赤（NG）", action: () => _applyCellColor("#FFCDD2") },
-              { label: "🔵 青（対応中）", action: () => _applyCellColor("#BBDEFB") },
-              { label: "🟠 橙（保留）", action: () => _applyCellColor("#FFE0B2") },
-              { label: "🟣 紫（メモ）", action: () => _applyCellColor("#E1BEE7") },
-              { label: "⬜ クリア", action: () => _applyCellColor(null) },
             ],
           },
         ];
@@ -6796,7 +6512,6 @@
         state.wrapRows.clear();
         state.regexMode = false;
         state.conditionalHL = false;
-        state.priceRef = null;
         state._dupSet = null;
         state._dupCol = null;
         state.sejVirtualCols = null; // 仮想列情報は読み込みデータと不可分（残すと保存時に実列を誤除外）
@@ -6812,8 +6527,6 @@
         document.body.classList.remove("wrap-cells");
         $("btn-wrap").classList.remove("active-state");
         $("btn-wrap").setAttribute("aria-pressed", "false");
-        $("btn-price-ref").classList.remove("active-state");
-        $("btn-price-ref").textContent = "価格連携";
         _visibleRowsCache = null;
         _visibleRowsCacheKey = "";
         lastRenderKey = null;
@@ -7162,7 +6875,11 @@
           cellColors: { ...state.cellColors },
           // SEJ仮想列はdata/headersと不可分（欠落するとundo後の保存で実列を誤除外）
           sejVirtualCols: state.sejVirtualCols
-            ? { indices: [...state.sejVirtualCols.indices], keys: [...state.sejVirtualCols.keys] }
+            ? {
+                indices: [...state.sejVirtualCols.indices],
+                keys: [...state.sejVirtualCols.keys],
+                nteCols: state.sejVirtualCols.nteCols ? state.sejVirtualCols.nteCols.map(p => [...p]) : undefined,
+              }
             : null,
         };
       }
@@ -7181,7 +6898,11 @@
         state.headerMode = s.headerMode || "firstRow";
         state.cellColors = s.cellColors ? { ...s.cellColors } : {};
         state.sejVirtualCols = s.sejVirtualCols
-          ? { indices: [...s.sejVirtualCols.indices], keys: [...s.sejVirtualCols.keys] }
+          ? {
+              indices: [...s.sejVirtualCols.indices],
+              keys: [...s.sejVirtualCols.keys],
+              nteCols: s.sejVirtualCols.nteCols ? s.sejVirtualCols.nteCols.map(p => [...p]) : undefined,
+            }
           : null;
         applyHeaderMapping();
         updateHeaderModeBtn();
@@ -7416,12 +7137,7 @@
         return _canvasCtx.measureText(text).width;
       }
       function autoFitColumn(col) {
-        let maxW;
-        if (state.verticalHeader) {
-          maxW = 20;
-        } else {
-          maxW = measureText(getDisplayHeader(col) || "", "600 13px system-ui") + 60;
-        }
+        let maxW = measureText(getDisplayHeader(col) || "", "600 13px system-ui") + 60;
         const sample = Math.min(state.data.length, 300);
         for (let i = 0; i < sample; i++) {
           const v = safeGet(i, col);
@@ -7430,8 +7146,7 @@
             if (w > maxW) maxW = w;
           }
         }
-        const minW = state.verticalHeader ? 28 : 40;
-        state.colWidths[col] = Math.max(minW, Math.min(maxW, 400));
+        state.colWidths[col] = Math.max(40, Math.min(maxW, 400));
         renderHeader();
         state.forceRender = true;
         renderBody();
@@ -7692,12 +7407,7 @@
       // ===== 全列の自動幅調整 =====
       function autoFitAllColumns() {
         for (let c = 0; c < state.headers.length; c++) {
-          let maxW;
-          if (state.verticalHeader) {
-            maxW = 30;
-          } else {
-            maxW = measureText(getDisplayHeader(c) || "", "600 13px system-ui") + 60;
-          }
+          let maxW = measureText(getDisplayHeader(c) || "", "600 13px system-ui") + 60;
           const sample = Math.min(state.data.length, 300);
           for (let i = 0; i < sample; i++) {
             const v = safeGet(i, c);
@@ -7720,30 +7430,468 @@
         const idx = ROW_H_OPTIONS.indexOf(ROW_H);
         ROW_H = ROW_H_OPTIONS[(idx + 1) % ROW_H_OPTIONS.length];
         document.documentElement.style.setProperty("--row-h", ROW_H + "px");
-        const btn = $("btn-row-height");
-        btn.textContent = `行${ROW_H}`;
+        setRbLabel("btn-row-height", `行高:${ROW_H}`);
         state.forceRender = true;
         renderBody();
         setStatus(`行の高さ: ${ROW_H}px`);
       }
 
-      // ===== セル全体表示 =====
-      function toggleFitText() {
-        state.fitText = !state.fitText;
-        _fitFont = null; // キャッシュリセット
-        document.body.classList.toggle("fit-text", state.fitText);
-        const btn = $("btn-fit-text");
-        btn.classList.toggle("active-state", state.fitText);
-        btn.setAttribute("aria-pressed", String(state.fitText));
-        state.forceRender = true;
-        renderBody();
-        setStatus(state.fitText ? "セル全体表示 ON" : "セル全体表示 OFF");
+      // ===== SEJ連携: 席種エリアマスタ読込 =====
+      function parseTsvText(text) {
+        if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+        const rows = [];
+        let row = [], cur = "", inQuote = false;
+        for (let i = 0; i < text.length; i++) {
+          const c = text[i], next = text[i + 1];
+          if (inQuote) {
+            if (c === '"' && next === '"') { cur += '"'; i++; }
+            else if (c === '"') inQuote = false;
+            else cur += c;
+          } else {
+            if (c === '"') inQuote = true;
+            else if (c === "\t") { row.push(cur); cur = ""; }
+            else if (c === "\r" || c === "\n") {
+              if (c === "\r" && next === "\n") i++;
+              row.push(cur); rows.push(row); row = []; cur = "";
+            } else cur += c;
+          }
+        }
+        if (cur || row.length) { row.push(cur); rows.push(row); }
+        return rows;
       }
 
-      // ===== 備考欄HTMLプレビュー =====
-      // 安全なHTMLタグのみ許可してプレビュー表示
-      // ===== HTML出力プレビュー =====
-      // 表示対象列（優先度順に表示）
+      function loadSejMasterFile(file, _encoding) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const text = reader.result;
+            // UTF-8で読んで文字化け（置換文字）があれば Shift_JIS で読み直す
+            if (!_encoding && text.includes("�")) {
+              loadSejMasterFile(file, "shift_jis");
+              return;
+            }
+            const rows = parseTsvText(text);
+            if (rows.length < 2) {
+              alert("マスタファイルにデータ行がありません。\nファイル: " + file.name);
+              setStatus("⚠ マスタファイルにデータがありません");
+              return;
+            }
+            const headers = rows[0].map(h => h.trim());
+            const codeIdx = headers.indexOf("seat_type_area_cd");
+            if (codeIdx === -1) {
+              alert("seat_type_area_cd 列が見つかりません。\n席種エリアマスタTSVを選択してください。\n\n1行目: " + rows[0].slice(0, 5).join(", ") + " ...");
+              setStatus("⚠ seat_type_area_cd 列が見つかりません");
+              return;
+            }
+            const byCode = {};
+            for (let i = 1; i < rows.length; i++) {
+              const r = rows[i];
+              const code = (r[codeIdx] || "").trim();
+              if (!code) continue;
+              const obj = {};
+              headers.forEach((h, idx) => { obj[h] = (r[idx] ?? "").replace(/^\ufeff/, ""); });
+              byCode[code] = obj;
+            }
+            state.sejMaster = { byCode, fileName: file.name, headers };
+            const cnt = Object.keys(byCode).length;
+            // 現在のデータでどれだけヒットするか確認
+            const curCodeIdx = state.headers.findIndex(h => h.trim() === "seat_type_area_cd");
+            let hitCnt = 0, missCnt = 0;
+            if (curCodeIdx !== -1) {
+              for (const row of state.data) {
+                const cd = (row[curCodeIdx] ?? "").trim();
+                if (!cd) continue;
+                if (byCode[cd]) hitCnt++; else missCnt++;
+              }
+            }
+            // 仮想列「グループ名」を追加（保存時除外・フィルター/ソート可能）
+            // マスタ側のグループ名候補列を優先順位で探す（BOM/空白除去）
+            const normHeaders = headers.map(h => (h || "").replace(/^\ufeff/, "").trim());
+            const grpKeyCandidates = ["grp_nm", "seat_type_grp_nm1", "seat_type_grp_nm2", "group_nm"];
+            const grpKeyIdx = grpKeyCandidates
+              .map(k => normHeaders.indexOf(k))
+              .find(i => i !== -1);
+            const grpKey = grpKeyIdx != null ? headers[grpKeyIdx] : null;
+            console.log("[SEJ] 仮想列追加チェック:", {
+              curCodeIdx,
+              masterHeaders: normHeaders,
+              grpKey,
+              hasExistingVirtual: !!state.sejVirtualCols,
+              dataRows: state.data.length,
+            });
+            if (curCodeIdx !== -1 && grpKey && !state.sejVirtualCols) {
+              const vIdx = state.headers.length;
+              state.headers.push("グループ名");
+              state.data.forEach(row => {
+                const cd = (row[curCodeIdx] ?? "").trim();
+                const m = byCode[cd];
+                row.push(m && m[grpKey] ? m[grpKey] : "");
+              });
+              state.sejVirtualCols = { indices: [vIdx], keys: [grpKey] };
+              if (state.displayHeaders) state.displayHeaders.push("グループ名");
+              console.log("[SEJ] 仮想列追加完了 index=" + vIdx);
+            } else if (!grpKey) {
+              console.warn("[SEJ] マスタにグループ名列が見つかりません。利用可能な列:", normHeaders);
+            } else if (state.sejVirtualCols) {
+              console.warn("[SEJ] 既に仮想列が存在するためスキップ:", state.sejVirtualCols);
+            }
+            // 仮想列「マスタ備考N」を追加（SEJのwordN列とマスタnteの<br>区切り項目を横並び比較）
+            const nteKeyIdx = normHeaders.indexOf("nte");
+            const wordCols = [];
+            state.headers.forEach((h, hi) => {
+              const m = String(h).trim().match(/^word([1-9])$/);
+              if (m) wordCols.push({ n: parseInt(m[1]), idx: hi });
+            });
+            if (curCodeIdx !== -1 && nteKeyIdx !== -1 && wordCols.length && state.sejVirtualCols && !state.sejVirtualCols.nteCols) {
+              const nteKey = headers[nteKeyIdx];
+              // マスタ備考の最大項目数（word列数と比較して大きい方、最大9）
+              let maxParts = 0;
+              for (const cd of Object.keys(byCode)) {
+                const parts = sejSplitNte(byCode[cd][nteKey] || "");
+                if (parts.length > maxParts) maxParts = parts.length;
+              }
+              maxParts = Math.min(Math.max(maxParts, wordCols.length), 9);
+              const nteCols = [];
+              for (let k = 1; k <= maxParts; k++) {
+                const vIdx = state.headers.length;
+                state.headers.push(`マスタ備考${k}`);
+                state.data.forEach(row => {
+                  const cd = (row[curCodeIdx] ?? "").trim();
+                  const m = byCode[cd];
+                  const parts = m ? sejSplitNte(m[nteKey] || "") : [];
+                  row.push(parts[k - 1] || "");
+                });
+                state.sejVirtualCols.indices.push(vIdx);
+                state.sejVirtualCols.keys.push(`_nte${k}`);
+                if (state.displayHeaders) state.displayHeaders.push(`マスタ備考${k}`);
+                const w = wordCols.find(wc => wc.n === k);
+                if (w) nteCols.push([w.idx, vIdx]);
+              }
+              state.sejVirtualCols.nteCols = nteCols;
+              console.log("[SEJ] マスタ備考仮想列を追加:", maxParts, "列 / word対応:", nteCols);
+            }
+            $("btn-sej-link").classList.add("active-state");
+            setRbLabel("btn-sej-link", `SEJ:${cnt}件`);
+            // 席種エリアコード列を自動で広く取る（席種名が併記されるため）
+            if (curCodeIdx !== -1) {
+              let maxLen = 12;
+              for (const row of state.data) {
+                const cd = (row[curCodeIdx] ?? "").trim();
+                const m = byCode[cd];
+                const nm = m ? (m.seat_type_area_disp_nm || m.seat_type_area_control_nm || "") : "";
+                const total = cd.length + nm.length + 4;
+                if (total > maxLen) maxLen = total;
+              }
+              state.colWidths[curCodeIdx] = Math.min(maxLen * 10, 420);
+            }
+            // 仮想列の列幅を設定
+            if (state.sejVirtualCols) {
+              for (const vIdx of state.sejVirtualCols.indices) {
+                let maxLen = 8;
+                for (const row of state.data) {
+                  const v = String(row[vIdx] ?? "");
+                  if (v.length > maxLen) maxLen = v.length;
+                }
+                state.colWidths[vIdx] = Math.min(maxLen * 12 + 24, 260);
+              }
+            }
+            applyFilters();
+            state.forceRender = true;
+            renderHeader();
+            renderBody();
+            setStatus(`SEJマスタ連携: ${file.name} / マスタ${cnt}件 / 現データヒット${hitCnt}件 未登録${missCnt}件`);
+          } catch (err) {
+            alert("マスタ読込に失敗しました: " + err.message);
+            setStatus("⚠ マスタ読込失敗: " + err.message);
+          }
+        };
+        reader.readAsText(file, _encoding || "utf-8");
+      }
+
+      function _doSejDisconnect() {
+        // 仮想列を削除（末尾から削ることで他indexに影響しない）
+        if (state.sejVirtualCols && state.sejVirtualCols.indices.length) {
+          const sorted = [...state.sejVirtualCols.indices].sort((a, b) => b - a);
+          for (const vIdx of sorted) {
+            state.headers.splice(vIdx, 1);
+            state.data.forEach(row => row.splice(vIdx, 1));
+            // shiftColIndices で selected/range/cellColors/displayHeaders 等を更新
+            shiftColIndices(vIdx, -1);
+          }
+          state.sejVirtualCols = null;
+          applyFilters();
+        }
+        state.sejMaster = null;
+        $("btn-sej-link").classList.remove("active-state");
+        setRbLabel("btn-sej-link", "SEJ読込");
+        state.forceRender = true;
+        renderHeader();
+        renderBody();
+        setStatus("SEJ連携を解除しました");
+      }
+
+      function toggleSejLink() {
+        if (state.sejMaster) {
+          const fn = state.sejMaster.fileName || "(不明)";
+          // confirm()はiframe内でブロックされる場合があるためカスタムモーダルを使用
+          document.querySelector("._sej-confirm-ov")?.remove();
+          const _ov = document.createElement("div");
+          _ov.className = "modal-overlay _sej-confirm-ov";
+          _ov.innerHTML = `<div class="modal-dialog">
+            <div class="modal-title">SEJ連携を解除しますか？</div>
+            <p style="font-size:13px;margin:8px 0 4px">現在のマスタ: <strong>${escHtml(fn)}</strong><br>解除するとマスタデータは破棄されます。</p>
+            <div class="modal-btns">
+              <button class="_sej-cancel btn-default">キャンセル</button>
+              <button class="_sej-ok btn-primary">解除する</button>
+            </div>
+          </div>`;
+          document.body.appendChild(_ov);
+          _ov.querySelector("._sej-cancel").onclick = () => _ov.remove();
+          _ov.querySelector("._sej-ok").onclick = () => { _ov.remove(); _doSejDisconnect(); };
+          _ov.onkeydown = (e) => { if (e.key === "Escape") _ov.remove(); };
+          _ov.querySelector("._sej-cancel").focus();
+          return;
+        }
+        setStatus("SEJマスタファイルを選択してください...");
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".tsv,.txt,text/plain";
+        input.onchange = () => {
+          if (input.files && input.files[0]) loadSejMasterFile(input.files[0]);
+        };
+        input.click();
+      }
+
+      // 現在の行データから席種エリアコードを取り、マスタの表示名を返す
+      function getSejMasterInfo(row) {
+        if (!state.sejMaster) return null;
+        const codeIdx = state.headers.findIndex(h => h.trim() === "seat_type_area_cd");
+        if (codeIdx === -1) return null;
+        const code = (row[codeIdx] ?? "").trim();
+        if (!code) return null;
+        return state.sejMaster.byCode[code] || null;
+      }
+
+      // SEJデータかどうか判定（word1〜word7 と sej_template_cd が存在）
+      function isSejData() {
+        const hs = state.headers.map(h => h.trim());
+        return hs.includes("sej_template_cd") && hs.includes("word1");
+      }
+
+
+
+      // ===== SEJ HTML出力 =====
+      function exportSejHtml(rowIndices, isFiltered) {
+        const H = state.headers.map(h => h.trim());
+        const idx = {
+          cd: H.indexOf("seat_type_area_cd"),
+          tpl: H.indexOf("sej_template_cd"),
+          opt: H.indexOf("opt_ok_flg"),
+          optCd: H.indexOf("opt_cd"),
+        };
+        const wordIdx = [];
+        for (let i = 1; i <= 7; i++) {
+          const x = H.indexOf("word" + i);
+          if (x !== -1) wordIdx.push({ n: i, idx: x });
+        }
+
+        const fileName = state.fileName || "data";
+        const totalRows = state.data.length;
+        const filteredRows = rowIndices.length;
+        const masterFile = state.sejMaster ? state.sejMaster.fileName : null;
+
+        let html = `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>${escHtml(fileName)} - SEJ設定プレビュー</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "Hiragino Kaku Gothic ProN", "Yu Gothic UI", sans-serif; background: #f8f9fa; color: #333; padding: 20px; }
+  .header { background: #fff; padding: 16px 24px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; }
+  .header h1 { font-size: 18px; font-weight: 600; }
+  .header .meta { font-size: 12px; color: #666; margin-top: 4px; }
+  .filter-note { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 4px; padding: 8px 12px; font-size: 12px; color: #1d4ed8; margin-bottom: 16px; }
+  .card { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 12px; overflow: hidden; }
+  .card-head { background: #f5f5f5; padding: 10px 16px; border-bottom: 1px solid #e5e5e5; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .card-head .code { font-family: monospace; font-size: 15px; font-weight: 600; color: #1a1a1a; }
+  .card-head .area-nm { font-size: 15px; color: #2563eb; font-weight: 600; }
+  .card-head .area-nm.missing { color: #dc2626; }
+  .card-head .tpl { margin-left: auto; font-size: 12px; color: #666; }
+  .card-head .tpl code { background: #f0f0f0; padding: 2px 6px; border-radius: 3px; }
+  .card-head .tpl.ng code { background: #fef2f2; color: #dc2626; font-weight: 600; }
+  .card-body { padding: 12px 16px; }
+  .word-row { display: flex; align-items: flex-start; gap: 8px; padding: 4px 0; font-size: 14px; line-height: 1.5; border-bottom: 1px dashed #eee; }
+  .word-row:last-child { border-bottom: none; }
+  .word-label { flex-shrink: 0; font-size: 11px; color: #888; width: 48px; padding-top: 2px; }
+  .word-val { flex: 1; cursor: help; position: relative; word-break: break-all; }
+  .word-val.match { color: #2563eb; }
+  .word-val.diff { color: #dc2626; font-weight: 500; }
+  .word-val.empty { color: #ccc; }
+  .vbadge { display: inline-block; font-size: 11px; margin-left: 6px; padding: 1px 6px; border-radius: 4px; vertical-align: middle; }
+  .vbadge-ok { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+  .vbadge-ng { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; font-weight: 600; }
+  #floating-tooltip { display: none; position: fixed; z-index: 9999; background: #1a1a1a; color: #f0f0f0; font-size: 12px; padding: 10px 14px; border-radius: 6px; white-space: pre-wrap; max-width: 520px; min-width: 160px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); line-height: 1.6; pointer-events: none; word-break: break-word; }
+  .summary { background: #fff; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; }
+  .summary h2 { font-size: 16px; margin-bottom: 8px; }
+  .summary-stats { display: flex; gap: 16px; font-size: 14px; flex-wrap: wrap; }
+  .summary-stats .stat-ok { color: #16a34a; font-weight: 600; }
+  .summary-stats .stat-ng { color: #dc2626; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>🎫 ${escHtml(fileName)} <span style="font-size:12px;color:#666;font-weight:400">(SEJ設定)</span></h1>
+  <div class="meta">${filteredRows}件${isFiltered ? ` / 全${totalRows}件（フィルター適用中）` : ""} — ${new Date().toLocaleString("ja-JP")}${masterFile ? `　連携マスタ: ${escHtml(masterFile)}` : "　⚠ マスタ未連携"}</div>
+</div>
+`;
+
+        if (isFiltered) {
+          html += `<div class="filter-note">🔍 フィルターが適用されています。表示中の ${filteredRows} 件のみ出力しています。</div>\n`;
+        }
+
+        html += "<!-- SEJ_SUMMARY -->\n";
+        let tplOk = 0, tplNg = 0, diffRows = 0;
+
+        for (const ri of rowIndices) {
+          const row = state.data[ri];
+          if (!row) continue;
+
+          const code = (row[idx.cd] ?? "").trim();
+          const tpl = (row[idx.tpl] ?? "").trim();
+          const master = state.sejMaster ? state.sejMaster.byCode[code] : null;
+          const areaNm = master ? (master.seat_type_area_disp_nm || master.seat_type_area_control_nm || "") : "";
+          const masterNte = master ? (master.nte || "") : "";
+
+          // テンプレートコード検証: 6桁目Pは NTFJ910002, それ以外は NTFJ910001
+          const char6 = code.length >= 6 ? code[5].toUpperCase() : "";
+          const expectedTpl = char6 === "P" ? "NTFJ910002" : "NTFJ910001";
+          const tplMatch = tpl === expectedTpl;
+          if (tplMatch) tplOk++; else tplNg++;
+
+          // マスタ備考を <br> / 改行で分割し、HTMLタグを除いた純テキストとして項目化
+          const splitNte = sejSplitNte;
+          const masterItems = splitNte(masterNte);
+          // 比較用: 正規化（全角スペース・制御文字・連続空白を除去）
+          const norm = (s) => s.replace(/[\u3000\s]+/g, "").replace(/[\u200B-\u200F\uFEFF]/g, "");
+          const masterItemsNorm = masterItems.map(norm);
+
+          // word値を収集してマスタ項目集合と比較
+          const wordVals = wordIdx.map(w => (row[w.idx] ?? "").trim()).filter(v => v);
+          const currentItemsNorm = wordVals.map(norm);
+          // 差分判定: word側とマスタ側の正規化集合が一致しないもの
+          const setsEqual = masterItemsNorm.length === currentItemsNorm.length &&
+            masterItemsNorm.every(x => currentItemsNorm.includes(x));
+          const hasDiff = master && !setsEqual;
+          if (hasDiff) diffRows++;
+
+          html += `<div class="card"><div class="card-head">`;
+          html += `<span class="code">${escHtml(code)}</span>`;
+          if (areaNm) {
+            html += `<span class="area-nm">${escHtml(areaNm)}</span>`;
+          } else if (state.sejMaster) {
+            html += `<span class="area-nm missing">⚠ マスタ未登録</span>`;
+          }
+          html += `<span class="tpl${tplMatch ? "" : " ng"}">テンプレート: <code>${escHtml(tpl || "(空)")}</code>`;
+          if (!tplMatch) {
+            html += ` <span class="vbadge vbadge-ng">❌ 期待値: ${escHtml(expectedTpl)}</span>`;
+          } else {
+            html += ` <span class="vbadge vbadge-ok">⭕</span>`;
+          }
+          html += `</span></div><div class="card-body">`;
+
+          // 備考（word1〜7）をマスタと比較（<br>区切り＋タグ除去＋正規化）
+          const masterDisplay = masterItems.length
+            ? masterItems.map((s, i) => `${i + 1}. ${s}`).join("\n")
+            : (masterNte || "(マスタ備考なし)");
+          const tipBase = state.sejMaster
+            ? `席種エリアマスタ備考（${masterItems.length}項目）:\n${masterDisplay}`
+            : "マスタ未連携";
+
+          for (const w of wordIdx) {
+            const v = (row[w.idx] ?? "").trim();
+            if (!v && !master) continue;
+            let cls = "empty";
+            let extraTip = "";
+            if (v) {
+              if (master) {
+                const vN = norm(v);
+                if (masterItemsNorm.includes(vN)) {
+                  cls = "match";
+                } else {
+                  cls = "diff";
+                  extraTip = `\n\n⚠ この値はマスタ備考に一致する項目がありません`;
+                }
+              } else {
+                cls = "";
+              }
+            }
+            const tip = tipBase + extraTip;
+            html += `<div class="word-row">`;
+            html += `<div class="word-label">word${w.n}</div>`;
+            html += `<div class="word-val ${cls}" data-tip="${escHtml(tip)}">${v ? escHtml(v) : '<span style="color:#ccc">—</span>'}</div>`;
+            html += `</div>`;
+          }
+
+          // マスタにあるがwordに無い項目を警告表示
+          if (master && masterItems.length) {
+            const missing = masterItems.filter((m, i) => !currentItemsNorm.includes(masterItemsNorm[i]));
+            if (missing.length) {
+              html += `<div class="word-row" style="background:#fffbeb;border-top:2px solid #fde68a;margin-top:4px">`;
+              html += `<div class="word-label" style="color:#b45309">不足</div>`;
+              html += `<div class="word-val diff" data-tip="${escHtml(tipBase)}">マスタにあるがwordに無い項目: ${missing.map(m => escHtml(m)).join(" / ")}</div>`;
+              html += `</div>`;
+            }
+          }
+          html += `</div></div>\n`;
+        }
+
+        // サマリー
+        let summaryHtml = `<div class="summary"><h2>🔍 SEJ設定検証サマリー</h2><div class="summary-stats">`;
+        summaryHtml += `<span class="stat-ok">⭕ テンプレート一致: ${tplOk}件</span>`;
+        summaryHtml += `<span class="stat-ng">❌ テンプレート不一致: ${tplNg}件</span>`;
+        if (state.sejMaster) summaryHtml += `<span>📝 マスタ備考と差分: ${diffRows}件</span>`;
+        summaryHtml += `</div></div>\n`;
+        html = html.replace("<!-- SEJ_SUMMARY -->", summaryHtml);
+
+        html += `<div id="floating-tooltip"></div>`;
+        html += "<" + "script>" +
+`(function(){
+  var tip = document.getElementById('floating-tooltip');
+  document.addEventListener('mouseover', function(e) {
+    var el = e.target.closest('.word-val[data-tip]');
+    if (!el) { tip.style.display = 'none'; return; }
+    var text = el.getAttribute('data-tip');
+    if (!text) { tip.style.display = 'none'; return; }
+    tip.textContent = text;
+    tip.style.display = 'block';
+    var rect = el.getBoundingClientRect();
+    var left = rect.left;
+    var top = rect.bottom + 6;
+    if (left + tip.offsetWidth > window.innerWidth - 12) {
+      left = window.innerWidth - tip.offsetWidth - 12;
+    }
+    if (left < 4) left = 4;
+    if (top + tip.offsetHeight > window.innerHeight - 12) {
+      top = rect.top - tip.offsetHeight - 6;
+    }
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
+  });
+  document.addEventListener('mouseout', function(e) {
+    if (e.target.closest('.word-val[data-tip]')) tip.style.display = 'none';
+  });
+})();` + "</" + "script>" +
+        `</body></html>`;
+
+        const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        window.open(url, "_blank");
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        setStatus(`SEJ HTML出力完了（${filteredRows}件）`);
+      }
+
+      // ===== HTML出力（席種エリアマスタ用プレビュー / SEJデータは自動でSEJ出力） =====
       const HTML_EXPORT_COLS = [
         { key: "seat_type_area_cd", label: "席種エリアコード", group: "基本" },
         { key: "seat_type_area_control_nm", label: "管理名", group: "基本" },
@@ -7774,8 +7922,6 @@
         { key: "single_day_admission_flg", label: "単日入場", group: "その他", isFlag: true },
       ];
 
-      // ===== HTML出力時のバリデーション =====
-      // 各カラムキーに紐づく判定結果を返す { key: [{ok, rule}] }
       function validateMasterRow(row, colMap) {
         const byKey = {}; // { colKey: [{ok, rule}], ... }
         const add = (key, ok, rule) => {
@@ -7898,478 +8044,11 @@
         return escHtml(v);
       }
 
-      // ===== SEJ連携: 席種エリアマスタ読込 =====
-      function parseTsvText(text) {
-        if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
-        const rows = [];
-        let row = [], cur = "", inQuote = false;
-        for (let i = 0; i < text.length; i++) {
-          const c = text[i], next = text[i + 1];
-          if (inQuote) {
-            if (c === '"' && next === '"') { cur += '"'; i++; }
-            else if (c === '"') inQuote = false;
-            else cur += c;
-          } else {
-            if (c === '"') inQuote = true;
-            else if (c === "\t") { row.push(cur); cur = ""; }
-            else if (c === "\r" || c === "\n") {
-              if (c === "\r" && next === "\n") i++;
-              row.push(cur); rows.push(row); row = []; cur = "";
-            } else cur += c;
-          }
-        }
-        if (cur || row.length) { row.push(cur); rows.push(row); }
-        return rows;
-      }
-
-      function loadSejMasterFile(file) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          try {
-            const text = reader.result;
-            const rows = parseTsvText(text);
-            if (rows.length < 2) {
-              setStatus("⚠ マスタファイルにデータがありません");
-              return;
-            }
-            const headers = rows[0].map(h => h.trim());
-            const codeIdx = headers.indexOf("seat_type_area_cd");
-            if (codeIdx === -1) {
-              setStatus("⚠ seat_type_area_cd 列が見つかりません");
-              return;
-            }
-            const byCode = {};
-            for (let i = 1; i < rows.length; i++) {
-              const r = rows[i];
-              const code = (r[codeIdx] || "").trim();
-              if (!code) continue;
-              const obj = {};
-              headers.forEach((h, idx) => { obj[h] = (r[idx] ?? "").replace(/^\ufeff/, ""); });
-              byCode[code] = obj;
-            }
-            state.sejMaster = { byCode, fileName: file.name, headers };
-            const cnt = Object.keys(byCode).length;
-            // 現在のデータでどれだけヒットするか確認
-            const curCodeIdx = state.headers.findIndex(h => h.trim() === "seat_type_area_cd");
-            let hitCnt = 0, missCnt = 0;
-            if (curCodeIdx !== -1) {
-              for (const row of state.data) {
-                const cd = (row[curCodeIdx] ?? "").trim();
-                if (!cd) continue;
-                if (byCode[cd]) hitCnt++; else missCnt++;
-              }
-            }
-            // 仮想列「グループ名」を追加（保存時除外・フィルター/ソート可能）
-            // マスタ側のグループ名候補列を優先順位で探す（BOM/空白除去）
-            const normHeaders = headers.map(h => (h || "").replace(/^\ufeff/, "").trim());
-            const grpKeyCandidates = ["grp_nm", "seat_type_grp_nm1", "seat_type_grp_nm2", "group_nm"];
-            const grpKeyIdx = grpKeyCandidates
-              .map(k => normHeaders.indexOf(k))
-              .find(i => i !== -1);
-            const grpKey = grpKeyIdx != null ? headers[grpKeyIdx] : null;
-            console.log("[SEJ] 仮想列追加チェック:", {
-              curCodeIdx,
-              masterHeaders: normHeaders,
-              grpKey,
-              hasExistingVirtual: !!state.sejVirtualCols,
-              dataRows: state.data.length,
-            });
-            if (curCodeIdx !== -1 && grpKey && !state.sejVirtualCols) {
-              const vIdx = state.headers.length;
-              state.headers.push("グループ名");
-              state.data.forEach(row => {
-                const cd = (row[curCodeIdx] ?? "").trim();
-                const m = byCode[cd];
-                row.push(m && m[grpKey] ? m[grpKey] : "");
-              });
-              state.sejVirtualCols = { indices: [vIdx], keys: [grpKey] };
-              if (state.displayHeaders) state.displayHeaders.push("グループ名");
-              console.log("[SEJ] 仮想列追加完了 index=" + vIdx);
-            } else if (!grpKey) {
-              console.warn("[SEJ] マスタにグループ名列が見つかりません。利用可能な列:", normHeaders);
-            } else if (state.sejVirtualCols) {
-              console.warn("[SEJ] 既に仮想列が存在するためスキップ:", state.sejVirtualCols);
-            }
-            $("btn-sej-link").classList.add("active-state");
-            $("btn-sej-link").textContent = `SEJ連携中 (${cnt})`;
-            // 席種エリアコード列を自動で広く取る（席種名が併記されるため）
-            if (curCodeIdx !== -1) {
-              let maxLen = 12;
-              for (const row of state.data) {
-                const cd = (row[curCodeIdx] ?? "").trim();
-                const m = byCode[cd];
-                const nm = m ? (m.seat_type_area_disp_nm || m.seat_type_area_control_nm || "") : "";
-                const total = cd.length + nm.length + 4;
-                if (total > maxLen) maxLen = total;
-              }
-              state.colWidths[curCodeIdx] = Math.min(maxLen * 10, 420);
-            }
-            // 仮想列の列幅を設定
-            if (state.sejVirtualCols) {
-              for (const vIdx of state.sejVirtualCols.indices) {
-                let maxLen = 8;
-                for (const row of state.data) {
-                  const v = String(row[vIdx] ?? "");
-                  if (v.length > maxLen) maxLen = v.length;
-                }
-                state.colWidths[vIdx] = Math.min(maxLen * 12 + 24, 260);
-              }
-            }
-            applyFilters();
-            state.forceRender = true;
-            renderHeader();
-            renderBody();
-            setStatus(`SEJマスタ連携: ${file.name} / マスタ${cnt}件 / 現データヒット${hitCnt}件 未登録${missCnt}件`);
-          } catch (err) {
-            setStatus("⚠ マスタ読込失敗: " + err.message);
-          }
-        };
-        reader.readAsText(file, "utf-8");
-      }
-
-      function _doSejDisconnect() {
-        // 仮想列を削除（末尾から削ることで他indexに影響しない）
-        if (state.sejVirtualCols && state.sejVirtualCols.indices.length) {
-          const sorted = [...state.sejVirtualCols.indices].sort((a, b) => b - a);
-          for (const vIdx of sorted) {
-            state.headers.splice(vIdx, 1);
-            state.data.forEach(row => row.splice(vIdx, 1));
-            // shiftColIndices で selected/range/cellColors/displayHeaders 等を更新
-            shiftColIndices(vIdx, -1);
-          }
-          state.sejVirtualCols = null;
-          applyFilters();
-        }
-        state.sejMaster = null;
-        $("btn-sej-link").classList.remove("active-state");
-        $("btn-sej-link").textContent = "SEJ連携";
-        state.forceRender = true;
-        renderHeader();
-        renderBody();
-        setStatus("SEJ連携を解除しました");
-        _ribSyncToggles();
-      }
-
-      function toggleSejLink() {
-        if (state.sejMaster) {
-          const fn = state.sejMaster.fileName || "(不明)";
-          // confirm()はiframe内でブロックされる場合があるためカスタムモーダルを使用
-          document.querySelector("._sej-confirm-ov")?.remove();
-          const _ov = document.createElement("div");
-          _ov.className = "modal-overlay _sej-confirm-ov";
-          _ov.innerHTML = `<div class="modal-dialog">
-            <div class="modal-title">SEJ連携を解除しますか？</div>
-            <p style="font-size:13px;margin:8px 0 4px">現在のマスタ: <strong>${escHtml(fn)}</strong><br>解除するとマスタデータは破棄されます。</p>
-            <div class="modal-btns">
-              <button class="_sej-cancel btn-default">キャンセル</button>
-              <button class="_sej-ok btn-primary">解除する</button>
-            </div>
-          </div>`;
-          document.body.appendChild(_ov);
-          _ov.querySelector("._sej-cancel").onclick = () => _ov.remove();
-          _ov.querySelector("._sej-ok").onclick = () => { _ov.remove(); _doSejDisconnect(); };
-          _ov.onkeydown = (e) => { if (e.key === "Escape") _ov.remove(); };
-          _ov.querySelector("._sej-cancel").focus();
-          return;
-        }
-        setStatus("SEJマスタファイルを選択してください...");
-        const input = document.createElement("input");
-        input.type = "file";
-        input.accept = ".tsv,.txt,text/plain";
-        input.onchange = () => {
-          if (input.files && input.files[0]) loadSejMasterFile(input.files[0]);
-        };
-        input.click();
-      }
-
-      // 現在の行データから席種エリアコードを取り、マスタの表示名を返す
-      function getSejMasterInfo(row) {
-        if (!state.sejMaster) return null;
-        const codeIdx = state.headers.findIndex(h => h.trim() === "seat_type_area_cd");
-        if (codeIdx === -1) return null;
-        const code = (row[codeIdx] ?? "").trim();
-        if (!code) return null;
-        return state.sejMaster.byCode[code] || null;
-      }
-
-      // SEJデータかどうか判定（word1〜word7 と sej_template_cd が存在）
-      function isSejData() {
-        const hs = state.headers.map(h => h.trim());
-        return hs.includes("sej_template_cd") && hs.includes("word1");
-      }
-
-      // ===== 経路価格スケジュール連携 =====
-      function loadPriceRefFile(file) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          try {
-            const json = JSON.parse(reader.result);
-            if (!json.data || !Array.isArray(json.data)) {
-              setStatus("⚠ 参照JSONの形式が不正です（data配列が必要）");
-              return;
-            }
-            const colMap = json.column_map || {};
-            const lookup = new Map();
-            for (const row of json.data) {
-              const key = (row.ticket || "").trim();
-              if (key) lookup.set(key, row);
-            }
-            state.priceRef = { meta: json.meta || {}, colMap, lookup };
-            const cnt = lookup.size;
-            const raceName = json.meta?.race || file.name;
-            $("btn-price-ref").classList.add("active-state");
-            $("btn-price-ref").textContent = `価格連携中 (${cnt})`;
-            state.forceRender = true;
-            renderHeader();
-            renderBody();
-            setStatus(`価格連携: ${raceName} / ${cnt}券種を読み込みました`);
-          } catch (err) {
-            setStatus("⚠ 参照JSON読込失敗: " + err.message);
-          }
-        };
-        reader.readAsText(file, "utf-8");
-      }
-
-      function togglePriceRef() {
-        if (state.priceRef) {
-          const raceName = state.priceRef.meta?.race || "(不明)";
-          if (!confirm(`価格連携を解除しますか？\n\n現在の参照データ:\n${raceName}\n\n解除すると参照データは破棄されます。`)) return;
-          state.priceRef = null;
-          $("btn-price-ref").classList.remove("active-state");
-          $("btn-price-ref").textContent = "価格連携";
-          state.forceRender = true;
-          renderHeader();
-          renderBody();
-          setStatus("価格連携を解除しました");
-          return;
-        }
-        const input = document.createElement("input");
-        input.type = "file";
-        input.accept = ".json,application/json";
-        input.onchange = () => {
-          if (input.files && input.files[0]) loadPriceRefFile(input.files[0]);
-        };
-        input.click();
-      }
-
-      // ===== SEJ HTML出力 =====
-      function exportSejHtml(rowIndices, isFiltered) {
-        const H = state.headers.map(h => h.trim());
-        const idx = {
-          cd: H.indexOf("seat_type_area_cd"),
-          tpl: H.indexOf("sej_template_cd"),
-          opt: H.indexOf("opt_ok_flg"),
-          optCd: H.indexOf("opt_cd"),
-        };
-        const wordIdx = [];
-        for (let i = 1; i <= 7; i++) {
-          const x = H.indexOf("word" + i);
-          if (x !== -1) wordIdx.push({ n: i, idx: x });
-        }
-
-        const fileName = state.fileName || "data";
-        const totalRows = state.data.length;
-        const filteredRows = rowIndices.length;
-        const masterFile = state.sejMaster ? state.sejMaster.fileName : null;
-
-        let html = `<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="UTF-8">
-<title>${escHtml(fileName)} - SEJ設定プレビュー</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, "Hiragino Kaku Gothic ProN", "Yu Gothic UI", sans-serif; background: #f8f9fa; color: #333; padding: 20px; }
-  .header { background: #fff; padding: 16px 24px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; }
-  .header h1 { font-size: 18px; font-weight: 600; }
-  .header .meta { font-size: 12px; color: #666; margin-top: 4px; }
-  .filter-note { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 4px; padding: 8px 12px; font-size: 12px; color: #1d4ed8; margin-bottom: 16px; }
-  .card { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 12px; overflow: hidden; }
-  .card-head { background: #f5f5f5; padding: 10px 16px; border-bottom: 1px solid #e5e5e5; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-  .card-head .code { font-family: monospace; font-size: 15px; font-weight: 600; color: #1a1a1a; }
-  .card-head .area-nm { font-size: 15px; color: #2563eb; font-weight: 600; }
-  .card-head .area-nm.missing { color: #dc2626; }
-  .card-head .tpl { margin-left: auto; font-size: 12px; color: #666; }
-  .card-head .tpl code { background: #f0f0f0; padding: 2px 6px; border-radius: 3px; }
-  .card-head .tpl.ng code { background: #fef2f2; color: #dc2626; font-weight: 600; }
-  .card-body { padding: 12px 16px; }
-  .word-row { display: flex; align-items: flex-start; gap: 8px; padding: 4px 0; font-size: 14px; line-height: 1.5; border-bottom: 1px dashed #eee; }
-  .word-row:last-child { border-bottom: none; }
-  .word-label { flex-shrink: 0; font-size: 11px; color: #888; width: 48px; padding-top: 2px; }
-  .word-val { flex: 1; cursor: help; position: relative; word-break: break-all; }
-  .word-val.match { color: #2563eb; }
-  .word-val.diff { color: #dc2626; font-weight: 500; }
-  .word-val.empty { color: #ccc; }
-  .vbadge { display: inline-block; font-size: 11px; margin-left: 6px; padding: 1px 6px; border-radius: 4px; vertical-align: middle; }
-  .vbadge-ok { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
-  .vbadge-ng { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; font-weight: 600; }
-  #floating-tooltip { display: none; position: fixed; z-index: 9999; background: #1a1a1a; color: #f0f0f0; font-size: 12px; padding: 10px 14px; border-radius: 6px; white-space: pre-wrap; max-width: 520px; min-width: 160px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); line-height: 1.6; pointer-events: none; word-break: break-word; }
-  .summary { background: #fff; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; }
-  .summary h2 { font-size: 16px; margin-bottom: 8px; }
-  .summary-stats { display: flex; gap: 16px; font-size: 14px; flex-wrap: wrap; }
-  .summary-stats .stat-ok { color: #16a34a; font-weight: 600; }
-  .summary-stats .stat-ng { color: #dc2626; font-weight: 600; }
-</style>
-</head>
-<body>
-<div class="header">
-  <h1>🎫 ${escHtml(fileName)} <span style="font-size:12px;color:#666;font-weight:400">(SEJ設定)</span></h1>
-  <div class="meta">${filteredRows}件${isFiltered ? ` / 全${totalRows}件（フィルター適用中）` : ""} — ${new Date().toLocaleString("ja-JP")}${masterFile ? `　連携マスタ: ${escHtml(masterFile)}` : "　⚠ マスタ未連携"}</div>
-</div>
-`;
-
-        if (isFiltered) {
-          html += `<div class="filter-note">🔍 フィルターが適用されています。表示中の ${filteredRows} 件のみ出力しています。</div>\n`;
-        }
-
-        html += "<!-- SEJ_SUMMARY -->\n";
-        let tplOk = 0, tplNg = 0, diffRows = 0;
-
-        for (const ri of rowIndices) {
-          const row = state.data[ri];
-          if (!row) continue;
-
-          const code = (row[idx.cd] ?? "").trim();
-          const tpl = (row[idx.tpl] ?? "").trim();
-          const master = state.sejMaster ? state.sejMaster.byCode[code] : null;
-          const areaNm = master ? (master.seat_type_area_disp_nm || master.seat_type_area_control_nm || "") : "";
-          const masterNte = master ? (master.nte || "") : "";
-
-          // テンプレートコード検証: 6桁目Pは NTFJ910002, それ以外は NTFJ910001
-          const char6 = code.length >= 6 ? code[5].toUpperCase() : "";
-          const expectedTpl = char6 === "P" ? "NTFJ910002" : "NTFJ910001";
-          const tplMatch = tpl === expectedTpl;
-          if (tplMatch) tplOk++; else tplNg++;
-
-          // マスタ備考を <br> / 改行で分割し、HTMLタグを除いた純テキストとして項目化
-          const splitNte = (s) => {
-            if (!s) return [];
-            return s
-              .split(/<br\s*\/?>|\r?\n/i)
-              .map(x => x.replace(/<[^>]+>/g, "").replace(/&nbsp;/gi, " ").trim())
-              .filter(x => x);
-          };
-          const masterItems = splitNte(masterNte);
-          // 比較用: 正規化（全角スペース・制御文字・連続空白を除去）
-          const norm = (s) => s.replace(/[\u3000\s]+/g, "").replace(/[\u200B-\u200F\uFEFF]/g, "");
-          const masterItemsNorm = masterItems.map(norm);
-
-          // word値を収集してマスタ項目集合と比較
-          const wordVals = wordIdx.map(w => (row[w.idx] ?? "").trim()).filter(v => v);
-          const currentItemsNorm = wordVals.map(norm);
-          // 差分判定: word側とマスタ側の正規化集合が一致しないもの
-          const setsEqual = masterItemsNorm.length === currentItemsNorm.length &&
-            masterItemsNorm.every(x => currentItemsNorm.includes(x));
-          const hasDiff = master && !setsEqual;
-          if (hasDiff) diffRows++;
-
-          html += `<div class="card"><div class="card-head">`;
-          html += `<span class="code">${escHtml(code)}</span>`;
-          if (areaNm) {
-            html += `<span class="area-nm">${escHtml(areaNm)}</span>`;
-          } else if (state.sejMaster) {
-            html += `<span class="area-nm missing">⚠ マスタ未登録</span>`;
-          }
-          html += `<span class="tpl${tplMatch ? "" : " ng"}">テンプレート: <code>${escHtml(tpl || "(空)")}</code>`;
-          if (!tplMatch) {
-            html += ` <span class="vbadge vbadge-ng">❌ 期待値: ${escHtml(expectedTpl)}</span>`;
-          } else {
-            html += ` <span class="vbadge vbadge-ok">⭕</span>`;
-          }
-          html += `</span></div><div class="card-body">`;
-
-          // 備考（word1〜7）をマスタと比較（<br>区切り＋タグ除去＋正規化）
-          const masterDisplay = masterItems.length
-            ? masterItems.map((s, i) => `${i + 1}. ${s}`).join("\n")
-            : (masterNte || "(マスタ備考なし)");
-          const tipBase = state.sejMaster
-            ? `席種エリアマスタ備考（${masterItems.length}項目）:\n${masterDisplay}`
-            : "マスタ未連携";
-
-          for (const w of wordIdx) {
-            const v = (row[w.idx] ?? "").trim();
-            if (!v && !master) continue;
-            let cls = "empty";
-            let extraTip = "";
-            if (v) {
-              if (master) {
-                const vN = norm(v);
-                if (masterItemsNorm.includes(vN)) {
-                  cls = "match";
-                } else {
-                  cls = "diff";
-                  extraTip = `\n\n⚠ この値はマスタ備考に一致する項目がありません`;
-                }
-              } else {
-                cls = "";
-              }
-            }
-            const tip = tipBase + extraTip;
-            html += `<div class="word-row">`;
-            html += `<div class="word-label">word${w.n}</div>`;
-            html += `<div class="word-val ${cls}" data-tip="${escHtml(tip)}">${v ? escHtml(v) : '<span style="color:#ccc">—</span>'}</div>`;
-            html += `</div>`;
-          }
-
-          // マスタにあるがwordに無い項目を警告表示
-          if (master && masterItems.length) {
-            const missing = masterItems.filter((m, i) => !currentItemsNorm.includes(masterItemsNorm[i]));
-            if (missing.length) {
-              html += `<div class="word-row" style="background:#fffbeb;border-top:2px solid #fde68a;margin-top:4px">`;
-              html += `<div class="word-label" style="color:#b45309">不足</div>`;
-              html += `<div class="word-val diff" data-tip="${escHtml(tipBase)}">マスタにあるがwordに無い項目: ${missing.map(m => escHtml(m)).join(" / ")}</div>`;
-              html += `</div>`;
-            }
-          }
-          html += `</div></div>\n`;
-        }
-
-        // サマリー
-        let summaryHtml = `<div class="summary"><h2>🔍 SEJ設定検証サマリー</h2><div class="summary-stats">`;
-        summaryHtml += `<span class="stat-ok">⭕ テンプレート一致: ${tplOk}件</span>`;
-        summaryHtml += `<span class="stat-ng">❌ テンプレート不一致: ${tplNg}件</span>`;
-        if (state.sejMaster) summaryHtml += `<span>📝 マスタ備考と差分: ${diffRows}件</span>`;
-        summaryHtml += `</div></div>\n`;
-        html = html.replace("<!-- SEJ_SUMMARY -->", summaryHtml);
-
-        html += `<div id="floating-tooltip"></div>`;
-        html += "<" + "script>" +
-`(function(){
-  var tip = document.getElementById('floating-tooltip');
-  document.addEventListener('mouseover', function(e) {
-    var el = e.target.closest('.word-val[data-tip]');
-    if (!el) { tip.style.display = 'none'; return; }
-    var text = el.getAttribute('data-tip');
-    if (!text) { tip.style.display = 'none'; return; }
-    tip.textContent = text;
-    tip.style.display = 'block';
-    var rect = el.getBoundingClientRect();
-    var left = rect.left;
-    var top = rect.bottom + 6;
-    if (left + tip.offsetWidth > window.innerWidth - 12) {
-      left = window.innerWidth - tip.offsetWidth - 12;
-    }
-    if (left < 4) left = 4;
-    if (top + tip.offsetHeight > window.innerHeight - 12) {
-      top = rect.top - tip.offsetHeight - 6;
-    }
-    tip.style.left = left + 'px';
-    tip.style.top = top + 'px';
-  });
-  document.addEventListener('mouseout', function(e) {
-    if (e.target.closest('.word-val[data-tip]')) tip.style.display = 'none';
-  });
-})();` + "</" + "script>" +
-        `</body></html>`;
-
-        const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-        const url = URL.createObjectURL(blob);
-        window.open(url, "_blank");
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
-        setStatus(`SEJ HTML出力完了（${filteredRows}件）`);
-      }
-
       function exportHtmlPreview() {
+        if (state.headerMode === "numbered") {
+          alert("ヘッダーが連番モードのため、列名を認識できません。\n\n「表示」タブの「ヘッダー」ボタンで 1行目モード に切り替えてから出力してください。");
+          return;
+        }
         // 対象行を決定（フィルター/表示行のみ）
         const vr = getVisibleRows();
         const rowIndices = vr._direct
@@ -8603,6 +8282,7 @@
         setStatus(`HTML出力完了（${filteredRows}件）`);
       }
 
+
       // ===== セル折り返し =====
       function toggleWrapCells() {
         // 選択範囲がある場合は範囲内の行だけトグル
@@ -8683,9 +8363,6 @@
         document.body.classList.remove("wrap-cells");
         $("btn-wrap").classList.remove("active-state");
         $("btn-wrap").setAttribute("aria-pressed", "false");
-        // HTMLプレビュー解除
-        state.htmlPreview = false;
-        state.htmlPreviewCol = -1;
         // 条件付きハイライト・重複ハイライト・カラープレビュー解除
         state.conditionalHL = false;
         state._dupSet = null;
@@ -8701,24 +8378,6 @@
         setStatus("表示をリセットしました");
       }
 
-      // ===== ヘッダー縦書き =====
-      function toggleVerticalHeader() {
-        state.verticalHeader = !state.verticalHeader;
-        document.body.classList.toggle("vertical-headers", state.verticalHeader);
-        const btn = $("btn-vertical-header");
-        btn.classList.toggle("active-state", state.verticalHeader);
-        btn.setAttribute("aria-pressed", String(state.verticalHeader));
-        // 縦書き切替時に列幅を再計算（ヘッダー幅を無視してデータ幅ベースに）
-        autoFitAllColumnsQuiet();
-        renderHeader();
-        state.forceRender = true;
-        renderBody();
-        setStatus(
-          state.verticalHeader
-            ? "ヘッダー縦書き ON（列幅をデータ幅に最適化）"
-            : "ヘッダー縦書き OFF",
-        );
-      }
 
       // ===== カラーコードプレビュー =====
       function normalizeColorCode(val) {
@@ -8750,17 +8409,6 @@
       // ===== 正規表現モード =====
       function toggleRegexMode() {
         state.regexMode = !state.regexMode;
-        const btn = $("btn-regex");
-        btn.style.background = state.regexMode ? "var(--accent-light)" : "";
-        btn.style.borderColor = state.regexMode ? "var(--accent)" : "";
-        btn.style.color = state.regexMode ? "var(--accent)" : "";
-        btn.setAttribute("aria-pressed", String(state.regexMode));
-        btn.setAttribute(
-          "aria-label",
-          state.regexMode
-            ? "正規表現モードをOFFにする"
-            : "正規表現モードをONにする",
-        );
         execSearch();
         setStatus(state.regexMode ? "正規表現モード ON" : "正規表現モード OFF");
       }
@@ -8800,54 +8448,6 @@
         a.click();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
         setStatus(`絞込保存: ${indices.length}行をエクスポートしました`);
-      }
-
-      // ===== 重複ハイライト（列指定） =====
-      function openDupHlDialog() {
-        const dlg = $("dup-hl-dialog");
-        const sel = $("dup-hl-col");
-        sel.innerHTML = state.headers
-          .map((h, i) => `<option value="${i}">${escHtml(getDisplayHeader(i))}</option>`)
-          .join("");
-        // 現在の dupCol を復元
-        if (state._dupCol != null) sel.value = state._dupCol;
-        dlg.classList.add("show");
-        trapFocus(dlg);
-      }
-      function closeDupHlDialog() {
-        const dlg = $("dup-hl-dialog");
-        releaseFocus(dlg);
-        dlg.classList.remove("show");
-      }
-      function runDupHlByCol() {
-        const col = parseInt($("dup-hl-col").value);
-        if (isNaN(col)) return;
-        state._dupCol = col;
-        const keyMap = new Map();
-        state.data.forEach((row, idx) => {
-          const key = String(row[col] ?? "");
-          if (!keyMap.has(key)) keyMap.set(key, []);
-          keyMap.get(key).push(idx);
-        });
-        const dupIndices = new Set();
-        keyMap.forEach((indices) => {
-          if (indices.length > 1) indices.forEach((i) => dupIndices.add(i));
-        });
-        state._dupSet = dupIndices;
-        state.forceRender = true;
-        renderBody();
-        closeDupHlDialog();
-        setStatus(
-          `「${getDisplayHeader(col)}」列: ${dupIndices.size}行の重複をハイライトしました`,
-        );
-      }
-      function clearDupHl() {
-        state._dupSet = null;
-        state._dupCol = null;
-        state.forceRender = true;
-        renderBody();
-        closeDupHlDialog();
-        setStatus("重複ハイライトをクリアしました");
       }
 
       // ===== 最近開いたファイル =====
@@ -8996,23 +8596,6 @@
         dlg.classList.remove("show");
       }
 
-      // ===== 重複行のハイライト/削除 =====
-      function highlightDuplicates() {
-        const keyMap = new Map();
-        state.data.forEach((row, idx) => {
-          const key = row.join("\t");
-          if (!keyMap.has(key)) keyMap.set(key, []);
-          keyMap.get(key).push(idx);
-        });
-        const dupIndices = new Set();
-        keyMap.forEach((indices) => {
-          if (indices.length > 1) indices.forEach((i) => dupIndices.add(i));
-        });
-        state._dupSet = dupIndices;
-        state.forceRender = true;
-        renderBody();
-        setStatus(`${dupIndices.size}行の重複を検出しました`);
-      }
 
       function deleteDuplicates() {
         saveUndo();
@@ -9072,42 +8655,6 @@
         );
       }
 
-      // ===== 列統計 =====
-      function showColStats(col) {
-        const vals = state.data.map((r) => r[col] ?? "");
-        const nonEmpty = vals.filter((v) => v !== "");
-        const nums = nonEmpty.map(Number).filter((v) => !isNaN(v));
-        const unique = new Set(vals).size;
-        const sum = nums.reduce((a, b) => a + b, 0);
-        const rows = [
-          ["総数", `${vals.length}件`],
-          ["空白", `${vals.length - nonEmpty.length}件`],
-          ["ユニーク", `${unique}種`],
-        ];
-        if (nums.length > 0) {
-          rows.push(["数値", `${nums.length}件`]);
-          rows.push(["合計", fmt(sum)]);
-          rows.push(["平均", fmt(sum / nums.length)]);
-          rows.push(["最小", fmt(Math.min(...nums))]);
-          rows.push(["最大", fmt(Math.max(...nums))]);
-        }
-        const tableHtml = rows.map(([k, v]) =>
-          `<tr><td style="padding:3px 10px 3px 0;color:#666;white-space:nowrap">${k}</td><td style="padding:3px 0;font-weight:600">${v}</td></tr>`
-        ).join("");
-        document.querySelector("._stats-ov")?.remove();
-        const ov = document.createElement("div");
-        ov.className = "modal-overlay show _stats-ov";
-        ov.innerHTML = `<div class="modal-dialog" style="min-width:220px">
-          <div class="modal-title">【${escHtml(getDisplayHeader(col))}】統計</div>
-          <table style="border-collapse:collapse;font-size:13px;margin:8px 0">${tableHtml}</table>
-          <div class="modal-btns"><button class="_stats-ok btn-primary">閉じる</button></div>
-        </div>`;
-        document.body.appendChild(ov);
-        const close = () => { ov.remove(); };
-        ov.querySelector("._stats-ok").onclick = close;
-        ov.onkeydown = (e) => { if (e.key === "Escape") close(); };
-        ov.querySelector("._stats-ok").focus();
-      }
 
       // ===== 条件付きハイライト =====
       function toggleConditionalHL() {
@@ -9147,229 +8694,6 @@
             }
           }
         });
-      }
-
-      // ===== デバッグメモ機能 =====
-
-      // PAT helpers
-      function dbmGetPat() {
-        try { return atob(localStorage.getItem(DEBUG_MEMO_PAT_KEY) || ""); } catch { return ""; }
-      }
-      function dbmSavePat(pat) {
-        localStorage.setItem(DEBUG_MEMO_PAT_KEY, btoa(pat));
-      }
-      function dbmGetRepo() {
-        return localStorage.getItem(DEBUG_MEMO_REPO_KEY) || "shunjapanes/main";
-      }
-      function dbmGetBranch() {
-        return localStorage.getItem(DEBUG_MEMO_BRANCH_KEY) || "main";
-      }
-
-      // ダイアログ開く
-      function openDebugMemoDialog() {
-        const dlg = $("debug-memo-dialog");
-        const patSection = $("dbm-pat-section");
-        const pat = dbmGetPat();
-        patSection.style.display = pat ? "none" : "";
-
-        // 本文・タイトルリセット
-        $("debug-memo-title").value = "";
-        const body = $("debug-memo-body");
-        body.innerHTML = "";
-        $("debug-memo-images").innerHTML = "";
-        _dbmImages = [];
-
-        dlg.classList.add("show");
-        body.focus();
-
-        // 閉じるハンドラー
-        dlg.onkeydown = (e) => { if (e.key === "Escape") closeDebugMemoDialog(); };
-        $("dbm-cancel").onclick = closeDebugMemoDialog;
-
-        // PAT保存
-        $("dbm-save-pat").onclick = async () => {
-          const val = $("debug-memo-pat").value.trim();
-          if (!val) return;
-          $("dbm-save-pat").disabled = true;
-          $("dbm-save-pat").textContent = "確認中...";
-          const ok = await dbmValidatePat(val);
-          $("dbm-save-pat").disabled = false;
-          $("dbm-save-pat").textContent = "保存";
-          if (ok) {
-            dbmSavePat(val);
-            patSection.style.display = "none";
-            setStatus("✓ GitHub PATを保存しました");
-          } else {
-            setStatus("⚠ PATが無効か権限が足りません（repo スコープが必要）");
-          }
-        };
-
-        // 画像ペーストハンドラー
-        body.addEventListener("paste", dbmHandlePaste, { once: false });
-
-        // アップロードボタン
-        $("dbm-upload").onclick = dbmUpload;
-      }
-
-      function closeDebugMemoDialog() {
-        $("debug-memo-dialog").classList.remove("show");
-        $("debug-memo-body").removeEventListener("paste", dbmHandlePaste);
-      }
-
-      let _dbmImages = []; // [{ dataUrl, type }]
-
-      function dbmHandlePaste(e) {
-        const items = e.clipboardData?.items || [];
-        let hasImage = false;
-        for (const item of items) {
-          if (item.type.startsWith("image/")) {
-            hasImage = true;
-            e.preventDefault();
-            const blob = item.getAsFile();
-            const reader = new FileReader();
-            reader.onload = () => {
-              _dbmImages.push({ dataUrl: reader.result, type: item.type });
-              dbmRenderImagePreviews();
-            };
-            reader.readAsDataURL(blob);
-          }
-        }
-        // テキストペーストは通常通り（preventDefault しない）
-        _ = hasImage;
-      }
-
-      function dbmRenderImagePreviews() {
-        const container = $("debug-memo-images");
-        container.innerHTML = "";
-        _dbmImages.forEach((img, i) => {
-          const wrap = document.createElement("div");
-          wrap.className = "dbm-img-thumb";
-          const im = document.createElement("img");
-          im.src = img.dataUrl;
-          im.alt = `screenshot ${i + 1}`;
-          const del = document.createElement("button");
-          del.className = "dbm-img-del";
-          del.textContent = "✕";
-          del.title = "削除";
-          del.onclick = () => {
-            _dbmImages.splice(i, 1);
-            dbmRenderImagePreviews();
-          };
-          wrap.appendChild(im);
-          wrap.appendChild(del);
-          container.appendChild(wrap);
-        });
-      }
-
-      async function dbmValidatePat(pat) {
-        try {
-          const r = await fetch("https://api.github.com/user", {
-            headers: { Authorization: `Bearer ${pat}`, "X-GitHub-Api-Version": "2022-11-28" }
-          });
-          return r.ok;
-        } catch { return false; }
-      }
-
-      async function dbmGitHubPut(pat, repo, branch, path, message, base64Content) {
-        // 既存ファイルのSHAを取得（なければ新規）
-        let sha;
-        try {
-          const r = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
-            headers: { Authorization: `Bearer ${pat}`, "X-GitHub-Api-Version": "2022-11-28" }
-          });
-          if (r.ok) { const d = await r.json(); sha = d.sha; }
-        } catch {}
-        const body = { message, content: base64Content, branch };
-        if (sha) body.sha = sha;
-        const res = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${pat}`,
-            "Content-Type": "application/json",
-            "X-GitHub-Api-Version": "2022-11-28",
-          },
-          body: JSON.stringify(body),
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.message || `HTTP ${res.status}`);
-        }
-        return res;
-      }
-
-      async function dbmUpload() {
-        const btn = $("dbm-upload");
-        const pat = dbmGetPat();
-        if (!pat) {
-          $("dbm-pat-section").style.display = "";
-          $("debug-memo-pat").focus();
-          return;
-        }
-        const title = $("debug-memo-title").value.trim() || "デバッグメモ";
-        const bodyEl = $("debug-memo-body");
-        const bodyText = bodyEl.innerText.trim();
-        if (!bodyText && _dbmImages.length === 0) {
-          setStatus("⚠ 内容を入力してください");
-          return;
-        }
-
-        btn.disabled = true;
-        btn.textContent = "アップロード中...";
-
-        const repo = dbmGetRepo();
-        const branch = dbmGetBranch();
-        const now = new Date();
-        const ts = [
-          now.getFullYear(),
-          String(now.getMonth() + 1).padStart(2, "0"),
-          String(now.getDate()).padStart(2, "0"),
-          "-",
-          String(now.getHours()).padStart(2, "0"),
-          String(now.getMinutes()).padStart(2, "0"),
-          String(now.getSeconds()).padStart(2, "0"),
-        ].join("").replace("-", "-");
-        const slug = title.replace(/[^\w぀-鿿]/g, "-").replace(/-+/g, "-").slice(0, 40);
-        const memoPath = `debug-memos/${ts}_${slug}.md`;
-
-        // 画像を先にアップロード
-        const imageRefs = [];
-        for (let i = 0; i < _dbmImages.length; i++) {
-          const img = _dbmImages[i];
-          const ext = img.type === "image/png" ? "png" : "jpg";
-          const imgPath = `debug-memos/images/${ts}_${i + 1}.${ext}`;
-          const base64 = img.dataUrl.split(",")[1];
-          try {
-            await dbmGitHubPut(pat, repo, branch, imgPath, `debug memo image: ${ts}`, base64);
-            imageRefs.push(`![screenshot ${i + 1}](images/${ts}_${i + 1}.${ext})`);
-          } catch (e) {
-            btn.disabled = false;
-            btn.textContent = "⬆ GitHubにアップロード";
-            setStatus(`⚠ 画像アップロード失敗: ${e.message}`);
-            return;
-          }
-        }
-
-        // Markdownファイルを生成
-        const dateStr = now.toLocaleString("ja-JP");
-        let md = `# ${title}\n\n`;
-        md += `- 日時: ${dateStr}\n`;
-        md += `- URL: ${location.href}\n\n`;
-        md += `## 内容\n\n${bodyText || "（内容なし）"}\n`;
-        if (imageRefs.length) {
-          md += `\n## スクリーンショット\n\n${imageRefs.join("\n")}\n`;
-        }
-
-        const mdBase64 = btoa(unescape(encodeURIComponent(md)));
-        try {
-          await dbmGitHubPut(pat, repo, branch, memoPath, `debug memo: ${title}`, mdBase64);
-          closeDebugMemoDialog();
-          setStatus(`✓ メモをアップロードしました → ${memoPath}`);
-        } catch (e) {
-          setStatus(`⚠ メモのアップロード失敗: ${e.message}`);
-        } finally {
-          btn.disabled = false;
-          btn.textContent = "⬆ GitHubにアップロード";
-        }
       }
 
       // ===== lint / marker / statusbar =====
@@ -9444,12 +8768,14 @@
         if (state.markedCells.has(key)) state.markedCells.delete(key);
         else state.markedCells.add(key);
         updateEncodingStatus();
+        state.forceRender = true;
         renderBody();
       }
 
       function clearAllMarkers() {
         state.markedCells.clear();
         updateEncodingStatus();
+        state.forceRender = true;
         renderBody();
       }
 
