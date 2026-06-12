@@ -2571,6 +2571,7 @@
       function switchTab(idx) {
         if (idx < 0 || idx >= state.tabs.length) return;
         saveCurrentTab();
+        _dataVersion++; // タブが変わるためゴースト行などのキャッシュを無効化
         // 前のアクティブタブのdataを解放（未編集かつrawTextがあれば）
         if (state.activeTab >= 0 && state.tabs[state.activeTab]) {
           const prev = state.tabs[state.activeTab];
@@ -2685,6 +2686,7 @@
       }
 
       function closeTab(idx) {
+        _dataVersion++; // タブ構成が変わるためキャッシュを無効化
         if (state.tabs[idx]?.dirty) {
           if (
             !confirm(
