@@ -1620,7 +1620,7 @@
         <!-- Group: 検品 -->
         <div class="rb-group">
           <div class="rb-buttons">
-            <button class="rb-btn" id="btn-marker" title="マーカーモード (M)&#10;ON中: ダブルクリックでセルにマーカーを付与/解除&#10;チェック作業・レビュー用" aria-label="マーカーモードの切り替え" aria-pressed="false">
+            <button class="rb-btn" id="btn-marker" title="マーカー（検品チェック用）&#10;範囲選択中に押す: 選択範囲へ一括付与/解除（Ctrl+Qでも可）&#10;範囲なしで押す: マーカーモード切替（ON中はダブルクリックで付け外し）&#10;Ctrl+Zで取り消せます" aria-label="マーカーの適用・モード切り替え" aria-pressed="false">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg></span>
               <span>マーカー</span>
             </button>
@@ -1952,7 +1952,7 @@
         <h2>📊 データタブ</h2>
         <div class="man-btn-section">
           <div class="man-btn-row"><span class="man-btn-label">フィルター</span><span class="man-btn-desc">各列に絞り込み欄を表示。テキスト・値選択・数値範囲で絞り込み。</span></div>
-          <div class="man-btn-row"><span class="man-btn-label">マーカー</span><span class="man-btn-desc">ONにしてセルをダブルクリックすると目印を付け外し（検品チェック用）。<b>範囲選択してからマーカーボタンを押すと一括で付け外し</b>。「マーカー色」で色を変更可能。「消去」は確認のうえ全消去。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">マーカー</span><span class="man-btn-desc">ONにしてセルをダブルクリックすると目印を付け外し（検品チェック用）。<b>範囲選択してからマーカーボタン（または Ctrl+Q）で一括付け外し</b>。F4で直前のマーカー操作を選択範囲に繰り返し。Ctrl+Zで取り消し可能。「マーカー色」で色を変更、「消去」は確認のうえ全消去。</span></div>
         </div>
 
         <h2>🎫 チケットタブ</h2>
@@ -1998,6 +1998,7 @@
             <div class="man-row"><span>コピー行をペースト</span><span class="man-key">Ctrl+Shift+V</span></div>
             <div class="man-row"><span>セル編集開始</span><span class="man-key">Enter / F2</span></div>
             <div class="man-row"><span>直前の操作を繰り返す</span><span class="man-key">F4</span></div>
+            <div class="man-row"><span>選択範囲にマーカー</span><span class="man-key">Ctrl+Q</span></div>
             <div class="man-row"><span>セルをクリア</span><span class="man-key">Delete / Backspace</span></div>
           </div>
           <div>
@@ -2273,9 +2274,8 @@
           renderBody();
           setStatus(`F4: 「${a.payload.value}」を再入力しました`);
         } else if (a.type === "marker") {
-          if (!sel) { setStatus("セルを選択してください"); return; }
-          toggleMarker(sel.row, sel.col);
-          setStatus("F4: マーカーを繰り返しました");
+          // 範囲選択があれば範囲全体に、なければ選択セルにマーカー
+          applyMarkerToSelection();
         } else if (a.type === "hideRow") {
           if (!sel) return;
           hideRows(sel.row, sel.row);
@@ -5001,6 +5001,14 @@
           repeatLastAction();
           return;
         }
+        // Ctrl+Q: 選択範囲/セルにマーカーを付け外し（左手ショートカット）
+        // ※Ctrl+1等の数字キーはブラウザのタブ切替に予約されているため使用不可
+        if ((e.ctrlKey || e.metaKey) && (e.key === "q" || e.key === "Q") && !e.altKey && !e.shiftKey) {
+          if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+          e.preventDefault();
+          applyMarkerToSelection();
+          return;
+        }
         // ダイアログ内でもCtrl+C/Vはセル操作として処理する
         const cmd = e.ctrlKey || e.metaKey;
         if (
@@ -7057,6 +7065,7 @@
           sejVirtualCols: state.sejVirtualCols
             ? { indices: [...state.sejVirtualCols.indices], keys: [...state.sejVirtualCols.keys] }
             : null,
+          markedCells: new Set(state.markedCells),
         };
       }
       function restoreState(s) {
@@ -7076,6 +7085,7 @@
         state.sejVirtualCols = s.sejVirtualCols
           ? { indices: [...s.sejVirtualCols.indices], keys: [...s.sejVirtualCols.keys] }
           : null;
+        if (s.markedCells) state.markedCells = new Set(s.markedCells);
         applyHeaderMapping();
         updateHeaderModeBtn();
       }
@@ -8894,8 +8904,8 @@
         $("lint-cancel").onclick = () => { dlg.style.display = "none"; };
       }
 
-      function toggleMarkerMode() {
-        // 範囲選択中はモード切替ではなく、選択範囲にマーカーを一括適用する
+      // 選択範囲（または選択セル）にマーカーを付け外しする。Ctrl+Q / F4 / マーカーボタンから共用。
+      function applyMarkerToSelection() {
         if (state.range) {
           const r1 = Math.min(state.range.r1, state.range.r2);
           const r2 = Math.max(state.range.r1, state.range.r2);
@@ -8906,6 +8916,7 @@
           for (let r = r1; r <= r2 && allMarked; r++)
             for (let c = c1; c <= c2; c++)
               if (!state.markedCells.has(`${r},${c}`)) { allMarked = false; break; }
+          saveUndo();
           for (let r = r1; r <= r2; r++)
             for (let c = c1; c <= c2; c++) {
               const key = `${r},${c}`;
@@ -8918,6 +8929,20 @@
           renderBody();
           const n = (r2 - r1 + 1) * (c2 - c1 + 1);
           setStatus(allMarked ? `選択範囲のマーカーを解除しました（${n}セル）` : `選択範囲にマーカーを付けました（${n}セル）`);
+          return true;
+        }
+        if (state.selected) {
+          toggleMarker(state.selected.row, state.selected.col);
+          return true;
+        }
+        setStatus("マーカーを付けるセルを選択してください");
+        return false;
+      }
+
+      function toggleMarkerMode() {
+        // 範囲選択中はモード切替ではなく、選択範囲にマーカーを一括適用する
+        if (state.range) {
+          applyMarkerToSelection();
           return;
         }
         state.markerMode = !state.markerMode;
@@ -8930,6 +8955,7 @@
       function isMarked(row, col) { return state.markedCells.has(`${row},${col}`); }
 
       function toggleMarker(row, col) {
+        saveUndo();
         const key = `${row},${col}`;
         if (state.markedCells.has(key)) state.markedCells.delete(key);
         else state.markedCells.add(key);
@@ -8945,6 +8971,7 @@
           return;
         }
         if (!confirm(`マーカーを ${state.markedCells.size} 個すべて消去します。\nよろしいですか？`)) return;
+        saveUndo();
         state.markedCells.clear();
         updateEncodingStatus();
         state.forceRender = true;
