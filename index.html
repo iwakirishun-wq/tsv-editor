@@ -2116,7 +2116,7 @@
         parkingCheck: false, // 席種エリアコード6桁目P ⇔ 駐車券フラグ1 の検査
         kanaCheck: false,    // 全角カタカナ検出（半角カナ必須フィールド用）
         boxCheck: false,     // 区画席（（〇名）席種）の設定検査
-        verticalHeader: false, // ヘッダー縦書き表示
+        verticalHeader: true, // ヘッダー縦書き表示（既定でON・列幅節約）
         markerColor: "#facc15", // マーカー色（localStorageに保存）
         _lastAction: null,   // F4 繰り返し用 { type, payload }
 
@@ -2802,6 +2802,12 @@
         // マーカー色
         $("marker-color").oninput = (e) => setMarkerColor(e.target.value);
         loadMarkerColor();
+        // 縦ヘッダーの初期状態を反映（既定ON）
+        if (state.verticalHeader) {
+          document.body.classList.add("vertical-headers");
+          const _vh = $("btn-vertical-header");
+          if (_vh) { _vh.classList.add("active-state"); _vh.setAttribute("aria-pressed", "true"); }
+        }
         $("btn-header-mode").onclick = toggleHeaderMode;
         $("btn-new-sheet").onclick = addNewSheet;
         $("btn-reset-view").onclick = resetView;
