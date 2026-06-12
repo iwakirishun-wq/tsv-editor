@@ -1682,9 +1682,13 @@
         <!-- Group: 変換・出力 -->
         <div class="rb-group">
           <div class="rb-buttons">
-            <button class="rb-btn" id="btn-apply-dict" title="辞書を使ってヘッダーを日本語に変換&#10;Shift+クリックで辞書編集画面を開きます" aria-label="辞書を適用してヘッダーを変換">
+            <button class="rb-btn" id="btn-apply-dict" title="辞書を使ってヘッダーを日本語に変換&#10;Shift+クリックでも辞書編集画面を開けます" aria-label="辞書を適用してヘッダーを変換">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 7V4h16v3"></path><path d="M9 20h6"></path><path d="M12 4v16"></path></svg></span>
               <span>日本語化</span>
+            </button>
+            <button class="rb-btn" id="btn-dict-edit" title="辞書とヘッダーメモを編集&#10;新しい列名の追加もここから（ブラウザに保存されます）" aria-label="辞書・ヘッダーメモを編集">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path><path d="M9 7h6M9 11h4"></path></svg></span>
+              <span>辞書編集</span>
             </button>
             <button class="rb-btn" id="btn-html-export" title="SEJ設定をHTMLページとして出力&#10;新しいタブで開き、席種設定の詳細を確認できます&#10;フィルター中は絞り込んだ行のみ出力" aria-label="SEJ HTML出力">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M12 13H8M12 17H8"></path><path d="M16 13l2 2-2 2"></path></svg></span>
@@ -1952,13 +1956,14 @@
         <h2>📊 データタブ</h2>
         <div class="man-btn-section">
           <div class="man-btn-row"><span class="man-btn-label">フィルター</span><span class="man-btn-desc">各列に絞り込み欄を表示。テキスト・値選択・数値範囲で絞り込み。</span></div>
-          <div class="man-btn-row"><span class="man-btn-label">マーカー</span><span class="man-btn-desc">ONにしてセルをダブルクリックすると目印を付け外し（検品チェック用）。「マーカー色」で色を変更可能。「消去」は確認のうえ全消去。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">マーカー</span><span class="man-btn-desc">ONにしてセルをダブルクリックすると目印を付け外し（検品チェック用）。<b>範囲選択してからマーカーボタンを押すと一括で付け外し</b>。「マーカー色」で色を変更可能。「消去」は確認のうえ全消去。</span></div>
         </div>
 
         <h2>🎫 チケットタブ</h2>
         <div class="man-btn-section">
-          <div class="man-btn-row"><span class="man-btn-label">SEJ読込</span><span class="man-btn-desc">席種エリアマスタTSVを連携。席種エリアコードに席種名を併記し、「グループ名」列を仮想追加。SEJデータ（word列）には備考差分も表示（下記）。</span></div>
-          <div class="man-btn-row"><span class="man-btn-label">日本語化</span><span class="man-btn-desc">英語の列名を日本語に変換（Shift+クリックで辞書編集）。保存時は元の英語に戻ります。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">SEJ読込</span><span class="man-btn-desc">席種エリアマスタTSVを連携。席種エリアコード・購入限定席種1〜3などのコード列に席種名を併記し、「グループ名」列を仮想追加。SEJデータ（word列）には備考差分も表示（下記）。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">日本語化</span><span class="man-btn-desc">英語の列名を日本語に変換。保存時は元の英語に戻ります。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">辞書編集</span><span class="man-btn-desc">日本語化の辞書とヘッダーメモを編集。今開いているファイルの列が一覧の先頭に出ます。新しい列名の追加も可能。ブラウザに保存されるため、オフラインHTML運用でもそのまま使えます。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">HTML出力</span><span class="man-btn-desc">確認用HTMLを新しいタブに出力。席種エリアマスタは備考・カラー・フラグ検証付き一覧、SEJデータはマスタ照合カードで出力。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">カラー表示</span><span class="man-btn-desc">表示カラーコード列の色をセル背景でプレビュー（切替）。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">ゲート表示</span><span class="man-btn-desc">ゲート用公演種別の番号にゲート名を併記。対応表は列ヘッダーのコメントから読み取り（切替）。</span></div>
@@ -2794,6 +2799,8 @@
         $("btn-parking-check").onclick = () => toggleInspect("parkingCheck", "btn-parking-check", "駐車券フラグ検査");
         $("btn-kana-check").onclick = () => toggleInspect("kanaCheck", "btn-kana-check", "半角カナ検査");
         $("btn-box-check").onclick = () => toggleInspect("boxCheck", "btn-box-check", "区画席検査");
+        // 辞書・ヘッダーメモ編集
+        $("btn-dict-edit").onclick = openDictEditor;
         // 縦書きヘッダー
         $("btn-vertical-header").onclick = toggleVerticalHeader;
         // マーカー色
@@ -4166,6 +4173,17 @@
         const sejCodeColIdx = state.sejMaster
           ? state.headers.findIndex(h => h.trim() === "seat_type_area_cd")
           : -1;
+        // SEJ連携: 席種コードを参照する追加列（席種一括設定の購入限定席種1〜3など）
+        const sejExtraCodeCols = new Set();
+        if (state.sejMaster) {
+          state.headers.forEach((h, hi) => {
+            if (hi === sejCodeColIdx) return;
+            const ht = String(h).trim();
+            if (/限定席種/.test(ht) || /^(purchase|buy)_?limit/i.test(ht) || /^limit_?seat/i.test(ht) || /^seat_type_area_cd[1-9]$/.test(ht)) {
+              sejExtraCodeCols.add(hi);
+            }
+          });
+        }
 
         // 検品表示: 対象列インデックスをキャッシュ
         const _hIdx = (name) => state.headers.findIndex(h => h.trim() === name);
@@ -4246,8 +4264,8 @@
             const isSelected =
               cls.includes("selected") || cls.includes("in-range");
             let displayVal = escHtml(cellVal);
-            // SEJ連携: 席種エリアコード列に席種名を併記
-            if (j === sejCodeColIdx && cellVal) {
+            // SEJ連携: 席種エリアコード列・購入限定席種列に席種名を併記
+            if ((j === sejCodeColIdx || sejExtraCodeCols.has(j)) && cellVal) {
               const m = state.sejMaster.byCode[cellVal.trim()];
               if (m) {
                 const nm = m.seat_type_area_disp_nm || m.seat_type_area_control_nm || "";
@@ -4875,21 +4893,34 @@
       // ===== 辞書エディター =====
       function openDictEditor() {
         closeDictEditor();
-        // 現在のヘッダーに関連するマッピングを表示
+        // 既存辞書 + 現在開いているファイルのヘッダーをすべて表示（未登録列もここから登録できる）
         const entries = [];
         const allKeys = new Set([...Object.keys(DEFAULT_HEADER_DICT), ...Object.keys(state.headerDict)]);
+        if (state.headerMode !== "numbered") {
+          state.headers.forEach(h => {
+            const key = String(h || "").trim();
+            // 数字だけ・空・仮想列（日本語名）は対象外
+            if (key && !/^\d+$/.test(key) && /^[\x21-\x7e]+$/.test(key)) allKeys.add(key);
+          });
+        }
         allKeys.forEach(key => {
-          entries.push({ key, display: state.headerDict[key] || DEFAULT_HEADER_DICT[key] || key, comment: state.headerComments[key] || "" });
+          entries.push({ key, display: state.headerDict[key] || DEFAULT_HEADER_DICT[key] || "", comment: state.headerComments[key] || "" });
         });
-        let html = '<div style="max-height:70vh;overflow:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;">';
-        html += '<tr style="background:#f0f0f0;position:sticky;top:0;"><th style="padding:4px;border:1px solid #ccc;width:30%">元ヘッダー</th><th style="padding:4px;border:1px solid #ccc;width:30%">表示名</th><th style="padding:4px;border:1px solid #ccc;width:40%">コメント</th></tr>';
-        entries.forEach(e => {
-          html += `<tr>
-            <td style="padding:3px;border:1px solid #ddd;font-family:monospace;font-size:11px;">${escHtml(e.key)}</td>
-            <td style="padding:2px;border:1px solid #ddd;"><input type="text" data-dict-key="${escHtml(e.key)}" value="${escHtml(e.display)}" style="width:100%;border:1px solid #ccc;padding:2px 4px;font-size:11px;border-radius:2px;"></td>
-            <td style="padding:2px;border:1px solid #ddd;"><textarea data-comment-key="${escHtml(e.key)}" style="width:100%;height:40px;border:1px solid #ccc;padding:2px 4px;font-size:11px;border-radius:2px;resize:vertical;font-family:var(--font-ui);" placeholder="コメント">${escHtml(e.comment)}</textarea></td>
+        // 現在のファイルにある列を先頭に並べる
+        const curSet = new Set(state.headers.map(h => String(h || "").trim()));
+        entries.sort((a, b) => (curSet.has(b.key) ? 1 : 0) - (curSet.has(a.key) ? 1 : 0));
+        const rowHtml = (e) => `<tr>
+            <td style="padding:3px;border:1px solid #ddd;font-family:monospace;font-size:11px;">${escHtml(e.key)}${curSet.has(e.key) ? ' <span style="color:#16a34a;font-size:10px">●現在</span>' : ''}</td>
+            <td style="padding:2px;border:1px solid #ddd;"><input type="text" data-dict-key="${escHtml(e.key)}" value="${escHtml(e.display)}" placeholder="日本語名" style="width:100%;border:1px solid #ccc;padding:2px 4px;font-size:11px;border-radius:2px;"></td>
+            <td style="padding:2px;border:1px solid #ddd;"><textarea data-comment-key="${escHtml(e.key)}" style="width:100%;height:40px;border:1px solid #ccc;padding:2px 4px;font-size:11px;border-radius:2px;resize:vertical;font-family:var(--font-ui);" placeholder="ヘッダーメモ（列のホバーで表示）">${escHtml(e.comment)}</textarea></td>
           </tr>`;
-        });
+        let html = '<div style="display:flex;gap:6px;margin-bottom:8px;align-items:center">'
+          + '<input type="text" id="dict-new-key" placeholder="新しい列名（例: new_column_cd）" style="flex:1;border:1px solid #ccc;padding:4px 8px;font-size:12px;border-radius:3px;font-family:monospace">'
+          + '<button type="button" id="dict-add-btn" style="padding:4px 14px;font-size:12px;border:1px solid #16a34a;color:#16a34a;background:#fff;border-radius:3px;cursor:pointer">＋ 行を追加</button>'
+          + '</div>';
+        html += '<div id="dict-table-wrap" style="max-height:62vh;overflow:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;">';
+        html += '<tr style="background:#f0f0f0;position:sticky;top:0;"><th style="padding:4px;border:1px solid #ccc;width:30%">元ヘッダー</th><th style="padding:4px;border:1px solid #ccc;width:30%">表示名（日本語化で使用）</th><th style="padding:4px;border:1px solid #ccc;width:40%">ヘッダーメモ</th></tr>';
+        entries.forEach(e => { html += rowHtml(e); });
         html += '</table></div>';
         html += '<div style="margin-top:8px;text-align:right;"><button type="button" id="dict-reset-btn" style="margin-right:auto;padding:4px 12px;font-size:12px;cursor:pointer;color:#d33;">リセット</button><button type="button" id="dict-cancel-btn" style="padding:4px 12px;margin-right:6px;font-size:12px;cursor:pointer;">キャンセル</button><button type="button" id="dict-save-btn" style="padding:4px 12px;font-size:12px;background:var(--accent);color:#fff;border:none;border-radius:3px;cursor:pointer;">保存</button></div>';
 
@@ -4904,6 +4935,26 @@
 
         overlay.onclick = (e) => { if (e.target === overlay) closeDictEditor(); };
         dlg.querySelector("#dict-cancel-btn").onclick = closeDictEditor;
+        // 新しい列名の行を追加
+        dlg.querySelector("#dict-add-btn").onclick = () => {
+          const keyInp = dlg.querySelector("#dict-new-key");
+          const key = (keyInp.value || "").trim();
+          if (!key) { keyInp.focus(); return; }
+          if (dlg.querySelector(`input[data-dict-key="${CSS.escape(key)}"]`)) {
+            alert("その列名はすでに一覧にあります。");
+            return;
+          }
+          const table = dlg.querySelector("#dict-table-wrap table");
+          const tbody = table.tBodies[0] || table;
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td style="padding:3px;border:1px solid #ddd;font-family:monospace;font-size:11px;">${escHtml(key)} <span style="color:#2563eb;font-size:10px">●新規</span></td>
+            <td style="padding:2px;border:1px solid #ddd;"><input type="text" data-dict-key="${escHtml(key)}" placeholder="日本語名" style="width:100%;border:1px solid #ccc;padding:2px 4px;font-size:11px;border-radius:2px;"></td>
+            <td style="padding:2px;border:1px solid #ddd;"><textarea data-comment-key="${escHtml(key)}" style="width:100%;height:40px;border:1px solid #ccc;padding:2px 4px;font-size:11px;border-radius:2px;resize:vertical;font-family:var(--font-ui);" placeholder="ヘッダーメモ"></textarea></td>`;
+          tbody.insertBefore(tr, tbody.rows[1] || null);
+          keyInp.value = "";
+          tr.querySelector("input[data-dict-key]").focus();
+        };
         dlg.querySelector("#dict-reset-btn").onclick = () => {
           if (!confirm("辞書・コメントをデフォルトに戻しますか？")) return;
           state.headerDict = { ...DEFAULT_HEADER_DICT };
@@ -8842,6 +8893,31 @@
       }
 
       function toggleMarkerMode() {
+        // 範囲選択中はモード切替ではなく、選択範囲にマーカーを一括適用する
+        if (state.range) {
+          const r1 = Math.min(state.range.r1, state.range.r2);
+          const r2 = Math.max(state.range.r1, state.range.r2);
+          const c1 = Math.min(state.range.c1, state.range.c2);
+          const c2 = Math.max(state.range.c1, state.range.c2);
+          // 全セルがマーク済みなら解除、それ以外は付与
+          let allMarked = true;
+          for (let r = r1; r <= r2 && allMarked; r++)
+            for (let c = c1; c <= c2; c++)
+              if (!state.markedCells.has(`${r},${c}`)) { allMarked = false; break; }
+          for (let r = r1; r <= r2; r++)
+            for (let c = c1; c <= c2; c++) {
+              const key = `${r},${c}`;
+              if (allMarked) state.markedCells.delete(key);
+              else state.markedCells.add(key);
+            }
+          recordAction("marker", {});
+          updateEncodingStatus();
+          state.forceRender = true;
+          renderBody();
+          const n = (r2 - r1 + 1) * (c2 - c1 + 1);
+          setStatus(allMarked ? `選択範囲のマーカーを解除しました（${n}セル）` : `選択範囲にマーカーを付けました（${n}セル）`);
+          return;
+        }
         state.markerMode = !state.markerMode;
         const btn = $("btn-marker");
         btn.classList.toggle("active-state", state.markerMode);
