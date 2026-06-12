@@ -4379,9 +4379,10 @@
         if (end < rows.length)
           html += `<tr style="height:${(rows.length - end) * rowH}px"><td colspan="${colSpan}"></td></tr>`;
 
-        // SEJゴースト行: マスタに登録があるのに現データに無いコードを最終行に表示
+        // SEJゴースト行: マスタに登録があるのに現データに無い席種を常に最終行に表示
         // （セブン発券対象の漏れ確認用。基本は発券不要チケットのはずなので目視確認のみ）
-        if (end >= rows.length && state.sejMaster && sejCodeColIdx !== -1) {
+        // ソートやスクロール位置に関係なく、表の末尾に席種名＋グループ名で表示（コードはホバーで確認）
+        if (state.sejMaster && sejCodeColIdx !== -1) {
           const usedCodes = new Set();
           for (const r of state.data) {
             const cd = (r[sejCodeColIdx] ?? "").trim();
@@ -4389,17 +4390,17 @@
           }
           const missing = Object.keys(state.sejMaster.byCode).filter(cd => !usedCodes.has(cd));
           if (missing.length) {
-            html += `<tr class="ghost-sep"><td colspan="${colSpan}">▼ マスタ未使用コード ${missing.length}件（現データに無い＝セブン発券していない席種。漏れがないか確認）</td></tr>`;
+            html += `<tr class="ghost-sep"><td colspan="${colSpan}">▼ マスタ未使用 ${missing.length}件（現データに無い＝セブン発券していない席種。漏れがないか確認）</td></tr>`;
             for (const cd of missing) {
               const m = state.sejMaster.byCode[cd];
-              const nm = m.seat_type_area_disp_nm || m.seat_type_area_control_nm || "";
+              const nm = m.seat_type_area_disp_nm || m.seat_type_area_control_nm || cd;
               const grp = m.grp_nm || m.seat_type_grp_nm1 || "";
-              html += `<tr class="ghost-row"><td class="row-num">−</td>`;
+              html += `<tr class="ghost-row" title="${escHtml(cd)}"><td class="row-num">−</td>`;
               for (const j of visCols) {
                 const tdCw = state.colWidths[j] || 80;
                 let v = "";
                 if (j === sejCodeColIdx) {
-                  v = `${escHtml(cd)}<span style="margin-left:6px;font-size:11px">▸ ${escHtml(nm)}</span>`;
+                  v = escHtml(nm);
                 } else if (state.sejVirtualCols && state.sejVirtualCols.indices.includes(j)) {
                   v = escHtml(grp);
                 }
