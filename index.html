@@ -2299,6 +2299,42 @@
         return list;
       }
 
+      // ===== UG差額の自動検算 =====
+      // 同じスケジュール内の通常価格から 期待差額 = 先席種価格 − 元席種価格 を計算する。
+      // 手数料ルール: 差額が500円以下（同額含む）の場合は一律500円。
+      // 戻り値: rowsの各UG行に対する { status: "ok"|"ng"|"unknown", expected, srcPrice, dstPrice }
+      function buildUgValidator(rows, c, v) {
+        const condKey = (row) => [v(row, c.kbn), v(row, c.rank), v(row, c.route)].join("|");
+        const priceByCond = new Map(); // cond|seat|age -> adv price (number)
+        const priceAny = new Map();    // seat|age -> adv price (number)
+        for (const row of rows) {
+          const flag = v(row, c.ugFlag);
+          if (flag === "該当" || flag === "1") continue;
+          const seat = v(row, c.seat), age = v(row, c.age);
+          const n = Number(String(v(row, c.adv)).replace(/,/g, ""));
+          if (!seat || isNaN(n)) continue;
+          priceByCond.set(condKey(row) + "|" + seat + "|" + age, n);
+          if (!priceAny.has(seat + "|" + age)) priceAny.set(seat + "|" + age, n);
+        }
+        return function validate(row) {
+          const ck = condKey(row);
+          const srcKey = v(row, c.ugSeat) + "|" + v(row, c.ugAge);
+          const dstKey = v(row, c.seat) + "|" + v(row, c.age);
+          const src = priceByCond.has(ck + "|" + srcKey) ? priceByCond.get(ck + "|" + srcKey) : priceAny.get(srcKey);
+          const dst = priceByCond.has(ck + "|" + dstKey) ? priceByCond.get(ck + "|" + dstKey) : priceAny.get(dstKey);
+          if (src === undefined || dst === undefined) {
+            return { status: "unknown", expected: null, srcPrice: src, dstPrice: dst };
+          }
+          const diff = dst - src;
+          const expected = diff <= 500 ? 500 : diff; // 同額・500円以下は一律500円
+          const actual = Number(String(v(row, c.adv)).replace(/,/g, ""));
+          return {
+            status: !isNaN(actual) && actual === expected ? "ok" : "ng",
+            expected, srcPrice: src, dstPrice: dst,
+          };
+        };
+      }
+
       // 経路価格スケジュール（BO-F-21030）→ チェック用参照シートを別タブに生成
       // 形式参考: 原紙［販売価格スケジュール］チェックシート
       function buildPriceCheckSheet() {
@@ -2320,10 +2356,18 @@
         };
         const v = (row, i) => (i === -1 ? "" : String(row[i] ?? "").trim());
         // UG行は元データの前売価格/当日価格がそのまま差額（前売差額/当日差額）
-        const headers = ["販売開始日時", "販売終了日時", "販売区分", "会員ランク", "販売経路", "席種", "年齢区分", "前売価格(UG行=差額)", "当日価格(UG行=差額)", "UG", "元席種", "元年齢区分"];
+        const validate = buildUgValidator(state.data, cols, v);
+        const headers = ["販売開始日時", "販売終了日時", "販売区分", "会員ランク", "販売経路", "席種", "年齢区分", "前売価格(UG行=差額)", "当日価格(UG行=差額)", "UG", "元席種", "元年齢区分", "差額検算"];
         const data = state.data.map((row) => {
           const flag = v(row, cols.ugFlag);
           const isUg = flag === "該当" || flag === "1";
+          let check = "";
+          if (isUg) {
+            const r = validate(row);
+            check = r.status === "ok" ? "OK"
+              : r.status === "ng" ? `NG(期待${r.expected.toLocaleString("ja-JP")})`
+              : "価格不明";
+          }
           return [
             v(row, cols.start), v(row, cols.end),
             v(row, cols.kbn), v(row, cols.rank), v(row, cols.route),
@@ -2331,6 +2375,7 @@
             v(row, cols.adv), v(row, cols.day),
             isUg ? "◯" : "",
             isUg ? v(row, cols.ugSeat) : "", isUg ? v(row, cols.ugAge) : "",
+            check,
           ];
         });
         const srcName = state.fileName.replace(/\.[^.]+$/, "");
@@ -8459,30 +8504,49 @@
           body += `</table>`;
         }
 
-        // --- アップグレード表: 元席種→先席種 でグループ化（券種の組をセット表示） ---
+        // --- アップグレード表: 元席種→先席種 でグループ化 + 差額の自動検算 ---
+        let hasUg = false;
         if ((mode === "ug" || mode === "both") && ugs.length) {
+          hasUg = true;
+          const validate = buildUgValidator(normals.concat(ugs), c, v);
           const pairOrder = [];
           const pairMap = new Map();
+          let ngCount = 0, naCount = 0;
           for (const row of ugs) {
             const key = v(row, c.ugSeat) + "→" + v(row, c.seat);
             if (!pairMap.has(key)) { pairMap.set(key, []); pairOrder.push(key); }
-            pairMap.get(key).push(row);
+            const chk = validate(row);
+            if (chk.status === "ng") ngCount++;
+            else if (chk.status === "unknown") naCount++;
+            pairMap.get(key).push({ row, chk });
           }
-          body += `<h2>🔀 アップグレード表（${ugs.length}件）</h2>
-<table>
-<tr><th class="mk-h"></th><th>元席種 → 先席種</th><th>元券種</th><th>先券種</th><th>販売条件</th><th class="num">前売差額</th><th class="num">当日差額</th><th>販売開始</th><th>販売終了</th></tr>`;
+          const ngBadge = ngCount
+            ? `　<span class="badge-ng">NG ${ngCount}件</span>`
+            : `　<span class="badge-ok">検算すべてOK</span>`;
+          const naBadge = naCount ? `　<span class="badge-na">価格不明 ${naCount}件</span>` : "";
+          body += `<h2>🔀 アップグレード表（${ugs.length}件）${ngBadge}${naBadge}</h2>
+<p class="legend">検算 = 先席種の前売価格 − 元席種の前売価格（差額500円以下・同額は一律500円ルール）。設定値と一致すれば ✓</p>
+<table class="ug-table">
+<tr><th class="mk-h"></th><th>元券種</th><th>先券種</th><th>販売条件</th><th class="num">前売差額</th><th class="num">期待差額</th><th>検算</th><th class="num">当日差額</th><th>販売開始</th><th>販売終了</th></tr>`;
           for (const key of pairOrder) {
             const group = pairMap.get(key);
             const [fromS, toS] = key.split("→");
-            group.forEach((row, gi) => {
+            const groupHasNg = group.some(g => g.chk.status === "ng");
+            body += `<tr class="pair-head${groupHasNg ? " has-ng" : ""}"><td colspan="10"><b>${escHtml(fromS)}</b><span class="arrow">→</span><b>${escHtml(toS)}</b>${groupHasNg ? '<span class="badge-ng" style="margin-left:10px">NGあり</span>' : ""}</td></tr>`;
+            group.forEach(({ row, chk }) => {
               const mid = encodeURIComponent(["U", key, v(row, c.ugAge), v(row, c.age), condOf(row), v(row, c.start)].join("|"));
-              body += `<tr data-mid="${mid}">
-<td class="mk-cell" title="クリックでマーク">✔</td>`;
-              if (gi === 0) body += `<td class="seat pair" rowspan="${group.length}"><b>${escHtml(fromS)}</b><span class="arrow">→</span><b>${escHtml(toS)}</b></td>`;
-              body += `<td>${escHtml(v(row, c.ugAge))}</td>
+              const isNg = chk.status === "ng";
+              const expTitle = chk.expected != null
+                ? `先 ${fmt(String(chk.dstPrice))} − 元 ${fmt(String(chk.srcPrice))}`
+                : "元席種または先席種の通常価格が表内に見つかりません";
+              body += `<tr data-mid="${mid}" class="ug-data${isNg ? " ng-row" : ""}">
+<td class="mk-cell" title="クリックでマーク">✔</td>
+<td>${escHtml(v(row, c.ugAge))}</td>
 <td>${escHtml(v(row, c.age))}</td>
 <td>${escHtml(condOf(row))}</td>
 <td class="num ug">${escHtml(fmt(v(row, c.adv)))}</td>
+<td class="num exp" title="${escHtml(expTitle)}">${chk.expected != null ? escHtml(fmt(String(chk.expected))) : "—"}</td>
+${chk.status === "ok" ? '<td class="chk-ok">✓</td>' : isNg ? '<td class="chk-ng">✗ NG</td>' : '<td class="chk-na">価格不明</td>'}
 <td class="num ugday">${escHtml(fmt(v(row, c.day)))}</td>
 <td class="dt">${escHtml(v(row, c.start))}</td>
 <td class="dt">${escHtml(v(row, c.end))}</td>
@@ -8549,6 +8613,12 @@
     document.documentElement.style.setProperty('--mk', e.target.value);
     try { localStorage.setItem(KEY + '|color', e.target.value); } catch(err){}
   };
+  var ngBtn = document.getElementById('mk-ngonly');
+  if (ngBtn) ngBtn.onclick = function(){
+    document.body.classList.toggle('ngonly');
+    ngBtn.classList.toggle('on');
+    ngBtn.textContent = document.body.classList.contains('ngonly') ? '全件表示に戻す' : 'NGのみ表示';
+  };
   try {
     var cc = localStorage.getItem(KEY + '|color');
     if (cc) { document.documentElement.style.setProperty('--mk', cc); document.getElementById('mk-color').value = cc; }
@@ -8580,6 +8650,21 @@ td.day { color: #b45309; }
 td.ug { font-weight: 600; color: #be185d; }
 td.ugday { color: #b45309; }
 td.dt { font-size: 11.5px; color: #555; }
+.legend { font-size: 11px; color: #888; margin: -4px 0 6px; }
+tr.pair-head td { background: #fdf2f8; font-weight: 700; border-top: 2px solid #be185d; font-size: 13px; }
+tr.pair-head .arrow { color: #be185d; margin: 0 8px; }
+td.exp { color: #555; }
+td.chk-ok { color: #16a34a; font-weight: 700; text-align: center; }
+td.chk-ng { color: #dc2626; font-weight: 700; text-align: center; white-space: nowrap; }
+td.chk-na { color: #9ca3af; text-align: center; font-size: 11px; }
+tr.ng-row td { background: #fef2f2; }
+tr.ng-row td:first-child { box-shadow: inset 3px 0 0 #dc2626; }
+.badge-ng { background: #dc2626; color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 999px; vertical-align: middle; }
+.badge-ok { background: #16a34a; color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 999px; vertical-align: middle; }
+.badge-na { background: #9ca3af; color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 999px; vertical-align: middle; }
+body.ngonly tr.ug-data:not(.ng-row) { display: none; }
+body.ngonly tr.pair-head:not(.has-ng) { display: none; }
+#mk-ngonly.on { background: #dc2626; color: #fff; }
 tr.marked td { background: color-mix(in srgb, var(--mk) 38%, #ffffff); }
 tr[data-mid]:hover td { outline: 1px solid #b8c4d4; outline-offset: -1px; }
 .toolbar { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255,255,255,.96); border-top: 1px solid #d8dde4; padding: 8px 20px; display: flex; align-items: center; gap: 12px; font-size: 12px; z-index: 10; box-shadow: 0 -2px 8px rgba(0,0,0,.06); }
@@ -8597,6 +8682,7 @@ ${body}
   <span>チェック進捗: <span id="mk-count">0 / 0</span></span>
   <button id="mk-btn">選択した行をマーク（Ctrl+Q）</button>
   <button id="mk-clear">全解除</button>
+  ${hasUg ? `<button id="mk-ngonly" style="border-color:#dc2626;color:#dc2626">NGのみ表示</button>` : ""}
   <input type="color" id="mk-color" value="#fde047" title="マーカー色">
   <span class="hint">行ダブルクリック / 左端✔クリックでもマークできます</span>
 </div>
