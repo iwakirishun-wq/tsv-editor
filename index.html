@@ -641,8 +641,8 @@
 
       /* ===ハイライト=== */
       td.selected {
-        background: var(--selected) !important;
-        outline: 2px solid var(--accent);
+        background: rgba(249, 115, 22, 0.22) !important;
+        outline: 2px solid #f97316;
         outline-offset: -1px;
         z-index: 2;
       }
@@ -8546,6 +8546,7 @@
             if (!m) return { found: false };
             const kbn = String(m.rsve_unrsve_kbn || "").trim();
             return { found: true, isFree: kbn === "2", isReserved: kbn === "1",
+              stockTyp: String(m.seattype_stock_control_typ || "").trim(),
               box: String(m.box_seat_flg || "").trim() === "1",
               dispAbb: String(m.disp_abb || "").trim(),
               dispNm: String(m.seat_type_area_disp_nm || m.seat_type_area_control_nm || "").trim() };
@@ -8571,27 +8572,48 @@
         const cell = (val, raw, cls) => `<td${cls ? ` class="${cls}"` : ""}${raw != null ? ` data-v="${escHtml(String(raw))}"` : ""}>${escHtml(val)}</td>`;
 
         // --- 共通: 略称・色・期間ヘルパー（全表で使用） ---
-        const money = (s) => { const n = Number(String(s).replace(/,/g, "")); if (isNaN(n)) return ""; return n >= UG_DUMMY_MIN ? "売止" : n.toLocaleString("ja-JP"); };
+        const money = (s) => { const n = Number(String(s).replace(/,/g, "")); if (isNaN(n)) return ""; return n >= UG_DUMMY_MIN ? "販売無" : n.toLocaleString("ja-JP"); };
+        const numOf = (s) => { const n = Number(String(s).replace(/,/g, "")); return isNaN(n) ? null : n; };
         // 席種名: マスタ連携時は表示略称、無ければ席種名
         const seatLabel = (seat, code) => { if (seatMeta) { const m = seatMeta(code, seat); if (m && m.found && m.dispAbb) return m.dispAbb; } return seat; };
         // 券種名: "_"以降〜"（"手前（大人/幼児 等）を抽出して略称化
         const ageLabel = (a) => { let s = String(a || ""); const u = s.lastIndexOf("_"); if (u >= 0) s = s.slice(u + 1); s = s.split(/[（(]/)[0]; return s.trim() || a; };
-        // 席種カテゴリ（指定席/エリア/その他/駐車券）— マスタ・コードを正とする
+        // 席種カテゴリ（指定席/数在庫/その他/駐車券）— マスタ・コードを正とする
         const seatCat = (code, seat) => {
           const ch6 = (code && String(code).length >= 6) ? String(code)[5].toUpperCase() : "";
           if (ch6 === "O") return "その他";
           if (ch6 === "P") return "駐車券";
-          if (seatMeta) { const m = seatMeta(code, seat); if (m && m.found) { if (m.isReserved) return "指定席"; if (m.isFree) return "エリア"; } }
+          if (seatMeta) { const m = seatMeta(code, seat); if (m && m.found) { if (m.stockTyp === "1" || m.isReserved) return "指定席"; if (m.stockTyp === "2" || m.isFree) return "数在庫"; } }
           if (/駐車/.test(seat)) return "駐車券";
-          return /自由席|エリア/.test(seat) ? "エリア" : "指定席";
+          return /自由席|エリア/.test(seat) ? "数在庫" : "指定席";
         };
-        const catBadge = (cat) => `<span class="catb cat-${cat === "指定席" ? "r" : cat === "エリア" ? "a" : cat === "駐車券" ? "p" : "o"}">${cat}</span>`;
-        const compactDate = (s) => String(s || "").replace(/^\d{2}(\d{2})[\/-]/, "").replace(/[\/\-]/g, "/").replace(/\s.*$/, "");
-        const periodOf = (row) => { const s = compactDate(v(row, c.start)), e = compactDate(v(row, c.end)); return (s || e) ? `${s}〜${e}` : ""; };
+        const catBadge = (cat) => `<span class="catb cat-${cat === "指定席" ? "r" : cat === "数在庫" ? "a" : cat === "駐車券" ? "p" : "o"}">${cat}</span>`;
+        // 日時 → MM/DD HH:MM（分単位まで）。"YYYY/MM/DD HH:MM" 等を想定
+        const dt = (s) => {
+          s = String(s || "");
+          let m = s.match(/\d{4}[\/\-](\d{1,2})[\/\-](\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);
+          if (!m) m = s.match(/^(\d{1,2})[\/\-](\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);
+          if (!m) return s;
+          const md = ("0" + m[1]).slice(-2) + "/" + ("0" + m[2]).slice(-2);
+          return m[3] != null ? md + " " + ("0" + m[3]).slice(-2) + ":" + m[4] : md;
+        };
+        const periodOf = (row) => { const s = dt(v(row, c.start)), e = dt(v(row, c.end)); return (s || e) ? `${s}〜${e}` : ""; };
         // 席種ごとの淡いカラー（地味めパレット）
         const _palette = ["#eef2f6", "#eef6f0", "#f6f0ee", "#f1eef6", "#f6f4ee", "#eef5f6", "#f6eef3", "#f0f2ee"];
         const _seatColors = {}; let _ci = 0;
         const seatColor = (seat) => { if (!(seat in _seatColors)) _seatColors[seat] = _palette[_ci++ % _palette.length]; return _seatColors[seat]; };
+        // 席種の並び順キー: 金額（代表前売価格）→ 席種エリアコード（車椅子上段/同伴など関連席をまとめる）
+        const _seatAdv = {}, _seatCodeMap = {};
+        for (const row of normals) {
+          const sc = v(row, c.seat); const n = numOf(v(row, c.adv));
+          if (sc && n != null && n < UG_DUMMY_MIN && (!(sc in _seatAdv) || n < _seatAdv[sc])) _seatAdv[sc] = n;
+          if (sc && !(sc in _seatCodeMap)) _seatCodeMap[sc] = v(row, c.seatCd);
+        }
+        const seatSortKey = (seat, code) => {
+          const price = _seatAdv[seat] != null ? _seatAdv[seat] : 9e9;
+          const cd = code || _seatCodeMap[seat] || seat;
+          return String(price).padStart(12, "0") + "|" + cd;
+        };
         // 券種コード順
         const ageCode = {};
         for (const row of normals.concat(ugs)) {
@@ -8604,21 +8626,31 @@
 
         // --- 通常価格表（フラット・並べ替え/絞り込み可） ---
         if (opt.normal && normals.length) {
-          const labels = ["席種名", "券種名", "販売区分", "会員ランク", "販売経路", "前売", "当日", "販売開始", "販売終了"];
+          const labels = ["席種名", "区分", "券種", "販売区分", "会員ランク", "販売経路", "前売", "当日", "販売開始", "販売終了"];
+          // 並び: 席種(金額→コード) → 券種コード
+          const nsorted = normals.slice().sort((x, y) => {
+            const sk = seatSortKey(v(x, c.seat), v(x, c.seatCd)).localeCompare(seatSortKey(v(y, c.seat), v(y, c.seatCd)), "ja");
+            if (sk) return sk;
+            return String(ageKey(v(x, c.age))).localeCompare(String(ageKey(v(y, c.age))), "ja");
+          });
           let rowsHtml = "";
-          for (const row of normals) {
+          let prevSeat = null;
+          for (const row of nsorted) {
             const mid = encodeURIComponent(["P", v(row, c.seat), v(row, c.age), condOf(row), v(row, c.route), v(row, c.start)].join("|"));
-            const seat = v(row, c.seat), sl = seatLabel(seat, v(row, c.seatCd)), al = ageLabel(v(row, c.age));
-            rowsHtml += `<tr data-mid="${mid}"><td class="mk-cell" title="クリックでマーク">✔</td>`
-              + `<td data-v="${escHtml(sl)}" style="background:${seatColor(seat)};font-weight:600" title="${escHtml(seat)}">${escHtml(sl)}</td>`
-              + cell(al, al)
+            const seat = v(row, c.seat), code = v(row, c.seatCd), sl = seatLabel(seat, code), al = ageLabel(v(row, c.age));
+            const cat = seatCat(code, seat);
+            const sep = (prevSeat !== null && prevSeat !== seat) ? " seat-sep" : ""; prevSeat = seat;
+            rowsHtml += `<tr data-mid="${mid}" data-cond="${escHtml(condOf(row))}" class="${sep.trim()}"><td class="mk-cell" title="クリックでマーク">✔</td>`
+              + `<td data-v="${escHtml(seatSortKey(seat, code))}" style="background:${seatColor(seat)};font-weight:600" title="${escHtml(seat)}">${escHtml(sl)}</td>`
+              + `<td data-v="${escHtml(cat)}">${catBadge(cat)}</td>`
+              + cell(al, ageKey(v(row, c.age)))
               + cell(v(row, c.kbn), v(row, c.kbn))
               + cell(v(row, c.rank), v(row, c.rank))
               + cell(v(row, c.route), v(row, c.route))
               + cell(fmt(v(row, c.adv)), Number(String(v(row, c.adv)).replace(/,/g, "")) || 0, "num adv")
               + cell(fmt(v(row, c.day)), Number(String(v(row, c.day)).replace(/,/g, "")) || 0, "num day")
-              + cell(v(row, c.start), v(row, c.start), "dt")
-              + cell(v(row, c.end), v(row, c.end), "dt")
+              + cell(periodOf ? dt(v(row, c.start)) : v(row, c.start), v(row, c.start), "dt")
+              + cell(dt(v(row, c.end)), v(row, c.end), "dt")
               + `</tr>`;
           }
           // 券種抜けの検出（他マスタが無いため、データ内の券種ユニバースから推定）
@@ -8680,6 +8712,9 @@ ${_sortableTable(labels, rowsHtml)}` };
             const sortAges = (arr) => arr.slice().sort((a, b) => String(ageKey(a)).localeCompare(String(ageKey(b)), "ja"));
             for (const s of fromSeats) fromAges[s] = sortAges(fromAges[s]);
             for (const s of toSeats) toAges[s] = sortAges(toAges[s]);
+            // 席種を金額→コード順に並べる（金額照準）
+            fromSeats.sort((a, b) => seatSortKey(a, seatCode[a]).localeCompare(seatSortKey(b, seatCode[b]), "ja"));
+            toSeats.sort((a, b) => seatSortKey(a, seatCode[a]).localeCompare(seatSortKey(b, seatCode[b]), "ja"));
             const toCols = [];
             for (const ts of toSeats) for (const ta of toAges[ts]) toCols.push({ ts, ta });
 
@@ -8722,11 +8757,11 @@ ${_sortableTable(labels, rowsHtml)}` };
                 bodyRows += `</tr>`;
               });
             }
-            mxBody += `<h3>${escHtml(k)}</h3><div class="scroll mxscroll"><table class="mx">${head}${bodyRows}</table></div>`;
+            mxBody += `<div class="cond-block" data-cond="${escHtml(k)}"><h3>${escHtml(k)}</h3><div class="scroll mxscroll"><table class="mx">${head}${bodyRows}</table></div></div>`;
           }
           const ngBadge = ngTotal ? `　<span class="badge-ng">NG ${ngTotal}件</span>` : `　<span class="badge-ok">検算OK</span>`;
           sections.matrix = { title: "UGマトリクス", body: `<h2>🔢 アップグレードマトリクス（俯瞰）${ngBadge}</h2>
-<p class="legend">行=元席種/券種、列=先席種/券種（券種コード順）。席種は表示略称＋区分（<span class="catb cat-r">指定席</span><span class="catb cat-a">エリア</span><span class="catb cat-o">その他</span>）。各セル: 前=前売差額 / 当=当日差額 / 下=販売期間。<b>赤字の行（前売/当日）が不一致</b>でセル内に理由表示。クリックでマーク</p>${mxBody}` };
+<p class="legend">行=元席種/券種、列=先席種/券種（金額順）。席種は表示略称＋区分（<span class="catb cat-r">指定席</span><span class="catb cat-a">数在庫</span><span class="catb cat-o">その他</span>）。各セル: 前=前売差額 / 当=当日差額 / 下=販売期間。<b>不一致は文字が赤・セルが薄ピンク</b>。クリックでマーク</p>${mxBody}` };
         }
 
         // --- UG一覧（席種ペアでセル結合・元⇒先・金額対比・差異強調） ---
@@ -8742,6 +8777,12 @@ ${_sortableTable(labels, rowsHtml)}` };
             const chk = validate(row);
             if (chk.status === "ng") ng++; else if (chk.status === "unknown") na++; else if (chk.status === "invalid") inv++;
           }
+          // 区間を 元席種(金額→コード)→先席種 順に並べる
+          pairOrder.sort((a, b) => {
+            const pa = pairCode[a], pb = pairCode[b];
+            const k1 = seatSortKey(pa.fs, pa.fcd).localeCompare(seatSortKey(pb.fs, pb.fcd), "ja");
+            return k1 || seatSortKey(pa.ts, pa.tcd).localeCompare(seatSortKey(pb.ts, pb.tcd), "ja");
+          });
           const dual = (a, d, ng1, ng2, t1, t2) => // 前売/当日 2段セル（個別に赤枠可）
             `<div class="two"><span class="${ng1 ? "v-ng" : ""}"${t1 ? ` title="${escHtml(t1)}"` : ""}>前 ${escHtml(a)}</span><span class="${ng2 ? "v-ng" : ""}"${t2 ? ` title="${escHtml(t2)}"` : ""}>当 ${escHtml(d)}</span></div>`;
 
@@ -8765,7 +8806,8 @@ ${_sortableTable(labels, rowsHtml)}` };
               const expStr = (chk.expected != null || chk.expectedDay != null)
                 ? `前 ${chk.expected != null ? chk.expected.toLocaleString("ja-JP") : "?"} / 当 ${chk.expectedDay != null ? chk.expectedDay.toLocaleString("ja-JP") : "?"}`
                 : (chk.advNote || "—");
-              bodyRows += `<tr data-mid="${mid}" class="${isNg ? "ng-row" : ""}"><td class="mk-cell" title="クリックでマーク">✔</td>`;
+              const sep = i === 0 ? " seat-sep" : "";
+              bodyRows += `<tr data-mid="${mid}" data-cond="${escHtml(condOf(row))}" class="${isNg ? "ng-row" : ""}${sep}"><td class="mk-cell" title="クリックでマーク">✔</td>`;
               if (i === 0) bodyRows += `<th class="rowh seatpair" rowspan="${list.length}" style="background:${seatColor(pc.fs)}" title="${escHtml(pc.fs + " ⇒ " + pc.ts)}"><b>${escHtml(fsl)}</b><span class="arrow">⇒</span><b>${escHtml(tsl)}</b></th>`;
               bodyRows += `<td class="kenpair">${escHtml(ageLabel(v(row, c.ugAge)))}<span class="arrow">⇒</span>${escHtml(ageLabel(v(row, c.age)))}</td>`
                 + `<td class="prices">${dual(money(chk.srcAdv != null ? chk.srcAdv : ""), money(chk.srcDay != null ? chk.srcDay : ""))}</td>`
@@ -8790,32 +8832,37 @@ ${_sortableTable(labels, rowsHtml)}` };
         const order = ["normal", "matrix", "ug"].filter(k => sections[k]);
         if (!order.length) { alert("出力対象の行がありません（選択した表に該当データがありません）。"); return; }
 
-        const metaLine = `${rowIndices.length}件${isFiltered ? "（フィルター適用中）" : ""} — ${new Date().toLocaleString("ja-JP")}　|　${seatMeta ? "席種エリアマスタ参照" : "マスタ未連携(券種名で推測)"}`;
+        const metaLine = `${rowIndices.length}件${isFiltered ? "（フィルター適用中）" : ""} — ${new Date().toLocaleString("ja-JP")}　|　席種エリアマスタ参照`;
         const fname = escHtml(state.fileName);
+        const tabLabels = { normal: "通常価格表", matrix: "UGマトリクス", ug: "UG一覧" };
 
-        // 選択した表ごとに別タブで出力する
-        let blocked = 0;
-        order.forEach((key) => {
-          const sec = sections[key];
-          const html = _priceDoc(fname, sec.title, metaLine, sec.body);
-          const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-          const url = URL.createObjectURL(blob);
-          const w = window.open(url, "_blank", "noopener");
-          if (!w) blocked++;
-          setTimeout(() => URL.revokeObjectURL(url), 60000);
+        // 販売条件（会員ランク等）の一覧。既定はチケットアカウントを含む条件
+        const condSet = [];
+        for (const row of normals.concat(ugs)) { const k = condOf(row); if (k && !condSet.includes(k)) condSet.push(k); }
+        const defaultCond = condSet.find(k => /チケットアカウント/.test(k)) || condSet[0] || "";
+        const condSel = condSet.length > 1
+          ? `<label class="cond-wrap">会員ランク/条件: <select id="cond-sel">${condSet.map(k => `<option value="${escHtml(k)}"${k === defaultCond ? " selected" : ""}>${escHtml(k)}</option>`).join("")}<option value="__all">（すべて表示）</option></select></label>`
+          : "";
+
+        // 選択した表を1タブ内のサブタブにまとめて出力（ポップアップブロック回避）
+        let nav = "", panes = "";
+        order.forEach((key, i) => {
+          nav += `<button class="ptab${i === 0 ? " on" : ""}" data-pane="${key}">${tabLabels[key]}</button>`;
+          panes += `<div class="ppane${i === 0 ? " on" : ""}" data-pane="${key}">${sections[key].body}</div>`;
         });
-        const names = order.map(k => sections[k].title).join("・");
-        if (blocked) {
-          setStatus(`価格チェックHTMLを出力（${names}）。一部タブがポップアップブロックされました（${blocked}件）。ブラウザでこのサイトのポップアップを許可してください。`);
-        } else {
-          setStatus(`価格チェックHTMLを${order.length}タブに出力しました（${names}）`);
-        }
+        const html = _priceDoc(fname, metaLine, nav, panes, condSel, defaultCond);
+        const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const w = window.open(url, "_blank", "noopener");
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        const names = order.map(k => tabLabels[k]).join("・");
+        setStatus(w ? `価格チェックHTMLを出力しました（${names}）` : `ポップアップがブロックされました。ブラウザでこのサイトのポップアップを許可してください。`);
       }
 
-      // 価格チェック用HTML文書（1表＝1ファイル）を組み立てる。ヘッダーはスクロール追従で固定。
-      function _priceDoc(fname, title, metaLine, bodyHtml) {
+      // 価格チェック用HTML文書（1タブ＝サブタブ切替）。ヘッダー固定・条件セレクタ付き。
+      function _priceDoc(fname, metaLine, navHtml, panesHtml, condSel, defaultCond) {
         return `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
-<title>${fname} - ${title}</title>
+<title>${fname} - 価格チェック</title>
 <style>
 :root { --mk: #fde047; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -8872,27 +8919,27 @@ tr.ng-row td.mk-cell { box-shadow: inset 3px 0 0 #dc2626; }
 .mxscroll { max-height: calc(100vh - 210px); }
 table.mx { width: auto; border-collapse: separate; border-spacing: 0; }
 table.mx th, table.mx td { text-align: center; padding: 2px 6px; font-size: 11px; line-height: 1.25; }
-/* 列ヘッダー（先・上部固定）2段 */
-table.mx th.seathdr { position: sticky; top: 0; z-index: 4; font-size: 11.5px; font-weight: 700; }
-table.mx th.agehdr:not(.rowh) { position: sticky; top: 24px; z-index: 4; background: #eef2f6; font-weight: 600; color: #444; }
-/* 行ヘッダー（元・左固定）2列 */
-table.mx th.seatrow { position: sticky; left: 0; z-index: 3; width: 64px; min-width: 64px; max-width: 64px; font-weight: 700; vertical-align: middle; writing-mode: vertical-rl; text-orientation: mixed; }
-table.mx th.agecol { position: sticky; left: 64px; z-index: 3; width: 92px; min-width: 92px; max-width: 92px; text-align: left; background: #f3f5f8; font-weight: 600; }
+/* 列ヘッダー（先・上部固定）2段。左固定セル(z5)より前面に */
+table.mx th.seathdr { position: sticky; top: 0; z-index: 6; font-size: 11.5px; font-weight: 700; }
+table.mx th.agehdr:not(.rowh) { position: sticky; z-index: 6; background: #eef2f6; font-weight: 600; color: #444; }
+/* 行ヘッダー（元・左固定）2列。隙間が透けないよう不透明・隣接 */
+table.mx th.seatrow { position: sticky; left: 0; z-index: 5; width: 58px; min-width: 58px; max-width: 58px; font-weight: 700; vertical-align: middle; white-space: normal; line-height: 1.2; }
+table.mx th.agecol { position: sticky; left: 58px; z-index: 5; width: 92px; min-width: 92px; max-width: 92px; text-align: left; background: #f3f5f8; font-weight: 600; }
 /* 隅（上＋左固定） */
-table.mx th.corner { position: sticky; top: 0; left: 0; z-index: 6; background: #e2e8ee; }
+table.mx th.corner { position: sticky; top: 0; left: 0; z-index: 7; background: #e2e8ee; }
 table.mx .hp { font-size: 9px; font-weight: 400; color: #777; line-height: 1.15; margin-top: 1px; }
 td.mxc { cursor: pointer; position: relative; min-width: 64px; }
 td.mxc .adv { font-weight: 600; color: #be185d; }
 td.mxc .day { font-size: 10px; color: #b45309; }
 td.mxc .per { font-size: 9px; color: #999; }
-td.mxc .l-ng { color: #dc2626; font-weight: 700; outline: 1.5px solid #dc2626; outline-offset: 0; border-radius: 2px; }
+td.mxc .l-ng { color: #dc2626; font-weight: 700; }
 td.mxc .rsn { font-size: 9px; color: #dc2626; font-weight: 700; margin-top: 1px; }
 .catb { display: inline-block; font-size: 8.5px; font-weight: 700; padding: 0 4px; border-radius: 6px; margin-left: 3px; vertical-align: middle; line-height: 1.5; }
 .cat-r { background: #dbeafe; color: #1d4ed8; }
 .cat-a { background: #dcfce7; color: #15803d; }
 .cat-o { background: #fef3c7; color: #b45309; }
 .cat-p { background: #ede9fe; color: #6d28d9; }
-td.mxc.mx-ng { background: #fee2e2; outline: 2px solid #dc2626; outline-offset: -2px; }
+td.mxc.mx-ng { background: #fde8e8; }
 td.mxc.mx-na { background: #f5f5f5; }
 td.mxc.mx-na .adv, td.mxc.mx-na .day { color: #9ca3af; }
 td.mxc.marked { box-shadow: inset 0 0 0 3px var(--mk); }
@@ -8915,11 +8962,21 @@ body.crosshi td.cross-col:not(.mk-cell), body.crosshi tr.cross-row td:not(.mk-ce
 .toolbar #mk-ngonly.on { background: #dc2626; color: #fff; }
 .toolbar .hint { color: #888; }
 #mk-count { font-weight: 700; color: #217346; }
-@media print { .toolbar, .filter-row { display: none; } .content { overflow: visible; } .scroll { overflow: visible; max-height: none; } }
+/* サブタブ・条件セレクタ */
+.ptabs { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
+.ptab { padding: 5px 16px; border: 1px solid #cfd6df; border-bottom: none; background: #eef2f6; color: #555; border-radius: 6px 6px 0 0; cursor: pointer; font-size: 13px; }
+.ptab.on { background: #217346; color: #fff; border-color: #217346; font-weight: 700; }
+.cond-wrap { font-size: 12px; color: #444; margin-left: 14px; }
+.cond-wrap select { font-size: 12px; padding: 2px 6px; border: 1px solid #cfd6df; border-radius: 4px; }
+.ppane { display: none; }
+.ppane.on { display: block; }
+.seat-sep td, .seat-sep th { border-top: 2px solid #94a3b8 !important; }
+@media print { .toolbar, .filter-row, .ptabs { display: none; } .ppane { display: block !important; } .content { overflow: visible; } .scroll { overflow: visible; max-height: none; } }
 </style></head><body>
-<div class="header"><h1>💴 ${fname} <span style="font-size:12px;color:#666;font-weight:400">${title}</span></h1>
-<div class="meta">${metaLine}　|　ヘッダー固定・列見出しで並べ替え・各列で絞り込み</div></div>
-<div class="content">${bodyHtml}</div>
+<div class="header"><h1>💴 ${fname} <span style="font-size:12px;color:#666;font-weight:400">価格チェック</span></h1>
+<div class="meta">${metaLine}　|　ヘッダー固定・列見出しで並べ替え・各列で絞り込み　${condSel}</div>
+<div class="ptabs">${navHtml}</div></div>
+<div class="content">${panesHtml}</div>
 <div class="toolbar">
   <span>チェック進捗: <span id="mk-count">0 / 0</span></span>
   <button id="mk-btn">選択した行をマーク（Ctrl+Q）</button>
@@ -8929,7 +8986,7 @@ body.crosshi td.cross-col:not(.mk-cell), body.crosshi tr.cross-row td:not(.mk-ce
   <label class="tg"><input type="checkbox" id="mk-cross"${state.crossHi ? " checked" : ""}> 十字強調</label>
   <span class="hint">行ダブルクリック / 左端✔クリックでもマーク</span>
 </div>
-<` + `script>${_priceCheckScript()}<` + `/script>
+<` + `script>var DEFAULT_COND=${JSON.stringify(defaultCond || "")};${_priceCheckScript()}<` + `/script>
 </body></html>`;
       }
 
@@ -8997,19 +9054,27 @@ body.crosshi td.cross-col:not(.mk-cell), body.crosshi tr.cross-row td:not(.mk-ce
   document.getElementById('mk-clear').onclick = function(){ if (!confirm('マークをすべて解除しますか？')) return; saved = {}; persist(); markables().forEach(paint); refreshCount(); };
   document.getElementById('mk-color').oninput = function(e){ document.documentElement.style.setProperty('--mk', e.target.value); try { localStorage.setItem(KEY + '|color', e.target.value); } catch(err){} };
   try { var cc = localStorage.getItem(KEY + '|color'); if (cc) { document.documentElement.style.setProperty('--mk', cc); document.getElementById('mk-color').value = cc; } } catch(e){}
+  var ngOnly = false;
   var ngBtn = document.getElementById('mk-ngonly');
   if (ngBtn) ngBtn.onclick = function(){
-    var on = !document.body.classList.contains('ngonly');
-    document.body.classList.toggle('ngonly', on); ngBtn.classList.toggle('on', on);
-    ngBtn.textContent = on ? '全件表示に戻す' : 'NG/未チェックのみ';
-    document.querySelectorAll('tr[data-mid]').forEach(function(tr){
-      if (!on) { tr.dataset._ngHide = ''; return; }
-      var isNg = tr.classList.contains('ng-row');
-      var isDone = tr.classList.contains('marked');
-      tr.dataset._ngHide = (isNg || !isDone) ? '' : '1';
-    });
+    ngOnly = !ngOnly;
+    document.body.classList.toggle('ngonly', ngOnly); ngBtn.classList.toggle('on', ngOnly);
+    ngBtn.textContent = ngOnly ? '全件表示に戻す' : 'NG/未チェックのみ';
     applyAll();
   };
+
+  // サブタブ切替
+  document.querySelectorAll('.ptab').forEach(function(tab){
+    tab.addEventListener('click', function(){
+      document.querySelectorAll('.ptab').forEach(function(t){ t.classList.toggle('on', t === tab); });
+      document.querySelectorAll('.ppane').forEach(function(p){ p.classList.toggle('on', p.getAttribute('data-pane') === tab.getAttribute('data-pane')); });
+    });
+  });
+
+  // 販売条件フィルタ（既定はチケットアカウント条件）
+  var condSel = document.getElementById('cond-sel');
+  var curCond = (typeof DEFAULT_COND !== 'undefined' && DEFAULT_COND) ? DEFAULT_COND : '__all';
+  if (condSel) { condSel.value = curCond; condSel.addEventListener('change', function(){ curCond = condSel.value; applyAll(); }); }
 
   // 並べ替え
   document.querySelectorAll('table.sortable').forEach(function(tbl){
@@ -9031,28 +9096,46 @@ body.crosshi td.cross-col:not(.mk-cell), body.crosshi tr.cross-row td:not(.mk-ce
           var r = bothNum ? na - nb : String(xa).localeCompare(String(xb), 'ja');
           return asc ? r : -r;
         });
-        rows.forEach(function(r){ tbody.appendChild(r); });
-        var arr = document.createElement('span'); arr.className = 'arr'; arr.textContent = asc ? ' ▲' : ' ▼'; th.appendChild(arr);
+        rows.forEach(function(r){ r.classList.remove('seat-sep'); tbody.appendChild(r); });
       });
     });
     tbl.querySelectorAll('.filter-row input[data-fc]').forEach(function(inp){ inp.addEventListener('input', applyAll); });
   });
 
+  function rowVisible(tr, inputs){
+    if (curCond !== '__all' && tr.getAttribute('data-cond') && tr.getAttribute('data-cond') !== curCond) return false;
+    if (ngOnly) { var ng = tr.classList.contains('ng-row'); var done = tr.classList.contains('marked'); if (!ng && done) return false; }
+    if (inputs) for (var i = 0; i < inputs.length; i++) {
+      var q = inputs[i].value.trim().toLowerCase(); if (!q) continue;
+      var ci = +inputs[i].getAttribute('data-fc'); var cl = tr.cells[ci + 1]; if (!cl) continue;
+      var txt = (cl.getAttribute('data-v') || cl.textContent).toLowerCase();
+      if (txt.indexOf(q) === -1) return false;
+    }
+    return true;
+  }
   function applyAll(){
+    // sortable（通常価格表）
     document.querySelectorAll('table.sortable').forEach(function(tbl){
       var inputs = tbl.querySelectorAll('.filter-row input[data-fc]');
-      tbl.tBodies[0].querySelectorAll('tr').forEach(function(tr){
-        var show = tr.dataset._ngHide !== '1';
-        if (show) inputs.forEach(function(inp){
-          var q = inp.value.trim().toLowerCase(); if (!q) return;
-          var ci = +inp.getAttribute('data-fc'); var cl = tr.cells[ci + 1];
-          var txt = (cl.getAttribute('data-v') || cl.textContent).toLowerCase();
-          if (txt.indexOf(q) === -1) show = false;
-        });
-        tr.style.display = show ? '' : 'none';
-      });
+      tbl.tBodies[0].querySelectorAll('tr').forEach(function(tr){ tr.style.display = rowVisible(tr, inputs) ? '' : 'none'; });
+    });
+    // UG一覧（グループ表・data-mid行）
+    document.querySelectorAll('table.uglist tr[data-mid]').forEach(function(tr){ tr.style.display = rowVisible(tr, null) ? '' : 'none'; });
+    // マトリクスは販売条件ブロック単位で表示
+    document.querySelectorAll('.cond-block').forEach(function(b){ b.style.display = (curCond === '__all' || b.getAttribute('data-cond') === curCond) ? '' : 'none'; });
+  }
+
+  // 2段ヘッダーの2行目stickyオフセットを1行目の高さに合わせる（行が隠れないように）
+  function fixSticky(){
+    document.querySelectorAll('table.mx').forEach(function(tbl){
+      var r0 = tbl.rows[0]; if (!r0) return;
+      var h = r0.getBoundingClientRect().height;
+      tbl.querySelectorAll('th.agehdr:not(.rowh)').forEach(function(th){ th.style.top = h + 'px'; });
     });
   }
+  window.addEventListener('load', fixSticky);
+  setTimeout(fixSticky, 50);
+  applyAll();
   refreshCount();
 })();`;
       }
