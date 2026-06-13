@@ -652,6 +652,9 @@
       td.col-highlight {
         background: var(--col-selected);
       }
+      td.cross-hi {
+        background: rgba(33, 115, 70, 0.06);
+      }
       td.search-hit {
         background: var(--hit) !important;
       }
@@ -1693,9 +1696,9 @@
               <span>区画席検査</span>
             </button>
           </div>
-          <span class="rb-group-label">検品表示</span>
+          <span class="rb-group-label">検品</span>
         </div>
-        <!-- Group: 変換・出力 -->
+        <!-- Group: 変換 -->
         <div class="rb-group">
           <div class="rb-buttons">
             <button class="rb-btn" id="btn-apply-dict" title="辞書を使ってヘッダーを日本語に変換&#10;Shift+クリックでも辞書編集画面を開けます" aria-label="辞書を適用してヘッダーを変換">
@@ -1706,16 +1709,22 @@
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path><path d="M9 7h6M9 11h4"></path></svg></span>
               <span>辞書編集</span>
             </button>
-            <button class="rb-btn" id="btn-html-export" title="SEJ設定をHTMLページとして出力&#10;新しいタブで開き、席種設定の詳細を確認できます&#10;フィルター中は絞り込んだ行のみ出力" aria-label="SEJ HTML出力">
+          </div>
+          <span class="rb-group-label">変換</span>
+        </div>
+        <!-- Group: HTML出力 -->
+        <div class="rb-group">
+          <div class="rb-buttons">
+            <button class="rb-btn" id="btn-html-export" title="SEJ設定／席種マスタをHTMLページとして出力&#10;新しいタブで開き、設定の詳細を確認できます&#10;フィルター中は絞り込んだ行のみ出力" aria-label="SEJ HTML出力">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M12 13H8M12 17H8"></path><path d="M16 13l2 2-2 2"></path></svg></span>
-              <span>HTML出力</span>
+              <span>SEJ/マスタ出力</span>
             </button>
-            <button class="rb-btn" id="btn-price-sheet" title="経路価格スケジュール（BO-F-21030）をチェック用HTMLとして出力&#10;通常価格表 / UGマトリクス / UG一覧 を選んで出力&#10;UG差額は自動検算（NG赤表示）、出力先で並べ替え・絞り込み可能" aria-label="価格チェック表を出力">
+            <button class="rb-btn" id="btn-price-sheet" title="経路価格スケジュール（BO-F-21030）をチェック用HTMLとして出力&#10;通常価格表 / UGマトリクス / UG一覧 を選んで出力&#10;UG差額は自動検算（NG赤表示）、出力先で並べ替え・絞り込み可能&#10;※席種エリアマスタ連携が必須" aria-label="価格チェック表を出力">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="17" rx="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="8" y1="4" x2="8" y2="2"></line><line x1="16" y1="4" x2="16" y2="2"></line><path d="M7 13h4M7 17h7"></path><circle cx="16.5" cy="15" r="2.5"></circle><path d="M16.5 14v1l.8.8"></path></svg></span>
               <span>価格チェック表</span>
             </button>
           </div>
-          <span class="rb-group-label">変換・出力</span>
+          <span class="rb-group-label">HTML出力</span>
         </div>
       </div>
 
@@ -1744,7 +1753,17 @@
               <span>ヘッダー</span>
             </button>
           </div>
-          <span class="rb-group-label">表示</span>
+          <span class="rb-group-label">行・列・ヘッダー</span>
+        </div>
+        <!-- Group: 補助表示 -->
+        <div class="rb-group">
+          <div class="rb-buttons">
+            <button class="rb-btn" id="btn-cross-hi" title="選択中のセルの行と列を淡く強調表示します（十字ハイライト）&#10;設定はブラウザに保存され、HTML出力にも反映されます" aria-label="十字ハイライトの切り替え" aria-pressed="true">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="1"></rect><rect x="3" y="9" width="18" height="6" fill="currentColor" opacity="0.15"></rect><rect x="9" y="3" width="6" height="18" fill="currentColor" opacity="0.15"></rect></svg></span>
+              <span>十字強調</span>
+            </button>
+          </div>
+          <span class="rb-group-label">補助</span>
         </div>
       </div>
     </div>
@@ -2144,6 +2163,7 @@
         kanaCheck: false,    // 全角カタカナ検出（半角カナ必須フィールド用）
         boxCheck: false,     // 区画席（（〇名）席種）の設定検査
         verticalHeader: true, // ヘッダー縦書き表示（既定でON・列幅節約）
+        crossHi: true,        // 選択セルの行・列を十字ハイライト（localStorage保存）
         markerColor: "#facc15", // マーカー色（localStorageに保存）
         _lastAction: null,   // F4 繰り返し用 { type, payload }
 
@@ -2419,6 +2439,17 @@
             note: [problems.join(" / "), notes.join(" / "), problems.length ? "" : (adv.note || "")].filter(Boolean).join(" / "),
           };
         };
+      }
+
+      // 十字ハイライト切り替え（選択セルの行・列を強調）
+      function toggleCrossHi() {
+        state.crossHi = !state.crossHi;
+        const btn = $("btn-cross-hi");
+        if (btn) { btn.classList.toggle("active-state", state.crossHi); btn.setAttribute("aria-pressed", String(state.crossHi)); }
+        try { localStorage.setItem("tsv-cross-hi", state.crossHi ? "1" : "0"); } catch (e) {}
+        state.forceRender = true;
+        renderBody();
+        setStatus(`十字ハイライト: ${state.crossHi ? "ON" : "OFF"}`);
       }
 
       // 縦書きヘッダー切り替え（列幅節約）
@@ -3002,6 +3033,10 @@
           const _vh = $("btn-vertical-header");
           if (_vh) { _vh.classList.add("active-state"); _vh.setAttribute("aria-pressed", "true"); }
         }
+        // 十字ハイライト（localStorageから復元・既定ON）
+        $("btn-cross-hi").onclick = toggleCrossHi;
+        try { const cs = localStorage.getItem("tsv-cross-hi"); if (cs !== null) state.crossHi = cs === "1"; } catch (e) {}
+        { const _ch = $("btn-cross-hi"); if (_ch) { _ch.classList.toggle("active-state", state.crossHi); _ch.setAttribute("aria-pressed", String(state.crossHi)); } }
         $("btn-header-mode").onclick = toggleHeaderMode;
         $("btn-new-sheet").onclick = addNewSheet;
         $("btn-reset-view").onclick = resetView;
@@ -4415,6 +4450,7 @@
           const wrapCls = state.wrapRows.has(i) ? " wrap-row" : "";
           html += `<tr role="row" data-row="${i}" aria-rowindex="${i + 2}" class="${isDup ? 'dup-row' : ''}${wrapCls}">`;
           html += `<td role="rowheader" class="row-num${rowInRange ? " row-selected" : ""}${isDup}" data-rownum="${i}">${i + 1}</td>`;
+          const crossRow = state.crossHi && state.selected && state.selected.row === i;
           for (const j of visCols) {
             let cls = [];
             if (state.selected?.row === i && state.selected?.col === j)
@@ -4426,6 +4462,10 @@
               !(state.selected?.row === i && state.selected?.col === j)
             )
               cls.push("col-highlight");
+            // 十字ハイライト（選択セルの行・列を淡く強調）
+            if (state.crossHi && state.selected && !(state.selected.row === i && state.selected.col === j)) {
+              if (crossRow || state.selected.col === j) cls.push("cross-hi");
+            }
             if (isHit(i, j)) {
               cls.push("search-hit");
               if (
@@ -4622,7 +4662,9 @@
         const rangeChanged =
           JSON.stringify(prev.range) !== JSON.stringify(cur.range);
         const colChanged = prev.selectedCol !== cur.selectedCol;
-        if (rangeChanged || colChanged) {
+        // 十字ハイライトON時は選択セルの行/列移動でも再描画が必要
+        const selMoved = (prev.selected?.row !== cur.selected?.row) || (prev.selected?.col !== cur.selected?.col);
+        if (rangeChanged || colChanged || (state.crossHi && selMoved)) {
           _prevHighlight = {
             selected: cur.selected,
             range: cur.range ? { ...cur.range } : null,
@@ -8863,6 +8905,9 @@ td.na { color: #ccc; background: #fafafa; }
 .badge-na { background: #9ca3af; color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 999px; vertical-align: middle; }
 tr.marked td { background: color-mix(in srgb, var(--mk) 38%, #ffffff); }
 tr[data-mid]:hover td { outline: 1px solid #b8c4d4; outline-offset: -1px; }
+/* 十字ハイライト（選択中の行・列） */
+body.crosshi td.cross-col:not(.mk-cell), body.crosshi tr.cross-row td:not(.mk-cell) { background: rgba(33, 115, 70, 0.08); }
+.toolbar label.tg { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; color: #444; }
 .toolbar { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255,255,255,.97); border-top: 1px solid #d8dde4; padding: 8px 20px; display: flex; align-items: center; gap: 12px; font-size: 12px; z-index: 10; box-shadow: 0 -2px 8px rgba(0,0,0,.06); }
 .toolbar button { padding: 5px 14px; border: 1px solid #217346; color: #217346; background: #fff; border-radius: 5px; cursor: pointer; font-size: 12px; }
 .toolbar button:hover { background: #eaf4ee; }
@@ -8881,6 +8926,7 @@ tr[data-mid]:hover td { outline: 1px solid #b8c4d4; outline-offset: -1px; }
   <button id="mk-clear">全解除</button>
   <button id="mk-ngonly" style="border-color:#dc2626;color:#dc2626">NG/未チェックのみ</button>
   <input type="color" id="mk-color" value="#fde047" title="マーカー色">
+  <label class="tg"><input type="checkbox" id="mk-cross"${state.crossHi ? " checked" : ""}> 十字強調</label>
   <span class="hint">行ダブルクリック / 左端✔クリックでもマーク</span>
 </div>
 <` + `script>${_priceCheckScript()}<` + `/script>
@@ -8907,6 +8953,22 @@ tr[data-mid]:hover td { outline: 1px solid #b8c4d4; outline-offset: -1px; }
   var saved = {};
   try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch(e){}
   function persist(){ try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch(e){} }
+
+  // --- 十字ハイライト（マウス位置の行・列を強調）---
+  var crossOn = false;
+  function clearCross(){ document.querySelectorAll('tr.cross-row').forEach(function(t){ t.classList.remove('cross-row'); }); document.querySelectorAll('td.cross-col').forEach(function(t){ t.classList.remove('cross-col'); }); }
+  function applyCross(cell){
+    clearCross();
+    if (!crossOn || !cell) return;
+    var tr = cell.parentElement; if (tr) tr.classList.add('cross-row');
+    var tbl = cell.closest('table'); if (!tbl) return;
+    var ci = cell.cellIndex;
+    tbl.querySelectorAll('tr').forEach(function(r){ var cc = r.cells[ci]; if (cc) cc.classList.add('cross-col'); });
+  }
+  document.addEventListener('mouseover', function(e){ if (!crossOn) return; var cell = e.target.closest('td,th'); if (cell) applyCross(cell); });
+  var crossBox = document.getElementById('mk-cross');
+  function setCross(on){ crossOn = on; document.body.classList.toggle('crosshi', on); if (!on) clearCross(); try { localStorage.setItem('tsv-cross-hi', on ? '1' : '0'); } catch(e){} }
+  if (crossBox){ try { var cs = localStorage.getItem('tsv-cross-hi'); if (cs !== null) crossBox.checked = cs === '1'; } catch(e){} setCross(crossBox.checked); crossBox.addEventListener('change', function(){ setCross(crossBox.checked); }); }
   // 一覧は行(tr[data-mid])、マトリクスはセル(td[data-mid])が対象
   function markables(){ return document.querySelectorAll('tr[data-mid], td.mxc[data-mid]'); }
   function paint(el){ el.classList.toggle('marked', !!saved[el.getAttribute('data-mid')]); }
