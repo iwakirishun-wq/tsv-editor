@@ -2326,11 +2326,13 @@
             return { status: "unknown", expected: null, srcPrice: src, dstPrice: dst };
           }
           const diff = dst - src;
-          const expected = diff <= 500 ? 500 : diff; // 同額・500円以下は一律500円
+          // 同額・500円以下（マイナス＝ダウングレード含む）は一律500円。0円にはならない
+          const expected = diff <= 500 ? 500 : diff;
           const actual = Number(String(v(row, c.adv)).replace(/,/g, ""));
           return {
             status: !isNaN(actual) && actual === expected ? "ok" : "ng",
             expected, srcPrice: src, dstPrice: dst,
+            isDown: diff < 0, // 下位席種への変更（通常は設定されないはず）
           };
         };
       }
@@ -8524,8 +8526,43 @@
             ? `　<span class="badge-ng">NG ${ngCount}件</span>`
             : `　<span class="badge-ok">検算すべてOK</span>`;
           const naBadge = naCount ? `　<span class="badge-na">価格不明 ${naCount}件</span>` : "";
-          body += `<h2>🔀 アップグレード表（${ugs.length}件）${ngBadge}${naBadge}</h2>
-<p class="legend">検算 = 先席種の前売価格 − 元席種の前売価格（差額500円以下・同額は一律500円ルール）。設定値と一致すれば ✓</p>
+
+          // --- マトリクス（Excel料金表のアップグレード表形式・俯瞰用） ---
+          const mxFrom = [], mxTo = [];
+          const mxMap = new Map();
+          for (const key of pairOrder) {
+            for (const { row, chk } of pairMap.get(key)) {
+              const fk = escHtml(v(row, c.ugSeat) || "?") + '<br><span class="sub">' + escHtml(v(row, c.ugAge) || "") + "</span>";
+              const tk = escHtml(v(row, c.seat) || "?") + '<br><span class="sub">' + escHtml(v(row, c.age) || "") + "</span>";
+              if (!mxFrom.includes(fk)) mxFrom.push(fk);
+              if (!mxTo.includes(tk)) mxTo.push(tk);
+              if (!mxMap.has(fk + "=>" + tk)) mxMap.set(fk + "=>" + tk, { row, chk });
+            }
+          }
+          body += `<h2>🔀 アップグレードマトリクス（俯瞰）${ngBadge}${naBadge}</h2>
+<p class="legend">上段: 前売差額 / 下段: 当日差額。赤セル = 検算NG。セルにマウスで期待値と販売期間</p>
+<div class="scroll"><table class="mx">
+<tr><th class="corner">元＼先</th>${mxTo.map(tk => `<th>${tk}</th>`).join("")}</tr>`;
+          for (const fk of mxFrom) {
+            body += `<tr><th class="rowh">${fk}</th>`;
+            for (const tk of mxTo) {
+              const cell = mxMap.get(fk + "=>" + tk);
+              if (!cell) { body += `<td class="na">—</td>`; continue; }
+              const { row, chk } = cell;
+              const tip = (chk.expected != null
+                ? `期待差額 ${chk.expected.toLocaleString("ja-JP")}（先 ${fmt(String(chk.dstPrice))} − 元 ${fmt(String(chk.srcPrice))}）`
+                : "通常価格が見つからず検算不能")
+                + `\n販売期間 ${v(row, c.start)} 〜 ${v(row, c.end)}`;
+              const cls = chk.status === "ng" ? " mx-ng" : chk.status === "unknown" ? " mx-na" : "";
+              const dg = chk.isDown ? '<div class="dg">▼下位変更</div>' : "";
+              body += `<td class="mxc${cls}" title="${escHtml(tip)}"><div class="adv">${escHtml(fmt(v(row, c.adv)))}</div><div class="day">${escHtml(fmt(v(row, c.day)))}</div>${dg}</td>`;
+            }
+            body += `</tr>`;
+          }
+          body += `</table></div>`;
+
+          body += `<h2>📝 アップグレード一覧（チェック用・${ugs.length}件）</h2>
+<p class="legend">検算 = 先席種の前売価格 − 元席種の前売価格。差額が500円以下・同額・マイナス（ダウングレード）の場合も0円にはならず一律500円。設定値と一致すれば ✓</p>
 <table class="ug-table">
 <tr><th class="mk-h"></th><th>元券種</th><th>先券種</th><th>販売条件</th><th class="num">前売差額</th><th class="num">期待差額</th><th>検算</th><th class="num">当日差額</th><th>販売開始</th><th>販売終了</th></tr>`;
           for (const key of pairOrder) {
@@ -8544,7 +8581,7 @@
 <td>${escHtml(v(row, c.ugAge))}</td>
 <td>${escHtml(v(row, c.age))}</td>
 <td>${escHtml(condOf(row))}</td>
-<td class="num ug">${escHtml(fmt(v(row, c.adv)))}</td>
+<td class="num ug">${escHtml(fmt(v(row, c.adv)))}${chk.isDown ? '<div class="dg">▼下位変更</div>' : ""}</td>
 <td class="num exp" title="${escHtml(expTitle)}">${chk.expected != null ? escHtml(fmt(String(chk.expected))) : "—"}</td>
 ${chk.status === "ok" ? '<td class="chk-ok">✓</td>' : isNg ? '<td class="chk-ng">✗ NG</td>' : '<td class="chk-na">価格不明</td>'}
 <td class="num ugday">${escHtml(fmt(v(row, c.day)))}</td>
@@ -8651,6 +8688,18 @@ td.ug { font-weight: 600; color: #be185d; }
 td.ugday { color: #b45309; }
 td.dt { font-size: 11.5px; color: #555; }
 .legend { font-size: 11px; color: #888; margin: -4px 0 6px; }
+.scroll { overflow-x: auto; }
+table.mx { width: auto; min-width: 420px; }
+table.mx th, table.mx td { text-align: center; }
+table.mx th.corner { background: #e2e8ee; }
+table.mx th.rowh { text-align: left; position: sticky; left: 0; background: #eef2f6; z-index: 1; }
+.sub { font-size: 10px; color: #888; font-weight: 400; }
+td.mxc .adv { font-weight: 600; color: #be185d; }
+td.mxc .day { font-size: 11px; color: #b45309; }
+td.mxc.mx-ng { background: #fee2e2; outline: 2px solid #dc2626; outline-offset: -2px; }
+td.mxc.mx-na { background: #f5f5f5; }
+td.mxc.mx-na .adv, td.mxc.mx-na .day { color: #9ca3af; }
+.dg { font-size: 10px; color: #ea580c; font-weight: 700; }
 tr.pair-head td { background: #fdf2f8; font-weight: 700; border-top: 2px solid #be185d; font-size: 13px; }
 tr.pair-head .arrow { color: #be185d; margin: 0 8px; }
 td.exp { color: #555; }
