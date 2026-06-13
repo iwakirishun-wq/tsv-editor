@@ -1710,7 +1710,7 @@
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M12 13H8M12 17H8"></path><path d="M16 13l2 2-2 2"></path></svg></span>
               <span>HTML出力</span>
             </button>
-            <button class="rb-btn" id="btn-price-sheet" title="経路価格スケジュール（BO-F-21030）をチェックしやすい形に変換し、&#10;別タブの参照シートとして生成します&#10;販売期間・席種・年齢区分・金額・UG元/差額を一覧化&#10;会員ランクや販売区分はフィルターで絞り込めます" aria-label="価格スケジュールチェック表を生成">
+            <button class="rb-btn" id="btn-price-sheet" title="経路価格スケジュール（BO-F-21030）をチェック用HTMLとして出力&#10;通常価格表 / UGマトリクス / UG一覧 を選んで出力&#10;UG差額は自動検算（NG赤表示）、出力先で並べ替え・絞り込み可能" aria-label="価格チェック表を出力">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="17" rx="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="8" y1="4" x2="8" y2="2"></line><line x1="16" y1="4" x2="16" y2="2"></line><path d="M7 13h4M7 17h7"></path><circle cx="16.5" cy="15" r="2.5"></circle><path d="M16.5 14v1l.8.8"></path></svg></span>
               <span>価格チェック表</span>
             </button>
@@ -2300,13 +2300,16 @@
       }
 
       // ===== UG差額の自動検算 =====
-      // 同じスケジュール内の通常価格から 期待差額 = 先席種価格 − 元席種価格 を計算する。
-      // 手数料ルール: 差額が500円以下（同額含む）の場合は一律500円。
-      // 戻り値: rowsの各UG行に対する { status: "ok"|"ng"|"unknown", expected, srcPrice, dstPrice }
+      // 検算ルール:
+      //  ・同席種（元席種==先席種）のUG → 一律500円（指定席のみ有効）
+      //    ただし席種名に「自由席」「エリア」を含み、同券種（元券種==先券種）の場合は設定不可（invalid）
+      //  ・異席種（席種が変わる本来のUG）→ 期待差額 = 先席種価格 − 元席種価格（実差額）
+      //    大人は上がるが子供は下がる等で負になっても500円にはせず実差額を記載
+      // 戻り値: { status: "ok"|"ng"|"unknown"|"invalid", expected, srcPrice, dstPrice, sameSeat, isDown, note }
       function buildUgValidator(rows, c, v) {
         const condKey = (row) => [v(row, c.kbn), v(row, c.rank), v(row, c.route)].join("|");
-        const priceByCond = new Map(); // cond|seat|age -> adv price (number)
-        const priceAny = new Map();    // seat|age -> adv price (number)
+        const priceByCond = new Map();
+        const priceAny = new Map();
         for (const row of rows) {
           const flag = v(row, c.ugFlag);
           if (flag === "該当" || flag === "1") continue;
@@ -2316,105 +2319,37 @@
           priceByCond.set(condKey(row) + "|" + seat + "|" + age, n);
           if (!priceAny.has(seat + "|" + age)) priceAny.set(seat + "|" + age, n);
         }
+        const isFreeArea = (seat) => /自由席|エリア/.test(seat);
         return function validate(row) {
-          const ck = condKey(row);
-          const srcKey = v(row, c.ugSeat) + "|" + v(row, c.ugAge);
-          const dstKey = v(row, c.seat) + "|" + v(row, c.age);
-          const src = priceByCond.has(ck + "|" + srcKey) ? priceByCond.get(ck + "|" + srcKey) : priceAny.get(srcKey);
-          const dst = priceByCond.has(ck + "|" + dstKey) ? priceByCond.get(ck + "|" + dstKey) : priceAny.get(dstKey);
-          if (src === undefined || dst === undefined) {
-            return { status: "unknown", expected: null, srcPrice: src, dstPrice: dst };
-          }
-          const diff = dst - src;
-          // 同額・500円以下（マイナス＝ダウングレード含む）は一律500円。0円にはならない
-          const expected = diff <= 500 ? 500 : diff;
+          const srcSeat = v(row, c.ugSeat), dstSeat = v(row, c.seat);
+          const srcAge = v(row, c.ugAge), dstAge = v(row, c.age);
           const actual = Number(String(v(row, c.adv)).replace(/,/g, ""));
+          const sameSeat = srcSeat === dstSeat && srcSeat !== "";
+          if (sameSeat) {
+            // 自由席/エリアの同席種・同券種は設定してはいけない
+            if (isFreeArea(dstSeat) && srcAge === dstAge) {
+              return { status: "invalid", expected: null, sameSeat: true, isDown: false,
+                note: "自由席/エリアの同席種・同券種UGは設定不可" };
+            }
+            const expected = 500; // 指定席の同席種UGは一律500円
+            return { status: (!isNaN(actual) && actual === expected) ? "ok" : "ng",
+              expected, sameSeat: true, isDown: false, note: "同席種=一律500円" };
+          }
+          // 異席種: 実差額で検算（500円ルールは適用しない）
+          const ck = condKey(row);
+          const src = priceByCond.has(ck + "|" + srcSeat + "|" + srcAge) ? priceByCond.get(ck + "|" + srcSeat + "|" + srcAge) : priceAny.get(srcSeat + "|" + srcAge);
+          const dst = priceByCond.has(ck + "|" + dstSeat + "|" + dstAge) ? priceByCond.get(ck + "|" + dstSeat + "|" + dstAge) : priceAny.get(dstSeat + "|" + dstAge);
+          if (src === undefined || dst === undefined) {
+            return { status: "unknown", expected: null, srcPrice: src, dstPrice: dst, sameSeat: false, isDown: false };
+          }
+          const expected = dst - src; // 実差額（負もありうる）
           return {
-            status: !isNaN(actual) && actual === expected ? "ok" : "ng",
-            expected, srcPrice: src, dstPrice: dst,
-            isDown: diff < 0, // 下位席種への変更（通常は設定されないはず）
+            status: (!isNaN(actual) && actual === expected) ? "ok" : "ng",
+            expected, srcPrice: src, dstPrice: dst, sameSeat: false,
+            isDown: expected < 0,
+            note: expected < 0 ? "差額マイナス（子供等で減額）" : "",
           };
         };
-      }
-
-      // 経路価格スケジュール（BO-F-21030）→ チェック用参照シートを別タブに生成
-      // 形式参考: 原紙［販売価格スケジュール］チェックシート
-      function buildPriceCheckSheet() {
-        const H = state.headers.map(h => String(h).trim());
-        const idx = (name) => H.indexOf(name);
-        const required = ["販売開始日時", "販売終了日時", "席種エリア名", "券種名", "前売価格", "アップグレード該当フラグ"];
-        const missingCols = required.filter(n => idx(n) === -1);
-        if (missingCols.length) {
-          alert("経路価格スケジュール形式ではありません。\n不足列: " + missingCols.join(", ") + "\n\nBO-F-21030（経路別価格スケジュール）のTSVを開いてから実行してください。");
-          return;
-        }
-        const cols = {
-          start: idx("販売開始日時"), end: idx("販売終了日時"),
-          kbn: idx("販売価格区分"), rank: idx("会員ランク名"), route: idx("販売経路区分"),
-          seat: idx("席種エリア名"), age: idx("券種名"),
-          adv: idx("前売価格"), day: idx("当日価格"),
-          ugFlag: idx("アップグレード該当フラグ"),
-          ugSeat: idx("アップグレード元席種エリア名"), ugAge: idx("アップグレード元券種名"),
-        };
-        const v = (row, i) => (i === -1 ? "" : String(row[i] ?? "").trim());
-        // UG行は元データの前売価格/当日価格がそのまま差額（前売差額/当日差額）
-        const validate = buildUgValidator(state.data, cols, v);
-        const headers = ["販売開始日時", "販売終了日時", "販売区分", "会員ランク", "販売経路", "席種", "年齢区分", "前売価格(UG行=差額)", "当日価格(UG行=差額)", "UG", "元席種", "元年齢区分", "差額検算"];
-        const data = state.data.map((row) => {
-          const flag = v(row, cols.ugFlag);
-          const isUg = flag === "該当" || flag === "1";
-          let check = "";
-          if (isUg) {
-            const r = validate(row);
-            check = r.status === "ok" ? "OK"
-              : r.status === "ng" ? `NG(期待${r.expected.toLocaleString("ja-JP")})`
-              : "価格不明";
-          }
-          return [
-            v(row, cols.start), v(row, cols.end),
-            v(row, cols.kbn), v(row, cols.rank), v(row, cols.route),
-            v(row, cols.seat), v(row, cols.age),
-            v(row, cols.adv), v(row, cols.day),
-            isUg ? "◯" : "",
-            isUg ? v(row, cols.ugSeat) : "", isUg ? v(row, cols.ugAge) : "",
-            check,
-          ];
-        });
-        const srcName = state.fileName.replace(/\.[^.]+$/, "");
-        saveCurrentTab();
-        resetState();
-        state.headers = headers;
-        state.data = data;
-        state.fileName = srcName + "_チェック表.tsv";
-        state.delimiter = "\t";
-        state.headerMode = "firstRow";
-        state.encoding = "utf8";
-        const tab = {
-          fileName: state.fileName,
-          headers: [...state.headers],
-          data: state.data,
-          delimiter: "\t",
-          colWidths: {},
-          sortCol: -1,
-          sortAsc: true,
-          sortKeys: [],
-          headerMode: "firstRow",
-          encoding: "utf8",
-          dirty: false,
-          cellColors: {},
-        };
-        state.tabs.push(tab);
-        state.activeTab = state.tabs.length - 1;
-        updateHeaderModeBtn();
-        renderTabBar();
-        autoFitAllColumnsQuiet();
-        state.tabs[state.activeTab].colWidths = { ...state.colWidths };
-        renderHeader();
-        state.forceRender = true;
-        renderBody();
-        showTable();
-        markClean();
-        setStatus(`価格チェック表を生成しました: ${data.length}行（元データは別タブに残っています）`);
       }
 
       // 縦書きヘッダー切り替え（列幅節約）
@@ -2986,7 +2921,7 @@
         // 辞書・ヘッダーメモ編集
         $("btn-dict-edit").onclick = openDictEditor;
         // 価格スケジュールチェック表
-        $("btn-price-sheet").onclick = buildPriceCheckSheet;
+        $("btn-price-sheet").onclick = exportPriceMatrixHtml;
         // 縦書きヘッダー
         $("btn-vertical-header").onclick = toggleVerticalHeader;
         // マーカー色
@@ -8411,38 +8346,56 @@
       }
 
       // ===== 経路価格スケジュール → チェック用HTML出力 =====
-      // 価格表: フラット一覧（条件×席種×券種を1行=1設定で表示、同一席種はセル結合）
-      // アップグレード表: 元席種→先席種でグループ化した一覧
-      // 出力HTML側にマーカー機能（行ダブルクリック / 選択+Ctrl+Q / ボタン、localStorage保存）
-      function exportPriceMatrixHtml(rowIndices, isFiltered) {
-        // 出力内容の選択ダイアログ
+      // 通常価格表 / UGマトリクス / UG一覧 を任意選択で出力。会員ランクは全件出力し、
+      // 出力先HTMLで列ごとの並べ替え・絞り込み（会員ランク/販売期間/席種名など）が可能。
+      function exportPriceMatrixHtml() {
+        const H = state.headers.map(h => String(h).trim());
+        const need = ["販売開始日時", "席種エリア名", "アップグレード該当フラグ"];
+        if (!need.every(n => H.includes(n))) {
+          alert("経路価格スケジュール（BO-F-21030）形式ではありません。\n「販売開始日時」「席種エリア名」「アップグレード該当フラグ」などの列が必要です。");
+          return;
+        }
+        const vr = getVisibleRows();
+        const rowIndices = vr._direct
+          ? Array.from({ length: state.data.length }, (_, i) => i)
+          : [...vr._indices];
+        if (!rowIndices.length) { setStatus("⚠ 表示する行がありません"); return; }
+        const isFiltered = rowIndices.length < state.data.length;
+
         document.querySelector("#price-export-choice")?.remove();
         const ov = document.createElement("div");
         ov.id = "price-export-choice";
         ov.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1600;display:flex;align-items:center;justify-content:center;";
         ov.innerHTML = `
-          <div style="background:#fff;border-radius:8px;padding:22px 26px;width:min(380px,90vw);box-shadow:0 8px 30px rgba(0,0,0,.25);font-size:13px">
-            <h3 style="margin:0 0 6px;font-size:14px">価格スケジュールのHTML出力</h3>
-            <p style="color:#737373;font-size:12px;margin-bottom:14px">出力する表を選択してください（${rowIndices.length}件${isFiltered ? "・フィルター適用中" : ""}）</p>
-            <div style="display:flex;flex-direction:column;gap:8px">
-              <button data-mode="price" style="padding:10px;border:1px solid #217346;color:#217346;background:#fff;border-radius:6px;cursor:pointer;font-size:13px;text-align:left">📋 価格表（席種×券種の設定一覧・チェック用）</button>
-              <button data-mode="ug" style="padding:10px;border:1px solid #be185d;color:#be185d;background:#fff;border-radius:6px;cursor:pointer;font-size:13px;text-align:left">🔀 アップグレード表（元席種→先席種の差額一覧）</button>
-              <button data-mode="both" style="padding:10px;border:1px solid #404040;color:#404040;background:#fff;border-radius:6px;cursor:pointer;font-size:13px;text-align:left">📚 両方</button>
-              <button data-mode="" style="padding:8px;border:none;color:#999;background:none;cursor:pointer;font-size:12px">キャンセル</button>
+          <div style="background:#fff;border-radius:8px;padding:22px 26px;width:min(400px,90vw);box-shadow:0 8px 30px rgba(0,0,0,.25);font-size:13px">
+            <h3 style="margin:0 0 6px;font-size:14px">価格チェック表の出力</h3>
+            <p style="color:#737373;font-size:12px;margin-bottom:14px">${rowIndices.length}件${isFiltered ? "・フィルター適用中" : ""}　/　会員ランクは全件出力（出力先で絞り込み・並べ替え可）</p>
+            <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="px-normal" checked> 📋 通常価格表（席種×券種の設定一覧）</label>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="px-matrix" checked> 🔢 アップグレードマトリクス（俯瞰）</label>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="px-ug" checked> 🔀 アップグレード一覧（検算・チェック用）</label>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:8px">
+              <button id="px-cancel" style="padding:7px 14px;border:none;color:#999;background:none;cursor:pointer;font-size:12px">キャンセル</button>
+              <button id="px-go" style="padding:7px 18px;border:none;background:#217346;color:#fff;border-radius:6px;cursor:pointer;font-size:13px">出力</button>
             </div>
           </div>`;
         document.body.appendChild(ov);
-        ov.onclick = (e) => {
-          if (e.target === ov) { ov.remove(); return; }
-          const btn = e.target.closest("button[data-mode]");
-          if (!btn) return;
-          const mode = btn.dataset.mode;
+        ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+        ov.querySelector("#px-cancel").onclick = () => ov.remove();
+        ov.querySelector("#px-go").onclick = () => {
+          const opt = {
+            normal: ov.querySelector("#px-normal").checked,
+            matrix: ov.querySelector("#px-matrix").checked,
+            ug: ov.querySelector("#px-ug").checked,
+          };
           ov.remove();
-          if (mode) _buildPriceCheckHtml(rowIndices, isFiltered, mode);
+          if (!opt.normal && !opt.matrix && !opt.ug) { alert("出力する表を1つ以上選択してください。"); return; }
+          _buildPriceCheckHtml(rowIndices, isFiltered, opt);
         };
       }
 
-      function _buildPriceCheckHtml(rowIndices, isFiltered, mode) {
+      function _buildPriceCheckHtml(rowIndices, isFiltered, opt) {
         const H = state.headers.map(h => String(h).trim());
         const ix = (n) => H.indexOf(n);
         const c = {
@@ -8455,16 +8408,12 @@
         };
         const v = (r, i) => (i === -1 ? "" : String(r[i] ?? "").trim());
         const fmt = (s) => {
-          if (!s) return "";
+          if (s === "" || s == null) return "";
           const n = Number(String(s).replace(/,/g, ""));
           return isNaN(n) ? s : n.toLocaleString("ja-JP");
         };
-        const condOf = (row) => {
-          const parts = [v(row, c.kbn), v(row, c.rank)].filter(x => x);
-          return parts.join("・") || "（条件なし）";
-        };
+        const condOf = (row) => [v(row, c.kbn), v(row, c.rank)].filter(x => x).join("・") || "（条件なし）";
 
-        // 通常行とUG行を分離（元データの順序を保持）
         const normals = [], ugs = [];
         for (const ri of rowIndices) {
           const row = state.data[ri];
@@ -8472,223 +8421,159 @@
           const flag = v(row, c.ugFlag);
           (flag === "該当" || flag === "1" ? ugs : normals).push(row);
         }
+        const validate = buildUgValidator(normals.concat(ugs), c, v);
+
+        // セル: data-v に並べ替え用の生値を入れる（数値・日時はそのまま比較可能に）
+        const cell = (val, raw, cls) => `<td${cls ? ` class="${cls}"` : ""}${raw != null ? ` data-v="${escHtml(String(raw))}"` : ""}>${escHtml(val)}</td>`;
 
         let body = "";
 
-        // --- 価格表: 席種→券種→条件 でソートした1行=1設定の一覧（席種はセル結合） ---
-        if ((mode === "price" || mode === "both") && normals.length) {
-          const seatOrder = [];
+        // --- 通常価格表（フラット・並べ替え/絞り込み可） ---
+        if (opt.normal && normals.length) {
+          const labels = ["席種名", "券種名", "販売区分", "会員ランク", "販売経路", "前売", "当日", "販売開始", "販売終了"];
+          let rowsHtml = "";
           for (const row of normals) {
-            const s = v(row, c.seat);
-            if (s && !seatOrder.includes(s)) seatOrder.push(s);
+            const mid = encodeURIComponent(["P", v(row, c.seat), v(row, c.age), condOf(row), v(row, c.route), v(row, c.start)].join("|"));
+            rowsHtml += `<tr data-mid="${mid}"><td class="mk-cell" title="クリックでマーク">✔</td>`
+              + cell(v(row, c.seat), v(row, c.seat))
+              + cell(v(row, c.age), v(row, c.age))
+              + cell(v(row, c.kbn), v(row, c.kbn))
+              + cell(v(row, c.rank), v(row, c.rank))
+              + cell(v(row, c.route), v(row, c.route))
+              + cell(fmt(v(row, c.adv)), Number(String(v(row, c.adv)).replace(/,/g, "")) || 0, "num adv")
+              + cell(fmt(v(row, c.day)), Number(String(v(row, c.day)).replace(/,/g, "")) || 0, "num day")
+              + cell(v(row, c.start), v(row, c.start), "dt")
+              + cell(v(row, c.end), v(row, c.end), "dt")
+              + `</tr>`;
           }
-          // 席種ごとにまとめ、内部は元の行順（券種→条件の出現順）
-          body += `<h2>📋 価格表（${normals.length}件）</h2>
-<table>
-<tr><th class="mk-h"></th><th>席種名</th><th>券種名</th><th>販売条件</th><th>販売経路</th><th class="num">前売</th><th class="num">当日</th><th>販売開始</th><th>販売終了</th></tr>`;
-          for (const s of seatOrder) {
-            const group = normals.filter(row => v(row, c.seat) === s);
-            group.forEach((row, gi) => {
-              const mid = encodeURIComponent(["P", s, v(row, c.age), condOf(row), v(row, c.route), v(row, c.start)].join("|"));
-              body += `<tr data-mid="${mid}">
-<td class="mk-cell" title="クリックでマーク">✔</td>`;
-              if (gi === 0) body += `<td class="seat" rowspan="${group.length}">${escHtml(s)}</td>`;
-              body += `<td>${escHtml(v(row, c.age))}</td>
-<td>${escHtml(condOf(row))}</td>
-<td>${escHtml(v(row, c.route))}</td>
-<td class="num adv">${escHtml(fmt(v(row, c.adv)))}</td>
-<td class="num day">${escHtml(fmt(v(row, c.day)))}</td>
-<td class="dt">${escHtml(v(row, c.start))}</td>
-<td class="dt">${escHtml(v(row, c.end))}</td>
-</tr>`;
-            });
-          }
-          body += `</table>`;
+          body += `<h2>📋 通常価格表（${normals.length}件）</h2>
+<p class="legend">列見出しクリックで並べ替え、各列の入力欄で絞り込み（会員ランク・席種名・期間など）</p>
+${_sortableTable(labels, rowsHtml)}`;
         }
 
-        // --- アップグレード表: 元席種→先席種 でグループ化 + 差額の自動検算 ---
-        let hasUg = false;
-        if ((mode === "ug" || mode === "both") && ugs.length) {
-          hasUg = true;
-          const validate = buildUgValidator(normals.concat(ugs), c, v);
-          const pairOrder = [];
-          const pairMap = new Map();
-          let ngCount = 0, naCount = 0;
+        // --- UGマトリクス（販売条件ごと・俯瞰用） ---
+        if (opt.matrix && ugs.length) {
+          const byCond = new Map();
           for (const row of ugs) {
-            const key = v(row, c.ugSeat) + "→" + v(row, c.seat);
-            if (!pairMap.has(key)) { pairMap.set(key, []); pairOrder.push(key); }
-            const chk = validate(row);
-            if (chk.status === "ng") ngCount++;
-            else if (chk.status === "unknown") naCount++;
-            pairMap.get(key).push({ row, chk });
+            const k = condOf(row);
+            if (!byCond.has(k)) byCond.set(k, []);
+            byCond.get(k).push(row);
           }
-          const ngBadge = ngCount
-            ? `　<span class="badge-ng">NG ${ngCount}件</span>`
-            : `　<span class="badge-ok">検算すべてOK</span>`;
-          const naBadge = naCount ? `　<span class="badge-na">価格不明 ${naCount}件</span>` : "";
-
-          // --- マトリクス（Excel料金表のアップグレード表形式・俯瞰用） ---
-          const mxFrom = [], mxTo = [];
-          const mxMap = new Map();
-          for (const key of pairOrder) {
-            for (const { row, chk } of pairMap.get(key)) {
+          let ngTotal = 0;
+          let mxBody = "";
+          for (const [k, list] of byCond) {
+            const froms = [], tos = [], map = new Map();
+            for (const row of list) {
+              const chk = validate(row);
+              if (chk.status === "ng") ngTotal++;
               const fk = escHtml(v(row, c.ugSeat) || "?") + '<br><span class="sub">' + escHtml(v(row, c.ugAge) || "") + "</span>";
               const tk = escHtml(v(row, c.seat) || "?") + '<br><span class="sub">' + escHtml(v(row, c.age) || "") + "</span>";
-              if (!mxFrom.includes(fk)) mxFrom.push(fk);
-              if (!mxTo.includes(tk)) mxTo.push(tk);
-              if (!mxMap.has(fk + "=>" + tk)) mxMap.set(fk + "=>" + tk, { row, chk });
+              if (!froms.includes(fk)) froms.push(fk);
+              if (!tos.includes(tk)) tos.push(tk);
+              map.set(fk + "=>" + tk, { row, chk });
             }
-          }
-          body += `<h2>🔀 アップグレードマトリクス（俯瞰）${ngBadge}${naBadge}</h2>
-<p class="legend">上段: 前売差額 / 下段: 当日差額。赤セル = 検算NG。セルにマウスで期待値と販売期間</p>
-<div class="scroll"><table class="mx">
-<tr><th class="corner">元＼先</th>${mxTo.map(tk => `<th>${tk}</th>`).join("")}</tr>`;
-          for (const fk of mxFrom) {
-            body += `<tr><th class="rowh">${fk}</th>`;
-            for (const tk of mxTo) {
-              const cell = mxMap.get(fk + "=>" + tk);
-              if (!cell) { body += `<td class="na">—</td>`; continue; }
-              const { row, chk } = cell;
-              const tip = (chk.expected != null
-                ? `期待差額 ${chk.expected.toLocaleString("ja-JP")}（先 ${fmt(String(chk.dstPrice))} − 元 ${fmt(String(chk.srcPrice))}）`
-                : "通常価格が見つからず検算不能")
-                + `\n販売期間 ${v(row, c.start)} 〜 ${v(row, c.end)}`;
-              const cls = chk.status === "ng" ? " mx-ng" : chk.status === "unknown" ? " mx-na" : "";
-              const dg = chk.isDown ? '<div class="dg">▼下位変更</div>' : "";
-              body += `<td class="mxc${cls}" title="${escHtml(tip)}"><div class="adv">${escHtml(fmt(v(row, c.adv)))}</div><div class="day">${escHtml(fmt(v(row, c.day)))}</div>${dg}</td>`;
+            mxBody += `<h3>${escHtml(k)}</h3><div class="scroll"><table class="mx"><tr><th class="corner">元＼先</th>${tos.map(tk => `<th>${tk}</th>`).join("")}</tr>`;
+            for (const fk of froms) {
+              mxBody += `<tr><th class="rowh">${fk}</th>`;
+              for (const tk of tos) {
+                const e = map.get(fk + "=>" + tk);
+                if (!e) { mxBody += `<td class="na">—</td>`; continue; }
+                const { row, chk } = e;
+                const tip = (chk.status === "invalid" ? chk.note
+                  : chk.expected != null ? `期待差額 ${chk.expected.toLocaleString("ja-JP")}` + (chk.sameSeat ? "（同席種=一律500）" : `（先${fmt(String(chk.dstPrice))} − 元${fmt(String(chk.srcPrice))}）`)
+                  : "通常価格が見つからず検算不能")
+                  + `\n販売期間 ${v(row, c.start)} 〜 ${v(row, c.end)}`;
+                const cls = chk.status === "ng" || chk.status === "invalid" ? " mx-ng" : chk.status === "unknown" ? " mx-na" : "";
+                const dg = chk.isDown ? '<div class="dg">▼減額</div>' : "";
+                mxBody += `<td class="mxc${cls}" title="${escHtml(tip)}"><div class="adv">${escHtml(fmt(v(row, c.adv)))}</div><div class="day">${escHtml(fmt(v(row, c.day)))}</div>${dg}</td>`;
+              }
+              mxBody += `</tr>`;
             }
-            body += `</tr>`;
+            mxBody += `</table></div>`;
           }
-          body += `</table></div>`;
-
-          body += `<h2>📝 アップグレード一覧（チェック用・${ugs.length}件）</h2>
-<p class="legend">検算 = 先席種の前売価格 − 元席種の前売価格。差額が500円以下・同額・マイナス（ダウングレード）の場合も0円にはならず一律500円。設定値と一致すれば ✓</p>
-<table class="ug-table">
-<tr><th class="mk-h"></th><th>元券種</th><th>先券種</th><th>販売条件</th><th class="num">前売差額</th><th class="num">期待差額</th><th>検算</th><th class="num">当日差額</th><th>販売開始</th><th>販売終了</th></tr>`;
-          for (const key of pairOrder) {
-            const group = pairMap.get(key);
-            const [fromS, toS] = key.split("→");
-            const groupHasNg = group.some(g => g.chk.status === "ng");
-            body += `<tr class="pair-head${groupHasNg ? " has-ng" : ""}"><td colspan="10"><b>${escHtml(fromS)}</b><span class="arrow">→</span><b>${escHtml(toS)}</b>${groupHasNg ? '<span class="badge-ng" style="margin-left:10px">NGあり</span>' : ""}</td></tr>`;
-            group.forEach(({ row, chk }) => {
-              const mid = encodeURIComponent(["U", key, v(row, c.ugAge), v(row, c.age), condOf(row), v(row, c.start)].join("|"));
-              const isNg = chk.status === "ng";
-              const expTitle = chk.expected != null
-                ? `先 ${fmt(String(chk.dstPrice))} − 元 ${fmt(String(chk.srcPrice))}`
-                : "元席種または先席種の通常価格が表内に見つかりません";
-              body += `<tr data-mid="${mid}" class="ug-data${isNg ? " ng-row" : ""}">
-<td class="mk-cell" title="クリックでマーク">✔</td>
-<td>${escHtml(v(row, c.ugAge))}</td>
-<td>${escHtml(v(row, c.age))}</td>
-<td>${escHtml(condOf(row))}</td>
-<td class="num ug">${escHtml(fmt(v(row, c.adv)))}${chk.isDown ? '<div class="dg">▼下位変更</div>' : ""}</td>
-<td class="num exp" title="${escHtml(expTitle)}">${chk.expected != null ? escHtml(fmt(String(chk.expected))) : "—"}</td>
-${chk.status === "ok" ? '<td class="chk-ok">✓</td>' : isNg ? '<td class="chk-ng">✗ NG</td>' : '<td class="chk-na">価格不明</td>'}
-<td class="num ugday">${escHtml(fmt(v(row, c.day)))}</td>
-<td class="dt">${escHtml(v(row, c.start))}</td>
-<td class="dt">${escHtml(v(row, c.end))}</td>
-</tr>`;
-            });
-          }
-          body += `</table>`;
+          const ngBadge = ngTotal ? `　<span class="badge-ng">NG ${ngTotal}件</span>` : `　<span class="badge-ok">検算OK</span>`;
+          body += `<h2>🔢 アップグレードマトリクス（俯瞰）${ngBadge}</h2>
+<p class="legend">上段: 前売差額 / 下段: 当日差額。赤セル = 検算NG（自由席/エリアの同席種設定や差額不一致）。セルにマウスで期待値・販売期間</p>${mxBody}`;
         }
 
-        if (!body) {
-          alert(mode === "ug" ? "アップグレード行（該当）がありません。" : "出力対象の行がありません。");
-          return;
+        // --- UG一覧（フラット・検算・並べ替え/絞り込み可） ---
+        if (opt.ug && ugs.length) {
+          let ng = 0, na = 0, inv = 0;
+          const labels = ["元席種", "先席種", "元券種", "先券種", "販売区分", "会員ランク", "前売差額", "期待差額", "検算", "当日差額", "販売開始", "販売終了"];
+          let rowsHtml = "";
+          for (const row of ugs) {
+            const chk = validate(row);
+            if (chk.status === "ng") ng++; else if (chk.status === "unknown") na++; else if (chk.status === "invalid") inv++;
+            const mid = encodeURIComponent(["U", v(row, c.ugSeat), v(row, c.seat), v(row, c.ugAge), v(row, c.age), condOf(row), v(row, c.start)].join("|"));
+            const verdict = chk.status === "ok" ? '<td class="chk-ok" data-v="1">✓</td>'
+              : chk.status === "ng" ? '<td class="chk-ng" data-v="3">✗ NG</td>'
+              : chk.status === "invalid" ? '<td class="chk-ng" data-v="4" title="' + escHtml(chk.note) + '">✗ 設定不可</td>'
+              : '<td class="chk-na" data-v="2">価格不明</td>';
+            const expTitle = chk.status === "invalid" ? chk.note
+              : chk.expected != null ? (chk.sameSeat ? "同席種=一律500円" : `先 ${fmt(String(chk.dstPrice))} − 元 ${fmt(String(chk.srcPrice))}`)
+              : "通常価格が見つかりません";
+            const isNg = chk.status === "ng" || chk.status === "invalid";
+            const dg = chk.isDown ? '<div class="dg">▼減額</div>' : "";
+            rowsHtml += `<tr data-mid="${mid}" class="${isNg ? "ng-row" : ""}"><td class="mk-cell" title="クリックでマーク">✔</td>`
+              + cell(v(row, c.ugSeat), v(row, c.ugSeat))
+              + cell(v(row, c.seat), v(row, c.seat))
+              + cell(v(row, c.ugAge), v(row, c.ugAge))
+              + cell(v(row, c.age), v(row, c.age))
+              + cell(v(row, c.kbn), v(row, c.kbn))
+              + cell(v(row, c.rank), v(row, c.rank))
+              + cell(fmt(v(row, c.adv)), Number(String(v(row, c.adv)).replace(/,/g, "")) || 0, "num ug")
+              + `<td class="num exp" data-v="${chk.expected != null ? chk.expected : ""}" title="${escHtml(expTitle)}">${chk.expected != null ? escHtml(fmt(String(chk.expected))) : "—"}${dg}</td>`
+              + verdict
+              + cell(fmt(v(row, c.day)), Number(String(v(row, c.day)).replace(/,/g, "")) || 0, "num ugday")
+              + cell(v(row, c.start), v(row, c.start), "dt")
+              + cell(v(row, c.end), v(row, c.end), "dt")
+              + `</tr>`;
+          }
+          const badges = (ng ? `　<span class="badge-ng">NG ${ng}件</span>` : `　<span class="badge-ok">検算OK</span>`)
+            + (inv ? `　<span class="badge-ng">設定不可 ${inv}件</span>` : "")
+            + (na ? `　<span class="badge-na">価格不明 ${na}件</span>` : "");
+          body += `<h2>🔀 アップグレード一覧（${ugs.length}件）${badges}</h2>
+<p class="legend">検算: 同席種=一律500円 / 異席種=先席種−元席種の実差額（減額になる場合も実差額を表示）。自由席・エリアの同席種同券種は設定不可。列見出しで並べ替え・各列で絞り込み可</p>
+${_sortableTable(labels, rowsHtml, true)}`;
         }
 
-        const markerScript = `(function(){
-  var KEY = 'tsv-price-marks|' + document.title;
-  var saved = {};
-  try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch(e){}
-  function persist(){ try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch(e){} }
-  function paint(tr){ tr.classList.toggle('marked', !!saved[tr.getAttribute('data-mid')]); refreshCount(); }
-  function toggle(tr){ var id = tr.getAttribute('data-mid'); if (saved[id]) delete saved[id]; else saved[id] = 1; paint(tr); persist(); }
-  function refreshCount(){
-    var total = document.querySelectorAll('tr[data-mid]').length;
-    var done = document.querySelectorAll('tr.marked').length;
-    var el = document.getElementById('mk-count');
-    if (el) el.textContent = done + ' / ' + total;
-  }
-  document.querySelectorAll('tr[data-mid]').forEach(paint);
-  document.addEventListener('dblclick', function(e){
-    var tr = e.target.closest('tr[data-mid]');
-    if (tr) toggle(tr);
-  });
-  document.addEventListener('click', function(e){
-    var mk = e.target.closest('td.mk-cell');
-    if (mk) toggle(mk.parentElement);
-  });
-  function markSelection(){
-    var sel = window.getSelection();
-    if (!sel || sel.isCollapsed) return;
-    var hit = [];
-    document.querySelectorAll('tr[data-mid]').forEach(function(tr){
-      if (sel.containsNode(tr, true)) hit.push(tr);
-    });
-    if (!hit.length) return;
-    var allMarked = hit.every(function(tr){ return saved[tr.getAttribute('data-mid')]; });
-    hit.forEach(function(tr){
-      var id = tr.getAttribute('data-mid');
-      if (allMarked) delete saved[id]; else saved[id] = 1;
-      paint(tr);
-    });
-    persist();
-    sel.removeAllRanges();
-  }
-  document.addEventListener('keydown', function(e){
-    if ((e.ctrlKey || e.metaKey) && (e.key === 'q' || e.key === 'Q')) { e.preventDefault(); markSelection(); }
-  });
-  document.getElementById('mk-btn').onclick = markSelection;
-  document.getElementById('mk-clear').onclick = function(){
-    if (!confirm('マークをすべて解除しますか？')) return;
-    saved = {}; persist();
-    document.querySelectorAll('tr[data-mid]').forEach(paint);
-  };
-  document.getElementById('mk-color').oninput = function(e){
-    document.documentElement.style.setProperty('--mk', e.target.value);
-    try { localStorage.setItem(KEY + '|color', e.target.value); } catch(err){}
-  };
-  var ngBtn = document.getElementById('mk-ngonly');
-  if (ngBtn) ngBtn.onclick = function(){
-    document.body.classList.toggle('ngonly');
-    ngBtn.classList.toggle('on');
-    ngBtn.textContent = document.body.classList.contains('ngonly') ? '全件表示に戻す' : 'NGのみ表示';
-  };
-  try {
-    var cc = localStorage.getItem(KEY + '|color');
-    if (cc) { document.documentElement.style.setProperty('--mk', cc); document.getElementById('mk-color').value = cc; }
-  } catch(e){}
-  refreshCount();
-})();`;
+        if (!body) { alert("出力対象の行がありません（選択した表に該当データがありません）。"); return; }
 
         const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
 <title>${escHtml(state.fileName)} - 価格チェック</title>
 <style>
 :root { --mk: #fde047; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, "Hiragino Kaku Gothic ProN", "Yu Gothic UI", sans-serif; background: #f8f9fa; color: #333; padding: 16px 20px 60px; }
+body { font-family: -apple-system, "Hiragino Kaku Gothic ProN", "Yu Gothic UI", sans-serif; background: #f8f9fa; color: #333; padding: 16px 20px 64px; }
 .header { background: #fff; padding: 12px 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.1); margin-bottom: 14px; }
 .header h1 { font-size: 16px; }
 .header .meta { font-size: 12px; color: #666; margin-top: 3px; }
-h2 { font-size: 14px; margin: 20px 0 8px; padding: 6px 12px; background: #217346; color: #fff; border-radius: 6px; }
-table { border-collapse: collapse; font-size: 12.5px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.08); width: 100%; }
+h2 { font-size: 14px; margin: 22px 0 6px; padding: 6px 12px; background: #217346; color: #fff; border-radius: 6px; }
+h3 { font-size: 13px; margin: 12px 0 6px; color: #1a1a1a; }
+.legend { font-size: 11px; color: #888; margin: -2px 0 6px; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 12.5px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 th, td { border: 1px solid #d8dde4; padding: 5px 10px; text-align: left; white-space: nowrap; }
-th { background: #eef2f6; font-weight: 600; position: sticky; top: 0; z-index: 2; }
+th { background: #eef2f6; font-weight: 600; }
+table.sortable thead th[data-c] { cursor: pointer; position: sticky; top: 0; z-index: 2; user-select: none; }
+table.sortable thead th[data-c]:hover { background: #e2e8ee; }
+.filter-row th { padding: 2px; position: sticky; top: 28px; z-index: 2; background: #f6f8fb; }
+.filter-row input { width: 100%; min-width: 70px; border: 1px solid #cfd6df; border-radius: 3px; padding: 2px 4px; font-size: 11px; }
+.arr { color: #217346; }
 th.num, td.num { text-align: right; }
 th.mk-h { width: 30px; }
 td.mk-cell { text-align: center; cursor: pointer; color: #d4d4d4; user-select: none; }
 tr.marked td.mk-cell { color: #16a34a; }
-td.seat { font-weight: 700; background: #fbfcfd; vertical-align: top; }
-td.pair .arrow { margin: 0 6px; color: #be185d; }
-td.adv { font-weight: 600; color: #1d4ed8; }
-td.day { color: #b45309; }
-td.ug { font-weight: 600; color: #be185d; }
-td.ugday { color: #b45309; }
+td.adv, td.ug { font-weight: 600; color: #1d4ed8; }
+td.ug { color: #be185d; }
+td.day, td.ugday { color: #b45309; }
+td.exp { color: #555; }
 td.dt { font-size: 11.5px; color: #555; }
-.legend { font-size: 11px; color: #888; margin: -4px 0 6px; }
-.scroll { overflow-x: auto; }
+td.chk-ok { color: #16a34a; font-weight: 700; text-align: center; }
+td.chk-ng { color: #dc2626; font-weight: 700; text-align: center; }
+td.chk-na { color: #9ca3af; text-align: center; font-size: 11px; }
+tr.ng-row td { background: #fef2f2; }
+tr.ng-row td.mk-cell { box-shadow: inset 3px 0 0 #dc2626; }
 table.mx { width: auto; min-width: 420px; }
 table.mx th, table.mx td { text-align: center; }
 table.mx th.corner { background: #e2e8ee; }
@@ -8699,50 +8584,145 @@ td.mxc .day { font-size: 11px; color: #b45309; }
 td.mxc.mx-ng { background: #fee2e2; outline: 2px solid #dc2626; outline-offset: -2px; }
 td.mxc.mx-na { background: #f5f5f5; }
 td.mxc.mx-na .adv, td.mxc.mx-na .day { color: #9ca3af; }
+td.na { color: #ccc; background: #fafafa; }
 .dg { font-size: 10px; color: #ea580c; font-weight: 700; }
-tr.pair-head td { background: #fdf2f8; font-weight: 700; border-top: 2px solid #be185d; font-size: 13px; }
-tr.pair-head .arrow { color: #be185d; margin: 0 8px; }
-td.exp { color: #555; }
-td.chk-ok { color: #16a34a; font-weight: 700; text-align: center; }
-td.chk-ng { color: #dc2626; font-weight: 700; text-align: center; white-space: nowrap; }
-td.chk-na { color: #9ca3af; text-align: center; font-size: 11px; }
-tr.ng-row td { background: #fef2f2; }
-tr.ng-row td:first-child { box-shadow: inset 3px 0 0 #dc2626; }
 .badge-ng { background: #dc2626; color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 999px; vertical-align: middle; }
 .badge-ok { background: #16a34a; color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 999px; vertical-align: middle; }
 .badge-na { background: #9ca3af; color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 999px; vertical-align: middle; }
-body.ngonly tr.ug-data:not(.ng-row) { display: none; }
-body.ngonly tr.pair-head:not(.has-ng) { display: none; }
-#mk-ngonly.on { background: #dc2626; color: #fff; }
 tr.marked td { background: color-mix(in srgb, var(--mk) 38%, #ffffff); }
 tr[data-mid]:hover td { outline: 1px solid #b8c4d4; outline-offset: -1px; }
 .toolbar { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255,255,255,.96); border-top: 1px solid #d8dde4; padding: 8px 20px; display: flex; align-items: center; gap: 12px; font-size: 12px; z-index: 10; box-shadow: 0 -2px 8px rgba(0,0,0,.06); }
 .toolbar button { padding: 5px 14px; border: 1px solid #217346; color: #217346; background: #fff; border-radius: 5px; cursor: pointer; font-size: 12px; }
 .toolbar button:hover { background: #eaf4ee; }
 .toolbar #mk-clear { border-color: #dc2626; color: #dc2626; }
+.toolbar #mk-ngonly.on { background: #dc2626; color: #fff; }
 .toolbar .hint { color: #888; }
 #mk-count { font-weight: 700; color: #217346; }
-@media print { .toolbar { display: none; } }
+@media print { .toolbar, .filter-row { display: none; } }
 </style></head><body>
-<div class="header"><h1>💴 ${escHtml(state.fileName)} <span style="font-size:12px;color:#666;font-weight:400">価格チェック表</span></h1>
-<div class="meta">${rowIndices.length}件${isFiltered ? "（フィルター適用中）" : ""} — ${new Date().toLocaleString("ja-JP")}　|　チェック済はブラウザに保存され、再出力しても残ります</div></div>
+<div class="header"><h1>💴 ${escHtml(state.fileName)} <span style="font-size:12px;color:#666;font-weight:400">価格チェック</span></h1>
+<div class="meta">${rowIndices.length}件${isFiltered ? "（フィルター適用中）" : ""} — ${new Date().toLocaleString("ja-JP")}　|　列見出しで並べ替え・各列で絞り込み・チェックはブラウザに保存</div></div>
 ${body}
 <div class="toolbar">
   <span>チェック進捗: <span id="mk-count">0 / 0</span></span>
   <button id="mk-btn">選択した行をマーク（Ctrl+Q）</button>
   <button id="mk-clear">全解除</button>
-  ${hasUg ? `<button id="mk-ngonly" style="border-color:#dc2626;color:#dc2626">NGのみ表示</button>` : ""}
+  <button id="mk-ngonly" style="border-color:#dc2626;color:#dc2626">NG/未チェックのみ</button>
   <input type="color" id="mk-color" value="#fde047" title="マーカー色">
   <span class="hint">行ダブルクリック / 左端✔クリックでもマークできます</span>
 </div>
-<` + `script>${markerScript}<` + `/script>
+<` + `script>${_priceCheckScript()}<` + `/script>
 </body></html>`;
 
         const blob = new Blob([html], { type: "text/html;charset=utf-8" });
         const url = URL.createObjectURL(blob);
         window.open(url, "_blank", "noopener");
         setTimeout(() => URL.revokeObjectURL(url), 60000);
-        setStatus(`価格チェックHTMLを出力しました（${mode === "both" ? "価格表+UG表" : mode === "ug" ? "UG表" : "価格表"}）`);
+        const parts = [opt.normal && "通常価格", opt.matrix && "UGマトリクス", opt.ug && "UG一覧"].filter(Boolean);
+        setStatus(`価格チェックHTMLを出力しました（${parts.join("・")}）`);
+      }
+
+      // 並べ替え/絞り込み対応テーブルのHTMLを組み立てる
+      function _sortableTable(labels, rowsHtml, ugHasNgClass) {
+        let head = `<tr><th class="mk-h"></th>`;
+        labels.forEach((l, i) => {
+          const numCls = ["前売", "当日", "前売差額", "当日差額", "期待差額"].includes(l) ? ' class="num"' : "";
+          head += `<th data-c="${i}"${numCls}>${escHtml(l)}</th>`;
+        });
+        head += `</tr><tr class="filter-row"><th></th>`;
+        labels.forEach((l, i) => { head += `<th><input data-fc="${i}" placeholder="絞込" aria-label="${escHtml(l)}で絞り込み"></th>`; });
+        head += `</tr>`;
+        return `<div class="scroll"><table class="sortable"><thead>${head}</thead><tbody>${rowsHtml}</tbody></table></div>`;
+      }
+
+      // 出力HTMLに埋め込むスクリプト（並べ替え・絞り込み・マーカー）
+      function _priceCheckScript() {
+        return `(function(){
+  var KEY = 'tsv-price-marks|' + document.title;
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch(e){}
+  function persist(){ try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch(e){} }
+  function paint(tr){ tr.classList.toggle('marked', !!saved[tr.getAttribute('data-mid')]); }
+  function refreshCount(){
+    var total = document.querySelectorAll('tr[data-mid]').length;
+    var done = document.querySelectorAll('tr[data-mid].marked').length;
+    var el = document.getElementById('mk-count'); if (el) el.textContent = done + ' / ' + total;
+  }
+  function toggle(tr){ var id = tr.getAttribute('data-mid'); if (saved[id]) delete saved[id]; else saved[id] = 1; paint(tr); persist(); refreshCount(); }
+  document.querySelectorAll('tr[data-mid]').forEach(paint);
+  document.addEventListener('dblclick', function(e){ var tr = e.target.closest('tr[data-mid]'); if (tr) toggle(tr); });
+  document.addEventListener('click', function(e){ var mk = e.target.closest('td.mk-cell'); if (mk) toggle(mk.parentElement); });
+  function markSelection(){
+    var sel = window.getSelection(); if (!sel || sel.isCollapsed) return;
+    var hit = []; document.querySelectorAll('tr[data-mid]').forEach(function(tr){ if (sel.containsNode(tr, true)) hit.push(tr); });
+    if (!hit.length) return;
+    var all = hit.every(function(tr){ return saved[tr.getAttribute('data-mid')]; });
+    hit.forEach(function(tr){ var id = tr.getAttribute('data-mid'); if (all) delete saved[id]; else saved[id] = 1; paint(tr); });
+    persist(); refreshCount(); sel.removeAllRanges();
+  }
+  document.addEventListener('keydown', function(e){ if ((e.ctrlKey || e.metaKey) && (e.key === 'q' || e.key === 'Q')) { e.preventDefault(); markSelection(); } });
+  document.getElementById('mk-btn').onclick = markSelection;
+  document.getElementById('mk-clear').onclick = function(){ if (!confirm('マークをすべて解除しますか？')) return; saved = {}; persist(); document.querySelectorAll('tr[data-mid]').forEach(paint); refreshCount(); };
+  document.getElementById('mk-color').oninput = function(e){ document.documentElement.style.setProperty('--mk', e.target.value); try { localStorage.setItem(KEY + '|color', e.target.value); } catch(err){} };
+  try { var cc = localStorage.getItem(KEY + '|color'); if (cc) { document.documentElement.style.setProperty('--mk', cc); document.getElementById('mk-color').value = cc; } } catch(e){}
+  var ngBtn = document.getElementById('mk-ngonly');
+  if (ngBtn) ngBtn.onclick = function(){
+    var on = !document.body.classList.contains('ngonly');
+    document.body.classList.toggle('ngonly', on); ngBtn.classList.toggle('on', on);
+    ngBtn.textContent = on ? '全件表示に戻す' : 'NG/未チェックのみ';
+    document.querySelectorAll('tr[data-mid]').forEach(function(tr){
+      if (!on) { tr.dataset._ngHide = ''; return; }
+      var isNg = tr.classList.contains('ng-row');
+      var isDone = tr.classList.contains('marked');
+      tr.dataset._ngHide = (isNg || !isDone) ? '' : '1';
+    });
+    applyAll();
+  };
+
+  // 並べ替え
+  document.querySelectorAll('table.sortable').forEach(function(tbl){
+    var headRow = tbl.tHead.rows[0];
+    var tbody = tbl.tBodies[0];
+    headRow.querySelectorAll('th[data-c]').forEach(function(th){
+      th.addEventListener('click', function(){
+        var ci = +th.getAttribute('data-c');
+        var asc = th.getAttribute('data-asc') !== 'true';
+        headRow.querySelectorAll('th[data-c]').forEach(function(h){ h.removeAttribute('data-asc'); var a = h.querySelector('.arr'); if (a) a.remove(); });
+        th.setAttribute('data-asc', asc);
+        var rows = Array.from(tbody.querySelectorAll('tr'));
+        rows.sort(function(a, b){
+          var ca = a.cells[ci + 1], cb = b.cells[ci + 1];
+          var xa = ca.getAttribute('data-v'); if (xa === null) xa = ca.textContent.trim();
+          var xb = cb.getAttribute('data-v'); if (xb === null) xb = cb.textContent.trim();
+          var na = parseFloat(String(xa).replace(/[^0-9.\\-]/g, '')), nb = parseFloat(String(xb).replace(/[^0-9.\\-]/g, ''));
+          var bothNum = !isNaN(na) && !isNaN(nb) && xa !== '' && xb !== '';
+          var r = bothNum ? na - nb : String(xa).localeCompare(String(xb), 'ja');
+          return asc ? r : -r;
+        });
+        rows.forEach(function(r){ tbody.appendChild(r); });
+        var arr = document.createElement('span'); arr.className = 'arr'; arr.textContent = asc ? ' ▲' : ' ▼'; th.appendChild(arr);
+      });
+    });
+    tbl.querySelectorAll('.filter-row input[data-fc]').forEach(function(inp){ inp.addEventListener('input', applyAll); });
+  });
+
+  function applyAll(){
+    document.querySelectorAll('table.sortable').forEach(function(tbl){
+      var inputs = tbl.querySelectorAll('.filter-row input[data-fc]');
+      tbl.tBodies[0].querySelectorAll('tr').forEach(function(tr){
+        var show = tr.dataset._ngHide !== '1';
+        if (show) inputs.forEach(function(inp){
+          var q = inp.value.trim().toLowerCase(); if (!q) return;
+          var ci = +inp.getAttribute('data-fc'); var cl = tr.cells[ci + 1];
+          var txt = (cl.getAttribute('data-v') || cl.textContent).toLowerCase();
+          if (txt.indexOf(q) === -1) show = false;
+        });
+        tr.style.display = show ? '' : 'none';
+      });
+    });
+  }
+  refreshCount();
+})();`;
       }
 
       function exportHtmlPreview() {
@@ -8773,11 +8753,11 @@ ${body}
           return;
         }
 
-        // 経路価格スケジュール（BO-F-21030）の場合はマトリクス表で出力
+        // 経路価格スケジュールは「価格チェック表」ボタン（btn-price-sheet）に分離済み
         {
           const _H = state.headers.map(h => String(h).trim());
           if (_H.includes("販売開始日時") && _H.includes("席種エリア名") && _H.includes("アップグレード該当フラグ")) {
-            exportPriceMatrixHtml(rowIndices, isFiltered);
+            alert("経路価格スケジュールは「価格チェック表」ボタンから出力してください。");
             return;
           }
         }
