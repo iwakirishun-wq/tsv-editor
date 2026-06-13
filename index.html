@@ -1662,9 +1662,9 @@
         <!-- Group: マスタ連携 -->
         <div class="rb-group">
           <div class="rb-buttons">
-            <button class="rb-btn" id="btn-sej-link" title="SEJデータに席種エリアマスタを連携&#10;クリック: マスタファイル(TSV)を選択&#10;もう一度押すと連携解除" aria-label="SEJマスタ連携">
+            <button class="rb-btn" id="btn-sej-link" title="席種エリアマスタを連携&#10;SEJ設定・価格経路スケジュールのチェック/HTML出力に必須&#10;クリック: マスタファイル(TSV)を選択／もう一度押すと解除" aria-label="席種エリアマスタ連携">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></span>
-              <span>SEJ読込</span>
+              <span>マスタ連携</span>
             </button>
           </div>
           <span class="rb-group-label">マスタ連携</span>
@@ -1981,7 +1981,7 @@
 
         <h2>🎫 チケットタブ</h2>
         <div class="man-btn-section">
-          <div class="man-btn-row"><span class="man-btn-label">SEJ読込</span><span class="man-btn-desc">席種エリアマスタTSVを連携。席種エリアコード・購入限定席種1〜3などのコード列に席種名を併記し、「グループ名」列を仮想追加。SEJデータ（word列）には備考差分も表示（下記）。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">マスタ連携</span><span class="man-btn-desc">席種エリアマスタTSVを連携。<b>SEJ設定・価格経路スケジュールのチェック/HTML出力に必須</b>（指定席/エリア/その他の判定・表示略称に使用）。席種コード列に席種名を併記し「グループ名」列を仮想追加、SEJデータには備考差分も表示。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">日本語化</span><span class="man-btn-desc">英語の列名を日本語に変換。保存時は元の英語に戻ります。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">辞書編集</span><span class="man-btn-desc">日本語化の辞書とヘッダーメモを編集。今開いているファイルの列が一覧の先頭に出ます。新しい列名の追加も可能。ブラウザに保存されるため、オフラインHTML運用でもそのまま使えます。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">HTML出力</span><span class="man-btn-desc">確認用HTMLを新しいタブに出力。開いているファイルに応じて自動切替: 席種エリアマスタ→検証付き一覧 / SEJデータ→マスタ照合カード / <b>経路価格スケジュール→価格マトリクス</b>（通常価格表とUG差額マトリクスを販売条件ごとに表示。セルにマウスで販売期間）。</span></div>
@@ -2324,10 +2324,15 @@
           byCond.set(condKey(row) + "|" + seat + "|" + age, rec);
           if (!any.has(seat + "|" + age)) any.set(seat + "|" + age, rec);
         }
-        // 自由席判定: マスタ連携時は指定席自由席区分(rsve_unrsve_kbn)を優先、無ければ券種名で推測
-        const isFreeArea = (seat, code) => {
-          if (seatMeta) { const m = seatMeta(code, seat); if (m && m.found) return m.isFree; }
-          return /自由席|エリア/.test(seat);
+        // 席種カテゴリ: 指定席 / エリア / その他 / 駐車券
+        //  コード6桁目 O=その他（パドック/パス/車椅子等・UG例外的に可）/ P=駐車券
+        //  それ以外はマスタの指定席自由席区分(1=指定席,2=エリア)で判定
+        const seatCat = (code, seat) => {
+          const ch6 = (code && String(code).length >= 6) ? String(code)[5].toUpperCase() : "";
+          if (ch6 === "O" || /車椅子|車いす|パドック|ピット|パス|デッキ|グリッド/.test(seat)) return "その他";
+          if (ch6 === "P" || /駐車/.test(seat)) return "駐車券";
+          if (seatMeta) { const m = seatMeta(code, seat); if (m && m.found) { if (m.isReserved) return "指定席"; if (m.isFree) return "エリア"; } }
+          return /自由席|エリア/.test(seat) ? "エリア" : "指定席";
         };
         const ageRank = (a) => {
           a = String(a);
@@ -2353,8 +2358,11 @@
           // --- 可否チェック ---
           if (!/会員/.test(kbn) && !/会員/.test(rank)) problems.push("一般販売にUG不可");
           const sr = ageRank(srcAge), dr = ageRank(dstAge);
+          // 年齢降格（先のランク < 元のランク）のみ不可。子供→大人など昇格・同ランクはOK
           if (sr && dr && dr < sr) problems.push("年齢降格(" + srcAge + "→" + dstAge + ")");
-          if (sameSeat && isFreeArea(dstSeat, dstCode) && srcAge === dstAge) problems.push("自由席/エリアの同席種同券種は設定不可");
+          // エリア席のみ「同席種・同券種UG不可」。その他(O・車椅子・パス等)/指定席は対象外
+          const dstCat = seatCat(dstCode, dstSeat);
+          if (sameSeat && dstCat === "エリア" && srcAge === dstAge) problems.push("エリア席の同席種同券種UGは設定不可");
           // マスタ連携時: マスタ未登録の席種を注記
           if (seatMeta) {
             const md = seatMeta(dstCode, dstSeat), ms = seatMeta(srcCode, srcSeat);
@@ -7929,7 +7937,7 @@
             }
             // 備考(nte)の差分は wordN セル内に併記する方式（renderBody側で処理）
             $("btn-sej-link").classList.add("active-state");
-            setRbLabel("btn-sej-link", `SEJ:${cnt}件`);
+            setRbLabel("btn-sej-link", `マスタ:${cnt}`);
             // 席種エリアコード列を自動で広く取る（席種名が併記されるため）
             if (curCodeIdx !== -1) {
               let maxLen = 12;
@@ -7981,7 +7989,7 @@
         }
         state.sejMaster = null;
         $("btn-sej-link").classList.remove("active-state");
-        setRbLabel("btn-sej-link", "SEJ読込");
+        setRbLabel("btn-sej-link", "マスタ連携");
         state.forceRender = true;
         renderHeader();
         renderBody();
@@ -8413,6 +8421,11 @@
           alert("経路価格スケジュール（BO-F-21030）形式ではありません。\n「販売開始日時」「席種エリア名」「アップグレード該当フラグ」などの列が必要です。");
           return;
         }
+        // 席種エリアマスタ連携が必須
+        if (!state.sejMaster) {
+          alert("席種エリアマスタが未連携です。\n\nチケットタブの「マスタ連携」ボタンで席種エリアマスタ（TSV）を読み込んでから出力してください。\n（指定席/エリア/その他の判定・席種名表示に必須です）");
+          return;
+        }
         const vr = getVisibleRows();
         const rowIndices = vr._direct
           ? Array.from({ length: state.data.length }, (_, i) => i)
@@ -8428,7 +8441,7 @@
           <div style="background:#fff;border-radius:8px;padding:22px 26px;width:min(400px,90vw);box-shadow:0 8px 30px rgba(0,0,0,.25);font-size:13px">
             <h3 style="margin:0 0 6px;font-size:14px">価格チェック表の出力</h3>
             <p style="color:#737373;font-size:12px;margin-bottom:8px">${rowIndices.length}件${isFiltered ? "・フィルター適用中" : ""}　/　会員ランクは全件出力（出力先で絞り込み・並べ替え可）</p>
-            <p style="font-size:12px;margin-bottom:14px;padding:6px 10px;border-radius:6px;background:${state.sejMaster ? "#e8f7ee;color:#16a34a" : "#fdf3e3;color:#b45309"}">${state.sejMaster ? "✓ 席種エリアマスタ参照中（指定席/自由席をマスタの区分で判定）" : "⚠ 席種エリアマスタ未連携（指定席/自由席は券種名から推測）。チケットタブの「SEJ読込」でマスタを連携すると精度が上がります"}</p>
+            <p style="font-size:12px;margin-bottom:14px;padding:6px 10px;border-radius:6px;background:#e8f7ee;color:#16a34a">✓ 席種エリアマスタ参照中（指定席/エリア/その他をマスタで判定・席種は表示略称）</p>
             <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="px-normal" checked> 📋 通常価格表（席種×券種の設定一覧）</label>
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="px-matrix" checked> 🔢 アップグレードマトリクス（俯瞰）</label>
@@ -8518,6 +8531,15 @@
         const seatLabel = (seat, code) => { if (seatMeta) { const m = seatMeta(code, seat); if (m && m.found && m.dispAbb) return m.dispAbb; } return seat; };
         // 券種名: "_"以降〜"（"手前（大人/幼児 等）を抽出して略称化
         const ageLabel = (a) => { let s = String(a || ""); const u = s.lastIndexOf("_"); if (u >= 0) s = s.slice(u + 1); s = s.split(/[（(]/)[0]; return s.trim() || a; };
+        // 席種カテゴリ（指定席/エリア/その他/駐車券）
+        const seatCat = (code, seat) => {
+          const ch6 = (code && String(code).length >= 6) ? String(code)[5].toUpperCase() : "";
+          if (ch6 === "O" || /車椅子|車いす|パドック|ピット|パス|デッキ|グリッド/.test(seat)) return "その他";
+          if (ch6 === "P" || /駐車/.test(seat)) return "駐車券";
+          if (seatMeta) { const m = seatMeta(code, seat); if (m && m.found) { if (m.isReserved) return "指定席"; if (m.isFree) return "エリア"; } }
+          return /自由席|エリア/.test(seat) ? "エリア" : "指定席";
+        };
+        const catBadge = (cat) => `<span class="catb cat-${cat === "指定席" ? "r" : cat === "エリア" ? "a" : cat === "駐車券" ? "p" : "o"}">${cat}</span>`;
         const compactDate = (s) => String(s || "").replace(/^\d{2}(\d{2})[\/-]/, "").replace(/[\/\-]/g, "/").replace(/\s.*$/, "");
         const periodOf = (row) => { const s = compactDate(v(row, c.start)), e = compactDate(v(row, c.end)); return (s || e) ? `${s}〜${e}` : ""; };
         // 席種ごとの淡いカラー（地味めパレット）
@@ -8553,8 +8575,29 @@
               + cell(v(row, c.end), v(row, c.end), "dt")
               + `</tr>`;
           }
+          // 券種抜けの検出（他マスタが無いため、データ内の券種ユニバースから推定）
+          // 席種×条件ごとに持つ券種を集計し、過半数の席種が持つ券種が欠けている席種を警告
+          const ageUniverse = {}; // age -> 出現席種数
+          const seatAgeSet = {};  // seat||cond -> Set(age)
+          const seatCondCount = new Set();
+          for (const row of normals) {
+            const sc = v(row, c.seat) + "||" + condOf(row);
+            if (!seatAgeSet[sc]) { seatAgeSet[sc] = new Set(); seatCondCount.add(sc); }
+            seatAgeSet[sc].add(v(row, c.age));
+          }
+          for (const sc in seatAgeSet) for (const a of seatAgeSet[sc]) ageUniverse[a] = (ageUniverse[a] || 0) + 1;
+          const totalSC = seatCondCount.size || 1;
+          const expectedAges = Object.keys(ageUniverse).filter(a => ageUniverse[a] >= totalSC * 0.6);
+          const missingWarn = [];
+          for (const sc in seatAgeSet) {
+            const miss = expectedAges.filter(a => !seatAgeSet[sc].has(a));
+            if (miss.length) { const [seat, cond] = sc.split("||"); missingWarn.push(`${seat}（${cond}）: ${miss.map(ageLabel).join("・")}`); }
+          }
+          const missBanner = missingWarn.length
+            ? `<div class="warn">⚠ 券種抜けの可能性（他席種では設定があるのに欠けています・要確認）:<br>${missingWarn.slice(0, 30).map(escHtml).join("<br>")}${missingWarn.length > 30 ? `<br>…他${missingWarn.length - 30}件` : ""}</div>`
+            : "";
           sections.normal = { title: "通常価格表", body: `<h2>📋 通常価格表（${normals.length}件）</h2>
-<p class="legend">列見出しクリックで並べ替え、各列の入力欄で絞り込み（会員ランク・席種名・期間など）。${seatMeta ? "席種は表示略称・" : ""}券種は略称表示</p>
+<p class="legend">列見出しクリックで並べ替え、各列の入力欄で絞り込み（会員ランク・席種名・期間など）。席種は表示略称・券種は略称表示</p>${missBanner}
 ${_sortableTable(labels, rowsHtml)}` };
         }
 
@@ -8594,9 +8637,9 @@ ${_sortableTable(labels, rowsHtml)}` };
             const toCols = [];
             for (const ts of toSeats) for (const ta of toAges[ts]) toCols.push({ ts, ta });
 
-            // ヘッダー: 行1=先席種(colspan,色) / 行2=先券種＋先基準価格
+            // ヘッダー: 行1=先席種(colspan,色,カテゴリ) / 行2=先券種＋先基準価格
             let head = `<tr><th class="corner" colspan="2" rowspan="2">元＼先</th>`;
-            for (const ts of toSeats) head += `<th class="seathdr" colspan="${toAges[ts].length}" style="background:${seatColor(ts)}">${escHtml(seatLabel(ts, seatCode[ts]))}</th>`;
+            for (const ts of toSeats) head += `<th class="seathdr" colspan="${toAges[ts].length}" style="background:${seatColor(ts)}">${escHtml(seatLabel(ts, seatCode[ts]))}${catBadge(seatCat(seatCode[ts], ts))}</th>`;
             head += `</tr><tr>`;
             for (const ts of toSeats) for (const ta of toAges[ts]) {
               const p = priceMap[ts + "|" + ta];
@@ -8609,7 +8652,7 @@ ${_sortableTable(labels, rowsHtml)}` };
             for (const fs of fromSeats) {
               fromAges[fs].forEach((fa, i) => {
                 bodyRows += `<tr>`;
-                if (i === 0) bodyRows += `<th class="rowh seatrow" rowspan="${fromAges[fs].length}" style="background:${seatColor(fs)}">${escHtml(seatLabel(fs, seatCode[fs]))}</th>`;
+                if (i === 0) bodyRows += `<th class="rowh seatrow" rowspan="${fromAges[fs].length}" style="background:${seatColor(fs)}">${escHtml(seatLabel(fs, seatCode[fs]))}${catBadge(seatCat(seatCode[fs], fs))}</th>`;
                 const p = priceMap[fs + "|" + fa];
                 const pr = p ? `<div class="hp">前${money(p.adv)} 当${money(p.day)}</div>` : "";
                 bodyRows += `<th class="agehdr rowh agecol">${escHtml(ageLabel(fa))}${pr}</th>`;
@@ -8618,13 +8661,17 @@ ${_sortableTable(labels, rowsHtml)}` };
                   if (!e) { bodyRows += `<td class="na">—</td>`; continue; }
                   const { row, chk } = e;
                   const tip = (chk.status === "invalid" ? chk.note
-                    : chk.expected != null ? `期待差額 ${chk.expected.toLocaleString("ja-JP")}` + (chk.sameSeat ? "（同席種=一律500）" : `（先${fmt(String(chk.dstPrice))} − 元${fmt(String(chk.srcPrice))}）`)
+                    : chk.expected != null ? `期待差額 前${chk.expected.toLocaleString("ja-JP")}/当${chk.expectedDay != null ? chk.expectedDay.toLocaleString("ja-JP") : "?"}` + (chk.sameSeat ? "（同席種=一律500）" : `（先${fmt(String(chk.dstPrice))} − 元${fmt(String(chk.srcPrice))}）`)
                     : "通常価格が見つからず検算不能")
                     + `\n販売期間 ${v(row, c.start)} 〜 ${v(row, c.end)}`;
                   const cls = (chk.status === "ng" || chk.status === "invalid") ? " mx-ng" : chk.status === "unknown" ? " mx-na" : "";
                   const dg = chk.isDown ? '<div class="dg">▼0</div>' : "";
                   const mid = encodeURIComponent(["M", k, fs, fa, ts, ta].join("|"));
-                  bodyRows += `<td class="mxc${cls}" data-mid="${mid}" title="${escHtml(tip)}"><div class="adv">${escHtml(money(v(row, c.adv)))}</div><div class="day">${escHtml(money(v(row, c.day)))}</div><div class="per">${escHtml(period(row))}</div>${dg}</td>`;
+                  // 何がNGかを明示（前売/当日/設定不可）
+                  let reason = "";
+                  if (chk.status === "invalid") reason = `<div class="rsn">${escHtml((chk.problems || []).join("/"))}</div>`;
+                  else { const rs = []; if (chk.advNg) rs.push("前売"); if (chk.dayNg) rs.push("当日"); if (rs.length) reason = `<div class="rsn">${rs.join("・")}NG</div>`; }
+                  bodyRows += `<td class="mxc${cls}" data-mid="${mid}" title="${escHtml(tip)}"><div class="adv${chk.advNg ? " l-ng" : ""}">前 ${escHtml(money(v(row, c.adv)))}</div><div class="day${chk.dayNg ? " l-ng" : ""}">当 ${escHtml(money(v(row, c.day)))}</div><div class="per">${escHtml(period(row))}</div>${dg}${reason}</td>`;
                 }
                 bodyRows += `</tr>`;
               });
@@ -8633,7 +8680,7 @@ ${_sortableTable(labels, rowsHtml)}` };
           }
           const ngBadge = ngTotal ? `　<span class="badge-ng">NG ${ngTotal}件</span>` : `　<span class="badge-ok">検算OK</span>`;
           sections.matrix = { title: "UGマトリクス", body: `<h2>🔢 アップグレードマトリクス（俯瞰）${ngBadge}</h2>
-<p class="legend">行=元席種/券種、列=先席種/券種（券種コード順）。ヘッダーに基準価格(前/当)。各セル: 上=前売差額 / 中=当日差額 / 下=販売期間。赤=NG。クリックでマーク。${seatMeta ? "席種は表示略称" : ""}</p>${mxBody}` };
+<p class="legend">行=元席種/券種、列=先席種/券種（券種コード順）。席種は表示略称＋区分（<span class="catb cat-r">指定席</span><span class="catb cat-a">エリア</span><span class="catb cat-o">その他</span>）。各セル: 前=前売差額 / 当=当日差額 / 下=販売期間。<b>赤字の行（前売/当日）が不一致</b>でセル内に理由表示。クリックでマーク</p>${mxBody}` };
         }
 
         // --- UG一覧（席種ペアでセル結合・元⇒先・金額対比・差異強調） ---
@@ -8734,6 +8781,7 @@ body { font-family: -apple-system, "Hiragino Kaku Gothic ProN", "Yu Gothic UI", 
 h2 { font-size: 14px; margin: 6px 0 6px; padding: 6px 12px; background: #217346; color: #fff; border-radius: 6px; }
 h3 { font-size: 13px; margin: 12px 0 6px; color: #1a1a1a; }
 .legend { font-size: 11px; color: #888; margin: -2px 0 6px; }
+.warn { background: #fef3c7; border: 1px solid #fcd34d; color: #92400e; font-size: 11.5px; padding: 7px 11px; border-radius: 6px; margin: 4px 0 8px; line-height: 1.5; }
 .scroll { overflow: auto; max-height: calc(100vh - 190px); border: 1px solid #e2e8ee; border-radius: 4px; }
 table { border-collapse: separate; border-spacing: 0; font-size: 12.5px; background: #fff; }
 th, td { border: 1px solid #d8dde4; padding: 5px 10px; text-align: left; white-space: nowrap; }
@@ -8791,6 +8839,13 @@ td.mxc { cursor: pointer; position: relative; min-width: 64px; }
 td.mxc .adv { font-weight: 600; color: #be185d; }
 td.mxc .day { font-size: 10px; color: #b45309; }
 td.mxc .per { font-size: 9px; color: #999; }
+td.mxc .l-ng { color: #dc2626; font-weight: 700; outline: 1.5px solid #dc2626; outline-offset: 0; border-radius: 2px; }
+td.mxc .rsn { font-size: 9px; color: #dc2626; font-weight: 700; margin-top: 1px; }
+.catb { display: inline-block; font-size: 8.5px; font-weight: 700; padding: 0 4px; border-radius: 6px; margin-left: 3px; vertical-align: middle; line-height: 1.5; }
+.cat-r { background: #dbeafe; color: #1d4ed8; }
+.cat-a { background: #dcfce7; color: #15803d; }
+.cat-o { background: #fef3c7; color: #b45309; }
+.cat-p { background: #ede9fe; color: #6d28d9; }
 td.mxc.mx-ng { background: #fee2e2; outline: 2px solid #dc2626; outline-offset: -2px; }
 td.mxc.mx-na { background: #f5f5f5; }
 td.mxc.mx-na .adv, td.mxc.mx-na .day { color: #9ca3af; }
