@@ -2310,7 +2310,8 @@
       //   ・異席種UG → diff = 先価格 − 元価格 で、 diff<=0→0円 / 1〜500→500円 / 500超→実差額
       //  売止めダミー: 価格が 800,000 以上は売止め扱い（検算対象外）
       const UG_DUMMY_MIN = 800000;
-      function buildUgValidator(rows, c, v) {
+      // seatMeta(code, name) -> { isFree, isReserved, found } | null（席種エリアマスタ連携時のみ）
+      function buildUgValidator(rows, c, v, seatMeta) {
         const num = (s) => { const n = Number(String(s).replace(/,/g, "")); return isNaN(n) ? null : n; };
         const condKey = (row) => [v(row, c.kbn), v(row, c.rank), v(row, c.route)].join("|");
         const byCond = new Map(), any = new Map();
@@ -2323,7 +2324,11 @@
           byCond.set(condKey(row) + "|" + seat + "|" + age, rec);
           if (!any.has(seat + "|" + age)) any.set(seat + "|" + age, rec);
         }
-        const isFreeArea = (s) => /自由席|エリア/.test(s);
+        // 自由席判定: マスタ連携時は指定席自由席区分(rsve_unrsve_kbn)を優先、無ければ券種名で推測
+        const isFreeArea = (seat, code) => {
+          if (seatMeta) { const m = seatMeta(code, seat); if (m && m.found) return m.isFree; }
+          return /自由席|エリア/.test(seat);
+        };
         const ageRank = (a) => {
           a = String(a);
           if (/幼児|未就学|INFANT/i.test(a)) return 1;
@@ -2338,16 +2343,24 @@
         return function validate(row) {
           const srcSeat = v(row, c.ugSeat), dstSeat = v(row, c.seat);
           const srcAge = v(row, c.ugAge), dstAge = v(row, c.age);
+          const srcCode = v(row, c.ugSeatCd), dstCode = v(row, c.seatCd);
           const kbn = v(row, c.kbn), rank = v(row, c.rank);
           const advActual = num(v(row, c.adv)), dayActual = num(v(row, c.day));
           const sameSeat = srcSeat === dstSeat && srcSeat !== "";
           const problems = [];
+          const notes = [];
 
           // --- 可否チェック ---
           if (!/会員/.test(kbn) && !/会員/.test(rank)) problems.push("一般販売にUG不可");
           const sr = ageRank(srcAge), dr = ageRank(dstAge);
           if (sr && dr && dr < sr) problems.push("年齢降格(" + srcAge + "→" + dstAge + ")");
-          if (sameSeat && isFreeArea(dstSeat) && srcAge === dstAge) problems.push("自由席/エリアの同席種同券種は設定不可");
+          if (sameSeat && isFreeArea(dstSeat, dstCode) && srcAge === dstAge) problems.push("自由席/エリアの同席種同券種は設定不可");
+          // マスタ連携時: マスタ未登録の席種を注記
+          if (seatMeta) {
+            const md = seatMeta(dstCode, dstSeat), ms = seatMeta(srcCode, srcSeat);
+            if (!md || !md.found) notes.push("先席種マスタ未登録");
+            if (srcSeat && (!ms || !ms.found)) notes.push("元席種マスタ未登録");
+          }
 
           // --- 期待差額（前売・当日） ---
           // 戻り: { exp:number|null, note:string, dummy:bool }
@@ -2387,8 +2400,8 @@
             srcPrice: adv.srcPrice, dstPrice: adv.dstPrice,
             sameSeat,
             isDown: !sameSeat && adv.rawDiff != null && adv.rawDiff <= 0,
-            advActual, dayActual,
-            note: problems.length ? problems.join(" / ") : (adv.note || ""),
+            advActual, dayActual, notes,
+            note: [problems.join(" / "), notes.join(" / "), problems.length ? "" : (adv.note || "")].filter(Boolean).join(" / "),
             // 当日差額が前売と別に間違っている場合のフラグ
             dayNg: !problems.length && !day.dummy && day.note !== "価格不明" && dayActual !== day.exp,
           };
@@ -8412,7 +8425,8 @@
         ov.innerHTML = `
           <div style="background:#fff;border-radius:8px;padding:22px 26px;width:min(400px,90vw);box-shadow:0 8px 30px rgba(0,0,0,.25);font-size:13px">
             <h3 style="margin:0 0 6px;font-size:14px">価格チェック表の出力</h3>
-            <p style="color:#737373;font-size:12px;margin-bottom:14px">${rowIndices.length}件${isFiltered ? "・フィルター適用中" : ""}　/　会員ランクは全件出力（出力先で絞り込み・並べ替え可）</p>
+            <p style="color:#737373;font-size:12px;margin-bottom:8px">${rowIndices.length}件${isFiltered ? "・フィルター適用中" : ""}　/　会員ランクは全件出力（出力先で絞り込み・並べ替え可）</p>
+            <p style="font-size:12px;margin-bottom:14px;padding:6px 10px;border-radius:6px;background:${state.sejMaster ? "#e8f7ee;color:#16a34a" : "#fdf3e3;color:#b45309"}">${state.sejMaster ? "✓ 席種エリアマスタ参照中（指定席/自由席をマスタの区分で判定）" : "⚠ 席種エリアマスタ未連携（指定席/自由席は券種名から推測）。チケットタブの「SEJ読込」でマスタを連携すると精度が上がります"}</p>
             <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="px-normal" checked> 📋 通常価格表（席種×券種の設定一覧）</label>
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="px-matrix" checked> 🔢 アップグレードマトリクス（俯瞰）</label>
@@ -8441,15 +8455,38 @@
       function _buildPriceCheckHtml(rowIndices, isFiltered, opt) {
         const H = state.headers.map(h => String(h).trim());
         const ix = (n) => H.indexOf(n);
+        const ixAny = (...names) => { for (const n of names) { const i = ix(n); if (i !== -1) return i; } return -1; };
         const c = {
           kbn: ix("販売価格区分"), rank: ix("会員ランク名"), route: ix("販売経路区分"),
           seat: ix("席種エリア名"), age: ix("券種名"),
+          seatCd: ixAny("席種エリアコード", "seat_type_area_cd"),
           start: ix("販売開始日時"), end: ix("販売終了日時"),
           adv: ix("前売価格"), day: ix("当日価格"),
           ugFlag: ix("アップグレード該当フラグ"),
           ugSeat: ix("アップグレード元席種エリア名"), ugAge: ix("アップグレード元券種名"),
+          ugSeatCd: ixAny("アップグレード元席種エリアコード", "アップグレード元会場座席コード"),
         };
         const v = (r, i) => (i === -1 ? "" : String(r[i] ?? "").trim());
+
+        // 席種エリアマスタ（SEJ読込で連携済みなら参照）: コード/名称 → { isFree, isReserved, found }
+        let seatMeta = null;
+        if (state.sejMaster && state.sejMaster.byCode) {
+          const byCode = state.sejMaster.byCode;
+          const byName = {};
+          for (const cd in byCode) {
+            const m = byCode[cd];
+            const nm = String(m.seat_type_area_disp_nm || m.seat_type_area_control_nm || "").trim();
+            if (nm && !byName[nm]) byName[nm] = m;
+          }
+          seatMeta = (code, name) => {
+            let m = code ? byCode[String(code).trim()] : null;
+            if (!m && name) m = byName[String(name).trim()];
+            if (!m) return { found: false };
+            const kbn = String(m.rsve_unrsve_kbn || "").trim();
+            return { found: true, isFree: kbn === "2", isReserved: kbn === "1",
+              box: String(m.box_seat_flg || "").trim() === "1" };
+          };
+        }
         const fmt = (s) => {
           if (s === "" || s == null) return "";
           const n = Number(String(s).replace(/,/g, ""));
@@ -8464,7 +8501,7 @@
           const flag = v(row, c.ugFlag);
           (flag === "該当" || flag === "1" ? ugs : normals).push(row);
         }
-        const validate = buildUgValidator(normals.concat(ugs), c, v);
+        const validate = buildUgValidator(normals.concat(ugs), c, v, seatMeta);
 
         // セル: data-v に並べ替え用の生値を入れる（数値・日時はそのまま比較可能に）
         const cell = (val, raw, cls) => `<td${cls ? ` class="${cls}"` : ""}${raw != null ? ` data-v="${escHtml(String(raw))}"` : ""}>${escHtml(val)}</td>`;
@@ -8648,7 +8685,7 @@ tr[data-mid]:hover td { outline: 1px solid #b8c4d4; outline-offset: -1px; }
 @media print { .toolbar, .filter-row { display: none; } }
 </style></head><body>
 <div class="header"><h1>💴 ${escHtml(state.fileName)} <span style="font-size:12px;color:#666;font-weight:400">価格チェック</span></h1>
-<div class="meta">${rowIndices.length}件${isFiltered ? "（フィルター適用中）" : ""} — ${new Date().toLocaleString("ja-JP")}　|　列見出しで並べ替え・各列で絞り込み・チェックはブラウザに保存</div></div>
+<div class="meta">${rowIndices.length}件${isFiltered ? "（フィルター適用中）" : ""} — ${new Date().toLocaleString("ja-JP")}　|　${seatMeta ? "席種エリアマスタ参照" : "マスタ未連携(券種名で推測)"}　|　列見出しで並べ替え・各列で絞り込み・チェックはブラウザに保存</div></div>
 ${body}
 <div class="toolbar">
   <span>チェック進捗: <span id="mk-count">0 / 0</span></span>
