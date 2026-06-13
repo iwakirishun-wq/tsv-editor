@@ -2300,54 +2300,97 @@
       }
 
       // ===== UG差額の自動検算 =====
-      // 検算ルール:
-      //  ・同席種（元席種==先席種）のUG → 一律500円（指定席のみ有効）
-      //    ただし席種名に「自由席」「エリア」を含み、同券種（元券種==先券種）の場合は設定不可（invalid）
-      //  ・異席種（席種が変わる本来のUG）→ 期待差額 = 先席種価格 − 元席種価格（実差額）
-      //    大人は上がるが子供は下がる等で負になっても500円にはせず実差額を記載
-      // 戻り値: { status: "ok"|"ng"|"unknown"|"invalid", expected, srcPrice, dstPrice, sameSeat, isDown, note }
+      // 検算ルール（2026-06-13 ナレッジ突合で確定）:
+      //  可否（これに反したら invalid）:
+      //   ・一般販売（販売区分に「会員」を含まない）のUG行は不可
+      //   ・年齢降格（先の年齢ランク < 元の年齢ランク）は不可
+      //   ・自由席/エリアの同席種・同券種UGは不可
+      //  期待差額（前売・当日それぞれ・同年齢どうしで算出）:
+      //   ・同席種UG（指定席）→ 一律500円
+      //   ・異席種UG → diff = 先価格 − 元価格 で、 diff<=0→0円 / 1〜500→500円 / 500超→実差額
+      //  売止めダミー: 価格が 800,000 以上は売止め扱い（検算対象外）
+      const UG_DUMMY_MIN = 800000;
       function buildUgValidator(rows, c, v) {
+        const num = (s) => { const n = Number(String(s).replace(/,/g, "")); return isNaN(n) ? null : n; };
         const condKey = (row) => [v(row, c.kbn), v(row, c.rank), v(row, c.route)].join("|");
-        const priceByCond = new Map();
-        const priceAny = new Map();
+        const byCond = new Map(), any = new Map();
         for (const row of rows) {
           const flag = v(row, c.ugFlag);
           if (flag === "該当" || flag === "1") continue;
           const seat = v(row, c.seat), age = v(row, c.age);
-          const n = Number(String(v(row, c.adv)).replace(/,/g, ""));
-          if (!seat || isNaN(n)) continue;
-          priceByCond.set(condKey(row) + "|" + seat + "|" + age, n);
-          if (!priceAny.has(seat + "|" + age)) priceAny.set(seat + "|" + age, n);
+          if (!seat) continue;
+          const rec = { adv: num(v(row, c.adv)), day: num(v(row, c.day)) };
+          byCond.set(condKey(row) + "|" + seat + "|" + age, rec);
+          if (!any.has(seat + "|" + age)) any.set(seat + "|" + age, rec);
         }
-        const isFreeArea = (seat) => /自由席|エリア/.test(seat);
+        const isFreeArea = (s) => /自由席|エリア/.test(s);
+        const ageRank = (a) => {
+          a = String(a);
+          if (/幼児|未就学|INFANT/i.test(a)) return 1;
+          if (/子供|こども|子ども|小中|小・中|小学|CHILD/i.test(a)) return 2;
+          if (/U23|ｱﾝﾀﾞｰ|アンダー/i.test(a)) return 3;
+          if (/大人|ADULT|高校/i.test(a)) return 4;
+          return 0; // 共通・不明はランク判定しない
+        };
+        const chargeFor = (diff) => diff <= 0 ? 0 : (diff <= 500 ? 500 : diff); // 0以下→0 / 1〜500→500 / 超→実差額
+        const lookup = (ck, seat, age) => byCond.get(ck + "|" + seat + "|" + age) || any.get(seat + "|" + age) || null;
+
         return function validate(row) {
           const srcSeat = v(row, c.ugSeat), dstSeat = v(row, c.seat);
           const srcAge = v(row, c.ugAge), dstAge = v(row, c.age);
-          const actual = Number(String(v(row, c.adv)).replace(/,/g, ""));
+          const kbn = v(row, c.kbn), rank = v(row, c.rank);
+          const advActual = num(v(row, c.adv)), dayActual = num(v(row, c.day));
           const sameSeat = srcSeat === dstSeat && srcSeat !== "";
-          if (sameSeat) {
-            // 自由席/エリアの同席種・同券種は設定してはいけない
-            if (isFreeArea(dstSeat) && srcAge === dstAge) {
-              return { status: "invalid", expected: null, sameSeat: true, isDown: false,
-                note: "自由席/エリアの同席種・同券種UGは設定不可" };
-            }
-            const expected = 500; // 指定席の同席種UGは一律500円
-            return { status: (!isNaN(actual) && actual === expected) ? "ok" : "ng",
-              expected, sameSeat: true, isDown: false, note: "同席種=一律500円" };
+          const problems = [];
+
+          // --- 可否チェック ---
+          if (!/会員/.test(kbn) && !/会員/.test(rank)) problems.push("一般販売にUG不可");
+          const sr = ageRank(srcAge), dr = ageRank(dstAge);
+          if (sr && dr && dr < sr) problems.push("年齢降格(" + srcAge + "→" + dstAge + ")");
+          if (sameSeat && isFreeArea(dstSeat) && srcAge === dstAge) problems.push("自由席/エリアの同席種同券種は設定不可");
+
+          // --- 期待差額（前売・当日） ---
+          // 戻り: { exp:number|null, note:string, dummy:bool }
+          const calc = (which) => {
+            if (sameSeat) return { exp: 500, note: "同席種=一律500", dummy: false };
+            const ck = condKey(row);
+            const s = lookup(ck, srcSeat, srcAge), d = lookup(ck, dstSeat, dstAge);
+            const sp = s ? s[which] : null, dp = d ? d[which] : null;
+            if (sp == null || dp == null) return { exp: null, note: "価格不明", dummy: false };
+            if (sp >= UG_DUMMY_MIN || dp >= UG_DUMMY_MIN) return { exp: null, note: "売止め", dummy: true };
+            return { exp: chargeFor(dp - sp), note: "", dummy: false, srcPrice: sp, dstPrice: dp, rawDiff: dp - sp };
+          };
+          const adv = calc("adv"), day = calc("day");
+
+          // --- 判定 ---
+          let status;
+          if (problems.length) {
+            status = "invalid";
+          } else {
+            const matchOne = (a, actual) => {
+              if (a.note === "価格不明") return "unknown";
+              if (a.dummy) return (actual == null || actual >= UG_DUMMY_MIN) ? "ok" : "ng"; // 売止めなら差額もダミーのはず
+              return actual === a.exp ? "ok" : "ng";
+            };
+            const advR = matchOne(adv, advActual);
+            const dayR = matchOne(day, dayActual);
+            if (advR === "unknown" && dayR === "unknown") status = "unknown";
+            else if (advR === "ng" || dayR === "ng") status = "ng";
+            else status = "ok";
           }
-          // 異席種: 実差額で検算（500円ルールは適用しない）
-          const ck = condKey(row);
-          const src = priceByCond.has(ck + "|" + srcSeat + "|" + srcAge) ? priceByCond.get(ck + "|" + srcSeat + "|" + srcAge) : priceAny.get(srcSeat + "|" + srcAge);
-          const dst = priceByCond.has(ck + "|" + dstSeat + "|" + dstAge) ? priceByCond.get(ck + "|" + dstSeat + "|" + dstAge) : priceAny.get(dstSeat + "|" + dstAge);
-          if (src === undefined || dst === undefined) {
-            return { status: "unknown", expected: null, srcPrice: src, dstPrice: dst, sameSeat: false, isDown: false };
-          }
-          const expected = dst - src; // 実差額（負もありうる）
+
           return {
-            status: (!isNaN(actual) && actual === expected) ? "ok" : "ng",
-            expected, srcPrice: src, dstPrice: dst, sameSeat: false,
-            isDown: expected < 0,
-            note: expected < 0 ? "差額マイナス（子供等で減額）" : "",
+            status, problems,
+            expected: adv.exp, expectedDay: day.exp,
+            advNote: adv.note, dayNote: day.note,
+            advDummy: adv.dummy, dayDummy: day.dummy,
+            srcPrice: adv.srcPrice, dstPrice: adv.dstPrice,
+            sameSeat,
+            isDown: !sameSeat && adv.rawDiff != null && adv.rawDiff <= 0,
+            advActual, dayActual,
+            note: problems.length ? problems.join(" / ") : (adv.note || ""),
+            // 当日差額が前売と別に間違っている場合のフラグ
+            dayNg: !problems.length && !day.dummy && day.note !== "価格不明" && dayActual !== day.exp,
           };
         };
       }
@@ -8505,15 +8548,18 @@ ${_sortableTable(labels, rowsHtml)}`;
             const chk = validate(row);
             if (chk.status === "ng") ng++; else if (chk.status === "unknown") na++; else if (chk.status === "invalid") inv++;
             const mid = encodeURIComponent(["U", v(row, c.ugSeat), v(row, c.seat), v(row, c.ugAge), v(row, c.age), condOf(row), v(row, c.start)].join("|"));
+            const dayExpStr = chk.expectedDay != null ? `当日期待 ${chk.expectedDay.toLocaleString("ja-JP")}` : (chk.dayNote ? `当日:${chk.dayNote}` : "");
             const verdict = chk.status === "ok" ? '<td class="chk-ok" data-v="1">✓</td>'
-              : chk.status === "ng" ? '<td class="chk-ng" data-v="3">✗ NG</td>'
+              : chk.status === "ng" ? `<td class="chk-ng" data-v="3" title="${escHtml(dayExpStr)}">✗ NG</td>`
               : chk.status === "invalid" ? '<td class="chk-ng" data-v="4" title="' + escHtml(chk.note) + '">✗ 設定不可</td>'
               : '<td class="chk-na" data-v="2">価格不明</td>';
             const expTitle = chk.status === "invalid" ? chk.note
-              : chk.expected != null ? (chk.sameSeat ? "同席種=一律500円" : `先 ${fmt(String(chk.dstPrice))} − 元 ${fmt(String(chk.srcPrice))}`)
-              : "通常価格が見つかりません";
+              : chk.expected != null ? ((chk.sameSeat ? "同席種=一律500円" : `先 ${fmt(String(chk.dstPrice))} − 元 ${fmt(String(chk.srcPrice))}`) + (dayExpStr ? "\n" + dayExpStr : ""))
+              : (chk.advNote || "通常価格が見つかりません");
             const isNg = chk.status === "ng" || chk.status === "invalid";
-            const dg = chk.isDown ? '<div class="dg">▼減額</div>' : "";
+            const dg = chk.isDown ? '<div class="dg">▼0円</div>' : "";
+            const dayCls = "num ugday" + (chk.dayNg ? " day-ng" : "");
+            const dayCellTitle = chk.dayNg && chk.expectedDay != null ? ` title="当日期待 ${escHtml(chk.expectedDay.toLocaleString("ja-JP"))}"` : "";
             rowsHtml += `<tr data-mid="${mid}" class="${isNg ? "ng-row" : ""}"><td class="mk-cell" title="クリックでマーク">✔</td>`
               + cell(v(row, c.ugSeat), v(row, c.ugSeat))
               + cell(v(row, c.seat), v(row, c.seat))
@@ -8524,7 +8570,7 @@ ${_sortableTable(labels, rowsHtml)}`;
               + cell(fmt(v(row, c.adv)), Number(String(v(row, c.adv)).replace(/,/g, "")) || 0, "num ug")
               + `<td class="num exp" data-v="${chk.expected != null ? chk.expected : ""}" title="${escHtml(expTitle)}">${chk.expected != null ? escHtml(fmt(String(chk.expected))) : "—"}${dg}</td>`
               + verdict
-              + cell(fmt(v(row, c.day)), Number(String(v(row, c.day)).replace(/,/g, "")) || 0, "num ugday")
+              + `<td class="${dayCls}" data-v="${Number(String(v(row, c.day)).replace(/,/g, "")) || 0}"${dayCellTitle}>${escHtml(fmt(v(row, c.day)))}</td>`
               + cell(v(row, c.start), v(row, c.start), "dt")
               + cell(v(row, c.end), v(row, c.end), "dt")
               + `</tr>`;
@@ -8533,7 +8579,7 @@ ${_sortableTable(labels, rowsHtml)}`;
             + (inv ? `　<span class="badge-ng">設定不可 ${inv}件</span>` : "")
             + (na ? `　<span class="badge-na">価格不明 ${na}件</span>` : "");
           body += `<h2>🔀 アップグレード一覧（${ugs.length}件）${badges}</h2>
-<p class="legend">検算: 同席種=一律500円 / 異席種=先席種−元席種の実差額（減額になる場合も実差額を表示）。自由席・エリアの同席種同券種は設定不可。列見出しで並べ替え・各列で絞り込み可</p>
+<p class="legend">検算: 同席種=一律500円 / 異席種=先−元の差額（0以下→0円, 1〜500→500円, 超→実差額）。前売・当日とも検算。可否違反（一般販売UG・年齢降格・自由席エリアの同席種同券種）は「設定不可」。800,000以上は売止めダミー。列見出しで並べ替え・各列で絞り込み可</p>
 ${_sortableTable(labels, rowsHtml, true)}`;
         }
 
@@ -8572,6 +8618,7 @@ td.dt { font-size: 11.5px; color: #555; }
 td.chk-ok { color: #16a34a; font-weight: 700; text-align: center; }
 td.chk-ng { color: #dc2626; font-weight: 700; text-align: center; }
 td.chk-na { color: #9ca3af; text-align: center; font-size: 11px; }
+td.day-ng { background: #fee2e2; outline: 2px solid #dc2626; outline-offset: -2px; }
 tr.ng-row td { background: #fef2f2; }
 tr.ng-row td.mk-cell { box-shadow: inset 3px 0 0 #dc2626; }
 table.mx { width: auto; min-width: 420px; }
