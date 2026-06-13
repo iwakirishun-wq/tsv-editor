@@ -2392,18 +2392,20 @@
             else status = "ok";
           }
 
+          // 前売/当日それぞれの不一致フラグ
+          const advNg = !problems.length && adv.note !== "価格不明" && (adv.dummy ? !(advActual == null || advActual >= UG_DUMMY_MIN) : advActual !== adv.exp);
+          const dayNg = !problems.length && day.note !== "価格不明" && (day.dummy ? !(dayActual == null || dayActual >= UG_DUMMY_MIN) : dayActual !== day.exp);
           return {
             status, problems,
             expected: adv.exp, expectedDay: day.exp,
             advNote: adv.note, dayNote: day.note,
             advDummy: adv.dummy, dayDummy: day.dummy,
             srcPrice: adv.srcPrice, dstPrice: adv.dstPrice,
+            srcAdv: adv.srcPrice, dstAdv: adv.dstPrice, srcDay: day.srcPrice, dstDay: day.dstPrice,
             sameSeat,
             isDown: !sameSeat && adv.rawDiff != null && adv.rawDiff < 0,
-            advActual, dayActual, notes,
+            advActual, dayActual, notes, advNg, dayNg,
             note: [problems.join(" / "), notes.join(" / "), problems.length ? "" : (adv.note || "")].filter(Boolean).join(" / "),
-            // 当日差額が前売と別に間違っている場合のフラグ
-            dayNg: !problems.length && !day.dummy && day.note !== "価格不明" && dayActual !== day.exp,
           };
         };
       }
@@ -8486,7 +8488,9 @@
             if (!m) return { found: false };
             const kbn = String(m.rsve_unrsve_kbn || "").trim();
             return { found: true, isFree: kbn === "2", isReserved: kbn === "1",
-              box: String(m.box_seat_flg || "").trim() === "1" };
+              box: String(m.box_seat_flg || "").trim() === "1",
+              dispAbb: String(m.disp_abb || "").trim(),
+              dispNm: String(m.seat_type_area_disp_nm || m.seat_type_area_control_nm || "").trim() };
           };
         }
         const fmt = (s) => {
@@ -8508,6 +8512,26 @@
         // セル: data-v に並べ替え用の生値を入れる（数値・日時はそのまま比較可能に）
         const cell = (val, raw, cls) => `<td${cls ? ` class="${cls}"` : ""}${raw != null ? ` data-v="${escHtml(String(raw))}"` : ""}>${escHtml(val)}</td>`;
 
+        // --- 共通: 略称・色・期間ヘルパー（全表で使用） ---
+        const money = (s) => { const n = Number(String(s).replace(/,/g, "")); if (isNaN(n)) return ""; return n >= UG_DUMMY_MIN ? "売止" : n.toLocaleString("ja-JP"); };
+        // 席種名: マスタ連携時は表示略称、無ければ席種名
+        const seatLabel = (seat, code) => { if (seatMeta) { const m = seatMeta(code, seat); if (m && m.found && m.dispAbb) return m.dispAbb; } return seat; };
+        // 券種名: "_"以降〜"（"手前（大人/幼児 等）を抽出して略称化
+        const ageLabel = (a) => { let s = String(a || ""); const u = s.lastIndexOf("_"); if (u >= 0) s = s.slice(u + 1); s = s.split(/[（(]/)[0]; return s.trim() || a; };
+        const compactDate = (s) => String(s || "").replace(/^\d{2}(\d{2})[\/-]/, "").replace(/[\/\-]/g, "/").replace(/\s.*$/, "");
+        const periodOf = (row) => { const s = compactDate(v(row, c.start)), e = compactDate(v(row, c.end)); return (s || e) ? `${s}〜${e}` : ""; };
+        // 席種ごとの淡いカラー（地味めパレット）
+        const _palette = ["#eef2f6", "#eef6f0", "#f6f0ee", "#f1eef6", "#f6f4ee", "#eef5f6", "#f6eef3", "#f0f2ee"];
+        const _seatColors = {}; let _ci = 0;
+        const seatColor = (seat) => { if (!(seat in _seatColors)) _seatColors[seat] = _palette[_ci++ % _palette.length]; return _seatColors[seat]; };
+        // 券種コード順
+        const ageCode = {};
+        for (const row of normals.concat(ugs)) {
+          const a1 = v(row, c.age), cd1 = v(row, c.ageCd); if (a1 && cd1 && !(a1 in ageCode)) ageCode[a1] = cd1;
+          const a2 = v(row, c.ugAge), cd2 = v(row, c.ugAgeCd); if (a2 && cd2 && !(a2 in ageCode)) ageCode[a2] = cd2;
+        }
+        const ageKey = (a) => ageCode[a] || ("zzz" + a);
+
         const sections = {}; // key -> { title, body }
 
         // --- 通常価格表（フラット・並べ替え/絞り込み可） ---
@@ -8516,9 +8540,10 @@
           let rowsHtml = "";
           for (const row of normals) {
             const mid = encodeURIComponent(["P", v(row, c.seat), v(row, c.age), condOf(row), v(row, c.route), v(row, c.start)].join("|"));
+            const seat = v(row, c.seat), sl = seatLabel(seat, v(row, c.seatCd)), al = ageLabel(v(row, c.age));
             rowsHtml += `<tr data-mid="${mid}"><td class="mk-cell" title="クリックでマーク">✔</td>`
-              + cell(v(row, c.seat), v(row, c.seat))
-              + cell(v(row, c.age), v(row, c.age))
+              + `<td data-v="${escHtml(sl)}" style="background:${seatColor(seat)};font-weight:600" title="${escHtml(seat)}">${escHtml(sl)}</td>`
+              + cell(al, al)
               + cell(v(row, c.kbn), v(row, c.kbn))
               + cell(v(row, c.rank), v(row, c.rank))
               + cell(v(row, c.route), v(row, c.route))
@@ -8529,45 +8554,34 @@
               + `</tr>`;
           }
           sections.normal = { title: "通常価格表", body: `<h2>📋 通常価格表（${normals.length}件）</h2>
-<p class="legend">列見出しクリックで並べ替え、各列の入力欄で絞り込み（会員ランク・席種名・期間など）</p>
+<p class="legend">列見出しクリックで並べ替え、各列の入力欄で絞り込み（会員ランク・席種名・期間など）。${seatMeta ? "席種は表示略称・" : ""}券種は略称表示</p>
 ${_sortableTable(labels, rowsHtml)}` };
         }
 
-        // --- UGマトリクス（販売条件ごと・席種でセル結合・俯瞰用） ---
+        // --- UGマトリクス（販売条件ごと・席種でセル結合・凍結ヘッダー・俯瞰用） ---
         if (opt.matrix && ugs.length) {
-          // 券種コード順に年齢区分を並べる（大人→子供は券種コードの昇順）
-          const ageCode = {};
-          for (const row of normals.concat(ugs)) {
-            const a1 = v(row, c.age), cd1 = v(row, c.ageCd);
-            if (a1 && cd1 && !(a1 in ageCode)) ageCode[a1] = cd1;
-            const a2 = v(row, c.ugAge), cd2 = v(row, c.ugAgeCd);
-            if (a2 && cd2 && !(a2 in ageCode)) ageCode[a2] = cd2;
-          }
-          const ageKey = (a) => ageCode[a] || ("zzz" + a); // コード無しは末尾
-          const compactDate = (s) => String(s || "").replace(/^\d{2}(\d{2})[\/-]/, "").replace(/\s.*$/, ""); // MM/DD
-          const period = (row) => {
-            const s = compactDate(v(row, c.start)), e = compactDate(v(row, c.end));
-            return (s || e) ? `${s}〜${e}` : "";
-          };
+          const period = periodOf; // 共通ヘルパーを使用
+          // 条件ごとの通常価格マップ
+          const normalsByCond = {};
+          for (const row of normals) { const k = condOf(row); (normalsByCond[k] = normalsByCond[k] || []).push(row); }
 
           const byCond = new Map();
-          for (const row of ugs) {
-            const k = condOf(row);
-            if (!byCond.has(k)) byCond.set(k, []);
-            byCond.get(k).push(row);
-          }
+          for (const row of ugs) { const k = condOf(row); if (!byCond.has(k)) byCond.set(k, []); byCond.get(k).push(row); }
           let ngTotal = 0;
           let mxBody = "";
           for (const [k, list] of byCond) {
-            // 元席種→[元年齢...] / 先席種→[先年齢...] を席種単位でグループ化
-            const fromSeats = [], toSeats = [];
-            const fromAges = {}, toAges = {};
-            const map = new Map();
+            // 基準価格マップ（席種|券種 → {adv,day}）
+            const priceMap = {};
+            for (const row of (normalsByCond[k] || [])) priceMap[v(row, c.seat) + "|" + v(row, c.age)] = { adv: v(row, c.adv), day: v(row, c.day), code: v(row, c.seatCd) };
+
+            const fromSeats = [], toSeats = [], fromAges = {}, toAges = {}, map = new Map();
+            const seatCode = {};
             for (const row of list) {
               const chk = validate(row);
               if (chk.status === "ng" || chk.status === "invalid") ngTotal++;
               const fs = v(row, c.ugSeat) || "?", fa = v(row, c.ugAge) || "";
               const ts = v(row, c.seat) || "?", ta = v(row, c.age) || "";
+              seatCode[fs] = v(row, c.ugSeatCd); seatCode[ts] = v(row, c.seatCd);
               if (!fromSeats.includes(fs)) { fromSeats.push(fs); fromAges[fs] = []; }
               if (!fromAges[fs].includes(fa)) fromAges[fs].push(fa);
               if (!toSeats.includes(ts)) { toSeats.push(ts); toAges[ts] = []; }
@@ -8577,23 +8591,28 @@ ${_sortableTable(labels, rowsHtml)}` };
             const sortAges = (arr) => arr.slice().sort((a, b) => String(ageKey(a)).localeCompare(String(ageKey(b)), "ja"));
             for (const s of fromSeats) fromAges[s] = sortAges(fromAges[s]);
             for (const s of toSeats) toAges[s] = sortAges(toAges[s]);
-            // 列の総数（先席種×先年齢）
             const toCols = [];
             for (const ts of toSeats) for (const ta of toAges[ts]) toCols.push({ ts, ta });
 
-            // ヘッダー2段（先席種=colspan / 先券種）
+            // ヘッダー: 行1=先席種(colspan,色) / 行2=先券種＋先基準価格
             let head = `<tr><th class="corner" colspan="2" rowspan="2">元＼先</th>`;
-            for (const ts of toSeats) head += `<th colspan="${toAges[ts].length}">${escHtml(ts)}</th>`;
+            for (const ts of toSeats) head += `<th class="seathdr" colspan="${toAges[ts].length}" style="background:${seatColor(ts)}">${escHtml(seatLabel(ts, seatCode[ts]))}</th>`;
             head += `</tr><tr>`;
-            for (const ts of toSeats) for (const ta of toAges[ts]) head += `<th class="agehdr">${escHtml(ta)}</th>`;
+            for (const ts of toSeats) for (const ta of toAges[ts]) {
+              const p = priceMap[ts + "|" + ta];
+              const pr = p ? `<div class="hp">前${money(p.adv)}<br>当${money(p.day)}</div>` : "";
+              head += `<th class="agehdr">${escHtml(ageLabel(ta))}${pr}</th>`;
+            }
             head += `</tr>`;
 
             let bodyRows = "";
             for (const fs of fromSeats) {
               fromAges[fs].forEach((fa, i) => {
                 bodyRows += `<tr>`;
-                if (i === 0) bodyRows += `<th class="rowh seatrow" rowspan="${fromAges[fs].length}">${escHtml(fs)}</th>`;
-                bodyRows += `<th class="agehdr rowh">${escHtml(fa)}</th>`;
+                if (i === 0) bodyRows += `<th class="rowh seatrow" rowspan="${fromAges[fs].length}" style="background:${seatColor(fs)}">${escHtml(seatLabel(fs, seatCode[fs]))}</th>`;
+                const p = priceMap[fs + "|" + fa];
+                const pr = p ? `<div class="hp">前${money(p.adv)} 当${money(p.day)}</div>` : "";
+                bodyRows += `<th class="agehdr rowh agecol">${escHtml(ageLabel(fa))}${pr}</th>`;
                 for (const { ts, ta } of toCols) {
                   const e = map.get(fs + "|" + fa + "=>" + ts + "|" + ta);
                   if (!e) { bodyRows += `<td class="na">—</td>`; continue; }
@@ -8603,62 +8622,76 @@ ${_sortableTable(labels, rowsHtml)}` };
                     : "通常価格が見つからず検算不能")
                     + `\n販売期間 ${v(row, c.start)} 〜 ${v(row, c.end)}`;
                   const cls = (chk.status === "ng" || chk.status === "invalid") ? " mx-ng" : chk.status === "unknown" ? " mx-na" : "";
-                  const dg = chk.isDown ? '<div class="dg">▼0円</div>' : "";
+                  const dg = chk.isDown ? '<div class="dg">▼0</div>' : "";
                   const mid = encodeURIComponent(["M", k, fs, fa, ts, ta].join("|"));
-                  bodyRows += `<td class="mxc${cls}" data-mid="${mid}" title="${escHtml(tip)}"><div class="adv">${escHtml(fmt(v(row, c.adv)))}</div><div class="day">${escHtml(fmt(v(row, c.day)))}</div><div class="per">${escHtml(period(row))}</div>${dg}</td>`;
+                  bodyRows += `<td class="mxc${cls}" data-mid="${mid}" title="${escHtml(tip)}"><div class="adv">${escHtml(money(v(row, c.adv)))}</div><div class="day">${escHtml(money(v(row, c.day)))}</div><div class="per">${escHtml(period(row))}</div>${dg}</td>`;
                 }
                 bodyRows += `</tr>`;
               });
             }
-            mxBody += `<h3>${escHtml(k)}</h3><div class="scroll"><table class="mx">${head}${bodyRows}</table></div>`;
+            mxBody += `<h3>${escHtml(k)}</h3><div class="scroll mxscroll"><table class="mx">${head}${bodyRows}</table></div>`;
           }
           const ngBadge = ngTotal ? `　<span class="badge-ng">NG ${ngTotal}件</span>` : `　<span class="badge-ok">検算OK</span>`;
           sections.matrix = { title: "UGマトリクス", body: `<h2>🔢 アップグレードマトリクス（俯瞰）${ngBadge}</h2>
-<p class="legend">行=元席種/券種、列=先席種/券種（券種コード順）。各セル: 上=前売差額 / 中=当日差額 / 下=販売期間。赤=検算NG。セルをクリックでマーク（保存）。マウスで期待値詳細</p>${mxBody}` };
+<p class="legend">行=元席種/券種、列=先席種/券種（券種コード順）。ヘッダーに基準価格(前/当)。各セル: 上=前売差額 / 中=当日差額 / 下=販売期間。赤=NG。クリックでマーク。${seatMeta ? "席種は表示略称" : ""}</p>${mxBody}` };
         }
 
-        // --- UG一覧（フラット・検算・並べ替え/絞り込み可） ---
+        // --- UG一覧（席種ペアでセル結合・元⇒先・金額対比・差異強調） ---
         if (opt.ug && ugs.length) {
           let ng = 0, na = 0, inv = 0;
-          const labels = ["元席種", "先席種", "元券種", "先券種", "販売区分", "会員ランク", "前売差額", "期待差額", "検算", "当日差額", "販売開始", "販売終了"];
-          let rowsHtml = "";
+          // 元席種→先席種 ペアでグループ化
+          const pairOrder = [], pairMap = new Map(), pairCode = {};
           for (const row of ugs) {
+            const fs = v(row, c.ugSeat) || "?", ts = v(row, c.seat) || "?";
+            const key = fs + " ⇒ " + ts;
+            if (!pairMap.has(key)) { pairMap.set(key, []); pairOrder.push(key); pairCode[key] = { fs, ts, fcd: v(row, c.ugSeatCd), tcd: v(row, c.seatCd) }; }
+            pairMap.get(key).push(row);
             const chk = validate(row);
             if (chk.status === "ng") ng++; else if (chk.status === "unknown") na++; else if (chk.status === "invalid") inv++;
-            const mid = encodeURIComponent(["U", v(row, c.ugSeat), v(row, c.seat), v(row, c.ugAge), v(row, c.age), condOf(row), v(row, c.start)].join("|"));
-            const dayExpStr = chk.expectedDay != null ? `当日期待 ${chk.expectedDay.toLocaleString("ja-JP")}` : (chk.dayNote ? `当日:${chk.dayNote}` : "");
-            const verdict = chk.status === "ok" ? '<td class="chk-ok" data-v="1">✓</td>'
-              : chk.status === "ng" ? `<td class="chk-ng" data-v="3" title="${escHtml(dayExpStr)}">✗ NG</td>`
-              : chk.status === "invalid" ? '<td class="chk-ng" data-v="4" title="' + escHtml(chk.note) + '">✗ 設定不可</td>'
-              : '<td class="chk-na" data-v="2">価格不明</td>';
-            const expTitle = chk.status === "invalid" ? chk.note
-              : chk.expected != null ? ((chk.sameSeat ? "同席種=一律500円" : `先 ${fmt(String(chk.dstPrice))} − 元 ${fmt(String(chk.srcPrice))}`) + (dayExpStr ? "\n" + dayExpStr : ""))
-              : (chk.advNote || "通常価格が見つかりません");
-            const isNg = chk.status === "ng" || chk.status === "invalid";
-            const dg = chk.isDown ? '<div class="dg">▼0円</div>' : "";
-            const dayCls = "num ugday" + (chk.dayNg ? " day-ng" : "");
-            const dayCellTitle = chk.dayNg && chk.expectedDay != null ? ` title="当日期待 ${escHtml(chk.expectedDay.toLocaleString("ja-JP"))}"` : "";
-            rowsHtml += `<tr data-mid="${mid}" class="${isNg ? "ng-row" : ""}"><td class="mk-cell" title="クリックでマーク">✔</td>`
-              + cell(v(row, c.ugSeat), v(row, c.ugSeat))
-              + cell(v(row, c.seat), v(row, c.seat))
-              + cell(v(row, c.ugAge), v(row, c.ugAge))
-              + cell(v(row, c.age), v(row, c.age))
-              + cell(v(row, c.kbn), v(row, c.kbn))
-              + cell(v(row, c.rank), v(row, c.rank))
-              + cell(fmt(v(row, c.adv)), Number(String(v(row, c.adv)).replace(/,/g, "")) || 0, "num ug")
-              + `<td class="num exp" data-v="${chk.expected != null ? chk.expected : ""}" title="${escHtml(expTitle)}">${chk.expected != null ? escHtml(fmt(String(chk.expected))) : "—"}${dg}</td>`
-              + verdict
-              + `<td class="${dayCls}" data-v="${Number(String(v(row, c.day)).replace(/,/g, "")) || 0}"${dayCellTitle}>${escHtml(fmt(v(row, c.day)))}</td>`
-              + cell(v(row, c.start), v(row, c.start), "dt")
-              + cell(v(row, c.end), v(row, c.end), "dt")
-              + `</tr>`;
           }
-          const badges = (ng ? `　<span class="badge-ng">NG ${ng}件</span>` : `　<span class="badge-ok">検算OK</span>`)
+          const dual = (a, d, ng1, ng2, t1, t2) => // 前売/当日 2段セル（個別に赤枠可）
+            `<div class="two"><span class="${ng1 ? "v-ng" : ""}"${t1 ? ` title="${escHtml(t1)}"` : ""}>前 ${escHtml(a)}</span><span class="${ng2 ? "v-ng" : ""}"${t2 ? ` title="${escHtml(t2)}"` : ""}>当 ${escHtml(d)}</span></div>`;
+
+          let bodyRows = "";
+          for (const key of pairOrder) {
+            const list = pairMap.get(key);
+            const pc = pairCode[key];
+            const fsl = seatLabel(pc.fs, pc.fcd), tsl = seatLabel(pc.ts, pc.tcd);
+            list.sort((x, y) => String(ageKey(v(x, c.ugAge))).localeCompare(String(ageKey(v(y, c.ugAge))), "ja"));
+            list.forEach((row, i) => {
+              const chk = validate(row);
+              const isNg = chk.status === "ng" || chk.status === "invalid";
+              const mid = encodeURIComponent(["U", pc.fs, pc.ts, v(row, c.ugAge), v(row, c.age), condOf(row), v(row, c.start)].join("|"));
+              // コメント（何が違うか）
+              const cmts = [];
+              if (chk.problems && chk.problems.length) cmts.push(...chk.problems);
+              if (chk.advNg) cmts.push(`前売差額NG（期待 ${chk.expected != null ? chk.expected.toLocaleString("ja-JP") : "?"}）`);
+              if (chk.dayNg) cmts.push(`当日差額NG（期待 ${chk.expectedDay != null ? chk.expectedDay.toLocaleString("ja-JP") : "?"}）`);
+              if (chk.notes && chk.notes.length) cmts.push(...chk.notes);
+              const comment = cmts.join(" / ");
+              const expStr = (chk.expected != null || chk.expectedDay != null)
+                ? `前 ${chk.expected != null ? chk.expected.toLocaleString("ja-JP") : "?"} / 当 ${chk.expectedDay != null ? chk.expectedDay.toLocaleString("ja-JP") : "?"}`
+                : (chk.advNote || "—");
+              bodyRows += `<tr data-mid="${mid}" class="${isNg ? "ng-row" : ""}"><td class="mk-cell" title="クリックでマーク">✔</td>`;
+              if (i === 0) bodyRows += `<th class="rowh seatpair" rowspan="${list.length}" style="background:${seatColor(pc.fs)}" title="${escHtml(pc.fs + " ⇒ " + pc.ts)}"><b>${escHtml(fsl)}</b><span class="arrow">⇒</span><b>${escHtml(tsl)}</b></th>`;
+              bodyRows += `<td class="kenpair">${escHtml(ageLabel(v(row, c.ugAge)))}<span class="arrow">⇒</span>${escHtml(ageLabel(v(row, c.age)))}</td>`
+                + `<td class="prices">${dual(money(chk.srcAdv != null ? chk.srcAdv : ""), money(chk.srcDay != null ? chk.srcDay : ""))}</td>`
+                + `<td class="prices">${dual(money(chk.dstAdv != null ? chk.dstAdv : ""), money(chk.dstDay != null ? chk.dstDay : ""))}</td>`
+                + `<td class="exp" title="元−先の期待差額（同席種=500/負→0/1〜500→500）">${escHtml(expStr)}</td>`
+                + `<td class="prices reg">${dual(money(v(row, c.adv)), money(v(row, c.day)), chk.advNg, chk.dayNg, chk.advNg ? "期待 " + (chk.expected != null ? chk.expected.toLocaleString("ja-JP") : "?") : "", chk.dayNg ? "期待 " + (chk.expectedDay != null ? chk.expectedDay.toLocaleString("ja-JP") : "?") : "")}</td>`
+                + cell(condOf(row), condOf(row))
+                + cell(periodOf(row), "dt")
+                + `<td class="cmt">${comment ? `<span class="cmt-ng">${escHtml(comment)}</span>` : ""}</td>`
+                + `</tr>`;
+            });
+          }
+          const head = `<tr><th class="mk-h"></th><th>区間（元⇒先）</th><th>券種（元⇒先）</th><th>元価格</th><th>先価格</th><th>期待差額</th><th>登録差額</th><th>販売条件</th><th>販売期間</th><th>コメント</th></tr>`;
+          const badges = (ng ? `　<span class="badge-ng">差額NG ${ng}件</span>` : `　<span class="badge-ok">検算OK</span>`)
             + (inv ? `　<span class="badge-ng">設定不可 ${inv}件</span>` : "")
             + (na ? `　<span class="badge-na">価格不明 ${na}件</span>` : "");
           sections.ug = { title: "UG一覧", body: `<h2>🔀 アップグレード一覧（${ugs.length}件）${badges}</h2>
-<p class="legend">検算: 同席種=一律500円 / 異席種=先−元の差額（0以下→0円, 1〜500→500円, 超→実差額）。前売・当日とも検算。可否違反（一般販売UG・年齢降格・自由席エリアの同席種同券種）は「設定不可」。800,000以上は売止めダミー。列見出しで並べ替え・各列で絞り込み可</p>
-${_sortableTable(labels, rowsHtml, true)}` };
+<p class="legend">区間=元席種⇒先席種（セル結合）。期待差額=先−元（同席種500/負→0/1〜500→500、前売・当日）。登録差額が期待と違う項目は赤枠、コメント欄に理由。${seatMeta ? "席種は表示略称・" : ""}券種は略称</p>
+<div class="scroll uglistscroll"><table class="uglist">${head}${bodyRows}</table></div>` };
         }
 
         const order = ["normal", "matrix", "ug"].filter(k => sections[k]);
@@ -8724,27 +8757,46 @@ td.chk-ok { color: #16a34a; font-weight: 700; text-align: center; }
 td.chk-ng { color: #dc2626; font-weight: 700; text-align: center; }
 td.chk-na { color: #9ca3af; text-align: center; font-size: 11px; }
 td.day-ng { background: #fee2e2; outline: 2px solid #dc2626; outline-offset: -2px; }
+/* UG一覧（グループ・対比） */
+table.uglist { border-collapse: separate; border-spacing: 0; }
+table.uglist thead { }
+table.uglist tr:first-child th { position: sticky; top: 0; z-index: 3; background: #eef2f6; }
+table.uglist th.seatpair { position: sticky; left: 0; z-index: 2; vertical-align: middle; text-align: center; min-width: 120px; font-size: 11.5px; }
+table.uglist th.seatpair .arrow { color: #be185d; margin: 0 5px; font-weight: 700; }
+table.uglist td.kenpair { white-space: nowrap; font-weight: 600; }
+table.uglist td.kenpair .arrow { color: #be185d; margin: 0 4px; }
+table.uglist td.prices { padding: 2px 8px; }
+table.uglist td.prices.reg { font-weight: 600; }
+table.uglist .two { display: flex; flex-direction: column; line-height: 1.3; }
+table.uglist .two span { font-size: 11px; }
+table.uglist .two .v-ng { color: #dc2626; font-weight: 700; outline: 2px solid #dc2626; outline-offset: 1px; border-radius: 2px; }
+table.uglist td.exp { color: #555; font-size: 11px; white-space: nowrap; }
+table.uglist td.cmt { max-width: 220px; white-space: normal; }
+table.uglist .cmt-ng { color: #dc2626; font-size: 11px; font-weight: 600; }
 tr.ng-row td { background: #fef2f2; }
 tr.ng-row td.mk-cell { box-shadow: inset 3px 0 0 #dc2626; }
-table.mx { width: auto; min-width: 420px; }
-table.mx th, table.mx td { text-align: center; }
-table.mx thead, table.mx tr:first-child th { }
-table.mx th { position: sticky; top: 0; z-index: 2; background: #eef2f6; }
-table.mx th.agehdr { font-weight: 500; font-size: 11.5px; color: #555; }
-table.mx th.corner { background: #e2e8ee; left: 0; z-index: 5; }
-table.mx th.rowh { text-align: left; position: sticky; left: 0; background: #eef2f6; z-index: 1; }
-table.mx th.seatrow { font-weight: 700; vertical-align: middle; }
-td.mxc { cursor: pointer; }
-.sub { font-size: 10px; color: #888; font-weight: 400; }
+.mxscroll { max-height: calc(100vh - 210px); }
+table.mx { width: auto; border-collapse: separate; border-spacing: 0; }
+table.mx th, table.mx td { text-align: center; padding: 2px 6px; font-size: 11px; line-height: 1.25; }
+/* 列ヘッダー（先・上部固定）2段 */
+table.mx th.seathdr { position: sticky; top: 0; z-index: 4; font-size: 11.5px; font-weight: 700; }
+table.mx th.agehdr:not(.rowh) { position: sticky; top: 24px; z-index: 4; background: #eef2f6; font-weight: 600; color: #444; }
+/* 行ヘッダー（元・左固定）2列 */
+table.mx th.seatrow { position: sticky; left: 0; z-index: 3; width: 64px; min-width: 64px; max-width: 64px; font-weight: 700; vertical-align: middle; writing-mode: vertical-rl; text-orientation: mixed; }
+table.mx th.agecol { position: sticky; left: 64px; z-index: 3; width: 92px; min-width: 92px; max-width: 92px; text-align: left; background: #f3f5f8; font-weight: 600; }
+/* 隅（上＋左固定） */
+table.mx th.corner { position: sticky; top: 0; left: 0; z-index: 6; background: #e2e8ee; }
+table.mx .hp { font-size: 9px; font-weight: 400; color: #777; line-height: 1.15; margin-top: 1px; }
+td.mxc { cursor: pointer; position: relative; min-width: 64px; }
 td.mxc .adv { font-weight: 600; color: #be185d; }
-td.mxc .day { font-size: 11px; color: #b45309; }
-td.mxc .per { font-size: 10px; color: #888; }
+td.mxc .day { font-size: 10px; color: #b45309; }
+td.mxc .per { font-size: 9px; color: #999; }
 td.mxc.mx-ng { background: #fee2e2; outline: 2px solid #dc2626; outline-offset: -2px; }
 td.mxc.mx-na { background: #f5f5f5; }
 td.mxc.mx-na .adv, td.mxc.mx-na .day { color: #9ca3af; }
 td.mxc.marked { box-shadow: inset 0 0 0 3px var(--mk); }
 td.mxc.marked::after { content: "✓"; position: absolute; top: 1px; right: 3px; font-size: 10px; color: #16a34a; font-weight: 700; }
-td.mxc { position: relative; }
+.sub { font-size: 10px; color: #888; font-weight: 400; }
 td.na { color: #ccc; background: #fafafa; }
 .dg { font-size: 10px; color: #ea580c; font-weight: 700; }
 .badge-ng { background: #dc2626; color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 999px; vertical-align: middle; }
