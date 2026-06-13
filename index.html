@@ -2325,13 +2325,16 @@
           if (!any.has(seat + "|" + age)) any.set(seat + "|" + age, rec);
         }
         // 席種カテゴリ: 指定席 / エリア / その他 / 駐車券
-        //  コード6桁目 O=その他（パドック/パス/車椅子等・UG例外的に可）/ P=駐車券
-        //  それ以外はマスタの指定席自由席区分(1=指定席,2=エリア)で判定
+        //  判定はマスタ・コードを正とする（席種名での決め打ちはしない）:
+        //   コード6桁目 O=その他（パドック/パス等・UG例外的に可）/ P=駐車券
+        //   それ以外はマスタの指定席自由席区分(1=指定席,2=エリア)
+        //  ※車椅子でもエリア区分なら席移動なし＝同席種UG不可（区分どおりに扱う）
         const seatCat = (code, seat) => {
           const ch6 = (code && String(code).length >= 6) ? String(code)[5].toUpperCase() : "";
-          if (ch6 === "O" || /車椅子|車いす|パドック|ピット|パス|デッキ|グリッド/.test(seat)) return "その他";
-          if (ch6 === "P" || /駐車/.test(seat)) return "駐車券";
+          if (ch6 === "O") return "その他";
+          if (ch6 === "P") return "駐車券";
           if (seatMeta) { const m = seatMeta(code, seat); if (m && m.found) { if (m.isReserved) return "指定席"; if (m.isFree) return "エリア"; } }
+          if (/駐車/.test(seat)) return "駐車券";
           return /自由席|エリア/.test(seat) ? "エリア" : "指定席";
         };
         const ageRank = (a) => {
@@ -8531,12 +8534,13 @@
         const seatLabel = (seat, code) => { if (seatMeta) { const m = seatMeta(code, seat); if (m && m.found && m.dispAbb) return m.dispAbb; } return seat; };
         // 券種名: "_"以降〜"（"手前（大人/幼児 等）を抽出して略称化
         const ageLabel = (a) => { let s = String(a || ""); const u = s.lastIndexOf("_"); if (u >= 0) s = s.slice(u + 1); s = s.split(/[（(]/)[0]; return s.trim() || a; };
-        // 席種カテゴリ（指定席/エリア/その他/駐車券）
+        // 席種カテゴリ（指定席/エリア/その他/駐車券）— マスタ・コードを正とする
         const seatCat = (code, seat) => {
           const ch6 = (code && String(code).length >= 6) ? String(code)[5].toUpperCase() : "";
-          if (ch6 === "O" || /車椅子|車いす|パドック|ピット|パス|デッキ|グリッド/.test(seat)) return "その他";
-          if (ch6 === "P" || /駐車/.test(seat)) return "駐車券";
+          if (ch6 === "O") return "その他";
+          if (ch6 === "P") return "駐車券";
           if (seatMeta) { const m = seatMeta(code, seat); if (m && m.found) { if (m.isReserved) return "指定席"; if (m.isFree) return "エリア"; } }
+          if (/駐車/.test(seat)) return "駐車券";
           return /自由席|エリア/.test(seat) ? "エリア" : "指定席";
         };
         const catBadge = (cat) => `<span class="catb cat-${cat === "指定席" ? "r" : cat === "エリア" ? "a" : cat === "駐車券" ? "p" : "o"}">${cat}</span>`;
