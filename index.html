@@ -8506,7 +8506,7 @@
         // セル: data-v に並べ替え用の生値を入れる（数値・日時はそのまま比較可能に）
         const cell = (val, raw, cls) => `<td${cls ? ` class="${cls}"` : ""}${raw != null ? ` data-v="${escHtml(String(raw))}"` : ""}>${escHtml(val)}</td>`;
 
-        let body = "";
+        const sections = {}; // key -> { title, body }
 
         // --- 通常価格表（フラット・並べ替え/絞り込み可） ---
         if (opt.normal && normals.length) {
@@ -8526,9 +8526,9 @@
               + cell(v(row, c.end), v(row, c.end), "dt")
               + `</tr>`;
           }
-          body += `<h2>📋 通常価格表（${normals.length}件）</h2>
+          sections.normal = { title: "通常価格表", body: `<h2>📋 通常価格表（${normals.length}件）</h2>
 <p class="legend">列見出しクリックで並べ替え、各列の入力欄で絞り込み（会員ランク・席種名・期間など）</p>
-${_sortableTable(labels, rowsHtml)}`;
+${_sortableTable(labels, rowsHtml)}` };
         }
 
         // --- UGマトリクス（販売条件ごと・俯瞰用） ---
@@ -8572,8 +8572,8 @@ ${_sortableTable(labels, rowsHtml)}`;
             mxBody += `</table></div>`;
           }
           const ngBadge = ngTotal ? `　<span class="badge-ng">NG ${ngTotal}件</span>` : `　<span class="badge-ok">検算OK</span>`;
-          body += `<h2>🔢 アップグレードマトリクス（俯瞰）${ngBadge}</h2>
-<p class="legend">上段: 前売差額 / 下段: 当日差額。赤セル = 検算NG（自由席/エリアの同席種設定や差額不一致）。セルにマウスで期待値・販売期間</p>${mxBody}`;
+          sections.matrix = { title: "UGマトリクス", body: `<h2>🔢 アップグレードマトリクス（俯瞰）${ngBadge}</h2>
+<p class="legend">上段: 前売差額 / 下段: 当日差額。赤セル = 検算NG（自由席/エリアの同席種設定や差額不一致）。セルにマウスで期待値・販売期間</p>${mxBody}` };
         }
 
         // --- UG一覧（フラット・検算・並べ替え/絞り込み可） ---
@@ -8615,32 +8615,59 @@ ${_sortableTable(labels, rowsHtml)}`;
           const badges = (ng ? `　<span class="badge-ng">NG ${ng}件</span>` : `　<span class="badge-ok">検算OK</span>`)
             + (inv ? `　<span class="badge-ng">設定不可 ${inv}件</span>` : "")
             + (na ? `　<span class="badge-na">価格不明 ${na}件</span>` : "");
-          body += `<h2>🔀 アップグレード一覧（${ugs.length}件）${badges}</h2>
+          sections.ug = { title: "UG一覧", body: `<h2>🔀 アップグレード一覧（${ugs.length}件）${badges}</h2>
 <p class="legend">検算: 同席種=一律500円 / 異席種=先−元の差額（0以下→0円, 1〜500→500円, 超→実差額）。前売・当日とも検算。可否違反（一般販売UG・年齢降格・自由席エリアの同席種同券種）は「設定不可」。800,000以上は売止めダミー。列見出しで並べ替え・各列で絞り込み可</p>
-${_sortableTable(labels, rowsHtml, true)}`;
+${_sortableTable(labels, rowsHtml, true)}` };
         }
 
-        if (!body) { alert("出力対象の行がありません（選択した表に該当データがありません）。"); return; }
+        const order = ["normal", "matrix", "ug"].filter(k => sections[k]);
+        if (!order.length) { alert("出力対象の行がありません（選択した表に該当データがありません）。"); return; }
 
-        const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
-<title>${escHtml(state.fileName)} - 価格チェック</title>
+        const metaLine = `${rowIndices.length}件${isFiltered ? "（フィルター適用中）" : ""} — ${new Date().toLocaleString("ja-JP")}　|　${seatMeta ? "席種エリアマスタ参照" : "マスタ未連携(券種名で推測)"}`;
+        const fname = escHtml(state.fileName);
+
+        // 選択した表ごとに別タブで出力する
+        let blocked = 0;
+        order.forEach((key) => {
+          const sec = sections[key];
+          const html = _priceDoc(fname, sec.title, metaLine, sec.body);
+          const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+          const url = URL.createObjectURL(blob);
+          const w = window.open(url, "_blank", "noopener");
+          if (!w) blocked++;
+          setTimeout(() => URL.revokeObjectURL(url), 60000);
+        });
+        const names = order.map(k => sections[k].title).join("・");
+        if (blocked) {
+          setStatus(`価格チェックHTMLを出力（${names}）。一部タブがポップアップブロックされました（${blocked}件）。ブラウザでこのサイトのポップアップを許可してください。`);
+        } else {
+          setStatus(`価格チェックHTMLを${order.length}タブに出力しました（${names}）`);
+        }
+      }
+
+      // 価格チェック用HTML文書（1表＝1ファイル）を組み立てる。ヘッダーはスクロール追従で固定。
+      function _priceDoc(fname, title, metaLine, bodyHtml) {
+        return `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
+<title>${fname} - ${title}</title>
 <style>
 :root { --mk: #fde047; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, "Hiragino Kaku Gothic ProN", "Yu Gothic UI", sans-serif; background: #f8f9fa; color: #333; padding: 16px 20px 64px; }
-.header { background: #fff; padding: 12px 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.1); margin-bottom: 14px; }
-.header h1 { font-size: 16px; }
+body { font-family: -apple-system, "Hiragino Kaku Gothic ProN", "Yu Gothic UI", sans-serif; background: #f8f9fa; color: #333; padding-bottom: 52px; min-height: 100vh; }
+.header { background: #fff; padding: 10px 20px; box-shadow: 0 1px 3px rgba(0,0,0,.1); position: sticky; top: 0; z-index: 20; }
+.header h1 { font-size: 15px; }
 .header .meta { font-size: 12px; color: #666; margin-top: 3px; }
-h2 { font-size: 14px; margin: 22px 0 6px; padding: 6px 12px; background: #217346; color: #fff; border-radius: 6px; }
+.content { padding: 12px 20px; }
+h2 { font-size: 14px; margin: 6px 0 6px; padding: 6px 12px; background: #217346; color: #fff; border-radius: 6px; }
 h3 { font-size: 13px; margin: 12px 0 6px; color: #1a1a1a; }
 .legend { font-size: 11px; color: #888; margin: -2px 0 6px; }
-.scroll { overflow-x: auto; }
-table { border-collapse: collapse; font-size: 12.5px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.scroll { overflow: auto; max-height: calc(100vh - 190px); border: 1px solid #e2e8ee; border-radius: 4px; }
+table { border-collapse: separate; border-spacing: 0; font-size: 12.5px; background: #fff; }
 th, td { border: 1px solid #d8dde4; padding: 5px 10px; text-align: left; white-space: nowrap; }
 th { background: #eef2f6; font-weight: 600; }
-table.sortable thead th[data-c] { cursor: pointer; position: sticky; top: 0; z-index: 2; user-select: none; }
+table.sortable thead th[data-c] { cursor: pointer; position: sticky; top: 0; z-index: 3; user-select: none; }
+table.sortable thead th.mk-h { position: sticky; top: 0; z-index: 3; }
 table.sortable thead th[data-c]:hover { background: #e2e8ee; }
-.filter-row th { padding: 2px; position: sticky; top: 28px; z-index: 2; background: #f6f8fb; }
+.filter-row th { padding: 2px; position: sticky; top: 29px; z-index: 3; background: #f6f8fb; }
 .filter-row input { width: 100%; min-width: 70px; border: 1px solid #cfd6df; border-radius: 3px; padding: 2px 4px; font-size: 11px; }
 .arr { color: #217346; }
 th.num, td.num { text-align: right; }
@@ -8660,7 +8687,8 @@ tr.ng-row td { background: #fef2f2; }
 tr.ng-row td.mk-cell { box-shadow: inset 3px 0 0 #dc2626; }
 table.mx { width: auto; min-width: 420px; }
 table.mx th, table.mx td { text-align: center; }
-table.mx th.corner { background: #e2e8ee; }
+table.mx th { position: sticky; top: 0; z-index: 2; }
+table.mx th.corner { background: #e2e8ee; left: 0; z-index: 4; }
 table.mx th.rowh { text-align: left; position: sticky; left: 0; background: #eef2f6; z-index: 1; }
 .sub { font-size: 10px; color: #888; font-weight: 400; }
 td.mxc .adv { font-weight: 600; color: #be185d; }
@@ -8675,35 +8703,28 @@ td.na { color: #ccc; background: #fafafa; }
 .badge-na { background: #9ca3af; color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 999px; vertical-align: middle; }
 tr.marked td { background: color-mix(in srgb, var(--mk) 38%, #ffffff); }
 tr[data-mid]:hover td { outline: 1px solid #b8c4d4; outline-offset: -1px; }
-.toolbar { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255,255,255,.96); border-top: 1px solid #d8dde4; padding: 8px 20px; display: flex; align-items: center; gap: 12px; font-size: 12px; z-index: 10; box-shadow: 0 -2px 8px rgba(0,0,0,.06); }
+.toolbar { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255,255,255,.97); border-top: 1px solid #d8dde4; padding: 8px 20px; display: flex; align-items: center; gap: 12px; font-size: 12px; z-index: 10; box-shadow: 0 -2px 8px rgba(0,0,0,.06); }
 .toolbar button { padding: 5px 14px; border: 1px solid #217346; color: #217346; background: #fff; border-radius: 5px; cursor: pointer; font-size: 12px; }
 .toolbar button:hover { background: #eaf4ee; }
 .toolbar #mk-clear { border-color: #dc2626; color: #dc2626; }
 .toolbar #mk-ngonly.on { background: #dc2626; color: #fff; }
 .toolbar .hint { color: #888; }
 #mk-count { font-weight: 700; color: #217346; }
-@media print { .toolbar, .filter-row { display: none; } }
+@media print { .toolbar, .filter-row { display: none; } .content { overflow: visible; } .scroll { overflow: visible; max-height: none; } }
 </style></head><body>
-<div class="header"><h1>💴 ${escHtml(state.fileName)} <span style="font-size:12px;color:#666;font-weight:400">価格チェック</span></h1>
-<div class="meta">${rowIndices.length}件${isFiltered ? "（フィルター適用中）" : ""} — ${new Date().toLocaleString("ja-JP")}　|　${seatMeta ? "席種エリアマスタ参照" : "マスタ未連携(券種名で推測)"}　|　列見出しで並べ替え・各列で絞り込み・チェックはブラウザに保存</div></div>
-${body}
+<div class="header"><h1>💴 ${fname} <span style="font-size:12px;color:#666;font-weight:400">${title}</span></h1>
+<div class="meta">${metaLine}　|　ヘッダー固定・列見出しで並べ替え・各列で絞り込み</div></div>
+<div class="content">${bodyHtml}</div>
 <div class="toolbar">
   <span>チェック進捗: <span id="mk-count">0 / 0</span></span>
   <button id="mk-btn">選択した行をマーク（Ctrl+Q）</button>
   <button id="mk-clear">全解除</button>
   <button id="mk-ngonly" style="border-color:#dc2626;color:#dc2626">NG/未チェックのみ</button>
   <input type="color" id="mk-color" value="#fde047" title="マーカー色">
-  <span class="hint">行ダブルクリック / 左端✔クリックでもマークできます</span>
+  <span class="hint">行ダブルクリック / 左端✔クリックでもマーク</span>
 </div>
 <` + `script>${_priceCheckScript()}<` + `/script>
 </body></html>`;
-
-        const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-        const url = URL.createObjectURL(blob);
-        window.open(url, "_blank", "noopener");
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
-        const parts = [opt.normal && "通常価格", opt.matrix && "UGマトリクス", opt.ug && "UG一覧"].filter(Boolean);
-        setStatus(`価格チェックHTMLを出力しました（${parts.join("・")}）`);
       }
 
       // 並べ替え/絞り込み対応テーブルのHTMLを組み立てる
