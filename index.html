@@ -4886,6 +4886,11 @@
           }
         }
         els.tbody.innerHTML = html;
+        _prevHighlight = {
+          selected: state.selected ? { ...state.selected } : null,
+          range: state.range ? { ...state.range } : null,
+          selectedCol: state.selectedCol,
+        };
       }
 
       function isRowInRange(r) {
