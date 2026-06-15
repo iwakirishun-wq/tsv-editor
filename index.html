@@ -1707,6 +1707,10 @@
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="3" y1="12" x2="21" y2="12"></line><line x1="12" y1="3" x2="12" y2="21"></line><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor"></circle><circle cx="16.5" cy="7.5" r="1.2" fill="currentColor"></circle><circle cx="7.5" cy="16.5" r="1.2" fill="currentColor"></circle><circle cx="16.5" cy="16.5" r="1.2" fill="currentColor"></circle></svg></span>
               <span>区画席検査</span>
             </button>
+            <button class="rb-btn" id="btn-ikkatsu-check" title="席種一括設定TSV(23列)の設定整合チェックを表にインライン表示（切り替え）&#10;NG（赤）: マスタ未登録・席種名不一致・指定席整合・上限9+リセール可・リセール下限1321・購入限定あり+単体不可・P+他種混在&#10;注意（橙）: 上限9+SEJ可&#10;席種エリアマスタを連携すると席種名/指定席チェックも有効になります" aria-label="席種一括設定チェックの切り替え" aria-pressed="false">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"></path><rect x="9" y="3" width="6" height="4" rx="1"></rect><path d="M9 12l2 2 4-4"></path></svg></span>
+              <span>一括設定検査</span>
+            </button>
           </div>
           <span class="rb-group-label">検品</span>
         </div>
@@ -2174,6 +2178,7 @@
         parkingCheck: false, // 席種エリアコード6桁目P ⇔ 駐車券フラグ1 の検査
         kanaCheck: false,    // 全角カタカナ検出（半角カナ必須フィールド用）
         boxCheck: false,     // 区画席（（〇名）席種）の設定検査
+        ikkatsuCheck: false, // 席種一括設定チェック（23列）のインライン検品
         verticalHeader: true, // ヘッダー縦書き表示（既定でON・列幅節約）
         crossHi: true,        // 選択セルの行・列を十字ハイライト（localStorage保存）
         markerColor: "#facc15", // マーカー色（localStorageに保存）
@@ -3034,6 +3039,12 @@
         $("btn-parking-check").onclick = () => toggleInspect("parkingCheck", "btn-parking-check", "駐車券フラグ検査");
         $("btn-kana-check").onclick = () => toggleInspect("kanaCheck", "btn-kana-check", "半角カナ検査");
         $("btn-box-check").onclick = () => toggleInspect("boxCheck", "btn-box-check", "区画席検査");
+        $("btn-ikkatsu-check").onclick = () => {
+          toggleInspect("ikkatsuCheck", "btn-ikkatsu-check", "席種一括設定チェック");
+          if (state.ikkatsuCheck && !state.sejMaster) {
+            setStatus("席種一括設定チェック: ON ※席種エリアマスタ未連携 → 席種名/指定席整合チェックをスキップ中");
+          }
+        };
         // 辞書・ヘッダーメモ編集
         $("btn-dict-edit").onclick = openDictEditor;
         // 価格スケジュールチェック表
@@ -4471,6 +4482,28 @@
         const boxCodeIdx = state.boxCheck ? _hIdx("seat_type_area_cd") : -1;
         const boxFlgIdx = state.boxCheck ? _hIdx("box_seat_flg") : -1;
         const boxCntIdx = state.boxCheck ? _hIdx("seat_cnt") : -1;
+        // 席種一括設定チェック: 列インデックスを1度だけ解決（ON かつ 23列フォーマット時のみ）
+        let ikkatsuCols = null;
+        if (state.ikkatsuCheck && isIkkatsuData()) {
+          const _ikNorm = (s) => String(s ?? "").trim().replace(/（/g,"(").replace(/）/g,")").replace(/[０-９]/g,(d)=>"０１２３４５６７８９".indexOf(d));
+          const _ikHs = state.headers.map(_ikNorm);
+          const _ikC = (n) => _ikHs.indexOf(_ikNorm(n));
+          ikkatsuCols = {
+            code:      _ikC("席種エリアコード"),
+            name:      _ikC("席種エリア管理名"),
+            design:    _ikC("座席指定不可フラグ"),
+            limit:     _ikC("購入上限数(決済毎)"),
+            resale:    _ikC("リセール可否"),
+            resaleMin: _ikC("リセール用販売価格下限"),
+            solo:      _ikC("単体販売不可"),
+            lim1:      _ikC("購入限定席種1"),
+            lim2:      _ikC("購入限定席種2"),
+            lim3:      _ikC("購入限定席種3"),
+            kubun:     _ikC("購入限定区分"),
+            sejPay:    _ikC("SEJ支払"),
+            sejIssue:  _ikC("SEJ発券"),
+          };
+        }
         // SEJ備考差分: wordN列とマスタnteのN番目項目をセル内で比較表示
         let nteWordCols = null;
         if (state.sejMaster && sejCodeColIdx !== -1) {
@@ -4490,6 +4523,33 @@
           // aria-rowindex: ヘッダー行が1なので、データ行は2から始まる
           const wrapCls = state.wrapRows.has(i) ? " wrap-row" : "";
           const crossRow = state.crossHi && state.selected && state.selected.row === i;
+          // 席種一括設定チェック: セル描画ループで参照する行単位の値を前計算
+          let ikRow = null;
+          if (ikkatsuCols) {
+            const _ikg = (idx) => idx < 0 ? "" : String(row[idx] ?? "").trim();
+            const _ikSix = (cd) => cd && cd.length >= 6 ? cd[5].toUpperCase() : "";
+            const _ikCode = _ikg(ikkatsuCols.code);
+            const _ikMaster = _ikCode && state.sejMaster?.byCode ? state.sejMaster.byCode[_ikCode] : null;
+            const _ikLimCodes = [_ikg(ikkatsuCols.lim1), _ikg(ikkatsuCols.lim2), _ikg(ikkatsuCols.lim3)].filter(Boolean);
+            ikRow = {
+              code:      _ikCode,
+              master:    _ikMaster,
+              mName:     _ikMaster ? String(_ikMaster.seat_type_area_control_nm || _ikMaster.seat_type_area_disp_nm || "").trim() : "",
+              kbn:       _ikMaster ? String(_ikMaster.rsve_unrsve_kbn || "").trim() : "",
+              name:      _ikg(ikkatsuCols.name),
+              design:    _ikg(ikkatsuCols.design),
+              limit:     _ikg(ikkatsuCols.limit),
+              resale:    _ikg(ikkatsuCols.resale),
+              resaleMin: _ikg(ikkatsuCols.resaleMin),
+              solo:      _ikg(ikkatsuCols.solo),
+              kubun:     _ikg(ikkatsuCols.kubun),
+              sejPay:    _ikg(ikkatsuCols.sejPay),
+              sejIssue:  _ikg(ikkatsuCols.sejIssue),
+              limCodes:  _ikLimCodes,
+              hasP:    _ikLimCodes.some(cd => _ikSix(cd) === "P"),
+              hasNonP: _ikLimCodes.some(cd => _ikSix(cd) && _ikSix(cd) !== "P"),
+            };
+          }
           html += `<tr role="row" data-row="${i}" aria-rowindex="${i + 2}" class="${isDup ? 'dup-row' : ''}${wrapCls}${crossRow ? ' cross-row' : ''}">`;
           html += `<td role="rowheader" class="row-num${rowInRange ? " row-selected" : ""}${isDup}" data-rownum="${i}">${i + 1}</td>`;
           for (const j of visCols) {
@@ -4617,6 +4677,60 @@
                 if (!flg) ng.push("BOXフラグ1");
                 if (!cntOk) ng.push("席数2以上");
                 displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">✗ ${ng.join("・")}が必要</span>`;
+              }
+            }
+            // 席種一括設定チェック: 各列に NG/WARN をインライン表示
+            if (ikRow) {
+              const ik = ikRow;
+              // マスタ未登録 (席種エリアコード列)
+              if (j === ikkatsuCols.code && ik.code && !ik.master) {
+                cls.push("cell-ng");
+                displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">✗ マスタ未登録</span>`;
+              }
+              // 席種名不一致 (席種エリア管理名列)
+              if (j === ikkatsuCols.name && ik.master && ik.mName && ik.name && ik.mName !== ik.name) {
+                cls.push("cell-ng");
+                displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">✗ マスタ「${escHtml(ik.mName)}」</span>`;
+              }
+              // 指定席/自由席整合 (座席指定不可フラグ列)
+              if (j === ikkatsuCols.design && ik.master && ik.design) {
+                if (ik.kbn === "1" && ik.design !== "指定可") {
+                  cls.push("cell-ng");
+                  displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">✗ 指定席(区分1)→指定可</span>`;
+                } else if (ik.kbn === "2" && ik.design !== "指定不可") {
+                  cls.push("cell-ng");
+                  displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">✗ 自由席(区分2)→指定不可</span>`;
+                }
+              }
+              // 上限9+リセール可 (リセール可否列)
+              if (j === ikkatsuCols.resale && ik.limit === "9" && ik.resale === "可能") {
+                cls.push("cell-ng");
+                displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">✗ 上限9(非販売)なのにリセール可</span>`;
+              }
+              // リセール下限不正 (リセール用販売価格下限列)
+              if (j === ikkatsuCols.resaleMin && ik.resale === "可能" && ik.resaleMin !== "1321") {
+                cls.push("cell-ng");
+                displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">✗ リセール可→1321必須</span>`;
+              }
+              // 上限9+SEJ支払可 (SEJ支払列)
+              if (j === ikkatsuCols.sejPay && ik.limit === "9" && ik.sejPay === "支払可") {
+                cls.push("cell-warn");
+                displayVal += `<span style="color:#ea580c;margin-left:5px;font-size:10px">⚠ 上限9なのにSEJ支払可</span>`;
+              }
+              // 上限9+SEJ発券可 (SEJ発券列)
+              if (j === ikkatsuCols.sejIssue && ik.limit === "9" && ik.sejIssue === "発券可") {
+                cls.push("cell-warn");
+                displayVal += `<span style="color:#ea580c;margin-left:5px;font-size:10px">⚠ 上限9なのにSEJ発券可</span>`;
+              }
+              // 購入限定あり+単体販売不可≠不可 (単体販売不可列)
+              if (j === ikkatsuCols.solo && ik.limCodes.length > 0 && ik.solo !== "不可") {
+                cls.push("cell-ng");
+                displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">✗ 購入限定あり→不可必須</span>`;
+              }
+              // 購入限定P+他種混在なのに複数区分でない (購入限定区分列)
+              if (j === ikkatsuCols.kubun && ik.limCodes.length > 0 && ik.hasP && ik.hasNonP && !ik.kubun.includes("複数")) {
+                cls.push("cell-ng");
+                displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">✗ P+他種混在→複数購入可にすべき</span>`;
               }
             }
             // SEJ備考差分: wordN列にマスタnteのN番目項目を併記し、差分を強調表示
@@ -9561,9 +9675,16 @@ ${findings.length
           return;
         }
 
-        // 席種一括設定（23列）の場合はチェックレポートを出力
+        // 席種一括設定（23列）の場合は検品リボンのインラインチェックを有効化
         if (isIkkatsuData()) {
-          exportIkkatsuCheckHtml(rowIndices, isFiltered);
+          if (!state.ikkatsuCheck) {
+            toggleInspect("ikkatsuCheck", "btn-ikkatsu-check", "席種一括設定チェック");
+            if (!state.sejMaster) {
+              setStatus("席種一括設定チェック: ONにしました（マスタ未連携のため席種名/指定席整合チェックをスキップ中）");
+            }
+          } else {
+            setStatus("席種一括設定チェックはすでにONです。検品リボンの「一括設定検査」ボタンでON/OFFを切り替えられます");
+          }
           return;
         }
 
