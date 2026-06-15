@@ -5314,6 +5314,10 @@
         td.innerHTML = `<input type="text">`;
         const inp = td.querySelector("input");
         inp.value = initVal !== undefined ? initVal : oldVal;
+        if (els.fbarVal) els.fbarVal.textContent = inp.value;
+        inp.addEventListener("input", (e) => {
+          if (els.fbarVal) els.fbarVal.textContent = e.target.value;
+        });
         inp.focus();
         if (initVal !== undefined)
           inp.selectionStart = inp.selectionEnd = inp.value.length;
@@ -5365,6 +5369,7 @@
             state.forceRender = true;
             renderBody();
           }
+          updateStatusPos();
         };
         inp.onblur = () => finish();
         inp.onkeydown = (ev) => {
@@ -7685,6 +7690,7 @@
         renderHeader();
         renderBody();
         updateHiddenStatus();
+        updateStatusPos();
       }
       function redo() {
         if (!state.redoStack.length) return;
@@ -7698,6 +7704,7 @@
         renderHeader();
         renderBody();
         updateHiddenStatus();
+        updateStatusPos();
       }
       function _refreshSearchHits() {
         // undo/redo後に検索ヒットをカーソル移動なしで再構築する
