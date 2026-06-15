@@ -8423,8 +8423,25 @@
 
       // 席種一括設定（23列）かどうか判定。固有列の組合せで判定する。
       function isIkkatsuData() {
-        const hs = state.headers.map(h => h.trim());
-        return hs.includes("座席指定不可フラグ") && hs.includes("リセール可否") && hs.includes("購入限定区分");
+        const normalize = (s) =>
+          String(s ?? "")
+            .trim()
+            .replace(/（/g, "(")
+            .replace(/）/g, ")")
+            .replace(/[０-９]/g, (d) => "０１２３４５６７８９".indexOf(d));
+        const hs = new Set(state.headers.map(normalize));
+        return [
+          "席種エリアコード",
+          "席種エリア管理名",
+          "座席指定不可フラグ",
+          "購入上限数(決済毎)",
+          "リセール可否",
+          "リセール用販売価格下限",
+          "単体販売不可",
+          "購入限定区分",
+          "SEJ支払",
+          "SEJ発券",
+        ].every((name) => hs.has(normalize(name)));
       }
 
 
