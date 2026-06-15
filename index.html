@@ -29,10 +29,10 @@
         --hit-current: rgba(249, 115, 22, 0.7);
         --toolbar-bg: #fafafa;
         --toolbar-text: #171717;
-        --header-bg: #f5f5f5;
-        --header-border: #d4d4d4;
-        --cell-border: #e5e5e5;
-        --col-active-bg: #f0f0f0;
+        --header-bg: #f0f0f0;
+        --header-border: #bfbfbf;
+        --cell-border: #d0d0d0;
+        --col-active-bg: #e8f0e8;
         --danger-bg: #fef2f2;
         --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
         --shadow-md: 0 2px 4px rgba(0,0,0,0.06);
@@ -487,8 +487,9 @@
         font-family: var(--font-ui);
       }
       th.col-active {
-        background: var(--col-active-bg);
-        color: var(--accent);
+        background: rgba(19, 100, 215, 0.12);
+        color: #1b6ec2;
+        border-bottom-color: #1b6ec2;
       }
       th.col-sorted {
         color: var(--accent);
@@ -591,6 +592,8 @@
         height: var(--row-h, 22px);
         background: #fff;
       }
+      /* ゼブラストライプ: Excelの交互行色に相当。ハイライト系はすべて!importantで上書きされる */
+      tbody tr:nth-child(even) { background: #f6f6f6; }
       tbody td {
         border-right: 1px solid var(--cell-border);
         border-bottom: 1px solid var(--cell-border);
@@ -634,23 +637,24 @@
         background: #d4d4d4;
       }
       .row-num.row-selected {
-        background: var(--col-active-bg);
-        color: var(--accent);
-        font-weight: 600;
+        background: rgba(19, 100, 215, 0.14);
+        color: #1b6ec2;
+        font-weight: 700;
+        border-right-color: #1b6ec2;
       }
 
-      /* ===ハイライト=== */
+      /* ===ハイライト（Excel互換・青系）=== */
       td.selected {
-        background: rgba(249, 115, 22, 0.22) !important;
-        outline: 2px solid #f97316;
+        background: rgba(19, 100, 215, 0.16) !important;
+        outline: 2px solid #1b6ec2;
         outline-offset: -1px;
         z-index: 2;
       }
       td.in-range {
-        background: rgba(33, 115, 70, 0.1) !important;
+        background: rgba(19, 100, 215, 0.07) !important;
       }
       td.col-highlight {
-        background: var(--col-selected);
+        background: rgba(19, 100, 215, 0.03);
       }
       /* 十字ハイライト（選択セルの行・列）。
          背景 + box-shadow の罫線のみで描画 → レイアウトに一切影響しない＝列ぶれゼロ。
@@ -685,7 +689,7 @@
       td.editing input {
         width: 100%;
         height: 100%;
-        border: 2px solid var(--accent);
+        border: 2px solid #217346;
         background: #fff;
         color: #000;
         outline: none;
@@ -693,6 +697,73 @@
         font-family: var(--font-ui);
         font-size: 12px;
         border-radius: 0;
+        box-shadow: 0 0 0 1px rgba(33,115,70,0.3);
+      }
+
+      /* ===数式バー（Excel式: アドレスボックス ＋ セル内容プレビュー）=== */
+      #formula-bar {
+        display: none;
+        height: 26px;
+        flex-shrink: 0;
+        align-items: center;
+        background: #fff;
+        border-bottom: 1px solid var(--border);
+        font-size: 12px;
+        user-select: none;
+      }
+      #formula-bar.fbar-visible { display: flex; }
+      #fbar-name-wrap {
+        width: 72px;
+        min-width: 72px;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-right: 1px solid var(--border);
+        flex-shrink: 0;
+      }
+      #fbar-name {
+        width: 100%;
+        border: none;
+        outline: none;
+        font-size: 12px;
+        font-family: var(--font-mono);
+        text-align: center;
+        background: transparent;
+        cursor: default;
+        color: var(--text);
+        font-weight: 600;
+      }
+      #fbar-name:focus { background: #eef4ff; cursor: text; }
+      #fbar-fx {
+        padding: 0 8px;
+        color: var(--text-dim);
+        font-style: italic;
+        font-size: 14px;
+        flex-shrink: 0;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        border-right: 1px solid var(--border);
+      }
+      #fbar-val-wrap {
+        flex: 1;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        padding: 0 8px;
+        min-width: 0;
+        overflow: hidden;
+      }
+      #fbar-val {
+        flex: 1;
+        font-size: 12px;
+        font-family: var(--font-mono);
+        color: var(--text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        pointer-events: none;
       }
 
       /* ===ステータスバー=== */
@@ -1226,15 +1297,29 @@
         border-right: 2px solid var(--accent) !important;
       }
       /* フリーズ列は半透明ハイライトだと下のスクロール文字が透けるため、不透明色で塗る */
-      td.frozen-col.selected { background: #e2e2e2 !important; }
-      td.frozen-col.in-range { background: #ececec !important; }
-      td.frozen-col.col-highlight { background: #f3f3f3 !important; }
+      td.frozen-col.selected { background: #c7dcf5 !important; }
+      td.frozen-col.in-range { background: #deeaf9 !important; }
+      td.frozen-col.col-highlight { background: #eef3fb !important; }
       td.frozen-col.search-hit { background: #fdf0b8 !important; }
       td.frozen-col.marked { background: color-mix(in srgb, var(--marker-color, #facc15) 35%, #ffffff) !important; }
       td.frozen-col.cell-ng { background: #fbe5e5 !important; }
       td.frozen-col.cell-warn { background: #fcecdc !important; }
       td.frozen-col.cell-diff { background: #fae3ee !important; }
       td.frozen-col.hl-empty { background: #f5f5f5 !important; }
+
+      /* ===列ヘッダー内の列文字ラベル(A, B, C...)=== */
+      .th-col-letter {
+        font-size: 9px;
+        color: var(--text-dim);
+        font-weight: 400;
+        letter-spacing: 0;
+        line-height: 1;
+        font-family: var(--font-mono);
+        display: block;
+        text-align: center;
+        opacity: 0.7;
+      }
+      th.col-active .th-col-letter { color: #1b6ec2; opacity: 1; font-weight: 700; }
 
       /* ===縦書きヘッダー（列幅節約）=== */
       body.vertical-headers thead tr:first-child th { height: 120px; vertical-align: bottom; }
@@ -1254,6 +1339,8 @@
         white-space: nowrap;
         flex: 1;
       }
+      /* 縦書き時は列文字を最上部に表示 */
+      body.vertical-headers thead tr:first-child .th-col-letter { margin-top: auto; }
 
       /* ===マニュアルダイアログ=== */
       #manual-dialog {
@@ -1786,6 +1873,17 @@
     <!-- === RIBBON HTML END === -->
 
     <div id="tab-bar"></div>
+
+    <!-- 数式バー: アドレスボックス(A1形式) + セル内容プレビュー -->
+    <div id="formula-bar" role="group" aria-label="数式バー">
+      <div id="fbar-name-wrap">
+        <input id="fbar-name" type="text" readonly aria-label="セルアドレス" spellcheck="false" tabindex="-1">
+      </div>
+      <div id="fbar-fx" aria-hidden="true">ƒx</div>
+      <div id="fbar-val-wrap">
+        <span id="fbar-val" role="status" aria-label="セル内容" aria-live="off"></span>
+      </div>
+    </div>
 
     <div id="main">
       <div id="drop-zone">
@@ -2555,6 +2653,9 @@
         statusFilter: $("status-filter"),
         statusPos: $("status-pos"),
         statusStats: $("status-stats"),
+        fbarName: $("fbar-name"),
+        fbarVal: $("fbar-val"),
+        fbar: $("formula-bar"),
         ctxMenu: $("context-menu"),
         search: $("search-input"),
         count: $("search-count"),
@@ -2618,6 +2719,7 @@
       function showTable() {
         els.dropZone.classList.add("hidden");
         els.container.style.display = "block";
+        if (els.fbar) els.fbar.classList.add("fbar-visible");
         const cap = $("main-table").querySelector("caption");
         if (cap)
           cap.textContent = `${state.fileName || "TSV/CSV"} データ編集グリッド`;
@@ -2815,6 +2917,7 @@
           $("tab-bar").style.display = "none";
           els.dropZone.classList.remove("hidden");
           els.container.style.display = "none";
+          if (els.fbar) els.fbar.classList.remove("fbar-visible");
           return;
         }
         const newIdx = Math.min(idx, state.tabs.length - 1);
@@ -4200,6 +4303,7 @@
           const tooltipHtml = hasComment ? `<div class="th-tooltip visible">${escHtml(comment)}</div>` : `<div class="th-tooltip" data-tooltip-col="${i}"></div>`;
           html += `<th scope="col" aria-label="${escHtml(displayH)}" style="${w}${freezeLeft}" data-col="${i}" aria-colindex="${i + 2}" class="${active} ${frozen} ${freezeBorder} ${hasComment ? 'has-comment' : ''}" aria-sort="${sortDir}" data-comment-col="${i}">
       <div class="th-inner">
+        <span class="th-col-letter" aria-hidden="true">${colIndexToLetter(i)}</span>
         <span class="th-label" title="${escHtml(labelTitle)}">${escHtml(displayH)}</span>
         <div class="th-controls">
           <span class="sort-arrow ${sortActive}" data-sort="${i}" title="ソート" role="button" tabindex="0" aria-label="${escHtml(displayH)}列でソート">${sortIcon}</span>
@@ -4885,16 +4989,35 @@
         updateStatusPos();
       }
 
+      // 列インデックス(0始まり)をExcel式列文字(A, B, ... Z, AA, ...)に変換
+      function colIndexToLetter(n) {
+        let s = "";
+        n++;
+        while (n > 0) {
+          n--;
+          s = String.fromCharCode(65 + (n % 26)) + s;
+          n = Math.floor(n / 26);
+        }
+        return s;
+      }
+
       function updateStatusPos() {
         if (!state.selected) {
           els.statusPos.textContent = "";
           els.statusStats.textContent = "";
+          // 数式バーをクリア
+          if (els.fbarName) { els.fbarName.value = ""; els.fbarVal.textContent = ""; }
           return;
         }
         const { row, col } = state.selected;
         const v = String(state.data[row]?.[col] ?? "");
         const bytes = new Blob([v]).size;
-        els.statusPos.textContent = `行${row + 1} 列${col + 1} : ${v.slice(0, 40)}${v.length > 0 ? ` [${v.length}文字/${bytes}B]` : ""}`;
+        // 数式バー: A1形式アドレス＋セル内容
+        if (els.fbarName) {
+          els.fbarName.value = `${colIndexToLetter(col)}${row + 1}`;
+          els.fbarVal.textContent = v;
+        }
+        els.statusPos.textContent = `${colIndexToLetter(col)}${row + 1}  行${row + 1} 列${col + 1} : ${v.slice(0, 40)}${v.length > 0 ? ` [${v.length}文字/${bytes}B]` : ""}`;
         if (state.range) {
           const { r1, c1, r2, c2 } = state.range;
           const stats = calcRangeStats(
