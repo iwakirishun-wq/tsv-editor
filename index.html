@@ -652,8 +652,20 @@
       td.col-highlight {
         background: var(--col-selected);
       }
-      td.cross-hi {
-        background: rgba(33, 115, 70, 0.06);
+      /* 十字ハイライト（選択セルの行・列）。
+         背景 + box-shadow の罫線のみで描画 → レイアウトに一切影響しない＝列ぶれゼロ。
+         罫線を太め(2px)にして「選択中の行・列」をはっきり示す。 */
+      td.cross-col:not(.selected) {
+        background: rgba(33, 115, 70, 0.08);
+        box-shadow: inset 2px 0 0 0 rgba(33, 115, 70, 0.6),
+          inset -2px 0 0 0 rgba(33, 115, 70, 0.6);
+      }
+      tr.cross-row td:not(.selected):not(.cross-col) {
+        background: rgba(33, 115, 70, 0.08);
+      }
+      tr.cross-row td:not(.selected) {
+        box-shadow: inset 0 2px 0 0 rgba(33, 115, 70, 0.6),
+          inset 0 -2px 0 0 rgba(33, 115, 70, 0.6);
       }
       td.search-hit {
         background: var(--hit) !important;
@@ -1758,7 +1770,7 @@
         <!-- Group: 補助表示 -->
         <div class="rb-group">
           <div class="rb-buttons">
-            <button class="rb-btn" id="btn-cross-hi" title="選択中のセルの行と列を淡く強調表示します（十字ハイライト）&#10;設定はブラウザに保存され、HTML出力にも反映されます" aria-label="十字ハイライトの切り替え" aria-pressed="true">
+            <button class="rb-btn" id="btn-cross-hi" title="選択中のセルの行と列を太い罫線＋淡い背景で強調します（十字ハイライト）&#10;列ぶれしない方式（罫線は box-shadow 描画でレイアウト非干渉）&#10;設定はブラウザに保存され、HTML出力にも反映されます" aria-label="十字ハイライトの切り替え" aria-pressed="true">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="1"></rect><rect x="3" y="9" width="18" height="6" fill="currentColor" opacity="0.15"></rect><rect x="9" y="3" width="6" height="18" fill="currentColor" opacity="0.15"></rect></svg></span>
               <span>十字強調</span>
             </button>
@@ -4448,9 +4460,9 @@
           const isDup = state._dupSet?.has(i) ? " hl-dup" : "";
           // aria-rowindex: ヘッダー行が1なので、データ行は2から始まる
           const wrapCls = state.wrapRows.has(i) ? " wrap-row" : "";
-          html += `<tr role="row" data-row="${i}" aria-rowindex="${i + 2}" class="${isDup ? 'dup-row' : ''}${wrapCls}">`;
-          html += `<td role="rowheader" class="row-num${rowInRange ? " row-selected" : ""}${isDup}" data-rownum="${i}">${i + 1}</td>`;
           const crossRow = state.crossHi && state.selected && state.selected.row === i;
+          html += `<tr role="row" data-row="${i}" aria-rowindex="${i + 2}" class="${isDup ? 'dup-row' : ''}${wrapCls}${crossRow ? ' cross-row' : ''}">`;
+          html += `<td role="rowheader" class="row-num${rowInRange ? " row-selected" : ""}${isDup}" data-rownum="${i}">${i + 1}</td>`;
           for (const j of visCols) {
             let cls = [];
             if (state.selected?.row === i && state.selected?.col === j)
@@ -4462,9 +4474,10 @@
               !(state.selected?.row === i && state.selected?.col === j)
             )
               cls.push("col-highlight");
-            // 十字ハイライト（選択セルの行・列を淡く強調）
-            if (state.crossHi && state.selected && !(state.selected.row === i && state.selected.col === j)) {
-              if (crossRow || state.selected.col === j) cls.push("cross-hi");
+            // 十字ハイライト: 列は cross-col（行は <tr> の cross-row で処理）。
+            // box-shadow罫線のみなので列幅・行高に影響しない。
+            if (state.crossHi && state.selected && state.selected.col === j && state.selected.row !== i) {
+              cls.push("cross-col");
             }
             if (isHit(i, j)) {
               cls.push("search-hit");
@@ -4662,9 +4675,9 @@
         const rangeChanged =
           JSON.stringify(prev.range) !== JSON.stringify(cur.range);
         const colChanged = prev.selectedCol !== cur.selectedCol;
-        // 十字ハイライトON時は選択セルの行/列移動でも再描画が必要
-        const selMoved = (prev.selected?.row !== cur.selected?.row) || (prev.selected?.col !== cur.selected?.col);
-        if (rangeChanged || colChanged || (state.crossHi && selMoved)) {
+        // 十字ハイライトはフル再描画せずクラス付け替えで処理する（後段）。
+        // 範囲選択・列選択の変化のみフル再描画。
+        if (rangeChanged || colChanged) {
           _prevHighlight = {
             selected: cur.selected,
             range: cur.range ? { ...cur.range } : null,
@@ -4688,6 +4701,28 @@
             `tr[data-row="${cur.selected.row}"] td[data-col="${cur.selected.col}"]`,
           );
           if (neo) neo.classList.add("selected");
+        }
+        // 十字ハイライト: 再描画せずクラス付け替えのみ（列ぶれ防止・高速）。
+        // 列セルは cross-col、行は <tr> の cross-row。スクロールで増える行は renderBody が付与。
+        if (state.crossHi) {
+          if (prev.selected) {
+            els.tbody
+              .querySelector(`tr[data-row="${prev.selected.row}"]`)
+              ?.classList.remove("cross-row");
+            els.tbody
+              .querySelectorAll(`td.cross-col[data-col="${prev.selected.col}"]`)
+              .forEach((td) => td.classList.remove("cross-col"));
+          }
+          if (cur.selected) {
+            els.tbody
+              .querySelector(`tr[data-row="${cur.selected.row}"]`)
+              ?.classList.add("cross-row");
+            els.tbody
+              .querySelectorAll(
+                `tr[data-row]:not([data-row="${cur.selected.row}"]) td[data-col="${cur.selected.col}"]`,
+              )
+              .forEach((td) => td.classList.add("cross-col"));
+          }
         }
         _prevHighlight = {
           selected: cur.selected ? { ...cur.selected } : null,
@@ -7905,14 +7940,14 @@
         return rows;
       }
 
-      function loadSejMasterFile(file, _encoding) {
+      function loadSejMasterFile(file, _encoding, onDone) {
         const reader = new FileReader();
         reader.onload = () => {
           try {
             const text = reader.result;
             // UTF-8で読んで文字化け（置換文字）があれば Shift_JIS で読み直す
             if (!_encoding && text.includes("�")) {
-              loadSejMasterFile(file, "shift_jis");
+              loadSejMasterFile(file, "shift_jis", onDone);
               return;
             }
             const rows = parseTsvText(text);
@@ -8011,6 +8046,7 @@
             renderHeader();
             renderBody();
             setStatus(`SEJマスタ連携: ${file.name} / マスタ${cnt}件 / 現データヒット${hitCnt}件 未登録${missCnt}件`);
+            if (typeof onDone === "function") { try { onDone(); } catch (e) { console.warn("[SEJ] onDone error:", e); } }
           } catch (err) {
             alert("マスタ読込に失敗しました: " + err.message);
             setStatus("⚠ マスタ読込失敗: " + err.message);
@@ -8063,12 +8099,17 @@
           _ov.querySelector("._sej-cancel").focus();
           return;
         }
-        setStatus("SEJマスタファイルを選択してください...");
+        _openSejMasterPicker();
+      }
+
+      // 席種エリアマスタTSVのファイル選択ダイアログを開く（onDone: 連携成功後に実行）
+      function _openSejMasterPicker(onDone) {
+        setStatus("席種エリアマスタTSVを選択してください...");
         const input = document.createElement("input");
         input.type = "file";
         input.accept = ".tsv,.txt,text/plain";
         input.onchange = () => {
-          if (input.files && input.files[0]) loadSejMasterFile(input.files[0]);
+          if (input.files && input.files[0]) loadSejMasterFile(input.files[0], null, onDone);
         };
         input.click();
       }
@@ -8466,9 +8507,15 @@
           alert("経路価格スケジュール（BO-F-21030）形式ではありません。\n「販売開始日時」「席種エリア名」「アップグレード該当フラグ」などの列が必要です。");
           return;
         }
-        // 席種エリアマスタ連携が必須
+        // 席種エリアマスタ連携が必須。未連携ならその場で連携を促し、成功したら自動で出力へ進む。
         if (!state.sejMaster) {
-          alert("席種エリアマスタが未連携です。\n\nチケットタブの「マスタ連携」ボタンで席種エリアマスタ（TSV）を読み込んでから出力してください。\n（指定席/エリア/その他の判定・席種名表示に必須です）");
+          setStatus("席種エリアマスタを連携してください（価格チェック表の出力に必須）");
+          _openSejMasterPicker(() => {
+            if (state.sejMaster) {
+              setStatus("マスタ連携が完了しました。価格チェック表の出力に進みます…");
+              exportPriceMatrixHtml();
+            }
+          });
           return;
         }
         const vr = getVisibleRows();
