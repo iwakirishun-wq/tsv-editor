@@ -1727,9 +1727,9 @@
         <!-- Group: HTML出力 -->
         <div class="rb-group">
           <div class="rb-buttons">
-            <button class="rb-btn" id="btn-html-export" title="SEJ設定／席種マスタをHTMLページとして出力&#10;新しいタブで開き、設定の詳細を確認できます&#10;フィルター中は絞り込んだ行のみ出力" aria-label="SEJ HTML出力">
+            <button class="rb-btn" id="btn-html-export" title="開いているファイルに応じてHTML出力を自動切替&#10;・席種エリアマスタ→検証付き一覧&#10;・SEJデータ→マスタ照合カード&#10;・席種一括設定→チェックレポート(席種名/指定席/初期値9/リセール下限/購入限定の整合)&#10;・経路価格スケジュール→「価格チェック表」ボタンへ案内&#10;フィルター中は絞り込んだ行のみ出力" aria-label="確認用HTML出力">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M12 13H8M12 17H8"></path><path d="M16 13l2 2-2 2"></path></svg></span>
-              <span>SEJ/マスタ出力</span>
+              <span>確認用HTML</span>
             </button>
             <button class="rb-btn" id="btn-price-sheet" title="経路価格スケジュール（BO-F-21030）をチェック用HTMLとして出力&#10;通常価格表 / UGマトリクス / UG一覧 を選んで出力&#10;UG差額は自動検算（NG赤表示）、出力先で並べ替え・絞り込み可能&#10;※席種エリアマスタ連携が必須" aria-label="価格チェック表を出力">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="17" rx="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="8" y1="4" x2="8" y2="2"></line><line x1="16" y1="4" x2="16" y2="2"></line><path d="M7 13h4M7 17h7"></path><circle cx="16.5" cy="15" r="2.5"></circle><path d="M16.5 14v1l.8.8"></path></svg></span>
@@ -2015,7 +2015,7 @@
           <div class="man-btn-row"><span class="man-btn-label">マスタ連携</span><span class="man-btn-desc">席種エリアマスタTSVを連携。<b>SEJ設定・価格経路スケジュールのチェック/HTML出力に必須</b>（指定席/エリア/その他の判定・表示略称に使用）。席種コード列に席種名を併記し「グループ名」列を仮想追加、SEJデータには備考差分も表示。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">日本語化</span><span class="man-btn-desc">英語の列名を日本語に変換。保存時は元の英語に戻ります。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">辞書編集</span><span class="man-btn-desc">日本語化の辞書とヘッダーメモを編集。今開いているファイルの列が一覧の先頭に出ます。新しい列名の追加も可能。ブラウザに保存されるため、オフラインHTML運用でもそのまま使えます。</span></div>
-          <div class="man-btn-row"><span class="man-btn-label">HTML出力</span><span class="man-btn-desc">確認用HTMLを新しいタブに出力。開いているファイルに応じて自動切替: 席種エリアマスタ→検証付き一覧 / SEJデータ→マスタ照合カード / <b>経路価格スケジュール→価格マトリクス</b>（通常価格表とUG差額マトリクスを販売条件ごとに表示。セルにマウスで販売期間）。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">HTML出力</span><span class="man-btn-desc">確認用HTMLを新しいタブに出力。開いているファイルに応じて自動切替: 席種エリアマスタ→検証付き一覧 / SEJデータ→マスタ照合カード / <b>経路価格スケジュール→価格マトリクス</b>（通常価格表とUG差額マトリクスを販売条件ごとに表示。セルにマウスで販売期間）/ <b>席種一括設定→チェックレポート</b>（席種名差分・指定席整合・購入上限数9(初期値)の整合・リセール下限1321・購入限定席種のP混在×複数購入可、を一覧。席種エリアマスタ連携が必須。購入限定席種コードはグリッド上に席種名をゴースト併記）。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">価格チェック表</span><span class="man-btn-desc">経路価格スケジュール（BO-F-21030）を開いた状態で押すと、販売期間・席種・年齢区分・金額・UG元/差額を一覧化した参照シートを別タブに生成。会員ランクや販売区分はフィルターで絞り込み。元データはそのまま残ります。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">カラー表示</span><span class="man-btn-desc">表示カラーコード列の色をセル背景でプレビュー（切替）。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">ゲート表示</span><span class="man-btn-desc">ゲート用公演種別の番号にゲート名を併記。対応表は列ヘッダーのコメントから読み取り（切替）。</span></div>
@@ -3015,10 +3015,14 @@
         $("btn-sej-link").onclick = toggleSejLink;
         // ドラッグ&ドロップでSEJマスタを読込
         const sejBtn = $("btn-sej-link");
-        sejBtn.addEventListener("dragover", (e) => { e.preventDefault(); sejBtn.classList.add("drag-over"); });
-        sejBtn.addEventListener("dragleave", () => sejBtn.classList.remove("drag-over"));
+        // stopPropagation必須: window側のドロップ処理に伝播するとファイルが
+        // マスタ連携と同時に新規タブとしても二重に開かれてしまう。
+        sejBtn.addEventListener("dragenter", (e) => { e.preventDefault(); e.stopPropagation(); sejBtn.classList.add("drag-over"); });
+        sejBtn.addEventListener("dragover", (e) => { e.preventDefault(); e.stopPropagation(); sejBtn.classList.add("drag-over"); });
+        sejBtn.addEventListener("dragleave", (e) => { e.stopPropagation(); sejBtn.classList.remove("drag-over"); });
         sejBtn.addEventListener("drop", (e) => {
           e.preventDefault();
+          e.stopPropagation();
           sejBtn.classList.remove("drag-over");
           if (e.dataTransfer.files && e.dataTransfer.files[0]) {
             loadSejMasterFile(e.dataTransfer.files[0]);
@@ -3094,27 +3098,52 @@
           e.target.value = "";
         };
 
-        window.ondragover = (e) => {
-          if (!e.dataTransfer?.types?.includes("Files")) return;
-          e.preventDefault();
+        // ドラッグ&ドロップ: dragenter/leave を数えて、ウィンドウ内をドラッグ移動中に
+        // ドロップゾーンが点滅・消失しないようにする。以前は dragleave のたびに隠して
+        // いたため、シート表示中（新規シート含む）に枠が消えてドロップを取りこぼしていた。
+        // また dropEffect=copy を明示しないと OS/ブラウザによってはドロップが拒否される。
+        let _dragDepth = 0;
+        const _showDrop = () => {
           els.dropZone.classList.remove("hidden");
           els.dropZone.classList.add("drag-over");
         };
-        window.ondragleave = () => {
+        const _hideDrop = () => {
           els.dropZone.classList.remove("drag-over");
           if (els.container.style.display === "block")
             els.dropZone.classList.add("hidden");
         };
-        window.ondrop = (e) => {
+        window.addEventListener("dragenter", (e) => {
+          if (!e.dataTransfer?.types?.includes("Files")) return;
           e.preventDefault();
-          els.dropZone.classList.remove("drag-over");
-          if (els.container.style.display === "block") els.dropZone.classList.add("hidden");
-          const file = e.dataTransfer.files[0];
+          _dragDepth++;
+          _showDrop();
+        });
+        window.addEventListener("dragover", (e) => {
+          if (!e.dataTransfer?.types?.includes("Files")) return;
+          e.preventDefault();
+          try { e.dataTransfer.dropEffect = "copy"; } catch (_) {}
+          // dragenter を取りこぼした場合の保険
+          if (els.dropZone.classList.contains("hidden")) _showDrop();
+        });
+        window.addEventListener("dragleave", (e) => {
+          if (!e.dataTransfer?.types?.includes("Files")) return;
+          _dragDepth = Math.max(0, _dragDepth - 1);
+          if (_dragDepth === 0) _hideDrop();
+        });
+        window.addEventListener("drop", (e) => {
+          e.preventDefault();
+          _dragDepth = 0;
+          _hideDrop();
+          const file = e.dataTransfer?.files?.[0];
           if (!file) return;
           // タブ化以降、ファイルを開いても現在タブは保持されるため未保存確認は不要
           // （編集中タブはそのまま残り、新しいファイルは別タブで開く）
           loadFile(file);
-        };
+        });
+        // ドロップせずにドラッグが中断された場合の保険（カウンタが0に戻らず
+        // ドロップゾーンが出っぱなしになるのを防ぐ）
+        window.addEventListener("dragend", () => { _dragDepth = 0; _hideDrop(); });
+        window.addEventListener("blur", () => { if (_dragDepth) { _dragDepth = 0; _hideDrop(); } });
 
         loadHeaderMapSettings();
         setupTheadDelegation();
@@ -4516,11 +4545,19 @@
               cls.includes("selected") || cls.includes("in-range");
             let displayVal = escHtml(cellVal);
             // SEJ連携: 席種エリアコード列・購入限定席種列に席種名を併記
+            // 主コード列は青の対訳、購入限定席種列はゴースト（淡いグレー斜体）で
+            // 「補助参照」だと一目で分かるようにする。未登録は両者とも赤で警告。
             if ((j === sejCodeColIdx || sejExtraCodeCols.has(j)) && cellVal) {
               const m = state.sejMaster.byCode[cellVal.trim()];
+              const ghost = sejExtraCodeCols.has(j) && j !== sejCodeColIdx;
               if (m) {
                 const nm = m.seat_type_area_disp_nm || m.seat_type_area_control_nm || "";
-                if (nm) displayVal += `<span style="color:#2563eb;margin-left:6px;font-size:11px">▸ ${escHtml(nm)}</span>`;
+                if (nm) {
+                  const st = ghost
+                    ? "color:#9ca3af;font-style:italic;margin-left:6px;font-size:11px"
+                    : "color:#2563eb;margin-left:6px;font-size:11px";
+                  displayVal += `<span style="${st}">▸ ${escHtml(nm)}</span>`;
+                }
               } else {
                 displayVal += `<span style="color:#dc2626;margin-left:6px;font-size:11px">▸ 未登録</span>`;
               }
@@ -4678,8 +4715,10 @@
         // 十字ハイライトはフル再描画せずクラス付け替えで処理する（後段）。
         // 範囲選択・列選択の変化のみフル再描画。
         if (rangeChanged || colChanged) {
+          // selectedはクローンして保持（state.selectedを直接参照すると、
+          // 後でin-place変更された際に前回値の追跡がずれる）
           _prevHighlight = {
-            selected: cur.selected,
+            selected: cur.selected ? { ...cur.selected } : null,
             range: cur.range ? { ...cur.range } : null,
             selectedCol: cur.selectedCol,
           };
@@ -8110,7 +8149,10 @@
         input.accept = ".tsv,.txt,text/plain";
         input.onchange = () => {
           if (input.files && input.files[0]) loadSejMasterFile(input.files[0], null, onDone);
+          else setStatus("ファイルが選択されませんでした");
         };
+        // 対応ブラウザではキャンセルを検知してフィードバック
+        input.oncancel = () => setStatus("マスタファイルの選択をキャンセルしました");
         input.click();
       }
 
@@ -8128,6 +8170,12 @@
       function isSejData() {
         const hs = state.headers.map(h => h.trim());
         return hs.includes("sej_template_cd") && hs.includes("word1");
+      }
+
+      // 席種一括設定（23列）かどうか判定。固有列の組合せで判定する。
+      function isIkkatsuData() {
+        const hs = state.headers.map(h => h.trim());
+        return hs.includes("座席指定不可フラグ") && hs.includes("リセール可否") && hs.includes("購入限定区分");
       }
 
 
@@ -8507,9 +8555,12 @@
           alert("経路価格スケジュール（BO-F-21030）形式ではありません。\n「販売開始日時」「席種エリア名」「アップグレード該当フラグ」などの列が必要です。");
           return;
         }
-        // 席種エリアマスタ連携が必須。未連携ならその場で連携を促し、成功したら自動で出力へ進む。
+        // 席種エリアマスタ連携が必須。未連携ならなぜ必要かを明示してから連携を促す。
         if (!state.sejMaster) {
-          setStatus("席種エリアマスタを連携してください（価格チェック表の出力に必須）");
+          if (!confirm("価格チェック表の出力には「席種エリアマスタTSV」の連携が必要です。\n（指定席/エリア判定・席種名表示に使用します）\n\n続けてマスタファイルを選択しますか？")) {
+            setStatus("マスタ未連携のため、価格チェック表の出力を中止しました");
+            return;
+          }
           _openSejMasterPicker(() => {
             if (state.sejMaster) {
               setStatus("マスタ連携が完了しました。価格チェック表の出力に進みます…");
@@ -9187,6 +9238,301 @@ body.crosshi td.cross-col:not(.mk-cell), body.crosshi tr.cross-row td:not(.mk-ce
 })();`;
       }
 
+      // ===== 席種一括設定チェック（席種エリアマスタ連携必須）=====
+      // 6項目を検査してチェックレポートHTMLを出力する。
+      //  1) マスタとの席種名差分
+      //  2) マスタ指定席/自由席と「座席指定不可フラグ」の整合
+      //  3) 購入上限数=9(初期値=非販売)なのにリセール可/SEJ可
+      //  4) リセール可なのにリセール用販売価格下限が1321でない（手数料割れ防止）
+      //  6) 購入限定席種にP(駐車)と他種が混在するのに購入限定区分が複数購入可でない
+      function exportIkkatsuCheckHtml(rowIndices, isFiltered) {
+        // マスタ未連携 → なぜ必要かを明示してから連携を促し、成功したら自動で続行
+        if (!state.sejMaster || !state.sejMaster.byCode) {
+          if (!confirm("席種一括設定チェックには「席種エリアマスタTSV」の連携が必要です。\n（席種名の照合・指定席判定に使用します）\n\n続けてマスタファイルを選択しますか？")) {
+            setStatus("マスタ未連携のため、席種一括設定チェックを中止しました");
+            return;
+          }
+          _openSejMasterPicker(() => {
+            if (state.sejMaster) {
+              setStatus("マスタ連携完了。席種一括設定チェックを実行します…");
+              exportIkkatsuCheckHtml(rowIndices, isFiltered);
+            }
+          });
+          return;
+        }
+
+        // 列名の正規化（全角数字→半角・全角括弧→半角）で多少の表記ゆれを吸収
+        const norm = (s) =>
+          String(s ?? "").trim()
+            .replace(/（/g, "(").replace(/）/g, ")")
+            .replace(/[０-９]/g, (d) => "０１２３４５６７８９".indexOf(d));
+        const Hn = state.headers.map(norm);
+        const col = (name) => Hn.indexOf(norm(name));
+        const c = {
+          code: col("席種エリアコード"),
+          name: col("席種エリア管理名"),
+          design: col("座席指定不可フラグ"),
+          limit: col("購入上限数(決済毎)"),
+          resale: col("リセール可否"),
+          resaleMin: col("リセール用販売価格下限"),
+          solo: col("単体販売不可"),
+          lim1: col("購入限定席種1"),
+          lim2: col("購入限定席種2"),
+          lim3: col("購入限定席種3"),
+          kubun: col("購入限定区分"),
+          sejPay: col("SEJ支払"),
+          sejIssue: col("SEJ発券"),
+        };
+        const g = (row, idx) => (idx < 0 ? "" : String(row[idx] ?? "").trim());
+        const byCode = state.sejMaster.byCode;
+        const mName = (m) => (m ? String(m.seat_type_area_control_nm || m.seat_type_area_disp_nm || "").trim() : "");
+        const sixth = (cd) => (cd && cd.length >= 6 ? cd[5].toUpperCase() : "");
+
+        const findings = []; // {rowNo, code, name, check, sev, msg}
+        let okRows = 0, ngSeats = 0, warnSeats = 0;
+        const CHK_KEYS = ["席種名", "指定席整合", "初期値9", "リセール下限", "購入限定/複数", "マスタ未登録"];
+        const counts = { NG: 0, WARN: 0 };
+
+        for (const i of rowIndices) {
+          const row = state.data[i];
+          if (!row) continue;
+          const code = g(row, c.code);
+          const name = g(row, c.name);
+          const rowNo = i + 1;
+          const master = code ? byCode[code] : null;
+          let rowIssues = 0, rowHasNG = false, rowHasWarn = false;
+          const add = (check, sev, msg) => {
+            findings.push({ rowNo, code, name, check, sev, msg });
+            rowIssues++;
+            if (sev === "NG") { counts.NG++; rowHasNG = true; } else { counts.WARN++; rowHasWarn = true; }
+          };
+
+          // 1) 席種名差分 / マスタ未登録
+          if (code && !master) {
+            add("マスタ未登録", "NG", `席種コード「${code}」がマスタに存在しません`);
+          } else if (master) {
+            const mn = mName(master);
+            if (mn && name && mn !== name) {
+              add("席種名", "NG", `席種名がマスタと不一致: 一括「${name}」 ≠ マスタ「${mn}」`);
+            }
+          }
+
+          // 2) 指定席/自由席の整合
+          if (master) {
+            const kbn = String(master.rsve_unrsve_kbn || "").trim();
+            const design = g(row, c.design);
+            if (kbn === "1" && design && design !== "指定可") {
+              add("指定席整合", "NG", `マスタは指定席(区分1)だが座席指定不可フラグ=「${design}」（「指定可」であるべき）`);
+            } else if (kbn === "2" && design && design !== "指定不可") {
+              add("指定席整合", "NG", `マスタは自由席(区分2)だが座席指定不可フラグ=「${design}」（「指定不可」であるべき）`);
+            }
+          }
+
+          // 3) 購入上限数=9（初期値＝一般販売しない）の整合
+          const limit = g(row, c.limit);
+          if (limit === "9") {
+            if (g(row, c.resale) === "可能") {
+              add("初期値9", "NG", "購入上限数=9（初期値＝非販売）なのにリセール可能になっています");
+            }
+            if (g(row, c.sejPay) === "支払可") {
+              add("初期値9", "WARN", "購入上限数=9（初期値＝非販売）なのにSEJ支払=支払可");
+            }
+            if (g(row, c.sejIssue) === "発券可") {
+              add("初期値9", "WARN", "購入上限数=9（初期値＝非販売）なのにSEJ発券=発券可");
+            }
+          }
+
+          // 4) リセール可なら下限=1321
+          if (g(row, c.resale) === "可能") {
+            const min = g(row, c.resaleMin);
+            if (min !== "1321") {
+              add("リセール下限", "NG", `リセール可能だがリセール用販売価格下限=「${min || "(空欄)"}」（1321であるべき：手数料1321円を下回ると赤字）`);
+            }
+          }
+
+          // 6) 購入限定席種のP混在 → 購入限定区分が複数購入可か
+          const limCodes = [g(row, c.lim1), g(row, c.lim2), g(row, c.lim3)].filter(Boolean);
+          if (limCodes.length) {
+            const hasP = limCodes.some((cd) => sixth(cd) === "P");
+            const hasNonP = limCodes.some((cd) => sixth(cd) && sixth(cd) !== "P");
+            const kubun = g(row, c.kubun);
+            if (hasP && hasNonP && !kubun.includes("複数")) {
+              const named = limCodes
+                .map((cd) => `${cd}${byCode[cd] ? "（" + mName(byCode[cd]) + "）" : ""}`)
+                .join(", ");
+              add("購入限定/複数", "NG", `購入限定席種にP(駐車)と他種が混在[${named}]のに購入限定区分=「${kubun}」。単数だと駐車券は選べても追加券が選べません→複数購入可にすべき`);
+            }
+          }
+
+          if (rowIssues === 0) okRows++;
+          if (rowHasNG) ngSeats++;
+          if (rowHasWarn) warnSeats++;
+        }
+
+        // 列不足の警告
+        const missingCols = [];
+        [["席種エリアコード", c.code], ["席種エリア管理名", c.name], ["座席指定不可フラグ", c.design],
+         ["購入上限数(決済毎)", c.limit], ["リセール可否", c.resale], ["購入限定区分", c.kubun]]
+          .forEach(([n, idx]) => { if (idx < 0) missingCols.push(n); });
+
+        const total = rowIndices.length;
+        const fname = escHtml(state.fileName || "席種一括設定");
+        const masterFile = escHtml(state.sejMaster.fileName || "(マスタ)");
+        const ts = new Date().toLocaleString("ja-JP");
+
+        const rowsHtml = findings.map((f, idx) => {
+          const sevCls = f.sev === "NG" ? "ng" : "warn";
+          const sevLabel = f.sev === "NG" ? "NG" : "注意";
+          return `<tr data-sev="${f.sev}" data-check="${escHtml(f.check)}" data-text="${escHtml((f.code + " " + f.name + " " + f.check + " " + f.msg).toLowerCase())}">
+            <td class="num">${f.rowNo}</td>
+            <td class="mono">${escHtml(f.code)}</td>
+            <td>${escHtml(f.name)}</td>
+            <td><span class="chk">${escHtml(f.check)}</span></td>
+            <td class="sev ${sevCls}">${sevLabel}</td>
+            <td class="msg">${escHtml(f.msg)}</td>
+          </tr>`;
+        }).join("");
+
+        const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${fname} - 席種一括設定チェック</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,"Hiragino Kaku Gothic ProN","Yu Gothic UI",sans-serif;background:#f5f6f8;color:#1f2937;padding:16px;font-size:13px;line-height:1.5}
+  .head{background:#fff;border-radius:10px;padding:16px 20px;box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:14px}
+  .head h1{font-size:17px;font-weight:700;margin-bottom:6px}
+  .head .meta{font-size:12px;color:#6b7280}
+  .cards{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0 0}
+  .card{flex:1;min-width:110px;border-radius:8px;padding:10px 14px;text-align:center;border:1px solid #e5e7eb}
+  .card .n{font-size:24px;font-weight:800;line-height:1.1}
+  .card .l{font-size:11px;color:#6b7280;margin-top:2px}
+  .card .sub{font-size:10px;color:#9ca3af;margin-top:3px}
+  .card.ng{background:#fef2f2;border-color:#fecaca}.card.ng .n{color:#dc2626}
+  .card.warn{background:#fffbeb;border-color:#fde68a}.card.warn .n{color:#d97706}
+  .card.ok{background:#f0fdf4;border-color:#bbf7d0}.card.ok .n{color:#16a34a}
+  .card.tot .n{color:#374151}
+  .legend{background:#fff;border-radius:10px;padding:12px 18px;box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:14px;font-size:12px;color:#4b5563}
+  .legend b{color:#1f2937}
+  .legend ol{margin:6px 0 0 18px}.legend li{margin:2px 0}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+  .controls button,.controls select,.controls input{font-size:12px;border:1px solid #d1d5db;border-radius:6px;padding:6px 10px;background:#fff;cursor:pointer}
+  .controls input{cursor:text;min-width:180px;flex:1}
+  .controls button.on{background:#2563eb;color:#fff;border-color:#2563eb}
+  table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  .twrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:10px}
+  thead th{background:#f3f4f6;text-align:left;padding:9px 10px;font-size:11px;color:#374151;border-bottom:1px solid #e5e7eb;cursor:pointer;white-space:nowrap;position:sticky;top:0;user-select:none}
+  thead th .arr{color:#2563eb;font-size:10px;margin-left:3px}
+  tbody td{padding:8px 10px;border-bottom:1px solid #f1f3f5;vertical-align:top}
+  tbody tr:hover{background:#f9fafb}
+  td.num{text-align:right;color:#9ca3af;font-variant-numeric:tabular-nums;width:48px}
+  td.mono{font-family:Menlo,Consolas,monospace;font-size:12px;white-space:nowrap}
+  td.msg{color:#374151;min-width:220px}
+  .chk{display:inline-block;background:#eef2ff;color:#4338ca;border-radius:4px;padding:1px 7px;font-size:11px;white-space:nowrap}
+  td.sev{font-weight:700;white-space:nowrap}
+  td.sev.ng{color:#dc2626}td.sev.warn{color:#d97706}
+  .empty{text-align:center;color:#16a34a;padding:30px;font-size:15px;font-weight:600}
+  .miss{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px}
+  @media(max-width:600px){
+    body{padding:10px;font-size:12px}
+    .head{padding:12px 14px}
+    .card{min-width:calc(50% - 6px)}
+    .controls button,.controls select,.controls input{min-height:40px}
+    .controls input{min-width:0;flex-basis:100%}
+    td.mono{white-space:normal;word-break:break-all}
+    td.msg{min-width:0;white-space:normal;word-break:break-word}
+    tbody td,thead th{padding:7px 6px}
+  }
+</style></head><body>
+<div class="head">
+  <h1>🎫 席種一括設定チェック</h1>
+  <div class="meta">${fname}　/　マスタ: ${masterFile}　/　${total}件${isFiltered ? "（フィルター適用中）" : ""}　/　${ts}</div>
+  <div class="cards">
+    <div class="card ng"><div class="n">${counts.NG}</div><div class="l">NG（要修正・件）</div><div class="sub">NGのある席種 ${ngSeats}件</div></div>
+    <div class="card warn"><div class="n">${counts.WARN}</div><div class="l">注意（確認・件）</div><div class="sub">注意のある席種 ${warnSeats}件</div></div>
+    <div class="card ok"><div class="n">${okRows}</div><div class="l">指摘なし（席種）</div><div class="sub">&nbsp;</div></div>
+    <div class="card tot"><div class="n">${total}</div><div class="l">対象（席種）</div><div class="sub">&nbsp;</div></div>
+  </div>
+</div>
+${missingCols.length ? `<div class="miss">⚠ 次の列が見つかりませんでした（一部チェックがスキップされます）: ${escHtml(missingCols.join(" / "))}</div>` : ""}
+<div class="legend">
+  <b>チェック内容</b>
+  <ol>
+    <li><b>席種名／マスタ未登録</b>: 席種エリアコードがマスタに存在するか＋管理名がマスタと一致しているか</li>
+    <li><b>指定席整合</b>: マスタの指定席/自由席区分と「座席指定不可フラグ」が整合しているか</li>
+    <li><b>初期値9</b>: 購入上限数=9（初期値＝一般販売しない）なのにリセール可/SEJ可になっていないか</li>
+    <li><b>リセール下限</b>: リセール可なら下限=1321（手数料1321円を下回ると赤字になるのを防止）</li>
+    <li><b>購入限定/複数</b>: 購入限定席種にP(駐車)と他種が混在するのに購入限定区分が複数購入可か</li>
+  </ol>
+</div>
+<div class="controls">
+  <button class="sevbtn on" data-sev="ALL">すべて (${findings.length})</button>
+  <button class="sevbtn" data-sev="NG">NG (${counts.NG})</button>
+  <button class="sevbtn" data-sev="WARN">注意 (${counts.WARN})</button>
+  <input id="q" type="text" placeholder="コード・席種名・内容で絞り込み…">
+</div>
+${findings.length
+  ? `<div class="twrap"><table id="t"><thead><tr><th data-s="num">行</th><th data-s="code">席種エリアコード</th><th data-s="name">管理名</th><th data-s="check">区分</th><th data-s="sev">重大度</th><th data-s="msg">内容</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`
+  : `<div class="empty">✓ 指摘事項はありません（全 ${total} 件 OK）</div>`}
+<script>
+(function(){
+  var curSev="ALL", q="";
+  var rows=[].slice.call(document.querySelectorAll("#t tbody tr"));
+  function apply(){
+    var qq=q.toLowerCase();
+    rows.forEach(function(tr){
+      var okSev = curSev==="ALL" || tr.getAttribute("data-sev")===curSev;
+      var okQ = !qq || tr.getAttribute("data-text").indexOf(qq)>=0;
+      tr.style.display = (okSev&&okQ)?"":"none";
+    });
+  }
+  document.querySelectorAll(".sevbtn").forEach(function(b){
+    b.addEventListener("click",function(){
+      document.querySelectorAll(".sevbtn").forEach(function(x){x.classList.remove("on");});
+      b.classList.add("on"); curSev=b.getAttribute("data-sev"); apply();
+    });
+  });
+  var qi=document.getElementById("q");
+  if(qi) qi.addEventListener("input",function(){ q=qi.value; apply(); });
+  // sortable
+  var tbl=document.getElementById("t");
+  if(tbl){
+    var dir={};
+    var ths=[].slice.call(tbl.querySelectorAll("thead th"));
+    ths.forEach(function(th){
+      th.addEventListener("click",function(){
+        var key=th.getAttribute("data-s");
+        var idx=[].indexOf.call(th.parentNode.children, th);
+        dir[key]=!dir[key];
+        var body=tbl.tBodies[0];
+        var arr=[].slice.call(body.querySelectorAll("tr"));
+        arr.sort(function(a,b){
+          var x=a.children[idx].textContent.trim(), y=b.children[idx].textContent.trim();
+          var nx=parseFloat(x), ny=parseFloat(y);
+          if(!isNaN(nx)&&!isNaN(ny)){ return dir[key]?nx-ny:ny-nx; }
+          return dir[key]? x.localeCompare(y,"ja"): y.localeCompare(x,"ja");
+        });
+        arr.forEach(function(tr){ body.appendChild(tr); });
+        // ソート方向インジケータ（▲昇順/▼降順）を表示
+        ths.forEach(function(o){ var a=o.querySelector(".arr"); if(a) a.remove(); });
+        var s=document.createElement("span"); s.className="arr"; s.textContent=dir[key]?"▲":"▼"; th.appendChild(s);
+      });
+    });
+  }
+})();
+<\/script>
+</body></html>`;
+
+        const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const w = window.open(url, "_blank", "noopener");
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        setStatus(
+          w
+            ? `席種一括設定チェック: NG ${counts.NG}件 / 注意 ${counts.WARN}件 / 指摘なし ${okRows}席種`
+            : "ポップアップがブロックされました。ブラウザでこのサイトのポップアップを許可してください。"
+        );
+      }
+
       function exportHtmlPreview() {
         if (state.headerMode === "numbered") {
           alert("ヘッダーが連番モードのため、列名を認識できません。\n\n「表示」タブの「ヘッダー」ボタンで 1行目モード に切り替えてから出力してください。");
@@ -9212,6 +9558,12 @@ body.crosshi td.cross-col:not(.mk-cell), body.crosshi tr.cross-row td:not(.mk-ce
         // SEJデータの場合は専用レイアウトで出力
         if (isSejData()) {
           exportSejHtml(rowIndices, isFiltered);
+          return;
+        }
+
+        // 席種一括設定（23列）の場合はチェックレポートを出力
+        if (isIkkatsuData()) {
+          exportIkkatsuCheckHtml(rowIndices, isFiltered);
           return;
         }
 
