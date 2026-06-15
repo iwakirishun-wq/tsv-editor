@@ -2723,6 +2723,7 @@
         const cap = $("main-table").querySelector("caption");
         if (cap)
           cap.textContent = `${state.fileName || "TSV/CSV"} データ編集グリッド`;
+        updateStatusPos();
       }
 
       // ===== タブ管理 =====
@@ -2742,6 +2743,10 @@
         t.dirty = state.dirty;
         t.undoStack = [...state.undoStack];
         t.redoStack = [...state.redoStack];
+        t.selected = state.selected ? { ...state.selected } : null;
+        t.anchor = state.anchor ? { ...state.anchor } : null;
+        t.range = state.range ? { ...state.range } : null;
+        t.selectedCol = state.selectedCol;
         // フィルター・表示状態をタブごとに保存
         const savedCF = {};
         for (const k in state.columnFilters) {
@@ -2801,6 +2806,10 @@
         state.dirty = savedDirty;
         state.undoStack = savedUndo;
         state.redoStack = savedRedo;
+        state.selected = t.selected ? { ...t.selected } : null;
+        state.anchor = t.anchor ? { ...t.anchor } : null;
+        state.range = t.range ? { ...t.range } : null;
+        state.selectedCol = Number.isInteger(t.selectedCol) ? t.selectedCol : null;
         // フィルター・表示状態をタブから復元
         {
           const restoredCF = {};
