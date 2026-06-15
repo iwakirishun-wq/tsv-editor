@@ -679,6 +679,21 @@
         color: #000;
         font-weight: bold;
       }
+      /* 選択セルと検索ヒットが重なる場合: 背景は検索色のまま、青枠線を明示 */
+      td.selected.search-hit {
+        position: relative;
+        background: var(--hit) !important;
+        outline: 2px solid #1b6ec2;
+        outline-offset: -1px;
+        z-index: 3;
+      }
+      td.selected.search-hit.current {
+        position: relative;
+        background: var(--hit-current) !important;
+        outline: 2px solid #1b6ec2;
+        outline-offset: -1px;
+        z-index: 3;
+      }
 
       /* ===編集=== */
       td.editing {
@@ -749,21 +764,23 @@
       #fbar-val-wrap {
         flex: 1;
         height: 100%;
-        display: flex;
-        align-items: center;
-        padding: 0 8px;
         min-width: 0;
-        overflow: hidden;
       }
       #fbar-val {
-        flex: 1;
+        width: 100%;
+        height: 100%;
+        border: none;
+        outline: none;
         font-size: 12px;
         font-family: var(--font-mono);
         color: var(--text);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        pointer-events: none;
+        padding: 0 8px;
+        background: transparent;
+        box-sizing: border-box;
+      }
+      #fbar-val:focus {
+        background: #fff;
+        box-shadow: inset 0 0 0 1px #1b6ec2;
       }
 
       /* ===ステータスバー=== */
@@ -923,6 +940,23 @@
           padding: 10px 14px;
           font-size: 14px;
         }
+      }
+      @media (max-width: 768px) {
+        .rb-tabbar {
+          overflow-x: auto;
+          white-space: nowrap;
+          flex-wrap: nowrap;
+          -webkit-overflow-scrolling: touch;
+        }
+        .rb-tab { flex-shrink: 0; }
+        .rb-content.rb-content-active {
+          flex-wrap: nowrap;
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+          padding-bottom: 8px;
+        }
+        .rb-group { flex-shrink: 0; }
+        .rb-btn { width: 56px; height: 64px; font-size: 10px; }
       }
       .ctx-tag {
         font-size: 10px;
@@ -1881,7 +1915,7 @@
       </div>
       <div id="fbar-fx" aria-hidden="true">ƒx</div>
       <div id="fbar-val-wrap">
-        <span id="fbar-val" role="status" aria-label="セル内容" aria-live="off"></span>
+        <input id="fbar-val" type="text" aria-label="セル内容を入力" spellcheck="false" tabindex="-1">
       </div>
     </div>
 
@@ -3185,6 +3219,45 @@
           if (e.target === $("manual-dialog")) hideManual();
         };
 
+        // 数式バー双方向バインディング
+        if (els.fbarVal) {
+          // セル編集中: fbar入力 → セル内inputに同期
+          els.fbarVal.addEventListener("input", () => {
+            if (state.isEditing) {
+              const cellInp = els.tbody.querySelector("td.editing input");
+              if (cellInp) cellInp.value = els.fbarVal.value;
+            }
+          });
+          // Enter: 編集中はセル確定、非編集中はデータへ直接コミット
+          // Escape: 編集中はセルキャンセル、非編集中はfbar表示を元の値に戻す
+          els.fbarVal.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              if (state.isEditing) {
+                const cellInp = els.tbody.querySelector("td.editing input");
+                if (cellInp) cellInp.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+              } else if (state.selected) {
+                const { row, col } = state.selected;
+                const nv = els.fbarVal.value;
+                if (nv !== safeGet(row, col)) {
+                  saveUndo(); safeSet(row, col, nv); markDirty();
+                  recordAction("editCell", { value: nv });
+                  state.forceRender = true; renderBody();
+                }
+                updateStatusPos();
+              }
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              if (state.isEditing) {
+                const cellInp = els.tbody.querySelector("td.editing input");
+                if (cellInp) cellInp.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+              } else if (state.selected) {
+                updateStatusPos();
+              }
+            }
+          });
+        }
+
         // 辞書・変換ボタン（Shift+クリックで辞書編集）
         $("btn-apply-dict").onclick = (e) => {
           if (e.shiftKey) { openDictEditor(); return; }
@@ -4283,7 +4356,7 @@
           const cw = state.colWidths[i] || 80;
           const w = `width:${cw}px;min-width:${cw}px;max-width:${cw}px`;
           const active =
-            state.selectedCol === i
+            state.selectedCol === i || state.selected?.col === i
               ? "col-active"
               : state.sortCol === i
                 ? "col-sorted"
@@ -4664,7 +4737,7 @@
             };
           }
           html += `<tr role="row" data-row="${i}" aria-rowindex="${i + 2}" class="${isDup ? 'dup-row' : ''}${wrapCls}${crossRow ? ' cross-row' : ''}">`;
-          html += `<td role="rowheader" class="row-num${rowInRange ? " row-selected" : ""}${isDup}" data-rownum="${i}">${i + 1}</td>`;
+          html += `<td role="rowheader" class="row-num${rowInRange || state.selected?.row === i ? " row-selected" : ""}${isDup}" data-rownum="${i}">${i + 1}</td>`;
           for (const j of visCols) {
             let cls = [];
             if (state.selected?.row === i && state.selected?.col === j)
@@ -4995,6 +5068,15 @@
               .forEach((td) => td.classList.add("cross-col"));
           }
         }
+        // セル選択に連動した列ヘッダー・行番号のアクティブ強調
+        if (prev.selected) {
+          els.thead.querySelector(`th[data-col="${prev.selected.col}"]`)?.classList.remove("col-active");
+          els.tbody.querySelector(`td.row-num[data-rownum="${prev.selected.row}"]`)?.classList.remove("row-selected");
+        }
+        if (cur.selected) {
+          els.thead.querySelector(`th[data-col="${cur.selected.col}"]`)?.classList.add("col-active");
+          els.tbody.querySelector(`td.row-num[data-rownum="${cur.selected.row}"]`)?.classList.add("row-selected");
+        }
         _prevHighlight = {
           selected: cur.selected ? { ...cur.selected } : null,
           range: cur.range ? { ...cur.range } : null,
@@ -5020,7 +5102,7 @@
           els.statusPos.textContent = "";
           els.statusStats.textContent = "";
           // 数式バーをクリア
-          if (els.fbarName) { els.fbarName.value = ""; els.fbarVal.textContent = ""; }
+          if (els.fbarName) { els.fbarName.value = ""; els.fbarVal.value = ""; }
           return;
         }
         const { row, col } = state.selected;
@@ -5029,7 +5111,7 @@
         // 数式バー: A1形式アドレス＋セル内容
         if (els.fbarName) {
           els.fbarName.value = `${colIndexToLetter(col)}${row + 1}`;
-          els.fbarVal.textContent = v;
+          els.fbarVal.value = v;
         }
         els.statusPos.textContent = `${colIndexToLetter(col)}${row + 1}  行${row + 1} 列${col + 1} : ${v.slice(0, 40)}${v.length > 0 ? ` [${v.length}文字/${bytes}B]` : ""}`;
         if (state.range) {
@@ -5328,9 +5410,9 @@
         td.innerHTML = `<input type="text">`;
         const inp = td.querySelector("input");
         inp.value = initVal !== undefined ? initVal : oldVal;
-        if (els.fbarVal) els.fbarVal.textContent = inp.value;
+        if (els.fbarVal) els.fbarVal.value = inp.value;
         inp.addEventListener("input", (e) => {
-          if (els.fbarVal) els.fbarVal.textContent = e.target.value;
+          if (els.fbarVal) els.fbarVal.value = e.target.value;
         });
         inp.focus();
         if (initVal !== undefined)
@@ -5619,6 +5701,8 @@
           }
           return;
         }
+
+        if (e.target === els.fbarVal) return;
 
         if (e.target === els.search) {
           if (e.key === "Enter") {
