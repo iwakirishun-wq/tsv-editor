@@ -9272,7 +9272,7 @@ ${_sortableTable(labels, rowsHtml)}` };
                 + `<td class="exp" title="元−先の期待差額（同席種=500/負→0/1〜500→500）">${escHtml(expStr)}</td>`
                 + `<td class="prices reg">${dual(money(v(row, c.adv)), money(v(row, c.day)), chk.advNg, chk.dayNg, chk.advNg ? "期待 " + (chk.expected != null ? chk.expected.toLocaleString("ja-JP") : "?") : "", chk.dayNg ? "期待 " + (chk.expectedDay != null ? chk.expectedDay.toLocaleString("ja-JP") : "?") : "")}</td>`
                 + cell(condOf(row), condOf(row))
-                + cell(periodOf(row), "dt")
+                + cell(periodOf(row), v(row, c.start), "dt")
                 + `<td class="cmt">${comment ? `<span class="cmt-ng">${escHtml(comment)}</span>` : ""}</td>`
                 + `</tr>`;
             });
@@ -9578,6 +9578,22 @@ body.crosshi td.cross-col:not(.mk-cell), body.crosshi tr.cross-row td:not(.mk-ce
     });
     // UG一覧（グループ表・data-mid行）
     document.querySelectorAll('table.uglist tr[data-mid]').forEach(function(tr){ tr.style.display = rowVisible(tr, null) ? '' : 'none'; });
+    // rowspan保護: グループ内に可視行があれば先頭行(seatpair<th>保持)を表示に戻す
+    // （先頭行が非表示になると後続行の列がずれるため）
+    (function(){
+      var ugBody = document.querySelector('table.uglist tbody');
+      if (!ugBody) return;
+      var groups = [], cur = null;
+      ugBody.querySelectorAll('tr[data-mid]').forEach(function(tr){
+        if (tr.classList.contains('seat-sep')){ cur = []; groups.push(cur); }
+        if (cur) cur.push(tr);
+      });
+      groups.forEach(function(grp){
+        if (!grp.length) return;
+        var hasVisible = grp.some(function(r){ return r.style.display !== 'none'; });
+        if (hasVisible) grp[0].style.display = '';
+      });
+    })();
     // マトリクスは販売条件ブロック単位で表示
     document.querySelectorAll('.cond-block').forEach(function(b){ b.style.display = (curCond === '__all' || b.getAttribute('data-cond') === curCond) ? '' : 'none'; });
   }
