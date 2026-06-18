@@ -3231,6 +3231,7 @@
           // Enter: 編集中はセル確定、非編集中はデータへ直接コミット
           // Escape: 編集中はセルキャンセル、非編集中はfbar表示を元の値に戻す
           els.fbarVal.addEventListener("keydown", (e) => {
+            if (e.isComposing || e.keyCode === 229) return;
             if (e.key === "Enter") {
               e.preventDefault();
               if (state.isEditing) {
@@ -3239,7 +3240,7 @@
               } else if (state.selected) {
                 const { row, col } = state.selected;
                 const nv = els.fbarVal.value;
-                if (nv !== safeGet(row, col)) {
+                if (nv !== (safeGet(row, col) ?? "")) {
                   saveUndo(); safeSet(row, col, nv); markDirty();
                   recordAction("editCell", { value: nv });
                   state.forceRender = true; renderBody();
@@ -3252,6 +3253,8 @@
                 const cellInp = els.tbody.querySelector("td.editing input");
                 if (cellInp) cellInp.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
               } else if (state.selected) {
+                const { row, col } = state.selected;
+                els.fbarVal.value = safeGet(row, col) ?? "";
                 updateStatusPos();
               }
             }
@@ -9559,6 +9562,23 @@ body.crosshi td.cross-col:not(.mk-cell), body.crosshi tr.cross-row td:not(.mk-ce
     tbl.querySelectorAll('.filter-row input[data-fc]').forEach(function(inp){ inp.addEventListener('input', applyAll); });
   });
 
+  function fixUgRowspan(){
+    var ugBody = document.querySelector('table.uglist tbody');
+    if (!ugBody) return;
+    var rows = ugBody.querySelectorAll('tr[data-mid]');
+    var groups = [], cur = [];
+    groups.push(cur);
+    rows.forEach(function(tr){
+      if (tr.classList.contains('seat-sep') && cur.length) { cur = []; groups.push(cur); }
+      cur.push(tr);
+    });
+    groups.forEach(function(grp){
+      if (!grp.length) return;
+      var hasVisible = grp.some(function(r){ return r.style.display !== 'none'; });
+      if (hasVisible) grp[0].style.display = '';
+    });
+  }
+
   function rowVisible(tr, inputs){
     if (curCond !== '__all' && tr.getAttribute('data-cond') && tr.getAttribute('data-cond') !== curCond) return false;
     if (ngOnly) { var ng = tr.classList.contains('ng-row'); var done = tr.classList.contains('marked'); if (!ng && done) return false; }
@@ -9580,20 +9600,7 @@ body.crosshi td.cross-col:not(.mk-cell), body.crosshi tr.cross-row td:not(.mk-ce
     document.querySelectorAll('table.uglist tr[data-mid]').forEach(function(tr){ tr.style.display = rowVisible(tr, null) ? '' : 'none'; });
     // rowspan保護: グループ内に可視行があれば先頭行(seatpair<th>保持)を表示に戻す
     // （先頭行が非表示になると後続行の列がずれるため）
-    (function(){
-      var ugBody = document.querySelector('table.uglist tbody');
-      if (!ugBody) return;
-      var groups = [], cur = null;
-      ugBody.querySelectorAll('tr[data-mid]').forEach(function(tr){
-        if (tr.classList.contains('seat-sep')){ cur = []; groups.push(cur); }
-        if (cur) cur.push(tr);
-      });
-      groups.forEach(function(grp){
-        if (!grp.length) return;
-        var hasVisible = grp.some(function(r){ return r.style.display !== 'none'; });
-        if (hasVisible) grp[0].style.display = '';
-      });
-    })();
+    fixUgRowspan();
     // マトリクスは販売条件ブロック単位で表示
     document.querySelectorAll('.cond-block').forEach(function(b){ b.style.display = (curCond === '__all' || b.getAttribute('data-cond') === curCond) ? '' : 'none'; });
   }
