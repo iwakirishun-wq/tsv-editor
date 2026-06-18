@@ -3228,6 +3228,26 @@
               if (cellInp) cellInp.value = els.fbarVal.value;
             }
           });
+          // フォーカス時に元の値を保存（blur で未確定の編集をコミット/破棄する基準）
+          let _fbarOrigVal = "";
+          els.fbarVal.addEventListener("focus", () => {
+            _fbarOrigVal = els.fbarVal.value;
+          });
+          // blur: 非編集中に値が変わっていれば自動コミット（#1）
+          els.fbarVal.addEventListener("blur", () => {
+            if (!state.isEditing && state.selected) {
+              const { row, col } = state.selected;
+              const nv = els.fbarVal.value;
+              if (nv !== _fbarOrigVal) {
+                if (nv !== (safeGet(row, col) ?? "")) {
+                  saveUndo(); safeSet(row, col, nv); markDirty();
+                  recordAction("editCell", { value: nv });
+                  state.forceRender = true; renderBody();
+                }
+                updateStatusPos();
+              }
+            }
+          });
           // Enter: 編集中はセル確定、非編集中はデータへ直接コミット
           // Escape: 編集中はセルキャンセル、非編集中はfbar表示を元の値に戻す
           els.fbarVal.addEventListener("keydown", (e) => {
@@ -3247,6 +3267,7 @@
                 }
                 updateStatusPos();
               }
+              els.container?.focus(); // グリッドにフォーカスを戻す（#7）
             } else if (e.key === "Escape") {
               e.preventDefault();
               if (state.isEditing) {
@@ -3257,6 +3278,7 @@
                 els.fbarVal.value = safeGet(row, col) ?? "";
                 updateStatusPos();
               }
+              els.container?.focus(); // グリッドにフォーカスを戻す（#7）
             }
           });
         }
@@ -5072,8 +5094,11 @@
           }
         }
         // セル選択に連動した列ヘッダー・行番号のアクティブ強調
+        // selectedCol（列全体選択）と selected?.col の両方を考慮する（#12）
+        const _colActive = (col) => cur.selectedCol === col || cur.selected?.col === col;
         if (prev.selected) {
-          els.thead.querySelector(`th[data-col="${prev.selected.col}"]`)?.classList.remove("col-active");
+          if (!_colActive(prev.selected.col))
+            els.thead.querySelector(`th[data-col="${prev.selected.col}"]`)?.classList.remove("col-active");
           els.tbody.querySelector(`td.row-num[data-rownum="${prev.selected.row}"]`)?.classList.remove("row-selected");
         }
         if (cur.selected) {
