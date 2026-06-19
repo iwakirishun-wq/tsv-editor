@@ -1849,9 +1849,9 @@
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"></path><rect x="9" y="3" width="6" height="4" rx="1"></rect><path d="M9 12l2 2 4-4"></path></svg></span>
               <span>一括設定検査</span>
             </button>
-            <button class="rb-btn" id="btn-biko-html-check" title="備考(nte)列の内容を実際のHTML表示として再現します（切り替え）&#10;席種エリアマスタ（nte列あり）を開いている時のみ使用できます" aria-label="備考HTML検査の切り替え" aria-pressed="false">
+            <button class="rb-btn" id="btn-biko-html-check" title="備考(nte)列・SEJデータのwordN列をHTML出力相当の表記に変換します（切り替え）&#10;席種エリアマスタ（nte列あり）またはSEJデータ（word1〜7列あり）を開いている時のみ使用できます&#10;ON時は読みやすさのため折り返し表示も自動で有効化されます&#10;※元データは書き換えません（表示のみ変換）" aria-label="備考HTML変換の切り替え" aria-pressed="false">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M8 13l1.5 1.5L8 16M12 13h4"></path></svg></span>
-              <span>備考HTML検査</span>
+              <span>備考HTML変換</span>
             </button>
           </div>
           <span class="rb-group-label">検品</span>
@@ -2440,6 +2440,15 @@
           .filter(x => x);
       }
 
+      // SEJ備考の分割（<br>・改行区切り、タグは保持）— 備考HTML変換でのHTML再現用
+      function sejSplitNteHtml(s) {
+        if (!s) return [];
+        return s
+          .split(/<br\s*\/?>|\r?\n/i)
+          .map(x => x.trim())
+          .filter(x => x);
+      }
+
       // マスタ値の差分箇所を赤太字で強調したHTMLを返す（共通の前後を除いた中央部を強調）
       function diffEmphasis(current, master) {
         const cur = String(current || ""), mas = String(master || "");
@@ -2541,7 +2550,7 @@
           if (/大人|ADULT|高校/i.test(a)) return 4;
           return 0; // 共通・不明はランク判定しない
         };
-        const chargeFor = (diff) => diff < 0 ? 0 : (diff <= 500 ? 500 : diff); // マイナス→0 / 同額0〜500→500 / 超→実差額
+        const chargeFor = (diff) => diff <= 0 ? 0 : (diff <= 500 ? 500 : diff); // 0以下→0 / 1〜500→500 / 超→実差額
         const lookup = (ck, seat, age) => byCond.get(ck + "|" + seat + "|" + age) || any.get(seat + "|" + age) || null;
 
         return function validate(row) {
@@ -2550,7 +2559,10 @@
           const srcCode = v(row, c.ugSeatCd), dstCode = v(row, c.seatCd);
           const kbn = v(row, c.kbn), rank = v(row, c.rank);
           const advActual = num(v(row, c.adv)), dayActual = num(v(row, c.day));
-          const sameSeat = srcSeat === dstSeat && srcSeat !== "";
+          // 一律500円は「席種も券種も同一」の場合のみ（再発行等）。
+          // 同席種でも年齢区分が変わる場合（例: G席 U23→大人）は実差額で計算する
+          // （もてぎMotoGPチェックリスト.xlsx「大人に変更」表で確認: G席 U23→大人=4,000円など、500円ではない）
+          const sameSeat = srcSeat === dstSeat && srcSeat !== "" && srcAge === dstAge;
           const problems = [];
           const notes = [];
 
@@ -2572,7 +2584,7 @@
           // --- 期待差額（前売・当日） ---
           // 戻り: { exp:number|null, note:string, dummy:bool }
           const calc = (which) => {
-            if (sameSeat) return { exp: 500, note: "同席種=一律500", dummy: false };
+            if (sameSeat) return { exp: 500, note: "同席種・同年齢区分=一律500（再発行等）", dummy: false };
             const ck = condKey(row);
             const s = lookup(ck, srcSeat, srcAge), d = lookup(ck, dstSeat, dstAge);
             const sp = s ? s[which] : null, dp = d ? d[which] : null;
@@ -3241,12 +3253,30 @@
         $("btn-biko-html-check").onclick = () => {
           if (!state.bikoHtmlCheck) {
             const hasNte = state.headers.some(h => h.trim() === "nte");
-            if (!hasNte) {
-              alert("備考HTML検査は席種エリアマスタ（nte列を含むTSV）を開いている時のみ使用できます。");
+            const isSej = isSejData();
+            if (!hasNte && !isSej) {
+              alert("備考HTML変換は席種エリアマスタ（nte列を含むTSV）またはSEJデータ（word1〜7列を含むTSV）を開いている時のみ使用できます。");
+              return;
+            }
+            if (isSej && !state.sejMaster) {
+              alert("SEJデータの備考HTML変換には席種エリアマスタの連携が必要です。\n\n「席種エリアマスタ連携」から席種エリアマスタ(TSV)を連携してから有効化してください。");
               return;
             }
           }
-          toggleInspect("bikoHtmlCheck", "btn-biko-html-check", "備考HTML検査");
+          toggleInspect("bikoHtmlCheck", "btn-biko-html-check", "備考HTML変換");
+          // 読みやすさのため、ONにした時は全体折り返し表示も自動で有効化する
+          if (state.bikoHtmlCheck && !state.wrapCells) {
+            state.wrapCells = true;
+            state.wrapRows.clear();
+            document.body.classList.add("wrap-cells");
+            const bw = $("btn-wrap");
+            if (bw) {
+              bw.classList.add("active-state");
+              bw.setAttribute("aria-pressed", "true");
+            }
+            state.forceRender = true;
+            renderBody();
+          }
         };
         // 辞書・ヘッダーメモ編集
         $("btn-dict-edit").onclick = openDictEditor;
@@ -4897,7 +4927,7 @@
             const isSelected =
               cls.includes("selected") || cls.includes("in-range");
             let displayVal = escHtml(cellVal);
-            // 備考HTML検査: nte列はサニタイズ済みの許可タグ(br/a/font/b/i/u/s/strong/em)のみ
+            // 備考HTML変換: nte列はサニタイズ済みの許可タグ(br/a/font/b/i/u/s/strong/em)のみ
             // 実HTMLとして描画し、それ以外は escHtml 済みのまま表示する（renderHtmlValue と同じ安全策）
             if (j === nteColIdx && cellVal) {
               displayVal = renderHtmlValue(cellVal, { isHtml: true });
@@ -5065,7 +5095,15 @@
                 const parts = sejSplitNte(m.nte || "");
                 const masterVal = parts[nteWordCols[j] - 1] || "";
                 const cur = cellVal.trim();
-                if (cur === masterVal.trim()) {
+                if (state.bikoHtmlCheck) {
+                  // 備考HTML変換: 表示のみマスタ備考のN番目項目をHTML表記に切り替える（元データは書き換えない）
+                  const htmlParts = sejSplitNteHtml(m.nte || "");
+                  const masterHtml = htmlParts[nteWordCols[j] - 1] || "";
+                  displayVal = masterHtml
+                    ? renderHtmlValue(masterHtml, { isHtml: true })
+                    : `<span style="color:#aaa">—</span>`;
+                  if (cur !== masterVal.trim()) cls.push("cell-diff");
+                } else if (cur === masterVal.trim()) {
                   if (cur) displayVal += `<span style="color:#16a34a;margin-left:5px;font-size:10px">✓</span>`;
                 } else {
                   cls.push("cell-diff");
@@ -8992,109 +9030,6 @@
         setTimeout(() => URL.revokeObjectURL(url), 60000);
         setStatus(`SEJ HTML出力完了（${filteredRows}件）`);
       }
-
-      // ===== HTML出力（席種エリアマスタ用プレビュー / SEJデータは自動でSEJ出力） =====
-      const HTML_EXPORT_COLS = [
-        { key: "seat_type_area_cd", label: "席種エリアコード", group: "基本" },
-        { key: "seat_type_area_control_nm", label: "管理名", group: "基本" },
-        { key: "seat_type_area_disp_nm", label: "表示名", group: "基本" },
-        { key: "disp_abb", label: "表示略称", group: "名称" },
-        { key: "seat_type_grp_nm1", label: "グループ名1", group: "名称" },
-        { key: "seat_type_grp_nm2", label: "グループ名2", group: "名称" },
-        { key: "nte", label: "備考", group: "備考", isHtml: true },
-        { key: "rsve_unrsve_kbn", label: "指定/自由席", group: "区分" },
-        { key: "grp_nm", label: "グループ名", group: "区分" },
-        { key: "disp_color_cd", label: "表示カラー", group: "区分", isColor: true },
-        { key: "qr_code_issue_presence_flg", label: "QR発行", group: "フラグ", isFlag: true },
-        { key: "enter_possible_flg", label: "入場可能", group: "フラグ", isFlag: true },
-        { key: "box_seat_flg", label: "BOX席", group: "フラグ", isFlag: true },
-        { key: "seat_cnt", label: "席数", group: "フラグ" },
-        { key: "presence_flg", label: "有効", group: "フラグ", isFlag: true },
-        { key: "parking_ticket_flg", label: "駐車券", group: "フラグ", isFlag: true },
-        { key: "place_type", label: "位置種別", group: "その他" },
-        { key: "seattype_stock_control_typ", label: "在庫管理種別", group: "その他" },
-        { key: "privilege_flg", label: "特典", group: "その他", isFlag: true },
-        { key: "seattype_sn", label: "席種連番", group: "その他" },
-        { key: "external_stock_cond_disp_tgt_flg", label: "外部在庫表示", group: "その他", isFlag: true },
-        { key: "external_stock_cond_disp_sort_order", label: "外部在庫並び順", group: "その他" },
-        { key: "lic_plate_reg_flg", label: "車両番号登録", group: "その他", isFlag: true },
-        { key: "parking_ticket_fed_flg", label: "駐車券連携", group: "その他", isFlag: true },
-        { key: "entrance_gate_area", label: "入場ゲートエリア", group: "その他" },
-        { key: "gate_stage_typ1", label: "ゲート用公演種別", group: "その他" },
-        { key: "front_pay_disp_flg", label: "フロント決済表示", group: "その他", isFlag: true },
-        { key: "single_day_admission_flg", label: "単日入場", group: "その他", isFlag: true },
-      ];
-
-      function validateMasterRow(row, colMap) {
-        const byKey = {}; // { colKey: [{ok, rule}], ... }
-        const add = (key, ok, rule) => {
-          if (!byKey[key]) byKey[key] = [];
-          byKey[key].push({ ok, rule });
-        };
-        const get = (key) => {
-          const c = colMap.find(x => x.key === key);
-          return c ? (row[c.idx] ?? "").trim() : "";
-        };
-
-        const cd = get("seat_type_area_cd");
-        const char6 = cd.length >= 6 ? cd[5].toUpperCase() : "";
-        const enterFlg = get("enter_possible_flg");
-        const parkingFlg = get("parking_ticket_flg");
-        const boxFlg = get("box_seat_flg");
-        const seatCnt = parseInt(get("seat_cnt"), 10) || 0;
-        const rsveKbn = get("rsve_unrsve_kbn");
-        const stockTyp = get("seattype_stock_control_typ");
-        const dispNm = get("seat_type_area_disp_nm");
-        const controlNm = get("seat_type_area_control_nm");
-        const dispAbb = get("disp_abb");
-        const nameTexts = [dispNm, controlNm, dispAbb].join(" ");
-
-        const hasArrow = /→/.test(nameTexts);
-        const isMultiPerson = /[0-9０-９]+名/.test(nameTexts) ||
-          /ボックス|BOX|box|テーブル|ラウンジ|スイート|ルーム|パーティ/i.test(nameTexts);
-        const isReserved = /指定席|指定/.test(nameTexts) || isMultiPerson;
-        const isAreaSeat = /エリア|自由席|自由|立見|芝生|広場/.test(nameTexts);
-
-        // 6桁目P → 駐車券=1
-        if (char6 === "P") {
-          add("parking_ticket_flg", parkingFlg === "1", "6桁目P → 駐車券=1");
-        }
-        // 6桁目E → 入場可能=1
-        if (char6 === "E" && !hasArrow) {
-          add("enter_possible_flg", enterFlg === "1", "6桁目E → 入場可能=1");
-        }
-        // 6桁目U → 入場可能=0
-        if (char6 === "U" && !hasArrow) {
-          add("enter_possible_flg", enterFlg === "0", "6桁目U → 入場可能=0");
-        }
-        // 6桁目O → 入場可能=1（端末読込あり）
-        if (char6 === "O" && !hasArrow) {
-          add("enter_possible_flg", enterFlg === "1", "6桁目O → 入場可能=1");
-        }
-        // 複数名利用 → BOX席=1, 席数>=2
-        if (isMultiPerson) {
-          add("box_seat_flg", boxFlg === "1", "複数名利用 → BOX席=1");
-          add("seat_cnt", seatCnt >= 2, "複数名利用 → 席数2以上");
-        }
-        // →付き → 入場可能=0, 指定自由区分=2, 在庫管理種別=2
-        if (hasArrow) {
-          add("enter_possible_flg", enterFlg === "0", "→付き → 入場可能=0");
-          add("rsve_unrsve_kbn", rsveKbn === "2", "→付き → 指定/自由区分=2");
-          add("seattype_stock_control_typ", stockTyp === "2", "→付き → 在庫管理種別=2");
-        } else {
-          if (isReserved && !isAreaSeat) {
-            add("rsve_unrsve_kbn", rsveKbn === "1", "指定席 → 指定/自由区分=1");
-            add("seattype_stock_control_typ", stockTyp === "1", "指定席 → 在庫管理種別=1");
-          }
-          if (isAreaSeat && !isReserved) {
-            add("rsve_unrsve_kbn", rsveKbn === "2", "エリア席 → 指定/自由区分=2");
-            add("seattype_stock_control_typ", stockTyp === "2", "エリア席 → 在庫管理種別=2");
-          }
-        }
-
-        return byKey;
-      }
-
       function renderHtmlValue(val, colDef) {
         const v = String(val ?? "").trim();
         if (!v) return '<span style="color:#aaa">—</span>';
@@ -9349,7 +9284,7 @@
               + cell(v(row, c.route), v(row, c.route))
               + cell(fmt(v(row, c.adv)), Number(String(v(row, c.adv)).replace(/,/g, "")) || 0, "num adv")
               + cell(fmt(v(row, c.day)), Number(String(v(row, c.day)).replace(/,/g, "")) || 0, "num day")
-              + cell(periodOf ? dt(v(row, c.start)) : v(row, c.start), v(row, c.start), "dt")
+              + cell(dt(v(row, c.start)), v(row, c.start), "dt")
               + cell(dt(v(row, c.end)), v(row, c.end), "dt")
               + `</tr>`;
           }
@@ -9442,7 +9377,7 @@ ${_sortableTable(labels, rowsHtml)}` };
                   if (!e) { bodyRows += `<td class="na">—</td>`; continue; }
                   const { row, chk } = e;
                   const tip = (chk.status === "invalid" ? chk.note
-                    : chk.expected != null ? `期待差額 前${chk.expected.toLocaleString("ja-JP")}/当${chk.expectedDay != null ? chk.expectedDay.toLocaleString("ja-JP") : "?"}` + (chk.sameSeat ? "（同席種=一律500）" : `（先${fmt(String(chk.dstPrice))} − 元${fmt(String(chk.srcPrice))}）`)
+                    : chk.expected != null ? `期待差額 前${chk.expected.toLocaleString("ja-JP")}/当${chk.expectedDay != null ? chk.expectedDay.toLocaleString("ja-JP") : "?"}` + (chk.sameSeat ? "（同席種・同年齢区分=一律500）" : `（先${fmt(String(chk.dstPrice))} − 元${fmt(String(chk.srcPrice))}）`)
                     : "通常価格が見つからず検算不能")
                     + `\n販売期間 ${v(row, c.start)} 〜 ${v(row, c.end)}`;
                   const cls = (chk.status === "ng" || chk.status === "invalid") ? " mx-ng" : chk.status === "unknown" ? " mx-na" : "";
@@ -9525,7 +9460,7 @@ ${_sortableTable(labels, rowsHtml)}` };
             + (inv ? `　<span class="badge-ng">設定不可 ${inv}件</span>` : "")
             + (na ? `　<span class="badge-na">価格不明 ${na}件</span>` : "");
           sections.ug = { title: "UG一覧", body: `<h2>🔀 アップグレード一覧（${ugs.length}件）${badges}</h2>
-<p class="legend">区間=元席種⇒先席種（セル結合）。期待差額=先−元（同席種500/負→0/1〜500→500、前売・当日）。登録差額が期待と違う項目は赤枠、コメント欄に理由。${seatMeta ? "席種は表示略称・" : ""}券種は略称</p>
+<p class="legend">区間=元席種⇒先席種（セル結合）。期待差額=先−元（同席種・同年齢区分のみ一律500／それ以外は実差額で0以下→0・1〜500→500・500超→実差額、前売・当日とも）。登録差額が期待と違う項目は赤枠、コメント欄に理由。${seatMeta ? "席種は表示略称・" : ""}券種は略称</p>
 <div class="scroll uglistscroll"><table class="uglist">${head}${bodyRows}</table></div>` };
         }
 
@@ -10217,266 +10152,6 @@ ${findings.length
         );
       }
 
-      function exportHtmlPreview() {
-        if (state.headerMode === "numbered") {
-          alert("ヘッダーが連番モードのため、列名を認識できません。\n\n「表示」タブの「ヘッダー」ボタンで 1行目モード に切り替えてから出力してください。");
-          return;
-        }
-        // 対象行を決定（フィルター/表示行のみ）
-        const vr = getVisibleRows();
-        const rowIndices = vr._direct
-          ? Array.from({ length: state.data.length }, (_, i) => i)
-          : [...vr._indices];
-
-        if (!rowIndices.length) {
-          setStatus("⚠ 表示する行がありません");
-          return;
-        }
-
-        const isFiltered = rowIndices.length < state.data.length;
-        const msg = isFiltered
-          ? `フィルター適用中の ${rowIndices.length} 件（全${state.data.length}件中）をHTML出力します。\nよろしいですか？`
-          : `全 ${rowIndices.length} 件をHTML出力します。\nよろしいですか？`;
-        if (!confirm(msg)) return;
-
-        // SEJデータの場合は専用レイアウトで出力
-        if (isSejData()) {
-          exportSejHtml(rowIndices, isFiltered);
-          return;
-        }
-
-        // 席種一括設定（23列）の場合は検品リボンのインラインチェックを有効化
-        if (isIkkatsuData()) {
-          if (!state.ikkatsuCheck) {
-            if (!state.sejMaster) {
-              alert("一括設定検査には席種エリアマスタの連携が必要です。\n\n「席種エリアマスタ連携」から席種エリアマスタ(TSV)を連携してから有効化してください。");
-              return;
-            }
-            toggleInspect("ikkatsuCheck", "btn-ikkatsu-check", "席種一括設定チェック", true);
-          } else {
-            setStatus("席種一括設定チェックはすでにONです。検品リボンの「一括設定検査」ボタンでON/OFFを切り替えられます");
-          }
-          return;
-        }
-
-        // 経路価格スケジュールは「価格チェック表」ボタン（btn-price-sheet）に分離済み
-        {
-          const _H = state.headers.map(h => String(h).trim());
-          if (_H.includes("販売開始日時") && _H.includes("席種エリア名") && _H.includes("アップグレード該当フラグ")) {
-            alert("経路価格スケジュールは「価格チェック表」ボタンから出力してください。");
-            return;
-          }
-        }
-
-        // 使用可能な列を抽出（ヘッダーに存在するもののみ）
-        const colMap = [];
-        for (const def of HTML_EXPORT_COLS) {
-          const idx = state.headers.findIndex(h => h.trim() === def.key);
-          if (idx !== -1) colMap.push({ ...def, idx });
-        }
-
-        if (!colMap.length) {
-          document.querySelector("._preview-err-ov")?.remove();
-          const _ov = document.createElement("div");
-          _ov.className = "modal-overlay _preview-err-ov";
-          _ov.innerHTML = `<div class="modal-dialog">
-            <div class="modal-title">⚠ マスター列が見つかりません</div>
-            <p style="font-size:13px;margin:8px 0 4px">HTML出力に必要な列が見つかりませんでした。<br>「ファイル → マスター読み込み」でマスターファイルを読み込んでください。</p>
-            <div class="modal-btns"><button class="_preview-err-ok btn-primary">閉じる</button></div>
-          </div>`;
-          document.body.appendChild(_ov);
-          _ov.querySelector("._preview-err-ok").onclick = () => _ov.remove();
-          _ov.onkeydown = (e) => { if (e.key === "Escape") _ov.remove(); };
-          _ov.querySelector("._preview-err-ok").focus();
-          return;
-        }
-
-        // コメントデータ取得
-        const comments = {};
-        for (const c of colMap) {
-          const comment = state.headerComments[c.key] || "";
-          if (comment) comments[c.key] = comment;
-        }
-
-        // グループ分け
-        const groups = {};
-        for (const c of colMap) {
-          if (!groups[c.group]) groups[c.group] = [];
-          groups[c.group].push(c);
-        }
-
-        const fileName = state.fileName || "data";
-        const totalRows = state.data.length;
-        const filteredRows = rowIndices.length;
-
-        let html = `<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="UTF-8">
-<title>${escHtml(fileName)} - マスターデータプレビュー</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, "Hiragino Kaku Gothic ProN", "Yu Gothic UI", sans-serif; background: #f8f9fa; color: #333; padding: 20px; }
-  .header { background: #fff; padding: 16px 24px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; }
-  .header h1 { font-size: 18px; font-weight: 600; }
-  .header .meta { font-size: 12px; color: #666; margin-top: 4px; }
-  .card { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 12px; overflow: hidden; }
-  .card-head { background: #f5f5f5; padding: 10px 16px; border-bottom: 1px solid #e5e5e5; display: flex; align-items: center; gap: 8px; }
-  .card-head .code { font-family: monospace; font-size: 15px; font-weight: 600; color: #1a1a1a; }
-  .card-head .name { font-size: 15px; color: #555; }
-  .card-head .ctrl-nm { font-size: 12px; color: #888; }
-  .card-body { padding: 12px 16px; }
-  .group-label { font-size: 10px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: 0.5px; margin: 8px 0 4px; }
-  .group-label:first-child { margin-top: 0; }
-  .fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 4px 16px; }
-  .field { display: flex; flex-direction: column; padding: 3px 0; position: relative; }
-  .field-label { font-size: 10px; color: #888; cursor: help; border-bottom: 1px dotted #ccc; display: inline-block; width: fit-content; }
-  .field-label:hover { color: #333; }
-  .field-value { font-size: 15px; line-height: 1.5; word-break: break-all; }
-  .field-value a { color: #2563eb; text-decoration: underline; }
-  .field-value code { background: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-size: 14px; }
-  .nte-field { grid-column: 1 / -1; }
-  .nte-value { background: #fafafa; border: 1px solid #eee; border-radius: 4px; padding: 8px 10px; font-size: 15px; line-height: 1.7; min-height: 24px; color: #dc2626; }
-  .flag-ok { color: #16a34a; font-weight: 600; }
-  .flag-off { color: #9ca3af; }
-  .flag-warn { color: #dc2626; font-weight: 600; }
-  #floating-tooltip { display: none; position: fixed; z-index: 9999; background: #1a1a1a; color: #f0f0f0; font-size: 12px; padding: 10px 14px; border-radius: 6px; white-space: pre-wrap; max-width: 480px; min-width: 120px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); line-height: 1.6; pointer-events: none; word-break: break-word; }
-  .vbadge { display: inline-block; font-size: 12px; margin-left: 6px; padding: 1px 6px; border-radius: 4px; vertical-align: middle; white-space: nowrap; }
-  .vbadge-ok { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
-  .vbadge-ng { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; font-weight: 600; }
-  .validation-summary { background: #fff; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; }
-  .validation-summary h2 { font-size: 16px; margin-bottom: 8px; }
-  .summary-stats { display: flex; gap: 16px; font-size: 14px; }
-  .summary-stats .stat-ok { color: #16a34a; font-weight: 600; }
-  .summary-stats .stat-ng { color: #dc2626; font-weight: 600; }
-  .filter-note { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 4px; padding: 8px 12px; font-size: 12px; color: #1d4ed8; margin-bottom: 16px; }
-  @media print { body { background: #fff; padding: 10px; } .card { break-inside: avoid; box-shadow: none; border: 1px solid #ddd; } }
-</style>
-</head>
-<body>
-<div class="header">
-  <h1>📋 ${escHtml(fileName)}</h1>
-  <div class="meta">${filteredRows}件${isFiltered ? ` / 全${totalRows}件（フィルター適用中）` : ""} — ${new Date().toLocaleString("ja-JP")}</div>
-</div>
-`;
-
-        if (isFiltered) {
-          html += `<div class="filter-note">🔍 フィルターが適用されています。表示中の ${filteredRows} 件のみ出力しています。</div>\n`;
-        }
-
-        html += "<!-- VALIDATION_SUMMARY -->\n";
-        let totalOk = 0, totalNg = 0, totalSkip = 0;
-
-        for (const ri of rowIndices) {
-          const row = state.data[ri];
-          if (!row) continue;
-
-          // カード見出し: エリアコード、表示名、管理名
-          const cdVal = row[colMap.find(c => c.key === "seat_type_area_cd")?.idx] ?? "";
-          const dispNm = row[colMap.find(c => c.key === "seat_type_area_disp_nm")?.idx] ?? "";
-          const ctrlNm = row[colMap.find(c => c.key === "seat_type_area_control_nm")?.idx] ?? "";
-
-          html += `<div class="card">
-  <div class="card-head">`;
-          html += `<span class="code">${escHtml(cdVal)}</span>`;
-          if (dispNm) html += `<span class="name">${escHtml(dispNm)}</span>`;
-          if (ctrlNm) html += `<span class="ctrl-nm">${escHtml(ctrlNm)}</span>`;
-          html += `</div>
-  <div class="card-body">`;
-
-          // バリデーション結果を取得（カラムキー別）
-          const vByKey = validateMasterRow(row, colMap);
-          const hasAnyRule = Object.keys(vByKey).length > 0;
-          if (hasAnyRule) {
-            const hasErr = Object.values(vByKey).some(arr => arr.some(r => !r.ok));
-            if (hasErr) totalNg++;
-            else totalOk++;
-          } else {
-            totalSkip++;
-          }
-
-          // グループ別に出力
-          for (const [gName, cols] of Object.entries(groups)) {
-            const showCols = cols.filter(c => c.key !== "seat_type_area_cd" && c.key !== "seat_type_area_control_nm");
-            if (!showCols.length) continue;
-
-            html += `<div class="group-label">${escHtml(gName)}</div><div class="fields">`;
-
-            for (const col of showCols) {
-              const val = row[col.idx] ?? "";
-              const rendered = renderHtmlValue(val, col);
-              const tooltipContent = comments[col.key] ? escHtml(comments[col.key]) : "";
-              const isNte = col.key === "nte";
-
-              // この列に対するバリデーション結果
-              const colVals = vByKey[col.key] || [];
-              let badges = "";
-              for (const r of colVals) {
-                badges += r.ok
-                  ? ` <span class="vbadge vbadge-ok" title="${escHtml(r.rule)}">⭕${escHtml(r.rule)}</span>`
-                  : ` <span class="vbadge vbadge-ng" title="${escHtml(r.rule)}">❌${escHtml(r.rule)}</span>`;
-              }
-
-              html += `<div class="field${isNte ? " nte-field" : ""}">`;
-              html += `<span class="field-label"${tooltipContent ? ` data-comment="${tooltipContent}"` : ""}>${escHtml(col.label)}${tooltipContent ? " 💬" : ""}</span>`;
-              if (isNte) {
-                html += `<div class="nte-value">${rendered}</div>`;
-              } else {
-                html += `<div class="field-value">${rendered}${badges}</div>`;
-              }
-              html += `</div>`;
-            }
-            html += `</div>`;
-          }
-
-          html += `</div></div>\n`;
-        }
-
-        // サマリーをヘッダー直後に挿入
-        let summaryHtml = `<div class="validation-summary"><h2>🔍 データ検証サマリー</h2><div class="summary-stats">`;
-        summaryHtml += `<span class="stat-ok">⭕ 正常: ${totalOk}件</span>`;
-        summaryHtml += `<span class="stat-ng">❌ エラー: ${totalNg}件</span>`;
-        summaryHtml += `<span>— 判定対象外: ${totalSkip}件</span>`;
-        summaryHtml += `</div></div>\n`;
-        html = html.replace("<!-- VALIDATION_SUMMARY -->", summaryHtml);
-
-        html += `<div id="floating-tooltip"></div>`;
-        html += "<" + "script>" +
-`(function(){
-  var tip = document.getElementById('floating-tooltip');
-  document.addEventListener('mouseover', function(e) {
-    var label = e.target.closest('.field-label[data-comment]');
-    if (!label) { tip.style.display = 'none'; return; }
-    var text = label.getAttribute('data-comment');
-    if (!text) { tip.style.display = 'none'; return; }
-    tip.textContent = text;
-    tip.style.display = 'block';
-    var rect = label.getBoundingClientRect();
-    var left = rect.left;
-    var top = rect.bottom + 6;
-    if (left + tip.offsetWidth > window.innerWidth - 12) {
-      left = window.innerWidth - tip.offsetWidth - 12;
-    }
-    if (left < 4) left = 4;
-    if (top + tip.offsetHeight > window.innerHeight - 12) {
-      top = rect.top - tip.offsetHeight - 6;
-    }
-    tip.style.left = left + 'px';
-    tip.style.top = top + 'px';
-  });
-  document.addEventListener('mouseout', function(e) {
-    if (e.target.closest('.field-label[data-comment]')) tip.style.display = 'none';
-  });
-})();` + "</" + "script>" +
-        `</body></html>`;
-
-        // 新しいウィンドウで開く
-        const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-        const url = URL.createObjectURL(blob);
-        window.open(url, "_blank", "noopener");
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
-        setStatus(`HTML出力完了（${filteredRows}件）`);
-      }
 
 
       // ===== セル折り返し =====
