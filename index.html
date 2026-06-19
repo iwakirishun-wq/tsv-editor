@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="ja">
   <head>
     <meta charset="UTF-8" />
@@ -1815,6 +1815,10 @@
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></span>
               <span>席種エリアマスタ連携</span>
             </button>
+            <button class="rb-btn" id="btn-price-link" title="価格経路スケジュールを連携&#10;席種一括設定のリセール上限検算に必要&#10;クリック: 価格マスタファイル(TSV/CSV)を選択／もう一度押すと解除" aria-label="価格マスタ連携">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="2"></rect><line x1="8" y1="2" x2="8" y2="6"></line><line x1="16" y1="2" x2="16" y2="6"></line><path d="M12 10a2 2 0 1 0 0 4h1a2 2 0 1 1 0 4H9"></path><line x1="12" y1="9" x2="12" y2="19"></line></svg></span>
+              <span>価格マスタ連携</span>
+            </button>
           </div>
           <span class="rb-group-label">マスタ連携</span>
         </div>
@@ -3186,6 +3190,7 @@
         $("btn-autofit-all").onclick = autoFitAllColumns;
         $("btn-wrap").onclick = toggleWrapCells;
         $("btn-sej-link").onclick = toggleSejLink;
+        if ($("btn-price-link")) $("btn-price-link").onclick = togglePriceLink;
         // ドラッグ&ドロップでSEJマスタを読込
         const sejBtn = $("btn-sej-link");
         // stopPropagation必須: window側のドロップ処理に伝播するとファイルが
@@ -7857,6 +7862,37 @@
         }
         return clone;
       }
+      function togglePriceLink() {
+        if (state.priceMaster) {
+          const fn = state.priceMaster.fileName || "(不明)";
+          document.querySelector("._price-confirm-ov")?.remove();
+          const _ov = document.createElement("div");
+          _ov.className = "modal-overlay _price-confirm-ov";
+          _ov.innerHTML = `<div class="modal-dialog">
+            <div class="modal-title">価格マスタ連携を解除しますか？</div>
+            <p style="font-size:13px;margin:8px 0 4px">現在のマスタ: <strong>${escHtml(fn)}</strong><br>解除すると検算に利用できなくなります。</p>
+            <div class="modal-btns">
+              <button class="_price-cancel btn-default">キャンセル</button>
+              <button class="_price-ok btn-primary">解除する</button>
+            </div>
+          </div>`;
+          document.body.appendChild(_ov);
+          _ov.querySelector("._price-cancel").onclick = () => _ov.remove();
+          _ov.querySelector("._price-ok").onclick = () => {
+             _ov.remove();
+             state.priceMaster = null;
+             const btn = document.getElementById("btn-price-link");
+             if (btn) btn.classList.remove("active-state");
+             setRbLabel("btn-price-link", "価格マスタ連携");
+             setStatus("価格経路スケジュール連携を解除しました");
+          };
+          _ov.onkeydown = (e) => { if (e.key === "Escape") _ov.remove(); };
+          _ov.querySelector("._price-cancel").focus();
+        } else {
+          _openPriceMasterPicker();
+        }
+      };
+
       function cloneState() {
         return {
           d: state.data.map((r) => [...r]),
@@ -8458,21 +8494,34 @@
       }
 
       
-      function loadPriceMasterFile(file, onDone) {
+      function loadPriceMasterFile(file, _encoding, onDone) {
+        if (typeof _encoding === 'function') {
+          onDone = _encoding;
+          _encoding = null;
+        }
         const r = new FileReader();
         r.onload = (e) => {
           const txt = e.target.result;
+          if (!_encoding && txt.includes("\ufffd")) {
+            loadPriceMasterFile(file, "shift_jis", onDone);
+            return;
+          }
           parsePrice(txt);
         };
         const parsePrice = (txt) => {
-          const delim = file.name.endsWith('.csv') ? ',' : '\t';
-          const rows = txt.split(/\r?\n/).map(l => l.split(delim));
+          const rows = parseTsvText(txt);
           const headers = rows[0] || [];
           const codeIdx = headers.findIndex(h => h === "席種エリアコード" || h === "seat_type_area_cd");
           const rankIdx = headers.findIndex(h => h === "会員ランク名");
           const routeIdx = headers.findIndex(h => h === "販売経路区分");
           const dayIdx = headers.findIndex(h => h === "当日価格");
           const advIdx = headers.findIndex(h => h === "前売価格");
+          
+          if (codeIdx === -1 || (dayIdx === -1 && advIdx === -1)) {
+            alert("「席種エリアコード」および価格の列が見つかりません。\n価格経路スケジュールマスタ(BO-F-21030)を選択してください。");
+            setStatus("⚠ 価格経路スケジュールの列が不足しています");
+            return;
+          }
           
           const maxPrices = {};
           for (let i=1; i<rows.length; i++) {
@@ -8492,9 +8541,12 @@
           }
           state.priceMaster = { maxPrices, fileName: file.name };
           setStatus(`価格経路スケジュール(${file.name})を連携しました`);
+          const btn = document.getElementById("btn-price-link");
+          if (btn) btn.classList.add("active-state");
+          setRbLabel("btn-price-link", "価格マスタ連携中");
           if (onDone) onDone();
         };
-        r.readAsText(file, "utf-8"); // Usually utf-8 or shift_jis, assume utf-8 initially
+        r.readAsText(file, _encoding || "utf-8");
       }
       
       function _openPriceMasterPicker(onDone) {
@@ -8502,7 +8554,7 @@
         input.type = "file";
         input.accept = ".tsv,.csv,.txt";
         input.onchange = () => {
-          if (input.files && input.files[0]) loadPriceMasterFile(input.files[0], onDone);
+          if (input.files && input.files[0]) loadPriceMasterFile(input.files[0], null, onDone);
         };
         input.click();
       }
@@ -10006,6 +10058,7 @@ body.crosshi .cross-col:not(.mk-cell), body.crosshi .cross-row:not(.mk-cell) { b
         const total = rowIndices.length;
         const fname = escHtml(state.fileName || "席種一括設定");
         const masterFile = escHtml(state.sejMaster.fileName || "(マスタ)");
+        const priceFile = state.priceMaster ? escHtml(state.priceMaster.fileName) : "(未連携)";
         const ts = new Date().toLocaleString("ja-JP");
 
         const rowsHtml = findings.map((f, idx) => {
@@ -10073,7 +10126,7 @@ body.crosshi .cross-col:not(.mk-cell), body.crosshi .cross-row:not(.mk-cell) { b
 </style></head><body>
 <div class="head">
   <h1>🎫 席種一括設定チェック</h1>
-  <div class="meta">${fname}　/　マスタ: ${masterFile}　/　${total}件${isFiltered ? "（フィルター適用中）" : ""}　/　${ts}</div>
+  <div class="meta">${fname}　/　マスタ: ${masterFile}　/　価格マスタ: ${priceFile}　/　${total}件${isFiltered ? "（フィルター適用中）" : ""}　/　${ts}</div>
   <div class="cards">
     <div class="card ng"><div class="n">${counts.NG}</div><div class="l">NG（要修正・件）</div><div class="sub">NGのある席種 ${ngSeats}件</div></div>
     <div class="card warn"><div class="n">${counts.WARN}</div><div class="l">注意（確認・件）</div><div class="sub">注意のある席種 ${warnSeats}件</div></div>
@@ -10082,6 +10135,7 @@ body.crosshi .cross-col:not(.mk-cell), body.crosshi .cross-row:not(.mk-cell) { b
   </div>
 </div>
 ${missingCols.length ? `<div class="miss">⚠ 次の列が見つかりませんでした（一部チェックがスキップされます）: ${escHtml(missingCols.join(" / "))}</div>` : ""}
+${!state.priceMaster ? `<div class="miss" style="background:#fffbeb;border-color:#fde68a;color:#d97706">⚠ 価格経路スケジュールが未連携です（リセール上限金額の検算はスキップされます）</div>` : ""}
 <div class="legend">
   <b>チェック内容</b>
   <ol>
@@ -10089,7 +10143,9 @@ ${missingCols.length ? `<div class="miss">⚠ 次の列が見つかりません�
     <li><b>指定席整合</b>: マスタの指定席/自由席区分と「座席指定不可フラグ」が整合しているか</li>
     <li><b>初期値9</b>: 購入上限数=9（初期値＝一般販売しない）なのにリセール可/SEJ可になっていないか</li>
     <li><b>リセール下限</b>: リセール可なら下限=1321（手数料1321円を下回ると赤字になるのを防止）</li>
+    <li><b>リセール上限</b>: リセール上限金額が価格経路スケジュールのチケットアカウント最高額と一致しているか（※要価格マスタ）</li>
     <li><b>購入限定/複数</b>: 購入限定席種にP(駐車)と他種が混在するのに購入限定区分が複数購入可か</li>
+    <li><b>単体販売</b>: 購入限定席種として他席から指定されている場合に「単体販売不可」になっているか</li>
   </ol>
 </div>
 <div class="controls">
