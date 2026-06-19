@@ -9387,7 +9387,10 @@ ${_sortableTable(labels, rowsHtml)}` };
                   let reason = "";
                   if (chk.status === "invalid") reason = `<div class="rsn">${escHtml((chk.problems || []).join("/"))}</div>`;
                   else { const rs = []; if (chk.advNg) rs.push("前売"); if (chk.dayNg) rs.push("当日"); if (rs.length) reason = `<div class="rsn">${rs.join("・")}NG</div>`; }
-                  bodyRows += `<td class="mxc${cls}" data-mid="${mid}" title="${escHtml(tip)}"><div class="adv${chk.advNg ? " l-ng" : ""}">前 ${escHtml(money(v(row, c.adv)))}</div><div class="day${chk.dayNg ? " l-ng" : ""}">当 ${escHtml(money(v(row, c.day)))}</div><div class="per">${escHtml(period(row))}</div>${dg}${reason}</td>`;
+                  // 期待差額をExcel(アップグレード表)同様に数字だけ大きく見せる（席種一覧での照合がしやすいように）
+                  const expBadge = (chk.status !== "invalid" && chk.expected != null)
+                    ? `<div class="exp-badge">差額 ${chk.expected.toLocaleString("ja-JP")}</div>` : "";
+                  bodyRows += `<td class="mxc${cls}" data-mid="${mid}" title="${escHtml(tip)}">${expBadge}<div class="adv${chk.advNg ? " l-ng" : ""}">前 ${escHtml(money(v(row, c.adv)))}</div><div class="day${chk.dayNg ? " l-ng" : ""}">当 ${escHtml(money(v(row, c.day)))}</div><div class="per">${escHtml(period(row))}</div>${dg}${reason}</td>`;
                 }
                 bodyRows += `</tr>`;
               });
@@ -9441,13 +9444,14 @@ ${_sortableTable(labels, rowsHtml)}` };
               const expStr = (chk.expected != null || chk.expectedDay != null)
                 ? `前 ${chk.expected != null ? chk.expected.toLocaleString("ja-JP") : "?"} / 当 ${chk.expectedDay != null ? chk.expectedDay.toLocaleString("ja-JP") : "?"}`
                 : (chk.advNote || "—");
+              const dgNote = chk.isDown ? `<div class="dg-note">▼ダウングレード</div>` : "";
               const sep = i === 0 ? " seat-sep" : "";
               bodyRows += `<tr data-mid="${mid}" data-cond="${escHtml(condOf(row))}" class="${isNg ? "ng-row" : ""}${sep}"><td class="mk-cell" title="クリックでマーク">✔</td>`;
               if (i === 0) bodyRows += `<th class="rowh seatpair" rowspan="${list.length}" style="background:${seatColor(pc.fs)}" title="${escHtml(pc.fs + " ⇒ " + pc.ts)}"><b>${escHtml(fsl)}</b><span class="arrow">⇒</span><b>${escHtml(tsl)}</b></th>`;
               bodyRows += `<td class="kenpair">${escHtml(ageLabel(v(row, c.ugAge)))}<span class="arrow">⇒</span>${escHtml(ageLabel(v(row, c.age)))}</td>`
                 + `<td class="prices">${dual(money(chk.srcAdv != null ? chk.srcAdv : ""), money(chk.srcDay != null ? chk.srcDay : ""))}</td>`
                 + `<td class="prices">${dual(money(chk.dstAdv != null ? chk.dstAdv : ""), money(chk.dstDay != null ? chk.dstDay : ""))}</td>`
-                + `<td class="exp" title="元−先の期待差額（同席種=500/負→0/1〜500→500）">${escHtml(expStr)}</td>`
+                + `<td class="exp" title="先−元の期待差額（同席種・同年齢区分=一律500／それ以外は実差額：0以下→0・1〜500→500・500超→実差額）">${escHtml(expStr)}${dgNote}</td>`
                 + `<td class="prices reg">${dual(money(v(row, c.adv)), money(v(row, c.day)), chk.advNg, chk.dayNg, chk.advNg ? "期待 " + (chk.expected != null ? chk.expected.toLocaleString("ja-JP") : "?") : "", chk.dayNg ? "期待 " + (chk.expectedDay != null ? chk.expectedDay.toLocaleString("ja-JP") : "?") : "")}</td>`
                 + cell(condOf(row), condOf(row))
                 + cell(periodOf(row), v(row, c.start), "dt")
@@ -9541,12 +9545,13 @@ table.uglist th.seatpair { position: sticky; left: 0; z-index: 2; vertical-align
 table.uglist th.seatpair .arrow { color: #be185d; margin: 0 5px; font-weight: 700; }
 table.uglist td.kenpair { white-space: nowrap; font-weight: 600; }
 table.uglist td.kenpair .arrow { color: #be185d; margin: 0 4px; }
-table.uglist td.prices { padding: 2px 8px; }
+table.uglist td.prices { padding: 2px 8px; text-align: right; }
 table.uglist td.prices.reg { font-weight: 600; }
-table.uglist .two { display: flex; flex-direction: column; line-height: 1.3; }
+table.uglist .dg-note { color: #ea580c; font-size: 10px; font-weight: 700; }
+table.uglist .two { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.3; }
 table.uglist .two span { font-size: 11px; }
 table.uglist .two .v-ng { color: #dc2626; font-weight: 700; outline: 2px solid #dc2626; outline-offset: 1px; border-radius: 2px; }
-table.uglist td.exp { color: #555; font-size: 11px; white-space: nowrap; }
+table.uglist td.exp { color: #555; font-size: 11px; white-space: nowrap; text-align: right; }
 table.uglist td.cmt { max-width: 220px; white-space: normal; }
 table.uglist .cmt-ng { color: #dc2626; font-size: 11px; font-weight: 600; }
 tr.ng-row td { background: #fef2f2; }
@@ -9564,6 +9569,7 @@ table.mx th.agecol { position: sticky; left: 58px; z-index: 5; width: 92px; min-
 table.mx th.corner { position: sticky; top: 0; left: 0; z-index: 7; background: #e2e8ee; }
 table.mx .hp { font-size: 9px; font-weight: 400; color: #777; line-height: 1.15; margin-top: 1px; }
 td.mxc { cursor: pointer; position: relative; min-width: 64px; }
+td.mxc .exp-badge { font-weight: 700; font-size: 12px; color: #1d4ed8; line-height: 1.2; }
 td.mxc .adv { font-weight: 600; color: #be185d; }
 td.mxc .day { font-size: 10px; color: #b45309; }
 td.mxc .per { font-size: 9px; color: #999; }
