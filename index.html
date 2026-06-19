@@ -2316,7 +2316,7 @@
         headerMapped: false, // ヘッダーマッピングが適用されているか
 
         // SEJ連携用: 席種エリアマスタ
-        sejMaster: null, // { byCode: { "MMTGPE25021": { disp_nm, control_nm, nte, ... } }, fileName }
+        sejMaster: null, priceMaster: null, // { byCode: { "MMTGPE25021": { disp_nm, control_nm, nte, ... } }, fileName }
         sejVirtualCols: null, // { indices: [i1, i2, ...], keys: ["grp_nm", ...] } 保存時除外する仮想列
         colorView: false,    // disp_color_cd をセル背景色で表示
         gateView: false,     // gate_stage_typ1 にゲート名を併記
@@ -4896,6 +4896,32 @@
             // 実HTMLとして描画し、それ以外は escHtml 済みのまま表示する（renderHtmlValue と同じ安全策）
             if (j === nteColIdx && cellVal) {
               displayVal = renderHtmlValue(cellVal, { isHtml: true });
+              if (state.sejMaster && sejCodeColIdx !== -1) {
+                const cd = (safeGet(i, sejCodeColIdx) || "").trim();
+                const m = state.sejMaster.byCode[cd];
+                if (m) {
+                  const mNte = (m.nte || "").trim();
+                  const cNte = cellVal.trim();
+                  if (!mNte) {
+                     displayVal = `<span style="color:#dc2626;font-weight:bold;">${displayVal}</span><span style="color:#dc2626;font-size:10px"><br>※マスタに備考なし</span>`;
+                  } else if (mNte !== cNte) {
+                     const mLines = mNte.split(/(?:<br\s*\/?>|\n)/i).map(s=>s.replace(/<[^>]*>/g,'').trim()).filter(Boolean);
+                     const cLinesHtml = cellVal.split(/(<br\s*\/?>|\n)/i);
+                     let newHtml = "";
+                     for (let cl of cLinesHtml) {
+                       if (cl.toLowerCase().startsWith("<br") || cl === "\n") { newHtml += cl; continue; }
+                       const clText = cl.replace(/<[^>]*>/g,'').trim();
+                       if (!clText) { newHtml += cl; continue; }
+                       if (mLines.includes(clText)) {
+                         newHtml += cl;
+                       } else {
+                         newHtml += `<span style="color:#dc2626;font-weight:bold;" title="差分あり">${cl}</span>`;
+                       }
+                     }
+                     displayVal = newHtml;
+                  }
+                }
+              }
             }
             // SEJ連携: 席種エリアコード列・購入限定席種列に席種名を併記
             // 主コード列は青の対訳、購入限定席種列はゴースト（淡いグレー斜体）で
@@ -8431,6 +8457,56 @@
         return rows;
       }
 
+      
+      function loadPriceMasterFile(file, onDone) {
+        const r = new FileReader();
+        r.onload = (e) => {
+          const txt = e.target.result;
+          parsePrice(txt);
+        };
+        const parsePrice = (txt) => {
+          const delim = file.name.endsWith('.csv') ? ',' : '\t';
+          const rows = txt.split(/\r?\n/).map(l => l.split(delim));
+          const headers = rows[0] || [];
+          const codeIdx = headers.findIndex(h => h === "席種エリアコード" || h === "seat_type_area_cd");
+          const rankIdx = headers.findIndex(h => h === "会員ランク名");
+          const routeIdx = headers.findIndex(h => h === "販売経路区分");
+          const dayIdx = headers.findIndex(h => h === "当日価格");
+          const advIdx = headers.findIndex(h => h === "前売価格");
+          
+          const maxPrices = {};
+          for (let i=1; i<rows.length; i++) {
+             const row = rows[i];
+             if (!row || row.length < 2 || codeIdx < 0) continue;
+             const code = String(row[codeIdx] || "").trim();
+             const rank = String(rankIdx >= 0 ? row[rankIdx] : "");
+             const route = String(routeIdx >= 0 ? row[routeIdx] : "");
+             if (rank.includes("チケットアカウント") || route.includes("チケットアカウント")) {
+                const p1 = parseInt(row[dayIdx]||"0", 10)||0;
+                const p2 = parseInt(row[advIdx]||"0", 10)||0;
+                const mx = Math.max(p1, p2);
+                if (!maxPrices[code] || mx > maxPrices[code]) {
+                   maxPrices[code] = mx;
+                }
+             }
+          }
+          state.priceMaster = { maxPrices, fileName: file.name };
+          setStatus(`価格経路スケジュール(${file.name})を連携しました`);
+          if (onDone) onDone();
+        };
+        r.readAsText(file, "utf-8"); // Usually utf-8 or shift_jis, assume utf-8 initially
+      }
+      
+      function _openPriceMasterPicker(onDone) {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".tsv,.csv,.txt";
+        input.onchange = () => {
+          if (input.files && input.files[0]) loadPriceMasterFile(input.files[0], onDone);
+        };
+        input.click();
+      }
+
       function loadSejMasterFile(file, _encoding, onDone) {
         const reader = new FileReader();
         reader.onload = () => {
@@ -8788,8 +8864,13 @@
                 if (masterItemsNorm.includes(vN)) {
                   cls = "match";
                 } else {
+                  // Partial diff check
+                  let isPartial = false;
+                  for (const m of masterItemsNorm) {
+                    if (vN.length > 3 && m.includes(vN.substring(0,3))) { isPartial = true; break; }
+                  }
                   cls = "diff";
-                  extraTip = `\n\n⚠ この値はマスタ備考に一致する項目がありません`;
+                  extraTip = isPartial ? `\n\n⚠ マスタに類似の備考がありますが、差分があります` : `\n\n⚠ この値はマスタ備考に一致する項目がありません`;
                 }
               } else {
                 cls = "";
@@ -9798,6 +9879,7 @@ body.crosshi .cross-col:not(.mk-cell), body.crosshi .cross-row:not(.mk-cell) { b
           limit: col("購入上限数(決済毎)"),
           resale: col("リセール可否"),
           resaleMin: col("リセール用販売価格下限"),
+          resaleMax: col("リセール用販売価格上限"),
           solo: col("単体販売不可"),
           lim1: col("購入限定席種1"),
           lim2: col("購入限定席種2"),
@@ -9813,7 +9895,13 @@ body.crosshi .cross-col:not(.mk-cell), body.crosshi .cross-row:not(.mk-cell) { b
 
         const findings = []; // {rowNo, code, name, check, sev, msg}
         let okRows = 0, ngSeats = 0, warnSeats = 0;
-        const CHK_KEYS = ["席種名", "指定席整合", "初期値9", "リセール下限", "購入限定/複数", "マスタ未登録"];
+        const CHK_KEYS = ["席種名", "指定席整合", "初期値9", "リセール下限", "リセール上限", "購入限定/複数", "単体販売", "マスタ未登録"];
+        
+        const limSeatCodes = new Set();
+        for (const r of state.data) {
+          if (!r) continue;
+          [g(r, c.lim1), g(r, c.lim2), g(r, c.lim3)].forEach(cd => { if (cd) limSeatCodes.add(cd.trim()); });
+        }
         const counts = { NG: 0, WARN: 0 };
 
         for (const i of rowIndices) {
@@ -9885,6 +9973,23 @@ body.crosshi .cross-col:not(.mk-cell), body.crosshi .cross-row:not(.mk-cell) { b
                 .join(", ");
               add("購入限定/複数", "NG", `購入限定席種にP(駐車)と他種が混在[${named}]のに購入限定区分=「${kubun}」。単数だと駐車券は選べても追加券が選べません→複数購入可にすべき`);
             }
+          }
+          
+          if (limSeatCodes.has(code)) {
+            const solo = g(row, c.solo);
+            if (solo !== "不可" && solo !== "1") {
+              add("単体販売", "NG", `購入限定席種として他席から指定されているため、単体販売不可にする必要があります`);
+            }
+          }
+          
+          if (state.priceMaster && g(row, c.resale) === "可能") {
+             const maxPrice = state.priceMaster.maxPrices[code];
+             if (maxPrice !== undefined) {
+                 const currentLimit = g(row, c.resaleMax) || g(row, c.resaleMin) || "";
+                 if (String(currentLimit) !== String(maxPrice)) {
+                     add("リセール上限", "NG", `リセール上限金額(${currentLimit})が価格経路スケジュールのチケットアカウント最高額(${maxPrice})と一致しません`);
+                 }
+             }
           }
 
           if (rowIssues === 0) okRows++;
