@@ -637,7 +637,8 @@
         background: #d4d4d4;
       }
       .row-num.row-selected {
-        background: rgba(19, 100, 215, 0.14);
+        /* 固定列のため背景は不透明を維持（透明だとスクロール時に下のセルが透けて見える） */
+        background: linear-gradient(rgba(19, 100, 215, 0.14), rgba(19, 100, 215, 0.14)), var(--header-bg);
         color: #1b6ec2;
         font-weight: 700;
         border-right-color: #1b6ec2;
@@ -664,10 +665,21 @@
         box-shadow: inset 2px 0 0 0 rgba(33, 115, 70, 0.6),
           inset -2px 0 0 0 rgba(33, 115, 70, 0.6);
       }
-      tr.cross-row td:not(.selected):not(.cross-col) {
+      tr.cross-row td:not(.selected):not(.cross-col):not(.row-num) {
         background: rgba(33, 115, 70, 0.08);
       }
-      tr.cross-row td:not(.selected) {
+      tr.cross-row td:not(.selected):not(.row-num) {
+        box-shadow: inset 0 2px 0 0 rgba(33, 115, 70, 0.6),
+          inset 0 -2px 0 0 rgba(33, 115, 70, 0.6);
+      }
+      /* 行番号セル（左固定列）は不透明背景を維持しつつ十字強調を重ねる（透けるとスクロール中の他セルが見えてしまう） */
+      tr.cross-row .row-num:not(.selected):not(.row-selected) {
+        background: linear-gradient(rgba(33, 115, 70, 0.12), rgba(33, 115, 70, 0.12)), var(--header-bg);
+        box-shadow: inset 0 2px 0 0 rgba(33, 115, 70, 0.6),
+          inset 0 -2px 0 0 rgba(33, 115, 70, 0.6);
+      }
+      tr.cross-row .row-num.row-selected {
+        background: linear-gradient(rgba(33, 115, 70, 0.12), rgba(33, 115, 70, 0.12)), linear-gradient(rgba(19, 100, 215, 0.14), rgba(19, 100, 215, 0.14)), var(--header-bg);
         box-shadow: inset 0 2px 0 0 rgba(33, 115, 70, 0.6),
           inset 0 -2px 0 0 rgba(33, 115, 70, 0.6);
       }
@@ -9438,7 +9450,7 @@ td.na { color: #ccc; background: #fafafa; }
 tr.marked td { background: color-mix(in srgb, var(--mk) 38%, #ffffff); }
 tr[data-mid]:hover td { outline: 1px solid #b8c4d4; outline-offset: -1px; }
 /* 十字ハイライト（選択中の行・列） */
-body.crosshi td.cross-col:not(.mk-cell), body.crosshi tr.cross-row td:not(.mk-cell) { background: rgba(33, 115, 70, 0.08); }
+body.crosshi .cross-col:not(.mk-cell), body.crosshi .cross-row:not(.mk-cell) { background: rgba(33, 115, 70, 0.08); }
 .toolbar label.tg { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; color: #444; }
 .toolbar { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255,255,255,.97); border-top: 1px solid #d8dde4; padding: 8px 20px; display: flex; align-items: center; gap: 12px; font-size: 12px; z-index: 10; box-shadow: 0 -2px 8px rgba(0,0,0,.06); }
 .toolbar button { padding: 5px 14px; border: 1px solid #217346; color: #217346; background: #fff; border-radius: 5px; cursor: pointer; font-size: 12px; }
@@ -9497,15 +9509,49 @@ body.crosshi td.cross-col:not(.mk-cell), body.crosshi tr.cross-row td:not(.mk-ce
   function persist(){ try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch(e){} }
 
   // --- 十字ハイライト（マウス位置の行・列を強調）---
+  // UG一覧/マトリクスは rowspan・colspan を含むため、cellIndex 基準だと
+  // ヘッダーやrowspanの後続行で実際の列とズレる（列・行がばらつく）。
+  // rowspan/colspanを考慮した可視グリッド座標を計算してから一致判定する。
   var crossOn = false;
-  function clearCross(){ document.querySelectorAll('tr.cross-row').forEach(function(t){ t.classList.remove('cross-row'); }); document.querySelectorAll('td.cross-col').forEach(function(t){ t.classList.remove('cross-col'); }); }
+  function buildGridMap(table){
+    var map = new Map();
+    var occupied = {};
+    Array.prototype.forEach.call(table.rows, function(row, rIdx){
+      var carriedKeys = Object.keys(occupied);
+      var col = 0, cellIdx = 0;
+      var cells = row.cells;
+      while (cellIdx < cells.length) {
+        while (occupied[col] > 0) col++;
+        var cell = cells[cellIdx];
+        var colspan = cell.colSpan || 1;
+        var rowspan = cell.rowSpan || 1;
+        map.set(cell, { row: rIdx, col: col, rowspan: rowspan, colspan: colspan });
+        if (rowspan > 1) {
+          for (var k = 0; k < colspan; k++) {
+            var cc = col + k;
+            occupied[cc] = Math.max(occupied[cc] || 0, rowspan - 1);
+          }
+        }
+        col += colspan;
+        cellIdx++;
+      }
+      carriedKeys.forEach(function(k){ if (occupied[k] > 0) occupied[k]--; });
+    });
+    return map;
+  }
+  function clearCross(){ document.querySelectorAll('.cross-row').forEach(function(t){ t.classList.remove('cross-row'); }); document.querySelectorAll('.cross-col').forEach(function(t){ t.classList.remove('cross-col'); }); }
   function applyCross(cell){
     clearCross();
     if (!crossOn || !cell) return;
-    var tr = cell.parentElement; if (tr) tr.classList.add('cross-row');
     var tbl = cell.closest('table'); if (!tbl) return;
-    var ci = cell.cellIndex;
-    tbl.querySelectorAll('tr').forEach(function(r){ var cc = r.cells[ci]; if (cc) cc.classList.add('cross-col'); });
+    var gm = buildGridMap(tbl);
+    var info = gm.get(cell); if (!info) return;
+    var targetRow = info.row, targetCol = info.col;
+    tbl.querySelectorAll('td,th').forEach(function(c){
+      var ci = gm.get(c); if (!ci) return;
+      if (targetRow >= ci.row && targetRow < ci.row + ci.rowspan) c.classList.add('cross-row');
+      if (targetCol >= ci.col && targetCol < ci.col + ci.colspan) c.classList.add('cross-col');
+    });
   }
   document.addEventListener('mouseover', function(e){ if (!crossOn) return; var cell = e.target.closest('td,th'); if (cell) applyCross(cell); });
   var crossBox = document.getElementById('mk-cross');
