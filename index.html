@@ -487,7 +487,8 @@
         font-family: var(--font-ui);
       }
       th.col-active {
-        background: rgba(19, 100, 215, 0.12);
+        /* theadはsticky固定のため背景は不透明を維持（透明だとスクロール時に下の行が透けて見える） */
+        background: linear-gradient(rgba(19, 100, 215, 0.12), rgba(19, 100, 215, 0.12)), var(--header-bg);
         color: #1b6ec2;
         border-bottom-color: #1b6ec2;
       }
@@ -1812,7 +1813,7 @@
           <div class="rb-buttons">
             <button class="rb-btn" id="btn-sej-link" title="席種エリアマスタを連携&#10;SEJ設定・価格経路スケジュールのチェック/HTML出力に必須&#10;クリック: マスタファイル(TSV)を選択／もう一度押すと解除" aria-label="席種エリアマスタ連携">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></span>
-              <span>マスタ連携</span>
+              <span>席種エリアマスタ連携</span>
             </button>
           </div>
           <span class="rb-group-label">マスタ連携</span>
@@ -1828,7 +1829,7 @@
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 21V8l9-5 9 5v13"></path><path d="M9 21v-8h6v8"></path><line x1="3" y1="21" x2="21" y2="21"></line></svg></span>
               <span>ゲート表示</span>
             </button>
-            <button class="rb-btn" id="btn-parking-check" title="席種エリアコード6桁目が P（駐車券）の行で&#10;駐車券フラグが 1 になっているか検査し、&#10;不一致セルをマーカー表示します（切り替え）" aria-label="駐車券フラグ検査の切り替え" aria-pressed="false">
+            <button class="rb-btn" id="btn-parking-check" title="席種エリアコード6桁目が P（駐車券）の行で&#10;駐車券フラグが 1 になっているか検査し、&#10;不一致セルをマーカー表示します（切り替え）&#10;席種エリアマスタ（nte列あり）を開いている時のみ使用できます" aria-label="駐車券フラグ検査の切り替え" aria-pressed="false">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M9 17V7h4a3 3 0 0 1 0 6H9"></path></svg></span>
               <span>駐車券検査</span>
             </button>
@@ -1844,6 +1845,10 @@
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"></path><rect x="9" y="3" width="6" height="4" rx="1"></rect><path d="M9 12l2 2 4-4"></path></svg></span>
               <span>一括設定検査</span>
             </button>
+            <button class="rb-btn" id="btn-biko-html-check" title="備考(nte)列の内容を実際のHTML表示として再現します（切り替え）&#10;席種エリアマスタ（nte列あり）を開いている時のみ使用できます" aria-label="備考HTML検査の切り替え" aria-pressed="false">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M8 13l1.5 1.5L8 16M12 13h4"></path></svg></span>
+              <span>備考HTML検査</span>
+            </button>
           </div>
           <span class="rb-group-label">検品</span>
         </div>
@@ -1852,22 +1857,18 @@
           <div class="rb-buttons">
             <button class="rb-btn" id="btn-apply-dict" title="辞書を使ってヘッダーを日本語に変換&#10;Shift+クリックでも辞書編集画面を開けます" aria-label="辞書を適用してヘッダーを変換">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 7V4h16v3"></path><path d="M9 20h6"></path><path d="M12 4v16"></path></svg></span>
-              <span>日本語化</span>
+              <span>日本語変換</span>
             </button>
             <button class="rb-btn" id="btn-dict-edit" title="辞書とヘッダーメモを編集&#10;新しい列名の追加もここから（ブラウザに保存されます）" aria-label="辞書・ヘッダーメモを編集">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path><path d="M9 7h6M9 11h4"></path></svg></span>
               <span>辞書編集</span>
             </button>
           </div>
-          <span class="rb-group-label">変換</span>
+          <span class="rb-group-label">ヘッダー</span>
         </div>
         <!-- Group: HTML出力 -->
         <div class="rb-group">
           <div class="rb-buttons">
-            <button class="rb-btn" id="btn-html-export" title="開いているファイルに応じてHTML出力を自動切替&#10;・席種エリアマスタ→検証付き一覧&#10;・SEJデータ→マスタ照合カード&#10;・席種一括設定→チェックレポート(席種名/指定席/初期値9/リセール下限/購入限定の整合)&#10;・経路価格スケジュール→「価格チェック表」ボタンへ案内&#10;フィルター中は絞り込んだ行のみ出力" aria-label="確認用HTML出力">
-              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M12 13H8M12 17H8"></path><path d="M16 13l2 2-2 2"></path></svg></span>
-              <span>確認用HTML</span>
-            </button>
             <button class="rb-btn" id="btn-price-sheet" title="経路価格スケジュール（BO-F-21030）をチェック用HTMLとして出力&#10;通常価格表 / UGマトリクス / UG一覧 を選んで出力&#10;UG差額は自動検算（NG赤表示）、出力先で並べ替え・絞り込み可能&#10;※席種エリアマスタ連携が必須" aria-label="価格チェック表を出力">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="17" rx="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="8" y1="4" x2="8" y2="2"></line><line x1="16" y1="4" x2="16" y2="2"></line><path d="M7 13h4M7 17h7"></path><circle cx="16.5" cy="15" r="2.5"></circle><path d="M16.5 14v1l.8.8"></path></svg></span>
               <span>価格チェック表</span>
@@ -2160,9 +2161,9 @@
 
         <h2>🎫 チケットタブ</h2>
         <div class="man-btn-section">
-          <div class="man-btn-row"><span class="man-btn-label">マスタ連携</span><span class="man-btn-desc">席種エリアマスタTSVを連携。<b>SEJ設定・価格経路スケジュールのチェック/HTML出力に必須</b>（指定席/エリア/その他の判定・表示略称に使用）。席種コード列に席種名を併記し「グループ名」列を仮想追加、SEJデータには備考差分も表示。</span></div>
-          <div class="man-btn-row"><span class="man-btn-label">日本語化</span><span class="man-btn-desc">英語の列名を日本語に変換。保存時は元の英語に戻ります。</span></div>
-          <div class="man-btn-row"><span class="man-btn-label">辞書編集</span><span class="man-btn-desc">日本語化の辞書とヘッダーメモを編集。今開いているファイルの列が一覧の先頭に出ます。新しい列名の追加も可能。ブラウザに保存されるため、オフラインHTML運用でもそのまま使えます。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">席種エリアマスタ連携</span><span class="man-btn-desc">席種エリアマスタTSVを連携。<b>SEJ設定・価格経路スケジュールのチェック/HTML出力に必須</b>（指定席/エリア/その他の判定・表示略称に使用）。席種コード列に席種名を併記し「グループ名」列を仮想追加、SEJデータには備考差分も表示。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">日本語変換</span><span class="man-btn-desc">英語の列名を日本語に変換。保存時は元の英語に戻ります。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">辞書編集</span><span class="man-btn-desc">日本語変換の辞書とヘッダーメモを編集。今開いているファイルの列が一覧の先頭に出ます。新しい列名の追加も可能。ブラウザに保存されるため、オフラインHTML運用でもそのまま使えます。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">HTML出力</span><span class="man-btn-desc">確認用HTMLを新しいタブに出力。開いているファイルに応じて自動切替: 席種エリアマスタ→検証付き一覧 / SEJデータ→マスタ照合カード / <b>経路価格スケジュール→価格マトリクス</b>（通常価格表とUG差額マトリクスを販売条件ごとに表示。セルにマウスで販売期間）/ <b>席種一括設定→チェックレポート</b>（席種名差分・指定席整合・購入上限数9(初期値)の整合・リセール下限1321・購入限定席種のP混在×複数購入可、を一覧。席種エリアマスタ連携が必須。購入限定席種コードはグリッド上に席種名をゴースト併記）。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">価格チェック表</span><span class="man-btn-desc">経路価格スケジュール（BO-F-21030）を開いた状態で押すと、販売期間・席種・年齢区分・金額・UG元/差額を一覧化した参照シートを別タブに生成。会員ランクや販売区分はフィルターで絞り込み。元データはそのまま残ります。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">カラー表示</span><span class="man-btn-desc">表示カラーコード列の色をセル背景でプレビュー（切替）。</span></div>
@@ -2176,7 +2177,7 @@
         <div class="man-btn-section">
           <div class="man-btn-row"><span class="man-btn-label">行高さ / 折り返し / 列自動</span><span class="man-btn-desc">行の高さ切替、セル内折り返し、全列幅の自動調整。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">縦ヘッダー</span><span class="man-btn-desc">列名を縦書きにして列幅を節約。コード系の細い列が多いときに（切替）。</span></div>
-          <div class="man-btn-row"><span class="man-btn-label">ヘッダー</span><span class="man-btn-desc">「1行目」モード（通常）と「連番」モードの切替。連番中は日本語化・HTML出力・検品が使えません。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">ヘッダー</span><span class="man-btn-desc">「1行目」モード（通常）と「連番」モードの切替。連番中は日本語変換・HTML出力・検品が使えません。</span></div>
         </div>
 
         <h2>🔍 SEJ備考差分の見かた</h2>
@@ -2323,6 +2324,7 @@
         kanaCheck: false,    // 全角カタカナ検出（半角カナ必須フィールド用）
         boxCheck: false,     // 区画席（（〇名）席種）の設定検査
         ikkatsuCheck: false, // 席種一括設定チェック（23列）のインライン検品
+        bikoHtmlCheck: false, // 備考(nte)列のHTMLを表上で実際のHTML表示として再現（席種エリアマスタのみ）
         verticalHeader: true, // ヘッダー縦書き表示（既定でON・列幅節約）
         crossHi: true,        // 選択セルの行・列を十字ハイライト（localStorage保存）
         markerColor: "#facc15", // マーカー色（localStorageに保存）
@@ -2373,7 +2375,8 @@
       }
 
       // 検品表示トグル共通処理（カラー表示/ゲート表示/駐車券検査/カナ検査）
-      function toggleInspect(stateKey, btnId, label) {
+      // autoFit=true の検査は ON 時に全列幅を自動調整する（カナ検査/区画席検査/一括設定検査）
+      function toggleInspect(stateKey, btnId, label, autoFit) {
         state[stateKey] = !state[stateKey];
         const btn = $(btnId);
         if (btn) {
@@ -2382,7 +2385,15 @@
         }
         state.forceRender = true;
         renderBody();
-        setStatus(`${label}: ${state[stateKey] ? "ON" : "OFF"}`);
+        let msg = `${label}: ${state[stateKey] ? "ON" : "OFF"}`;
+        if (autoFit && state[stateKey]) {
+          autoFitAllColumnsQuiet();
+          renderHeader();
+          state.forceRender = true;
+          renderBody();
+          msg += "（列幅を自動調整しました）";
+        }
+        setStatus(msg);
       }
 
       // ゲート用公演種別: ヘッダーコメントの「名称：番号」行から 番号→名称 の対応表を作る
@@ -3174,7 +3185,6 @@
         $("btn-row-height").onclick = cycleRowHeight;
         $("btn-autofit-all").onclick = autoFitAllColumns;
         $("btn-wrap").onclick = toggleWrapCells;
-        $("btn-html-export").onclick = exportHtmlPreview;
         $("btn-sej-link").onclick = toggleSejLink;
         // ドラッグ&ドロップでSEJマスタを読込
         const sejBtn = $("btn-sej-link");
@@ -3193,15 +3203,45 @@
         });
         // 検品表示トグル（チケットタブ）
         $("btn-color-view").onclick = () => toggleInspect("colorView", "btn-color-view", "カラーコード表示");
-        $("btn-gate-view").onclick = () => toggleInspect("gateView", "btn-gate-view", "ゲート名表示");
-        $("btn-parking-check").onclick = () => toggleInspect("parkingCheck", "btn-parking-check", "駐車券フラグ検査");
-        $("btn-kana-check").onclick = () => toggleInspect("kanaCheck", "btn-kana-check", "半角カナ検査");
-        $("btn-box-check").onclick = () => toggleInspect("boxCheck", "btn-box-check", "区画席検査");
-        $("btn-ikkatsu-check").onclick = () => {
-          toggleInspect("ikkatsuCheck", "btn-ikkatsu-check", "席種一括設定チェック");
-          if (state.ikkatsuCheck && !state.sejMaster) {
-            setStatus("席種一括設定チェック: ON ※席種エリアマスタ未連携 → 席種名/指定席整合チェックをスキップ中");
+        $("btn-gate-view").onclick = () => {
+          if (!state.gateView) {
+            const gateColExists = state.headers.some(h => h.trim() === "gate_stage_typ1");
+            const gateMapNow = gateColExists ? getGateMap() : {};
+            if (!gateColExists || !Object.keys(gateMapNow).length) {
+              alert("ゲート表記には対応表が必要です。\n\ngate_stage_typ1列のヘッダーコメントに「名称：番号」の対応表が見つからないため、ゲート表記を有効化できません。");
+              return;
+            }
           }
+          toggleInspect("gateView", "btn-gate-view", "ゲート名表示");
+        };
+        $("btn-parking-check").onclick = () => {
+          if (!state.parkingCheck) {
+            const hasNte = state.headers.some(h => h.trim() === "nte");
+            if (!hasNte) {
+              alert("駐車券検査は席種エリアマスタ（nte列を含むTSV）を開いている時のみ使用できます。");
+              return;
+            }
+          }
+          toggleInspect("parkingCheck", "btn-parking-check", "駐車券フラグ検査");
+        };
+        $("btn-kana-check").onclick = () => toggleInspect("kanaCheck", "btn-kana-check", "半角カナ検査", true);
+        $("btn-box-check").onclick = () => toggleInspect("boxCheck", "btn-box-check", "区画席検査", true);
+        $("btn-ikkatsu-check").onclick = () => {
+          if (!state.ikkatsuCheck && !state.sejMaster) {
+            alert("一括設定検査には席種エリアマスタの連携が必要です。\n\n「席種エリアマスタ連携」から席種エリアマスタ(TSV)を連携してから有効化してください。");
+            return;
+          }
+          toggleInspect("ikkatsuCheck", "btn-ikkatsu-check", "席種一括設定チェック", true);
+        };
+        $("btn-biko-html-check").onclick = () => {
+          if (!state.bikoHtmlCheck) {
+            const hasNte = state.headers.some(h => h.trim() === "nte");
+            if (!hasNte) {
+              alert("備考HTML検査は席種エリアマスタ（nte列を含むTSV）を開いている時のみ使用できます。");
+              return;
+            }
+          }
+          toggleInspect("bikoHtmlCheck", "btn-biko-html-check", "備考HTML検査");
         };
         // 辞書・ヘッダーメモ編集
         $("btn-dict-edit").onclick = openDictEditor;
@@ -3299,7 +3339,7 @@
         $("btn-apply-dict").onclick = (e) => {
           if (e.shiftKey) { openDictEditor(); return; }
           if (state.headerMode === "numbered") {
-            alert("ヘッダーが連番モードのため日本語化できません。\n\n「表示」タブの「ヘッダー」ボタンで 1行目モード に切り替えてください。");
+            alert("ヘッダーが連番モードのため日本語変換できません。\n\n「表示」タブの「ヘッダー」ボタンで 1行目モード に切り替えてください。");
             return;
           }
           applyHeaderMapping();
@@ -3815,6 +3855,27 @@
 
       // ステータス表示なしの自動幅調整（ロード時用）
       function autoFitAllColumnsQuiet() {
+        // 検品チェックがONの時、セル末尾に付くゴースト表示（✓/✗マーカー）の分だけ
+        // 余白を加算する（マーカーは生データに含まれないため通常の幅計算では拾えない）
+        const _hIdxQuiet = (name) => state.headers.findIndex(h => h.trim() === name);
+        const boxNmIdxQuiet = state.boxCheck
+          ? (_hIdxQuiet("seat_type_area_disp_nm") !== -1 ? _hIdxQuiet("seat_type_area_disp_nm") : _hIdxQuiet("seat_type_area_control_nm"))
+          : -1;
+        let ikkatsuMarkerCols = null;
+        if (state.ikkatsuCheck && isIkkatsuData()) {
+          const _ikNormQ = (s) => String(s ?? "").trim().replace(/（/g,"(").replace(/）/g,")").replace(/[０-９]/g,(d)=>"０１２３４５６７８９".indexOf(d));
+          const _ikHsQ = state.headers.map(_ikNormQ);
+          const _ikCQ = (n) => _ikHsQ.indexOf(_ikNormQ(n));
+          ikkatsuMarkerCols = new Set([
+            _ikCQ("席種エリアコード"), _ikCQ("席種エリア管理名"), _ikCQ("座席指定不可フラグ"),
+            _ikCQ("リセール可否"), _ikCQ("リセール用販売価格下限"), _ikCQ("単体販売不可"),
+            _ikCQ("購入限定区分"), _ikCQ("SEJ支払"), _ikCQ("SEJ発券"),
+          ].filter(idx => idx !== -1));
+        }
+        const GHOST_BUFFER_KANA = 80;   // 「✗ 全角カナ」（カナ検査は列を問わず付与されうる）
+        const GHOST_BUFFER_BOX = 220;   // 「✗ 6桁目E・BOXフラグ1・席数2以上が必要」想定
+        const GHOST_BUFFER_IKKATSU = 180; // 一括設定検査の各マーカー想定
+
         for (let c = 0; c < state.headers.length; c++) {
           const displayH = getDisplayHeader(c);
           // 縦ヘッダー時はヘッダー文字幅を列幅に含めない（列幅節約）
@@ -3827,7 +3888,10 @@
               if (w > maxW) maxW = w;
             }
           }
-          state.colWidths[c] = Math.max(40, Math.min(maxW, 400));
+          if (state.kanaCheck) maxW += GHOST_BUFFER_KANA;
+          if (c === boxNmIdxQuiet) maxW += GHOST_BUFFER_BOX;
+          if (ikkatsuMarkerCols && ikkatsuMarkerCols.has(c)) maxW += GHOST_BUFFER_IKKATSU;
+          state.colWidths[c] = Math.max(40, Math.min(maxW, 600));
         }
       }
 
@@ -3869,7 +3933,7 @@
         btn.setAttribute("aria-pressed", String(isFirstRow));
         setRbTip(btn, isFirstRow
           ? "ヘッダー: 1行目を使用中\nクリックすると連番（1,2,3...）に切り替わります"
-          : "ヘッダー: 連番を使用中\nクリックするとファイルの1行目をヘッダーとして使用します\n※連番モードでは日本語化・HTML出力が使えません");
+          : "ヘッダー: 連番を使用中\nクリックするとファイルの1行目をヘッダーとして使用します\n※連番モードでは日本語変換・HTML出力が使えません");
       }
 
       function toggleHeaderMode() {
@@ -4696,6 +4760,7 @@
         // 検品表示: 対象列インデックスをキャッシュ
         const _hIdx = (name) => state.headers.findIndex(h => h.trim() === name);
         const colorColIdx = state.colorView ? _hIdx("disp_color_cd") : -1;
+        const nteColIdx = state.bikoHtmlCheck ? _hIdx("nte") : -1;
         const gateColIdx = state.gateView ? _hIdx("gate_stage_typ1") : -1;
         const gateMap = gateColIdx !== -1 ? getGateMap() : null;
         const parkCodeIdx = state.parkingCheck ? _hIdx("seat_type_area_cd") : -1;
@@ -4827,6 +4892,11 @@
             const isSelected =
               cls.includes("selected") || cls.includes("in-range");
             let displayVal = escHtml(cellVal);
+            // 備考HTML検査: nte列はサニタイズ済みの許可タグ(br/a/font/b/i/u/s/strong/em)のみ
+            // 実HTMLとして描画し、それ以外は escHtml 済みのまま表示する（renderHtmlValue と同じ安全策）
+            if (j === nteColIdx && cellVal) {
+              displayVal = renderHtmlValue(cellVal, { isHtml: true });
+            }
             // SEJ連携: 席種エリアコード列・購入限定席種列に席種名を併記
             // 主コード列は青の対訳、購入限定席種列はゴースト（淡いグレー斜体）で
             // 「補助参照」だと一目で分かるようにする。未登録は両者とも赤で警告。
@@ -5634,7 +5704,7 @@
           + '<button type="button" id="dict-add-btn" style="padding:4px 14px;font-size:12px;border:1px solid #16a34a;color:#16a34a;background:#fff;border-radius:3px;cursor:pointer">＋ 行を追加</button>'
           + '</div>';
         html += '<div id="dict-table-wrap" style="max-height:62vh;overflow:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;">';
-        html += '<tr style="background:#f0f0f0;position:sticky;top:0;"><th style="padding:4px;border:1px solid #ccc;width:30%">元ヘッダー</th><th style="padding:4px;border:1px solid #ccc;width:30%">表示名（日本語化で使用）</th><th style="padding:4px;border:1px solid #ccc;width:40%">ヘッダーメモ</th></tr>';
+        html += '<tr style="background:#f0f0f0;position:sticky;top:0;"><th style="padding:4px;border:1px solid #ccc;width:30%">元ヘッダー</th><th style="padding:4px;border:1px solid #ccc;width:30%">表示名（日本語変換で使用）</th><th style="padding:4px;border:1px solid #ccc;width:40%">ヘッダーメモ</th></tr>';
         entries.forEach(e => { html += rowHtml(e); });
         html += '</table></div>';
         html += '<div style="margin-top:8px;text-align:right;"><button type="button" id="dict-reset-btn" style="margin-right:auto;padding:4px 12px;font-size:12px;cursor:pointer;color:#d33;">リセット</button><button type="button" id="dict-cancel-btn" style="padding:4px 12px;margin-right:6px;font-size:12px;cursor:pointer;">キャンセル</button><button type="button" id="dict-save-btn" style="padding:4px 12px;font-size:12px;background:var(--accent);color:#fff;border:none;border-radius:3px;cursor:pointer;">保存</button></div>';
@@ -10017,10 +10087,11 @@ ${findings.length
         // 席種一括設定（23列）の場合は検品リボンのインラインチェックを有効化
         if (isIkkatsuData()) {
           if (!state.ikkatsuCheck) {
-            toggleInspect("ikkatsuCheck", "btn-ikkatsu-check", "席種一括設定チェック");
             if (!state.sejMaster) {
-              setStatus("席種一括設定チェック: ONにしました（マスタ未連携のため席種名/指定席整合チェックをスキップ中）");
+              alert("一括設定検査には席種エリアマスタの連携が必要です。\n\n「席種エリアマスタ連携」から席種エリアマスタ(TSV)を連携してから有効化してください。");
+              return;
             }
+            toggleInspect("ikkatsuCheck", "btn-ikkatsu-check", "席種一括設定チェック", true);
           } else {
             setStatus("席種一括設定チェックはすでにONです。検品リボンの「一括設定検査」ボタンでON/OFFを切り替えられます");
           }
