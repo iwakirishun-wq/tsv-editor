@@ -2387,16 +2387,16 @@
           btn.classList.toggle("active-state", state[stateKey]);
           btn.setAttribute("aria-pressed", String(state[stateKey]));
         }
-        state.forceRender = true;
-        renderBody();
         let msg = `${label}: ${state[stateKey] ? "ON" : "OFF"}`;
         if (autoFit && state[stateKey]) {
+          // autoFitAllColumnsQuiet はデータから列幅を測るので renderBody より前で実行でき、
+          // これにより renderBody の二度描きを避けられる（大きなTSVでの描画コスト削減）。
           autoFitAllColumnsQuiet();
           renderHeader();
-          state.forceRender = true;
-          renderBody();
           msg += "（列幅を自動調整しました）";
         }
+        state.forceRender = true;
+        renderBody();
         setStatus(msg);
       }
 
@@ -4944,13 +4944,16 @@
                      const cLinesHtml = cellVal.split(/(<br\s*\/?>|\n)/i);
                      let newHtml = "";
                      for (let cl of cLinesHtml) {
-                       if (cl.toLowerCase().startsWith("<br") || cl === "\n") { newHtml += cl; continue; }
+                       if (/^<br\s*\/?>$/i.test(cl) || cl === "\n") { newHtml += cl; continue; }
                        const clText = cl.replace(/<[^>]*>/g,'').trim();
-                       if (!clText) { newHtml += cl; continue; }
+                       if (!clText) { newHtml += escHtml(cl); continue; }
+                       // 生HTMLを直接挿入すると XSS/レイアウト破壊の恐れがあるため、
+                       // 許可タグのみのサニタイズ済みHTML（renderHtmlValue）に通してから埋め込む。
+                       const safeCl = renderHtmlValue(cl, { isHtml: true });
                        if (mLines.includes(clText)) {
-                         newHtml += cl;
+                         newHtml += safeCl;
                        } else {
-                         newHtml += `<span style="color:#dc2626;font-weight:bold;" title="差分あり">${cl}</span>`;
+                         newHtml += `<span style="color:#dc2626;font-weight:bold;" title="差分あり">${safeCl}</span>`;
                        }
                      }
                      displayVal = newHtml;
