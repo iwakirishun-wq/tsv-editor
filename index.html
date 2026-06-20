@@ -269,6 +269,18 @@
         margin-bottom: 0;
         flex-shrink: 0;
       }
+      .rb-input-btn-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .rb-input-btn-label {
+        font-size: 10px;
+        color: var(--rb-dim);
+        text-align: center;
+        margin-top: 2px;
+        line-height: 1.2;
+      }
       #dirty-indicator {
         display: none;
         width: 6px;
@@ -559,34 +571,6 @@
       }
 
 
-      /* ===フィルター行=== */
-      #filter-row th {
-        background: var(--surface);
-        border-bottom: 1px solid var(--border);
-        padding: 2px 3px;
-        height: 22px;
-        font-weight: normal;
-        cursor: default;
-      }
-      .filter-input {
-        width: 100%;
-        height: 17px;
-        border: 1px solid var(--border);
-        border-radius: 1px;
-        padding: 0 4px;
-        font-size: 11px;
-        font-family: var(--font-ui);
-        background: #fff;
-        color: var(--text);
-        outline: none;
-      }
-      .filter-input:focus {
-        border-color: var(--accent);
-      }
-      .filter-input.active {
-        background: var(--accent-light);
-        color: var(--accent);
-      }
 
       /* ===ボディ=== */
       tbody tr {
@@ -1369,7 +1353,7 @@
       th.col-active .th-col-letter { color: #1b6ec2; opacity: 1; font-weight: 700; }
 
       /* ===縦書きヘッダー（列幅節約）=== */
-      body.vertical-headers thead tr:first-child th { height: 120px; vertical-align: bottom; }
+      body.vertical-headers thead tr:first-child th { height: var(--vheader-h, 120px); vertical-align: bottom; }
       body.vertical-headers thead tr:first-child .th-inner {
         flex-direction: column-reverse;
         align-items: center;
@@ -1380,7 +1364,7 @@
       body.vertical-headers thead tr:first-child .th-label {
         writing-mode: vertical-rl;
         text-orientation: mixed;
-        max-height: 92px;
+        max-height: calc(var(--vheader-h, 120px) - 28px);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -1547,82 +1531,6 @@
         background: #fff1f1;
       }
 
-      /* ===最近開いたファイルメニュー=== */
-      #recent-menu {
-        display: none;
-        position: absolute;
-        top: 38px;
-        left: 0;
-        background: var(--surface);
-        border: 1px solid var(--border);
-        z-index: 2000;
-        min-width: 260px;
-        max-width: 420px;
-        padding: 2px 0;
-        overflow: hidden;
-        font-family: var(--font-ui);
-      }
-      #recent-menu.show {
-        display: block;
-      }
-      .recent-header {
-        font-size: 11px;
-        font-weight: 700;
-        color: var(--text-dim);
-        padding: 6px 12px 4px;
-        letter-spacing: 0.05em;
-        text-transform: uppercase;
-      }
-      .recent-item {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 6px 12px;
-        cursor: pointer;
-        font-size: 12px;
-        color: var(--text);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-      .recent-item:hover {
-        background: var(--accent-light);
-      }
-      .recent-item .recent-name {
-        flex: 1;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-      .recent-item .recent-path {
-        font-size: 11px;
-        color: var(--text-dim);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        max-width: 180px;
-      }
-      .recent-empty {
-        padding: 10px 12px;
-        font-size: 12px;
-        color: var(--text-dim);
-        text-align: center;
-      }
-      .recent-clear {
-        display: block;
-        width: 100%;
-        padding: 5px 12px;
-        font-size: 11px;
-        color: var(--text-dim);
-        background: none;
-        border: none;
-        border-top: 1px solid var(--border);
-        cursor: pointer;
-        text-align: left;
-        margin-top: 2px;
-      }
-      .recent-clear:hover {
-        color: #ef4444;
-      }
-
       /* ===セル折り返し=== */
       body.wrap-cells tbody td {
         white-space: pre-wrap;
@@ -1697,10 +1605,6 @@
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline><path d="M9 12h6M9 16h6"></path></svg></span>
               <span>開く</span>
             </button>
-            <button class="rb-btn" id="btn-open-recent" title="最近開いたファイルの一覧を表示&#10;クリックで再度開けます" aria-label="最近開いたファイル" aria-haspopup="menu" aria-expanded="false" aria-controls="recent-menu">
-              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></span>
-              <span>最近</span>
-            </button>
             <button class="rb-btn" id="btn-save" title="現在のデータをファイルとして保存&#10;ショートカット: Ctrl+S" aria-label="ファイルを保存">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg></span>
               <span>保存 <span id="dirty-indicator" role="status" aria-label="未保存の変更があります"></span></span>
@@ -1716,7 +1620,6 @@
           </div>
           <span class="rb-group-label">ファイル</span>
         </div>
-        <div id="recent-menu" role="menu" aria-label="最近開いたファイル"></div>
       </div>
 
       <!-- Content Pane: ホーム (default active) -->
@@ -1738,9 +1641,12 @@
         <!-- Group: 検索 -->
         <div class="rb-group">
           <div class="rb-buttons">
-            <div class="rb-input-btn">
-              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg></span>
-              <input id="search-input" type="text" placeholder="検索..." title="テキスト検索 (Ctrl+F)" aria-label="セルを検索" aria-controls="search-count" aria-describedby="search-count">
+            <div class="rb-input-btn-wrap">
+              <div class="rb-input-btn">
+                <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg></span>
+                <input id="search-input" type="text" placeholder="検索..." title="テキスト検索 (Ctrl+F)" aria-label="セルを検索" aria-controls="search-count" aria-describedby="search-count">
+              </div>
+              <span class="rb-input-btn-label">検索</span>
             </div>
             <button class="rb-btn" id="btn-prev" title="前の検索結果" aria-label="前の検索結果へ">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="15 18 9 12 15 6"></polyline></svg></span>
@@ -1754,9 +1660,12 @@
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="3"></circle><path d="M7 10v4M17 3h-4m4 0l-4 4m4-4l4 4"></path><circle cx="17" cy="17" r="3"></circle></svg></span>
               <span>置換</span>
             </button>
-            <div class="rb-input-btn">
-              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="12 3 12 21"></polyline><polyline points="3 12 12 3 21 12"></polyline></svg></span>
-              <input id="goto-input" type="number" placeholder="行#" title="行番号ジャンプ (Ctrl+G)" aria-label="行番号ジャンプ">
+            <div class="rb-input-btn-wrap">
+              <div class="rb-input-btn">
+                <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="12 3 12 21"></polyline><polyline points="3 12 12 3 21 12"></polyline></svg></span>
+                <input id="goto-input" type="number" placeholder="行#" title="行番号ジャンプ (Ctrl+G)" aria-label="行番号ジャンプ">
+              </div>
+              <span class="rb-input-btn-label">行移動</span>
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;">
@@ -1771,10 +1680,6 @@
         <!-- Group: 絞り込み -->
         <div class="rb-group">
           <div class="rb-buttons">
-            <button class="rb-btn" id="btn-filter-toggle" title="各列のフィルター入力行を表示/非表示&#10;テキスト入力で行を絞り込めます" aria-label="フィルター行を表示" aria-pressed="false">
-              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg></span>
-              <span>フィルター</span>
-            </button>
             <button class="rb-btn" id="btn-filter-clear" style="display:none" title="現在設定されているフィルターをすべて解除&#10;非表示の行も再表示されます" aria-label="フィルターをクリア">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 6L6 18M6 6l12 12"></path></svg></span>
               <span>解除</span>
@@ -1803,6 +1708,28 @@
             </label>
           </div>
           <span class="rb-group-label">検品</span>
+        </div>
+        <!-- Group: データ整理 -->
+        <div class="rb-group">
+          <div class="rb-buttons">
+            <button class="rb-btn" id="btn-delete-empty-rows" title="全列が空欄になっている行をまとめて削除します&#10;Ctrl+Zで元に戻せます" aria-label="空行を一括削除">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="1"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line><line x1="7" y1="11.5" x2="11" y2="11.5"></line></svg></span>
+              <span>空行削除</span>
+            </button>
+            <button class="rb-btn" id="btn-trim-cells" title="すべてのセルとヘッダーの前後にある余分な空白文字を取り除きます&#10;Ctrl+Zで元に戻せます" aria-label="前後空白をトリム">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 4v16M17 4v16"></path><path d="M10 9h4M10 15h4"></path></svg></span>
+              <span>空白トリム</span>
+            </button>
+            <button class="rb-btn" id="btn-conditional-hl" title="空欄セルをグレー、数値セルを正の値と負の値で色分け表示します（切り替え）&#10;データの傾向や異常値をひと目で確認できます" aria-label="条件付きハイライトの切り替え" aria-pressed="false">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"></rect><rect x="6" y="6" width="5" height="5" fill="currentColor" opacity="0.3"></rect><rect x="13" y="13" width="5" height="5" fill="currentColor" opacity="0.6"></rect></svg></span>
+              <span>条件付き表示</span>
+            </button>
+            <button class="rb-btn" id="btn-delete-duplicates" title="全列の値が完全に一致する重複行をまとめて削除します（先に出現した行を残します）&#10;Ctrl+Zで元に戻せます" aria-label="重複行を削除">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="6" width="12" height="14" rx="1"></rect><path d="M8 6V4a1 1 0 0 1 1-1h11a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-2"></path><line x1="6" y1="11" x2="12" y2="11"></line><line x1="6" y1="15" x2="12" y2="15"></line></svg></span>
+              <span>重複削除</span>
+            </button>
+          </div>
+          <span class="rb-group-label">データ整理</span>
         </div>
       </div>
 
@@ -1859,11 +1786,7 @@
         <!-- Group: 変換 -->
         <div class="rb-group">
           <div class="rb-buttons">
-            <button class="rb-btn" id="btn-apply-dict" title="辞書を使ってヘッダーを日本語に変換&#10;Shift+クリックでも辞書編集画面を開けます" aria-label="辞書を適用してヘッダーを変換">
-              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 7V4h16v3"></path><path d="M9 20h6"></path><path d="M12 4v16"></path></svg></span>
-              <span>日本語変換</span>
-            </button>
-            <button class="rb-btn" id="btn-dict-edit" title="辞書とヘッダーメモを編集&#10;新しい列名の追加もここから（ブラウザに保存されます）" aria-label="辞書・ヘッダーメモを編集">
+            <button class="rb-btn" id="btn-dict-edit" title="辞書とヘッダーメモを編集&#10;新しい列名の追加もここから（ブラウザに保存されます）&#10;保存すると現在のヘッダーへ自動で反映されます" aria-label="辞書・ヘッダーメモを編集">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path><path d="M9 7h6M9 11h4"></path></svg></span>
               <span>辞書編集</span>
             </button>
@@ -1902,6 +1825,10 @@
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="1"></rect><line x1="3" y1="13" x2="21" y2="13"></line><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line><path d="M6 5v6M12 5v6M18 5v6" stroke-width="2"></path></svg></span>
               <span>縦ヘッダー</span>
             </button>
+            <label class="rb-btn" id="vheader-height-wrap" title="縦書きヘッダーの行高さをpxで調整&#10;ヘッダー文字が見切れる場合はここで広げてください" style="cursor:pointer">
+              <input type="number" id="vheader-height" min="60" max="300" step="10" value="120" aria-label="縦書きヘッダーの高さ(px)" style="width:48px;border:1px solid var(--border,#ccc);border-radius:4px;padding:1px 2px;font-size:11px;text-align:center;background:var(--bg-elev,#fff);color:inherit;">
+              <span>行高(px)</span>
+            </label>
             <button class="rb-btn" id="btn-header-mode" title="ヘッダーモードを切り替え&#10;「1行目」: ファイルの1行目をヘッダーとして使用&#10;「連番」: 1, 2, 3...の連番ヘッダー" aria-label="ヘッダーモード切り替え" aria-pressed="true">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18"></rect><rect x="3" y="3" width="18" height="6" fill="currentColor" opacity="0.15"></rect><line x1="3" y1="9" x2="21" y2="9"></line></svg></span>
               <span>ヘッダー</span>
@@ -2145,7 +2072,7 @@
 
         <h2>📁 ファイルタブ</h2>
         <div class="man-btn-section">
-          <div class="man-btn-row"><span class="man-btn-label">開く / 最近</span><span class="man-btn-desc">TSV・CSV・TXTを開く。画面へのドラッグ&amp;ドロップでも可。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">開く</span><span class="man-btn-desc">TSV・CSV・TXTを開く。画面へのドラッグ&amp;ドロップでも可。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">保存</span><span class="man-btn-desc">上書き保存（Ctrl+S）。タブの赤い●は未保存の印。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">絞込保存</span><span class="man-btn-desc">フィルターで絞り込んだ行だけを別ファイルに保存。</span></div>
         </div>
@@ -2159,15 +2086,18 @@
 
         <h2>📊 データタブ</h2>
         <div class="man-btn-section">
-          <div class="man-btn-row"><span class="man-btn-label">フィルター</span><span class="man-btn-desc">各列に絞り込み欄を表示。テキスト・値選択・数値範囲で絞り込み。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">列フィルター（▼）</span><span class="man-btn-desc">各列ヘッダーの▼ボタンから絞り込み。テキスト部分一致・値の選択・数値範囲のいずれでも絞り込み可能。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">マーカー</span><span class="man-btn-desc">ONにしてセルをダブルクリックすると目印を付け外し（検品チェック用）。<b>範囲選択してからマーカーボタン（または Ctrl+Q）で一括付け外し</b>。F4で直前のマーカー操作を選択範囲に繰り返し。Ctrl+Zで取り消し可能。「マーカー色」で色を変更、「消去」は確認のうえ全消去。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">空行削除</span><span class="man-btn-desc">全列が空欄になっている行をまとめて削除（Ctrl+Zで取り消し可能）。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">空白トリム</span><span class="man-btn-desc">すべてのセル・ヘッダーの前後の余分な空白を削除（Ctrl+Zで取り消し可能）。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">条件付き表示</span><span class="man-btn-desc">空欄セルをグレー、数値セルを正負で色分け表示（切替）。データの傾向や異常値の確認用。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">重複削除</span><span class="man-btn-desc">全列の値が完全一致する重複行をまとめて削除（先に出現した行を残す。Ctrl+Zで取り消し可能）。</span></div>
         </div>
 
         <h2>🎫 チケットタブ</h2>
         <div class="man-btn-section">
           <div class="man-btn-row"><span class="man-btn-label">席種エリアマスタ連携</span><span class="man-btn-desc">席種エリアマスタTSVを連携。<b>SEJ設定・価格経路スケジュールのチェック/HTML出力に必須</b>（指定席/エリア/その他の判定・表示略称に使用）。席種コード列に席種名を併記し「グループ名」列を仮想追加、SEJデータには備考差分も表示。</span></div>
-          <div class="man-btn-row"><span class="man-btn-label">日本語変換</span><span class="man-btn-desc">英語の列名を日本語に変換。保存時は元の英語に戻ります。</span></div>
-          <div class="man-btn-row"><span class="man-btn-label">辞書編集</span><span class="man-btn-desc">日本語変換の辞書とヘッダーメモを編集。今開いているファイルの列が一覧の先頭に出ます。新しい列名の追加も可能。ブラウザに保存されるため、オフラインHTML運用でもそのまま使えます。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">辞書編集</span><span class="man-btn-desc">列名の日本語変換に使う辞書とヘッダーメモを編集。ヘッダーは開いた時点で辞書により自動的に日本語表示になり、保存時は元の英語に戻ります（手動での切替操作は不要）。今開いているファイルの列が一覧の先頭に出ます。新しい列名の追加も可能。ブラウザに保存されるため、オフラインHTML運用でもそのまま使えます。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">HTML出力</span><span class="man-btn-desc">確認用HTMLを新しいタブに出力。開いているファイルに応じて自動切替: 席種エリアマスタ→検証付き一覧 / SEJデータ→マスタ照合カード / <b>経路価格スケジュール→価格マトリクス</b>（通常価格表とUG差額マトリクスを販売条件ごとに表示。セルにマウスで販売期間）/ <b>席種一括設定→チェックレポート</b>（席種名差分・指定席整合・購入上限数9(初期値)の整合・リセール下限1321・購入限定席種のP混在×複数購入可、を一覧。席種エリアマスタ連携が必須。購入限定席種コードはグリッド上に席種名をゴースト併記）。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">価格チェック表</span><span class="man-btn-desc">経路価格スケジュール（BO-F-21030）を開いた状態で押すと、販売期間・席種・年齢区分・金額・UG元/差額を一覧化した参照シートを別タブに生成。会員ランクや販売区分はフィルターで絞り込み。元データはそのまま残ります。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">カラー表示</span><span class="man-btn-desc">表示カラーコード列の色をセル背景でプレビュー（切替）。</span></div>
@@ -2175,12 +2105,13 @@
           <div class="man-btn-row"><span class="man-btn-label">駐車券検査</span><span class="man-btn-desc">エリアコード6桁目P ⇔ 駐車券フラグ1 を検査。✓OK / ✗NG どちらも表示（切替）。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">カナ検査</span><span class="man-btn-desc">全角カタカナが残っているセルをオレンジ表示。システム取込は半角ｶﾅ必須のため（切替）。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">区画席検査</span><span class="man-btn-desc">席種名に「（〇名）」がある行は、6桁目E・BOX席フラグ1・席数2以上が揃っているか検査。✓OK / ✗不足項目を表示（切替）。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">一括設定検査</span><span class="man-btn-desc">席種一括設定TSV(23列)の設定整合をインライン表示（切替）。マスタ未登録・席種名不一致・指定席整合・リセール下限1321（券面価格固定の場合は対象外）・購入限定P混在×複数購入可・<b>他席から購入限定席種として指定されているのに単体販売可になっている場合はNG</b>を検査。複数日入場の開始日・終了日には曜日も併記。席種エリアマスタ連携が必要。</span></div>
         </div>
 
         <h2>👁 表示タブ</h2>
         <div class="man-btn-section">
           <div class="man-btn-row"><span class="man-btn-label">行高さ / 折り返し / 列自動</span><span class="man-btn-desc">行の高さ切替、セル内折り返し、全列幅の自動調整。</span></div>
-          <div class="man-btn-row"><span class="man-btn-label">縦ヘッダー</span><span class="man-btn-desc">列名を縦書きにして列幅を節約。コード系の細い列が多いときに（切替）。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">縦ヘッダー</span><span class="man-btn-desc">列名を縦書きにして列幅を節約。コード系の細い列が多いときに（切替）。隣の「行高(px)」でヘッダー行の高さを手動調整できます（文字が見切れる場合に広げてください）。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">ヘッダー</span><span class="man-btn-desc">「1行目」モード（通常）と「連番」モードの切替。連番中は日本語変換・HTML出力・検品が使えません。</span></div>
         </div>
 
@@ -2260,7 +2191,6 @@
           <div class="man-row"><span>列の挿入・削除</span><span class="man-key">左/右に挿入、削除（複数列一括も可）</span></div>
           <div class="man-row"><span>行・列の非表示</span><span class="man-key">再表示も同メニューから</span></div>
           <div class="man-row"><span>列のフリーズ</span><span class="man-key">指定列まで固定表示（横スクロール時に固定）</span></div>
-          <div class="man-row"><span>条件付きハイライト</span><span class="man-key">空セル・正数・負数を色分け表示</span></div>
         </div>
 
         <h2>シートタブ</h2>
@@ -2300,7 +2230,6 @@
         // フィルター
         columnFilters: {}, // { colIdx: {type:'text',query} | {type:'values',values:Set} }
         filteredIndices: null, // null=全件, [idx...]=表示対象
-        filterVisible: false,
 
         // 行コピー / 内部クリップボード
         copiedRows: [],
@@ -2330,6 +2259,8 @@
         ikkatsuCheck: false, // 席種一括設定チェック（23列）のインライン検品
         bikoHtmlCheck: false, // 備考(nte)列のHTMLを表上で実際のHTML表示として再現（席種エリアマスタのみ）
         verticalHeader: true, // ヘッダー縦書き表示（既定でON・列幅節約）
+        vHeaderHeight: 120, // 縦書きヘッダーの行高さ(px・手動調整可能)
+        originalRowCount: 0, // ファイルを開いた直後の行数（保存時の予期せぬ増減チェック用）
         crossHi: true,        // 選択セルの行・列を十字ハイライト（localStorage保存）
         markerColor: "#facc15", // マーカー色（localStorageに保存）
         _lastAction: null,   // F4 繰り返し用 { type, payload }
@@ -2449,6 +2380,15 @@
           .filter(x => x);
       }
 
+      // "YYYY/MM/DD"等の日付文字列から日本語の曜日（1文字）を返す。解釈できない場合は空文字
+      function weekdayJa(dateStr) {
+        const m = String(dateStr ?? "").trim().match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+        if (!m) return "";
+        const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+        if (isNaN(d.getTime())) return "";
+        return "日月火水木金土"[d.getDay()];
+      }
+
       // マスタ値の差分箇所を赤太字で強調したHTMLを返す（共通の前後を除いた中央部を強調）
       function diffEmphasis(current, master) {
         const cur = String(current || ""), mas = String(master || "");
@@ -2463,6 +2403,21 @@
         return pre + (mid
           ? `<b style="color:#dc2626;background:#fde3e3;border-radius:2px;padding:0 1px">${mid}</b>`
           : `<b style="color:#dc2626">［この位置に余分な文字］</b>`) + suf;
+      }
+
+      // 席種一括設定チェック: 購入限定席種として「他席から指定されているコード」集合のキャッシュ
+      let _ikLimCache = { key: null, set: null };
+      function getIkLimSeatCodes(ikkatsuCols) {
+        const key = state.data.length + "|" + _dataVersion + "|" + ikkatsuCols.lim1 + "," + ikkatsuCols.lim2 + "," + ikkatsuCols.lim3;
+        if (_ikLimCache.key === key) return _ikLimCache.set;
+        const set = new Set();
+        const g = (row, idx) => (idx < 0 ? "" : String(row[idx] ?? "").trim());
+        for (const r of state.data) {
+          if (!r) continue;
+          [g(r, ikkatsuCols.lim1), g(r, ikkatsuCols.lim2), g(r, ikkatsuCols.lim3)].forEach((cd) => { if (cd) set.add(cd); });
+        }
+        _ikLimCache = { key, set };
+        return set;
       }
 
       // SEJゴースト行リスト（キャッシュ付き）
@@ -2505,11 +2460,14 @@
       }
 
       // ===== UG差額の自動検算 =====
-      // 検算ルール（2026-06-13 ナレッジ突合で確定）:
+      // 検算ルール（2026-06-13 ナレッジ突合で確定、2026-06-21 車椅子・大人料金ダウングレード規定を追加）:
       //  可否（これに反したら invalid）:
       //   ・一般販売（販売区分に「会員」を含まない）のUG行は不可
       //   ・年齢降格（先の年齢ランク < 元の年齢ランク）は不可
       //   ・自由席/エリアの同席種・同券種UGは不可
+      //   ・車椅子は他席種との相互UG不可。車椅子内では「同年齢・指定席内の席変更」または「大人へのランクアップ」のみ可
+      //   ・大人料金が先<元（実質ダウングレード）のUGは不可。ただし大人以外の年齢区分は、
+      //     その年齢自身の差額が500円以内（先が安い側）なら0円として許可する例外がある
       //  期待差額（前売・当日それぞれ・同年齢どうしで算出）:
       //   ・同席種UG（指定席）→ 一律500円
       //   ・異席種UG → diff = 先価格 − 元価格 で、 diff<=0→0円 / 1〜500→500円 / 500超→実差額
@@ -2519,7 +2477,16 @@
       function buildUgValidator(rows, c, v, seatMeta) {
         const num = (s) => { const n = Number(String(s).replace(/,/g, "")); return isNaN(n) ? null : n; };
         const condKey = (row) => [v(row, c.kbn), v(row, c.rank), v(row, c.route)].join("|");
+        const ageRank = (a) => {
+          a = String(a);
+          if (/幼児|未就学|INFANT/i.test(a)) return 1;
+          if (/子供|こども|子ども|小中|小・中|小学|CHILD/i.test(a)) return 2;
+          if (/U23|ｱﾝﾀﾞｰ|アンダー/i.test(a)) return 3;
+          if (/大人|ADULT|高校/i.test(a)) return 4;
+          return 0; // 共通・不明はランク判定しない
+        };
         const byCond = new Map(), any = new Map();
+        const adultByCond = new Map(), adultAny = new Map(); // 席ごとの大人料金（ランク4）を引くための索引
         for (const row of rows) {
           const flag = v(row, c.ugFlag);
           if (flag === "該当" || flag === "1") continue;
@@ -2528,6 +2495,10 @@
           const rec = { adv: num(v(row, c.adv)), day: num(v(row, c.day)) };
           byCond.set(condKey(row) + "|" + seat + "|" + age, rec);
           if (!any.has(seat + "|" + age)) any.set(seat + "|" + age, rec);
+          if (ageRank(age) === 4) {
+            adultByCond.set(condKey(row) + "|" + seat, rec);
+            if (!adultAny.has(seat)) adultAny.set(seat, rec);
+          }
         }
         // 席種カテゴリ: 指定席 / エリア / その他 / 駐車券
         //  判定はマスタ・コードを正とする（席種名での決め打ちはしない）:
@@ -2542,16 +2513,12 @@
           if (/駐車/.test(seat)) return "駐車券";
           return /自由席|エリア/.test(seat) ? "エリア" : "指定席";
         };
-        const ageRank = (a) => {
-          a = String(a);
-          if (/幼児|未就学|INFANT/i.test(a)) return 1;
-          if (/子供|こども|子ども|小中|小・中|小学|CHILD/i.test(a)) return 2;
-          if (/U23|ｱﾝﾀﾞｰ|アンダー/i.test(a)) return 3;
-          if (/大人|ADULT|高校/i.test(a)) return 4;
-          return 0; // 共通・不明はランク判定しない
-        };
+        const isWheelchair = (seat) => /車椅子|車いす/.test(seat || "");
+        // 800,000以上、または全桁が9（99999等）はダミー値（売止め・その販売区分での取扱なし）として価格扱いしない
+        const isDummyPrice = (n) => n != null && (n >= UG_DUMMY_MIN || /^9+$/.test(String(n)));
         const chargeFor = (diff) => diff <= 0 ? 0 : (diff <= 500 ? 500 : diff); // 0以下→0 / 1〜500→500 / 超→実差額
         const lookup = (ck, seat, age) => byCond.get(ck + "|" + seat + "|" + age) || any.get(seat + "|" + age) || null;
+        const lookupAdult = (ck, seat) => adultByCond.get(ck + "|" + seat) || adultAny.get(seat) || null;
 
         return function validate(row) {
           const srcSeat = v(row, c.ugSeat), dstSeat = v(row, c.seat);
@@ -2574,6 +2541,39 @@
           // エリア席のみ「同席種・同券種UG不可」。その他(O・車椅子・パス等)/指定席は対象外
           const dstCat = seatCat(dstCode, dstSeat);
           if (sameSeat && dstCat === "エリア" && srcAge === dstAge) problems.push("エリア席の同席種同券種UGは設定不可");
+          // 車椅子: 購入後の他席種への/からのUGは不可。車椅子内では「同年齢・指定席内の席変更」または「大人へのランクアップ」のみ可
+          const srcWc = isWheelchair(srcSeat), dstWc = isWheelchair(dstSeat);
+          if (srcWc || dstWc) {
+            if (srcWc !== dstWc) {
+              problems.push("車椅子は他席種とのUG不可");
+            } else {
+              const sameAgeReserved = srcAge === dstAge && dstCat === "指定席";
+              const upgradeToAdult = srcAge !== dstAge && dr === 4 && dr > sr;
+              if (!sameAgeReserved && !upgradeToAdult) problems.push("車椅子は同年齢の席変更または大人へのUGのみ可");
+            }
+          }
+          // 大人料金が先<元（実質ダウングレード）のUGは不可。
+          // 大人以外の年齢区分は、その年齢自身の差額が500円以内（先が安い側）なら例外的に許可（fee=0）
+          if (!sameSeat && !srcWc && !dstWc) {
+            const ck0 = condKey(row);
+            const as = lookupAdult(ck0, srcSeat), ad = lookupAdult(ck0, dstSeat);
+            const adultDowngrade = ["adv", "day"].some((which) => {
+              const asp = as ? as[which] : null, adp = ad ? ad[which] : null;
+              return asp != null && adp != null && asp > adp;
+            });
+            if (adultDowngrade && sr !== 4) {
+              const s0 = lookup(ck0, srcSeat, srcAge), d0 = lookup(ck0, dstSeat, dstAge);
+              const exempt = ["adv", "day"].every((which) => {
+                const sp = s0 ? s0[which] : null, dp = d0 ? d0[which] : null;
+                if (sp == null || dp == null) return false;
+                const diff = dp - sp;
+                return diff < 0 && diff >= -500;
+              });
+              if (!exempt) problems.push("大人料金が先<元のためUG不可");
+            } else if (adultDowngrade) {
+              problems.push("大人料金が先<元のためUG不可");
+            }
+          }
           // マスタ連携時: マスタ未登録の席種を注記
           if (seatMeta) {
             const md = seatMeta(dstCode, dstSeat), ms = seatMeta(srcCode, srcSeat);
@@ -2589,7 +2589,7 @@
             const s = lookup(ck, srcSeat, srcAge), d = lookup(ck, dstSeat, dstAge);
             const sp = s ? s[which] : null, dp = d ? d[which] : null;
             if (sp == null || dp == null) return { exp: null, note: "価格不明", dummy: false };
-            if (sp >= UG_DUMMY_MIN || dp >= UG_DUMMY_MIN) return { exp: null, note: "売止め", dummy: true };
+            if (isDummyPrice(sp) || isDummyPrice(dp)) return { exp: null, note: "売止め/その販売区分の取扱なし", dummy: true };
             return { exp: chargeFor(dp - sp), note: "", dummy: false, srcPrice: sp, dstPrice: dp, rawDiff: dp - sp };
           };
           const adv = calc("adv"), day = calc("day");
@@ -2601,7 +2601,7 @@
           } else {
             const matchOne = (a, actual) => {
               if (a.note === "価格不明") return "unknown";
-              if (a.dummy) return (actual == null || actual >= UG_DUMMY_MIN) ? "ok" : "ng"; // 売止めなら差額もダミーのはず
+              if (a.dummy) return (actual == null || isDummyPrice(actual)) ? "ok" : "ng"; // 売止め/取扱なしなら差額もダミーのはず
               return actual === a.exp ? "ok" : "ng";
             };
             const advR = matchOne(adv, advActual);
@@ -2612,8 +2612,8 @@
           }
 
           // 前売/当日それぞれの不一致フラグ
-          const advNg = !problems.length && adv.note !== "価格不明" && (adv.dummy ? !(advActual == null || advActual >= UG_DUMMY_MIN) : advActual !== adv.exp);
-          const dayNg = !problems.length && day.note !== "価格不明" && (day.dummy ? !(dayActual == null || dayActual >= UG_DUMMY_MIN) : dayActual !== day.exp);
+          const advNg = !problems.length && adv.note !== "価格不明" && (adv.dummy ? !(advActual == null || isDummyPrice(advActual)) : advActual !== adv.exp);
+          const dayNg = !problems.length && day.note !== "価格不明" && (day.dummy ? !(dayActual == null || isDummyPrice(dayActual)) : dayActual !== day.exp);
           return {
             status, problems,
             expected: adv.exp, expectedDay: day.exp,
@@ -2733,7 +2733,6 @@
         search: $("search-input"),
         count: $("search-count"),
         dirty: $("dirty-indicator"),
-        filterToggle: $("btn-filter-toggle"),
         filterClear: $("btn-filter-clear"),
         filterExport: $("btn-export-filtered"),
         statusEncoding: $("status-encoding"),
@@ -2829,7 +2828,6 @@
             : { ...f };
         }
         t.columnFilters = savedCF;
-        t.filterVisible = state.filterVisible;
         t.hiddenRows = new Set(state.hiddenRows);
         t.hiddenCols = new Set(state.hiddenCols);
         t.freezeCols = state.freezeCols;
@@ -2845,6 +2843,7 @@
         t.newline = state.newline;
         t.newlineMixed = state.newlineMixed;
         t.markedCells = new Set(state.markedCells);
+        t.originalRowCount = state.originalRowCount;
       }
 
       function switchTab(idx) {
@@ -2893,7 +2892,6 @@
               : { ...f };
           }
           state.columnFilters = restoredCF;
-          state.filterVisible = t.filterVisible || false;
           state.hiddenRows = t.hiddenRows ? new Set(t.hiddenRows) : new Set();
           state.hiddenCols = t.hiddenCols ? new Set(t.hiddenCols) : new Set();
           state.freezeCols = t.freezeCols || 0;
@@ -2901,6 +2899,7 @@
           state.wrapRows = t.wrapRows ? new Set(t.wrapRows) : new Set();
           state.conditionalHL = t.conditionalHL || false;
           state.cellColors = t.cellColors ? { ...t.cellColors } : {};
+          state.originalRowCount = Number.isInteger(t.originalRowCount) ? t.originalRowCount : state.data.length;
           if (t.encoding) state.encoding = t.encoding;
           // filteredIndicesをレンダリングなしで再計算
           _visibleRowsCache = null;
@@ -2931,13 +2930,6 @@
             els.filterExport.style.display = '';
           }
           updateHiddenStatus();
-          // フィルタートグルボタン外観を復元
-          const fOn = state.filterVisible;
-          els.filterToggle.style.background = fOn ? '#eff6ff' : '';
-          els.filterToggle.style.borderColor = fOn ? 'var(--accent)' : '';
-          els.filterToggle.style.color = fOn ? 'var(--accent)' : '';
-          els.filterToggle.setAttribute('aria-pressed', String(fOn));
-          els.filterToggle.setAttribute('aria-label', fOn ? 'フィルター行を非表示' : 'フィルター行を表示');
           // 折り返しボタン外観を復元
           document.body.classList.toggle('wrap-cells', state.wrapCells);
           const bw = $('btn-wrap');
@@ -3161,7 +3153,6 @@
         $("btn-save").onclick = saveFile;
         $("btn-undo").onclick = undo;
         $("btn-redo").onclick = redo;
-        els.filterToggle.onclick = toggleFilter;
         els.filterClear.onclick = clearAllFilters;
         let _imeComposing = false;
         let _lastSearched = '';
@@ -3170,6 +3161,7 @@
         els.search.oninput = debounce(() => { if (!_imeComposing) execSearch(); }, 150);
         $("btn-next").onclick = () => moveSearch(1);
         $("btn-prev").onclick = () => moveSearch(-1);
+        $("btn-replace").onclick = openReplaceDialog;
         $("goto-input").onkeydown = (e) => {
           if (e.key === "Enter") {
             gotoRow($("goto-input").value);
@@ -3229,7 +3221,7 @@
               return;
             }
           }
-          toggleInspect("gateView", "btn-gate-view", "ゲート名表示");
+          toggleInspect("gateView", "btn-gate-view", "ゲート名表示", true);
         };
         $("btn-parking-check").onclick = () => {
           if (!state.parkingCheck) {
@@ -3239,7 +3231,7 @@
               return;
             }
           }
-          toggleInspect("parkingCheck", "btn-parking-check", "駐車券フラグ検査");
+          toggleInspect("parkingCheck", "btn-parking-check", "駐車券フラグ検査", true);
         };
         $("btn-kana-check").onclick = () => toggleInspect("kanaCheck", "btn-kana-check", "半角カナ検査", true);
         $("btn-box-check").onclick = () => toggleInspect("boxCheck", "btn-box-check", "区画席検査", true);
@@ -3284,6 +3276,19 @@
         $("btn-price-sheet").onclick = exportPriceMatrixHtml;
         // 縦書きヘッダー
         $("btn-vertical-header").onclick = toggleVerticalHeader;
+        // 縦書きヘッダーの行高さ（手動調整）
+        document.documentElement.style.setProperty("--vheader-h", state.vHeaderHeight + "px");
+        $("vheader-height").value = state.vHeaderHeight;
+        $("vheader-height").oninput = (e) => {
+          const v = Math.max(60, Math.min(300, parseInt(e.target.value, 10) || 120));
+          state.vHeaderHeight = v;
+          document.documentElement.style.setProperty("--vheader-h", v + "px");
+        };
+        // データ整理（空行削除・トリム・条件付きハイライト・重複削除）
+        $("btn-delete-empty-rows").onclick = deleteEmptyRows;
+        $("btn-trim-cells").onclick = trimAllCells;
+        $("btn-conditional-hl").onclick = toggleConditionalHL;
+        $("btn-delete-duplicates").onclick = deleteDuplicates;
         // マーカー色
         $("marker-color").oninput = (e) => setMarkerColor(e.target.value);
         loadMarkerColor();
@@ -3371,35 +3376,8 @@
         }
 
         // 辞書・変換ボタン（Shift+クリックで辞書編集）
-        $("btn-apply-dict").onclick = (e) => {
-          if (e.shiftKey) { openDictEditor(); return; }
-          if (state.headerMode === "numbered") {
-            alert("ヘッダーが連番モードのため日本語変換できません。\n\n「表示」タブの「ヘッダー」ボタンで 1行目モード に切り替えてください。");
-            return;
-          }
-          applyHeaderMapping();
-          renderHeader();
-          state.forceRender = true;
-          renderBody();
-          setStatus(state.headerMapped ? "ヘッダー変換を適用しました" : "一致するヘッダーが見つかりません");
-        };
-
         // 絞込保存ボタン
         els.filterExport.onclick = exportFiltered;
-
-        // 最近開いたファイル
-        $("btn-open-recent").onclick = (e) => {
-          e.stopPropagation();
-          if ($("recent-menu").classList.contains("show")) closeRecentMenu();
-          else openRecentMenu();
-        };
-        document.addEventListener("click", (e) => {
-          if (
-            !e.target.closest("#recent-menu") &&
-            !e.target.closest("#btn-open-recent")
-          )
-            closeRecentMenu();
-        });
 
         els.fileInput.onchange = (e) => {
           loadFile(e.target.files[0]);
@@ -3528,6 +3506,7 @@
           const text = e.target.result;
           state.delimiter = detectDelimiter(text, file.name);
           parseData(text);
+          state.originalRowCount = state.data.length; // 開いた直後の行数（保存時の予期せぬ増減チェック用）
           clearAutoDropColumns();
           applyHeaderMapping();
           // 前タブの表示状態が新ファイルに引き継がれないようリセット
@@ -3539,7 +3518,6 @@
           state.conditionalHL = false;
           state.columnFilters = {};
           state.filteredIndices = null;
-          state.filterVisible = false;
           state.freezeCols = 0;
           state.sortCol = -1;
           state.sortAsc = true;
@@ -3554,10 +3532,6 @@
           document.body.classList.remove('wrap-cells');
           const _bwLF = $('btn-wrap');
           if (_bwLF) { _bwLF.classList.remove('active-state'); _bwLF.setAttribute('aria-pressed', 'false'); }
-          els.filterToggle.style.background = '';
-          els.filterToggle.style.borderColor = '';
-          els.filterToggle.style.color = '';
-          els.filterToggle.setAttribute('aria-pressed', 'false');
           els.filterClear.style.display = 'none';
           els.filterExport.style.display = 'none';
           const tab = {
@@ -3573,6 +3547,7 @@
             encoding: state.encoding,
             dirty: false,
             _rawText: text, // 遅延復元用にrawTextを保持
+            originalRowCount: state.originalRowCount,
           };
           // 現在のタブが空白シート（+ボタンで作成・未編集）なら上書き、それ以外は新タブ
           const cur = state.tabs[state.activeTab];
@@ -3592,7 +3567,6 @@
           renderBody();
           showTable();
           markClean();
-          addRecentFile(state.fileName, "");
           setStatus(
             `ロード完了: ${state.data.length}行 × ${state.headers.length}列`,
           );
@@ -3896,6 +3870,20 @@
         const boxNmIdxQuiet = state.boxCheck
           ? (_hIdxQuiet("seat_type_area_disp_nm") !== -1 ? _hIdxQuiet("seat_type_area_disp_nm") : _hIdxQuiet("seat_type_area_control_nm"))
           : -1;
+        // ゲート名表示: 対応表中の最長名から必要幅を実測（名前の長さは現場ごとに異なるため固定値にしない）
+        const gateColIdxQuiet = state.gateView ? _hIdxQuiet("gate_stage_typ1") : -1;
+        let gateBufferQuiet = 0;
+        if (gateColIdxQuiet !== -1) {
+          const gmap = getGateMap();
+          const names = Object.values(gmap).concat(["対応表になし"]);
+          names.forEach((n) => {
+            const w = measureText("▸ " + n, "11px system-ui");
+            if (w > gateBufferQuiet) gateBufferQuiet = w;
+          });
+          gateBufferQuiet += 20;
+        }
+        const parkFlagIdxQuiet = state.parkingCheck ? _hIdxQuiet("parking_ticket_flg") : -1;
+        const GHOST_BUFFER_PARK = 150; // 「✗ 駐車券(P)は1必須」想定
         let ikkatsuMarkerCols = null;
         if (state.ikkatsuCheck && isIkkatsuData()) {
           const _ikNormQ = (s) => String(s ?? "").trim().replace(/（/g,"(").replace(/）/g,")").replace(/[０-９]/g,(d)=>"０１２３４５６７８９".indexOf(d));
@@ -3905,6 +3893,7 @@
             _ikCQ("席種エリアコード"), _ikCQ("席種エリア管理名"), _ikCQ("座席指定不可フラグ"),
             _ikCQ("リセール可否"), _ikCQ("リセール用販売価格下限"), _ikCQ("単体販売不可"),
             _ikCQ("購入限定区分"), _ikCQ("SEJ支払"), _ikCQ("SEJ発券"),
+            _ikCQ("複数日入場開始日"), _ikCQ("複数日入場終了日"),
           ].filter(idx => idx !== -1));
         }
         const GHOST_BUFFER_KANA = 80;   // 「✗ 全角カナ」（カナ検査は列を問わず付与されうる）
@@ -3926,6 +3915,8 @@
           if (state.kanaCheck) maxW += GHOST_BUFFER_KANA;
           if (c === boxNmIdxQuiet) maxW += GHOST_BUFFER_BOX;
           if (ikkatsuMarkerCols && ikkatsuMarkerCols.has(c)) maxW += GHOST_BUFFER_IKKATSU;
+          if (c === gateColIdxQuiet) maxW += gateBufferQuiet;
+          if (c === parkFlagIdxQuiet) maxW += GHOST_BUFFER_PARK;
           state.colWidths[c] = Math.max(40, Math.min(maxW, 600));
         }
       }
@@ -4059,6 +4050,15 @@
             }
           }
         }
+        // 開いた直後の行数と保存時の行数が異なる場合は事前に確認（予期せぬ行の増減チェック）
+        const savedRowsForCheck = state.filteredIndices ? state.filteredIndices.length : state.data.length;
+        if (state.originalRowCount > 0 && savedRowsForCheck !== state.originalRowCount) {
+          const diff = savedRowsForCheck - state.originalRowCount;
+          if (!confirm(`開いた時点では ${state.originalRowCount}行でしたが、保存時は ${savedRowsForCheck}行になります（${diff > 0 ? "+" : ""}${diff}行）。\n\n意図した変更でなければキャンセルして確認してください。続行しますか？`)) {
+            setStatus("保存をキャンセルしました");
+            return;
+          }
+        }
         const virtualNote = state.sejVirtualCols ? "（仮想列は除外）" : "";
         const bom = state.encoding === "utf8bom" ? "﻿" : "";
         const txt = bom + buildFileContent();
@@ -4071,7 +4071,9 @@
         setTimeout(() => URL.revokeObjectURL(objUrl), 1000);
         markClean();
         const savedRows = state.filteredIndices ? state.filteredIndices.length : state.data.length;
-        setStatus(`保存しました（${savedRows}行${virtualNote}）`);
+        const rowNote = savedRows !== state.originalRowCount ? `（元 ${state.originalRowCount}行→保存 ${savedRows}行）` : "";
+        state.originalRowCount = savedRows; // 保存後の行数を新たな基準にする
+        setStatus(`保存しました（${savedRows}行${virtualNote}）${rowNote}`);
       }
 
       async function saveFile() {
@@ -4148,21 +4150,6 @@
       }
 
       // ===== フィルター =====
-      function toggleFilter() {
-        state.filterVisible = !state.filterVisible;
-        const on = state.filterVisible;
-        els.filterToggle.style.background = on ? "#eff6ff" : "";
-        els.filterToggle.style.borderColor = on ? "var(--accent)" : "";
-        els.filterToggle.style.color = on ? "var(--accent)" : "";
-        els.filterToggle.setAttribute("aria-pressed", String(on));
-        els.filterToggle.setAttribute(
-          "aria-label",
-          on ? "フィルター行を非表示" : "フィルター行を表示",
-        );
-        renderHeader();
-        applyFilters();
-      }
-
       function applyFilters() {
         _visibleRowsCache = null;
         const filterKeys = Object.keys(state.columnFilters);
@@ -4223,10 +4210,6 @@
         state.filteredIndices = null;
         els.filterClear.style.display = "none";
         els.filterExport.style.display = "none";
-        els.thead.querySelectorAll(".filter-input").forEach((inp) => {
-          inp.value = "";
-          inp.classList.remove("active");
-        });
         updateHiddenStatus();
         renderHeader();
         state.forceRender = true;
@@ -4272,7 +4255,6 @@
           else delete state.columnFilters[col];
           closeFilterDropdown();
           applyFilters();
-          if (state.filterVisible) renderHeader();
         };
         textInput.onkeydown = (e) => {
           if (e.key === "Enter") applyTextBtn.click();
@@ -4324,7 +4306,6 @@
             state.columnFilters[col] = { type: "range", min: minV, max: maxV };
           closeFilterDropdown();
           applyFilters();
-          if (state.filterVisible) renderHeader();
         };
         [rangeMin, rangeMax].forEach((inp) => {
           inp.onkeydown = (e) => {
@@ -4414,7 +4395,6 @@
           delete state.columnFilters[col];
           closeFilterDropdown();
           applyFilters();
-          if (state.filterVisible) renderHeader();
         };
 
         // フッター
@@ -4437,7 +4417,6 @@
           else state.columnFilters[col] = { type: "values", values: sel };
           closeFilterDropdown();
           applyFilters();
-          if (state.filterVisible) renderHeader();
         };
         footer.appendChild(cancelBtn);
         footer.appendChild(applyBtn);
@@ -4534,18 +4513,6 @@
         });
         html += "</tr>";
 
-        if (state.filterVisible) {
-          html += `<tr id="filter-row"><th class="row-num-header"></th>`;
-          visCols.forEach((i) => {
-            const displayH = getDisplayHeader(i);
-            const f = state.columnFilters[i];
-            const val = f?.type === "text" ? f.query : "";
-            const active = f ? "active" : "";
-            html += `<th><input class="filter-input ${active}" data-fcol="${i}" placeholder="${escHtml(displayH)}" value="${escHtml(val)}"></th>`;
-          });
-          html += "</tr>";
-        }
-
         els.thead.innerHTML = html;
         $("main-table").setAttribute(
           "aria-colcount",
@@ -4559,7 +4526,6 @@
       }
 
       // ===== theadイベント委譲（一度だけ設定）=====
-      const _debouncedFilterApply = debounce(() => applyFilters(), 150);
       function setupTheadDelegation() {
         // ホバーでコメントツールチップ表示（position:fixedで位置計算）
         els.thead.addEventListener("mouseover", (e) => {
@@ -4613,11 +4579,6 @@
             openFilterDropdown(parseInt(filterBtn.dataset.filter), filterBtn);
             return;
           }
-          // フィルターinputクリック → 伝播停止
-          if (e.target.closest(".filter-input")) {
-            e.stopPropagation();
-            return;
-          }
         });
         // keydown委譲
         els.thead.addEventListener("keydown", (e) => {
@@ -4635,27 +4596,6 @@
             openFilterDropdown(parseInt(filterBtn.dataset.filter), filterBtn);
             return;
           }
-          // フィルターinput Escape
-          const fInp = e.target.closest(".filter-input");
-          if (fInp) {
-            if (e.key === "Escape") {
-              fInp.value = "";
-              fInp.dispatchEvent(new Event("input"));
-            }
-            e.stopPropagation();
-            return;
-          }
-        });
-        // input委譲（フィルター入力）
-        els.thead.addEventListener("input", (e) => {
-          const inp = e.target.closest(".filter-input");
-          if (!inp) return;
-          const ci = parseInt(inp.dataset.fcol);
-          const q = inp.value;
-          if (q) state.columnFilters[ci] = { type: "text", query: q };
-          else delete state.columnFilters[ci];
-          inp.classList.toggle("active", !!q);
-          _debouncedFilterApply();
         });
         // ダブルクリック委譲
         els.thead.addEventListener("dblclick", (e) => {
@@ -4668,7 +4608,7 @@
           }
           // ヘッダーセルダブルクリック → コメント編集（Shift併用で列名編集）
           const th = e.target.closest("th[data-col]");
-          if (th && !e.target.closest(".filter-input")) {
+          if (th) {
             if (e.shiftKey) editHeader(parseInt(th.dataset.col));
             else editHeaderComment(parseInt(th.dataset.col));
           }
@@ -4818,15 +4758,20 @@
             limit:     _ikC("購入上限数(決済毎)"),
             resale:    _ikC("リセール可否"),
             resaleMin: _ikC("リセール用販売価格下限"),
+            priceFixed:_ikC("リセール用券面価格固定フラグ"),
             solo:      _ikC("単体販売不可"),
             lim1:      _ikC("購入限定席種1"),
             lim2:      _ikC("購入限定席種2"),
             lim3:      _ikC("購入限定席種3"),
             kubun:     _ikC("購入限定区分"),
+            dateFrom:  _ikC("複数日入場開始日"),
+            dateTo:    _ikC("複数日入場終了日"),
             sejPay:    _ikC("SEJ支払"),
             sejIssue:  _ikC("SEJ発券"),
           };
         }
+        // 購入限定席種として「他席から指定されているコード」の集合（単体販売チェックの方向判定に使用）
+        const _ikLimSeatCodes = ikkatsuCols ? getIkLimSeatCodes(ikkatsuCols) : null;
         // SEJ備考差分: wordN列とマスタnteのN番目項目をセル内で比較表示
         let nteWordCols = null;
         if (state.sejMaster && sejCodeColIdx !== -1) {
@@ -4864,6 +4809,7 @@
               limit:     _ikg(ikkatsuCols.limit),
               resale:    _ikg(ikkatsuCols.resale),
               resaleMin: _ikg(ikkatsuCols.resaleMin),
+              priceFixed:_ikg(ikkatsuCols.priceFixed),
               solo:      _ikg(ikkatsuCols.solo),
               kubun:     _ikg(ikkatsuCols.kubun),
               sejPay:    _ikg(ikkatsuCols.sejPay),
@@ -4871,6 +4817,7 @@
               limCodes:  _ikLimCodes,
               hasP:    _ikLimCodes.some(cd => _ikSix(cd) === "P"),
               hasNonP: _ikLimCodes.some(cd => _ikSix(cd) && _ikSix(cd) !== "P"),
+              isLimTarget: !!(_ikLimSeatCodes && _ikLimSeatCodes.has(_ikCode)),
             };
           }
           html += `<tr role="row" data-row="${i}" aria-rowindex="${i + 2}" class="${isDup ? 'dup-row' : ''}${wrapCls}${crossRow ? ' cross-row' : ''}">`;
@@ -5064,8 +5011,8 @@
                 cls.push("cell-ng");
                 displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">✗ 上限9(非販売)なのにリセール可</span>`;
               }
-              // リセール下限不正 (リセール用販売価格下限列)
-              if (j === ikkatsuCols.resaleMin && ik.resale === "可能" && ik.resaleMin !== "1321") {
+              // リセール下限不正 (リセール用販売価格下限列)。券面価格固定の場合は手数料割れの懸念がないため対象外
+              if (j === ikkatsuCols.resaleMin && ik.resale === "可能" && !ik.priceFixed.includes("固定") && ik.resaleMin !== "1321") {
                 cls.push("cell-ng");
                 displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">✗ リセール可→1321必須</span>`;
               }
@@ -5079,15 +5026,21 @@
                 cls.push("cell-warn");
                 displayVal += `<span style="color:#ea580c;margin-left:5px;font-size:10px">⚠ 上限9なのにSEJ発券可</span>`;
               }
-              // 購入限定あり+単体販売不可≠不可 (単体販売不可列)
-              if (j === ikkatsuCols.solo && ik.limCodes.length > 0 && ik.solo !== "不可") {
+              // 他席から購入限定席種として指定されているのに単体販売可になっている (単体販売不可列)
+              // ※自分自身が購入限定席種を持つ（他席を要求する）側は対象外。指定「される」側だけが不可必須。
+              if (j === ikkatsuCols.solo && ik.isLimTarget && !ik.solo.includes("不可")) {
                 cls.push("cell-ng");
-                displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">✗ 購入限定あり→不可必須</span>`;
+                displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">✗ 購入限定対象→単体販売不可必須</span>`;
               }
               // 購入限定P+他種混在なのに複数区分でない (購入限定区分列)
               if (j === ikkatsuCols.kubun && ik.limCodes.length > 0 && ik.hasP && ik.hasNonP && !ik.kubun.includes("複数")) {
                 cls.push("cell-ng");
                 displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">✗ P+他種混在→複数購入可にすべき</span>`;
+              }
+              // 複数日入場の開始日・終了日に曜日を併記（ゴースト）
+              if ((j === ikkatsuCols.dateFrom || j === ikkatsuCols.dateTo) && cellVal.trim()) {
+                const wd = weekdayJa(cellVal);
+                if (wd) displayVal += `<span style="color:#6b7280;margin-left:5px;font-size:10px">(${wd})</span>`;
               }
             }
             // SEJ備考差分: wordN列にマスタnteのN番目項目を併記し、差分を強調表示
@@ -5345,6 +5298,12 @@
         if (e.target.closest("td.editing")) return;
         // 右クリックは onContextMenu で処理（選択範囲を維持するため）
         if (e.button === 2) return;
+        // 編集中に他セルをクリックした場合: 以下の e.preventDefault() がフォーカス移動(blur)を
+        // 抑制してしまい編集が確定されないため、先に明示的blurで確定させてから選択処理に進む
+        if (state.isEditing) {
+          const editingInput = els.tbody.querySelector("td.editing input");
+          if (editingInput) editingInput.blur();
+        }
         const rowNum = e.target.closest(".row-num[data-rownum]");
         if (rowNum) {
           e.preventDefault();
@@ -5867,7 +5826,6 @@
         // ダイアログ内でもCtrl+C/Vはセル操作として処理する
         const cmd = e.ctrlKey || e.metaKey;
         if (
-          e.target.classList.contains("filter-input") ||
           e.target.closest("#replace-dialog") ||
           e.target.closest(".filter-dropdown") ||
           e.target.id === "goto-input"
@@ -7041,18 +6999,9 @@
             group: "編集",
             icon: "✎",
             children: [
-              {
-                label: "セルを編集",
-                key: "Enter / F2",
-                action: () => {
-                  const t = getSelTd();
-                  if (t) startEdit(row, col, t);
-                },
-              },
               { label: "コピー", key: "Ctrl+C", action: copyToClipboard },
               { label: "切り取り", key: "Ctrl+X", action: cutToClipboard },
               { label: "ペースト", key: "Ctrl+V", action: pasteFromClipboard },
-              { label: "検索と置換", key: "Ctrl+H", action: openReplaceDialog },
             ],
           },
           {
@@ -7098,15 +7047,6 @@
                 },
               },
               {
-                label: "行を複製",
-                key: "Ctrl+Shift+D",
-                action: () => {
-                  state.selected = { row, col };
-                  duplicateRow();
-                },
-              },
-              { sep: true },
-              {
                 label: "行コピー",
                 key: "Ctrl+Shift+C",
                 action: () => {
@@ -7120,23 +7060,6 @@
                 action: () => {
                   state.selected = { row, col: 0 };
                   pasteRows();
-                },
-              },
-              { sep: true },
-              {
-                label: "行を上に移動",
-                key: "Alt+↑",
-                action: () => {
-                  state.selected = { row, col };
-                  moveRowUp();
-                },
-              },
-              {
-                label: "行を下に移動",
-                key: "Alt+↓",
-                action: () => {
-                  state.selected = { row, col };
-                  moveRowDown();
                 },
               },
               { sep: true },
@@ -7203,79 +7126,6 @@
               },
               { sep: true },
               {
-                label: "昇順ソート ▲",
-                action: () => {
-                  saveUndo();
-                  state.sortCol = col;
-                  state.sortAsc = true;
-                  state.sortKeys = [{ col, asc: true }];
-                  const _ch1 = state.data.length > 1 ? state.data[0] : null;
-                  const _cd1 = _ch1 ? state.data.slice(1) : state.data;
-                  const _base1 = _ch1 ? 1 : 0;
-                  const _idx1 = _cd1.map((row, i) => ({ row, origIdx: _base1 + i }));
-                  _idx1.sort((a, b) => {
-                    const va = a.row[col] ?? "", vb = b.row[col] ?? "";
-                    if (va === "" && vb === "") return 0;
-                    if (va === "") return 1;
-                    if (vb === "") return -1;
-                    const na = Number(va), nb = Number(vb);
-                    if (!isNaN(na) && !isNaN(nb)) return na - nb;
-                    return String(va).localeCompare(String(vb), "ja");
-                  });
-                  _sortDataUpdateColors(_idx1, !!_ch1);
-                  if (_ch1) state.data = [_ch1, ..._idx1.map(x => x.row)];
-                  else state.data = _idx1.map(x => x.row);
-                  state.selected = null;
-                  state.range = null;
-                  state.anchor = null;
-                  state._dupSet = null;
-                  applyFilters();
-                  markDirty();
-                  renderHeader();
-                  state.forceRender = true;
-                  renderBody();
-                  execSearch();
-                  setStatus(`「${getDisplayHeader(col)}」で昇順ソート`);
-                },
-              },
-              {
-                label: "降順ソート ▼",
-                action: () => {
-                  saveUndo();
-                  state.sortCol = col;
-                  state.sortAsc = false;
-                  state.sortKeys = [{ col, asc: false }];
-                  const _ch2 = state.data.length > 1 ? state.data[0] : null;
-                  const _cd2 = _ch2 ? state.data.slice(1) : state.data;
-                  const _base2 = _ch2 ? 1 : 0;
-                  const _idx2 = _cd2.map((row, i) => ({ row, origIdx: _base2 + i }));
-                  _idx2.sort((a, b) => {
-                    const va = a.row[col] ?? "", vb = b.row[col] ?? "";
-                    if (va === "" && vb === "") return 0;
-                    if (va === "") return 1;
-                    if (vb === "") return -1;
-                    const na = Number(va), nb = Number(vb);
-                    if (!isNaN(na) && !isNaN(nb)) return nb - na;
-                    return String(vb).localeCompare(String(va), "ja");
-                  });
-                  _sortDataUpdateColors(_idx2, !!_ch2);
-                  if (_ch2) state.data = [_ch2, ..._idx2.map(x => x.row)];
-                  else state.data = _idx2.map(x => x.row);
-                  state.selected = null;
-                  state.range = null;
-                  state.anchor = null;
-                  state._dupSet = null;
-                  applyFilters();
-                  markDirty();
-                  renderHeader();
-                  state.forceRender = true;
-                  renderBody();
-                  execSearch();
-                  setStatus(`「${getDisplayHeader(col)}」で降順ソート`);
-                },
-              },
-              { sep: true },
-              {
                 label: "この列までフリーズ",
                 key: "Ctrl+Shift+F",
                 action: () => {
@@ -7310,11 +7160,6 @@
             icon: "⊙",
             children: [
               {
-                label: "この行を非表示",
-                key: "Ctrl+Shift+H",
-                action: () => hideRows(row, row),
-              },
-              {
                 label: (() => {
                   if (state.range) {
                     const nr = Math.abs(state.range.r2 - state.range.r1) + 1;
@@ -7331,11 +7176,6 @@
                     );
                   } else hideRows(row, row);
                 },
-              },
-              {
-                label: "この列を非表示",
-                key: "Ctrl+Alt+H",
-                action: () => hideCols(col, col),
               },
               {
                 label: (() => {
@@ -7374,22 +7214,6 @@
                     },
                   ]
                 : []),
-            ],
-          },
-          {
-            group: "データ",
-            icon: "⬡",
-            children: [
-              { label: "空行を一括削除", action: deleteEmptyRows },
-              { label: "前後空白をトリム", action: trimAllCells },
-              {
-                label: state.conditionalHL
-                  ? "条件付きハイライト OFF"
-                  : "条件付きハイライト ON",
-                action: toggleConditionalHL,
-              },
-              { sep: true },
-              { label: "重複行を削除", danger: true, action: deleteDuplicates },
             ],
           },
         ];
@@ -7543,7 +7367,6 @@
         state.columnFilters = {};
         state.filteredIndices = null;
         state.selectedCol = null;
-        state.filterVisible = false;
         state.sortCol = -1;
         state.sortAsc = true;
         state.sortKeys = [];
@@ -7580,9 +7403,6 @@
         els.filterExport.style.display = "none";
         els.statusFilter.textContent = "";
         els.statusStats.textContent = "";
-        els.filterToggle.style.background = "";
-        els.filterToggle.style.borderColor = "";
-        els.filterToggle.style.color = "";
         els.dirty.classList.remove("show");
         document.title = "TSV/CSV Editor";
       }
@@ -7600,6 +7420,7 @@
         state.delimiter = "\t";
         state.headerMode = "firstRow";
         state.encoding = "utf8";
+        state.originalRowCount = state.data.length;
         const tab = {
           fileName: state.fileName,
           headers: [...state.headers],
@@ -7614,6 +7435,7 @@
           dirty: false,
           cellColors: {},
           _isBlankSheet: true,
+          originalRowCount: state.originalRowCount,
         };
         state.tabs.push(tab);
         state.activeTab = state.tabs.length - 1;
@@ -9226,29 +9048,35 @@
           return /自由席|エリア/.test(seat) ? "数在庫" : "指定席";
         };
         const catBadge = (cat) => `<span class="catb cat-${cat === "指定席" ? "r" : cat === "数在庫" ? "a" : cat === "駐車券" ? "p" : "o"}">${cat}</span>`;
-        // 日時 → MM/DD HH:MM（分単位まで）。"YYYY/MM/DD HH:MM" 等を想定
+        // 日時 → MM/DD(曜)HH:MM（分単位まで）。"YYYY/MM/DD HH:MM" 等を想定
         const dt = (s) => {
           s = String(s || "");
           let m = s.match(/\d{4}[\/\-](\d{1,2})[\/\-](\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);
           if (!m) m = s.match(/^(\d{1,2})[\/\-](\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);
           if (!m) return s;
           const md = ("0" + m[1]).slice(-2) + "/" + ("0" + m[2]).slice(-2);
-          return m[3] != null ? md + " " + ("0" + m[3]).slice(-2) + ":" + m[4] : md;
+          const wd = weekdayJa(s);
+          const wdStr = wd ? `(${wd})` : "";
+          return (m[3] != null ? md + wdStr + " " + ("0" + m[3]).slice(-2) + ":" + m[4] : md + wdStr);
         };
         const periodOf = (row) => { const s = dt(v(row, c.start)), e = dt(v(row, c.end)); return (s || e) ? `${s}〜${e}` : ""; };
         // 席種ごとの淡いカラー（地味めパレット）
         const _palette = ["#eef2f6", "#eef6f0", "#f6f0ee", "#f1eef6", "#f6f4ee", "#eef5f6", "#f6eef3", "#f0f2ee"];
         const _seatColors = {}; let _ci = 0;
         const seatColor = (seat) => { if (!(seat in _seatColors)) _seatColors[seat] = _palette[_ci++ % _palette.length]; return _seatColors[seat]; };
-        // 席種の並び順キー: 金額（代表前売価格）→ 席種エリアコード（車椅子上段/同伴など関連席をまとめる）
-        const _seatAdv = {}, _seatCodeMap = {};
+        // 席種の並び順キー: 金額（大人の前売価格を優先・無ければ代表前売価格）→ 席種エリアコード（車椅子上段/同伴など関連席をまとめる）
+        const _seatAdv = {}, _seatAdvAny = {}, _seatCodeMap = {};
+        const isAdultAgeLabel = (a) => /大人|ADULT|高校/i.test(String(a || ""));
         for (const row of normals) {
           const sc = v(row, c.seat); const n = numOf(v(row, c.adv));
-          if (sc && n != null && n < UG_DUMMY_MIN && (!(sc in _seatAdv) || n < _seatAdv[sc])) _seatAdv[sc] = n;
           if (sc && !(sc in _seatCodeMap)) _seatCodeMap[sc] = v(row, c.seatCd);
+          if (sc && n != null && n < UG_DUMMY_MIN) {
+            if (!(sc in _seatAdvAny) || n < _seatAdvAny[sc]) _seatAdvAny[sc] = n;
+            if (isAdultAgeLabel(v(row, c.age)) && (!(sc in _seatAdv) || n < _seatAdv[sc])) _seatAdv[sc] = n;
+          }
         }
         const seatSortKey = (seat, code) => {
-          const price = _seatAdv[seat] != null ? _seatAdv[seat] : 9e9;
+          const price = _seatAdv[seat] != null ? _seatAdv[seat] : (_seatAdvAny[seat] != null ? _seatAdvAny[seat] : 9e9);
           const cd = code || _seatCodeMap[seat] || seat;
           return String(price).padStart(12, "0") + "|" + cd;
         };
@@ -9313,7 +9141,7 @@
             ? `<div class="warn">⚠ 券種抜けの可能性（他席種では設定があるのに欠けています・要確認）:<br>${missingWarn.slice(0, 30).map(escHtml).join("<br>")}${missingWarn.length > 30 ? `<br>…他${missingWarn.length - 30}件` : ""}</div>`
             : "";
           sections.normal = { title: "通常価格表", body: `<h2>📋 通常価格表（${normals.length}件）</h2>
-<p class="legend">列見出しクリックで並べ替え、各列の入力欄で絞り込み（会員ランク・席種名・期間など）。席種は表示略称・券種は略称表示</p>${missBanner}
+<p class="legend">列見出しクリック、または下の「並び替え列を選択」（検索・チェックボックスで列を指定）で並べ替え。各列の入力欄で絞り込み（会員ランク・席種名・期間など）。席種は表示略称・券種は略称表示</p>${missBanner}
 ${_sortableTable(labels, rowsHtml)}` };
         }
 
@@ -9331,7 +9159,7 @@ ${_sortableTable(labels, rowsHtml)}` };
           for (const [k, list] of byCond) {
             // 基準価格マップ（席種|券種 → {adv,day}）
             const priceMap = {};
-            for (const row of (normalsByCond[k] || [])) priceMap[v(row, c.seat) + "|" + v(row, c.age)] = { adv: v(row, c.adv), day: v(row, c.day), code: v(row, c.seatCd) };
+            for (const row of (normalsByCond[k] || [])) priceMap[v(row, c.seat) + "|" + v(row, c.age)] = { adv: v(row, c.adv), day: v(row, c.day), code: v(row, c.seatCd), period: period(row) };
 
             const fromSeats = [], toSeats = [], fromAges = {}, toAges = {}, map = new Map();
             const seatCode = {};
@@ -9360,24 +9188,32 @@ ${_sortableTable(labels, rowsHtml)}` };
             let head = `<tr><th class="corner" colspan="2" rowspan="2">元＼先</th>`;
             for (const ts of toSeats) head += `<th class="seathdr" colspan="${toAges[ts].length}" style="background:${seatColor(ts)}">${escHtml(seatLabel(ts, seatCode[ts]))}${catBadge(seatCat(seatCode[ts], ts))}</th>`;
             head += `</tr><tr>`;
+            let prevTsHead = null;
             for (const ts of toSeats) for (const ta of toAges[ts]) {
               const p = priceMap[ts + "|" + ta];
-              const pr = p ? `<div class="hp">前${money(p.adv)}<br>当${money(p.day)}</div>` : "";
-              head += `<th class="agehdr">${escHtml(ageLabel(ta))}${pr}</th>`;
+              const pr = p ? `<div class="hp">前${money(p.adv)}<br>当${money(p.day)}${p.period ? `<br><span class="hp-period">${escHtml(p.period)}</span>` : ""}</div>` : "";
+              const colSep = ts !== prevTsHead ? " mx-colsep" : "";
+              prevTsHead = ts;
+              head += `<th class="agehdr${colSep}">${escHtml(ageLabel(ta))}${pr}</th>`;
             }
             head += `</tr>`;
 
             let bodyRows = "";
             for (const fs of fromSeats) {
               fromAges[fs].forEach((fa, i) => {
-                bodyRows += `<tr>`;
+                // 席種ブロックの境目を太線で区切る（席種が変わる最初の年齢行）
+                bodyRows += `<tr${i === 0 ? ' class="seat-sep"' : ""}>`;
                 if (i === 0) bodyRows += `<th class="rowh seatrow" rowspan="${fromAges[fs].length}" style="background:${seatColor(fs)}">${escHtml(seatLabel(fs, seatCode[fs]))}${catBadge(seatCat(seatCode[fs], fs))}</th>`;
                 const p = priceMap[fs + "|" + fa];
-                const pr = p ? `<div class="hp">前${money(p.adv)} 当${money(p.day)}</div>` : "";
+                const pr = p ? `<div class="hp">前${money(p.adv)} 当${money(p.day)}${p.period ? `<br><span class="hp-period">${escHtml(p.period)}</span>` : ""}</div>` : "";
                 bodyRows += `<th class="agehdr rowh agecol">${escHtml(ageLabel(fa))}${pr}</th>`;
+                let prevTsBody = null;
                 for (const { ts, ta } of toCols) {
+                  // 先側も席種が変わる最初の列を太線で区切る
+                  const colSep = ts !== prevTsBody ? " mx-colsep" : "";
+                  prevTsBody = ts;
                   const e = map.get(fs + "|" + fa + "=>" + ts + "|" + ta);
-                  if (!e) { bodyRows += `<td class="na">—</td>`; continue; }
+                  if (!e) { bodyRows += `<td class="na${colSep}">—</td>`; continue; }
                   const { row, chk } = e;
                   const tip = (chk.status === "invalid" ? chk.note
                     : chk.expected != null ? `期待差額 前${chk.expected.toLocaleString("ja-JP")}/当${chk.expectedDay != null ? chk.expectedDay.toLocaleString("ja-JP") : "?"}` + (chk.sameSeat ? "（同席種・同年齢区分=一律500）" : `（先${fmt(String(chk.dstPrice))} − 元${fmt(String(chk.srcPrice))}）`)
@@ -9391,9 +9227,10 @@ ${_sortableTable(labels, rowsHtml)}` };
                   if (chk.status === "invalid") reason = `<div class="rsn">${escHtml((chk.problems || []).join("/"))}</div>`;
                   else { const rs = []; if (chk.advNg) rs.push("前売"); if (chk.dayNg) rs.push("当日"); if (rs.length) reason = `<div class="rsn">${rs.join("・")}NG</div>`; }
                   // 期待差額をExcel(アップグレード表)同様に数字だけ大きく見せる（席種一覧での照合がしやすいように）
+                  // 「差額」だけでは何の差か分からないため「先－元」と明示する
                   const expBadge = (chk.status !== "invalid" && chk.expected != null)
-                    ? `<div class="exp-badge">差額 ${chk.expected.toLocaleString("ja-JP")}</div>` : "";
-                  bodyRows += `<td class="mxc${cls}" data-mid="${mid}" title="${escHtml(tip)}">${expBadge}<div class="adv${chk.advNg ? " l-ng" : ""}">前 ${escHtml(money(v(row, c.adv)))}</div><div class="day${chk.dayNg ? " l-ng" : ""}">当 ${escHtml(money(v(row, c.day)))}</div><div class="per">${escHtml(period(row))}</div>${dg}${reason}</td>`;
+                    ? `<div class="exp-badge">先－元 ${chk.expected.toLocaleString("ja-JP")}</div>` : "";
+                  bodyRows += `<td class="mxc${cls}${colSep}" data-mid="${mid}" title="${escHtml(tip)}">${expBadge}<div class="adv${chk.advNg ? " l-ng" : ""}">前売 ${escHtml(money(v(row, c.adv)))}</div><div class="day${chk.dayNg ? " l-ng" : ""}">当日 ${escHtml(money(v(row, c.day)))}</div><div class="per">${escHtml(period(row))}</div>${dg}${reason}</td>`;
                 }
                 bodyRows += `</tr>`;
               });
@@ -9402,7 +9239,7 @@ ${_sortableTable(labels, rowsHtml)}` };
           }
           const ngBadge = ngTotal ? `　<span class="badge-ng">NG ${ngTotal}件</span>` : `　<span class="badge-ok">検算OK</span>`;
           sections.matrix = { title: "UGマトリクス", body: `<h2>🔢 アップグレードマトリクス（俯瞰）${ngBadge}</h2>
-<p class="legend">行=元席種/券種、列=先席種/券種（金額順）。席種は表示略称＋区分（<span class="catb cat-r">指定席</span><span class="catb cat-a">数在庫</span><span class="catb cat-o">その他</span>）。各セル: 前=前売差額 / 当=当日差額 / 下=販売期間。<b>不一致は文字が赤・セルが薄ピンク</b>。クリックでマーク</p>${mxBody}` };
+<p class="legend">行=元席種/券種、列=先席種/券種（大人の前売価格の安い順）。見出しには通常価格の販売期間も併記。席種は表示略称＋区分（<span class="catb cat-r">指定席</span><span class="catb cat-a">数在庫</span><span class="catb cat-o">その他</span>）。各セル: 先－元=期待差額（緑） / 前売・当日=実際の金額 / 下=販売期間（曜日付き）。<b>不一致は文字が赤・セルが薄ピンク</b>。「NG/未チェックのみ」ON時は対象外セルを薄く退色表示。クリックでマーク</p>${mxBody}` };
         }
 
         // --- UG一覧（席種ペアでセル結合・元⇒先・金額対比・差異強調） ---
@@ -9424,7 +9261,7 @@ ${_sortableTable(labels, rowsHtml)}` };
             const k1 = seatSortKey(pa.fs, pa.fcd).localeCompare(seatSortKey(pb.fs, pb.fcd), "ja");
             return k1 || seatSortKey(pa.ts, pa.tcd).localeCompare(seatSortKey(pb.ts, pb.tcd), "ja");
           });
-          const dual = (a, d, ng1, ng2, t1, t2) => // 前売/当日 2段セル（個別に赤枠可）
+          const dual = (a, d, ng1, ng2, t1, t2) => // 前売/当日 2段セル（個別に赤字可）
             `<div class="two"><span class="${ng1 ? "v-ng" : ""}"${t1 ? ` title="${escHtml(t1)}"` : ""}>前 ${escHtml(a)}</span><span class="${ng2 ? "v-ng" : ""}"${t2 ? ` title="${escHtml(t2)}"` : ""}>当 ${escHtml(d)}</span></div>`;
 
           let bodyRows = "";
@@ -9467,7 +9304,7 @@ ${_sortableTable(labels, rowsHtml)}` };
             + (inv ? `　<span class="badge-ng">設定不可 ${inv}件</span>` : "")
             + (na ? `　<span class="badge-na">価格不明 ${na}件</span>` : "");
           sections.ug = { title: "UG一覧", body: `<h2>🔀 アップグレード一覧（${ugs.length}件）${badges}</h2>
-<p class="legend">区間=元席種⇒先席種（セル結合）。期待差額=先−元（同席種・同年齢区分のみ一律500／それ以外は実差額で0以下→0・1〜500→500・500超→実差額、前売・当日とも）。登録差額が期待と違う項目は赤枠、コメント欄に理由。${seatMeta ? "席種は表示略称・" : ""}券種は略称</p>
+<p class="legend">区間=元席種⇒先席種（セル結合）。期待差額=先−元（同席種・同年齢区分のみ一律500／それ以外は実差額で0以下→0・1〜500→500・500超→実差額、前売・当日とも）。車椅子は他席種との相互UG不可、大人料金が先&lt;元のUGも原則不可。登録差額が期待と違う項目は文字が赤、コメント欄に理由。${seatMeta ? "席種は表示略称・" : ""}券種は略称</p>
 <div class="scroll uglistscroll"><table class="uglist">${head}${bodyRows}</table></div>` };
         }
 
@@ -9526,6 +9363,17 @@ table.sortable thead th.mk-h { position: sticky; top: 0; z-index: 3; }
 table.sortable thead th[data-c]:hover { background: #e2e8ee; }
 .filter-row th { padding: 2px; position: sticky; top: 29px; z-index: 3; background: #f6f8fb; }
 .filter-row input { width: 100%; min-width: 70px; border: 1px solid #cfd6df; border-radius: 3px; padding: 2px 4px; font-size: 11px; }
+/* 並び替え列ピッカー（列名クリックでの並べ替えがわかりにくいための明示的UI） */
+.sort-picker-wrap { position: relative; display: inline-block; margin: 0 0 6px; }
+.sort-picker-btn { font-size: 12px; padding: 5px 10px; border: 1px solid #217346; color: #217346; background: #fff; border-radius: 5px; cursor: pointer; }
+.sort-picker-btn:hover { background: #eaf4ee; }
+.sort-picker-dd { position: absolute; top: 100%; left: 0; margin-top: 4px; background: #fff; border: 1px solid #cfd6df; border-radius: 6px; box-shadow: 0 4px 16px rgba(0,0,0,.12); padding: 8px; min-width: 220px; max-width: 280px; z-index: 30; }
+.sort-picker-search { width: 100%; border: 1px solid #cfd6df; border-radius: 4px; padding: 4px 6px; font-size: 12px; margin-bottom: 6px; box-sizing: border-box; }
+.sort-picker-list { max-height: 220px; overflow: auto; border-top: 1px solid #eef2f6; border-bottom: 1px solid #eef2f6; }
+.sort-picker-item { display: flex; align-items: center; gap: 6px; padding: 3px 2px; font-size: 12px; cursor: pointer; }
+.sort-picker-item:hover { background: #f6f8fb; }
+.sort-picker-dir { display: flex; gap: 12px; font-size: 12px; margin-top: 6px; }
+.sort-picker-dir label { display: flex; align-items: center; gap: 3px; cursor: pointer; }
 .arr { color: #217346; }
 th.num, td.num { text-align: right; }
 th.mk-h { width: 30px; }
@@ -9553,7 +9401,7 @@ table.uglist td.prices.reg { font-weight: 600; }
 table.uglist .dg-note { color: #ea580c; font-size: 10px; font-weight: 700; }
 table.uglist .two { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.3; }
 table.uglist .two span { font-size: 11px; }
-table.uglist .two .v-ng { color: #dc2626; font-weight: 700; outline: 2px solid #dc2626; outline-offset: 1px; border-radius: 2px; }
+table.uglist .two .v-ng { color: #dc2626; font-weight: 700; }
 table.uglist td.exp { color: #555; font-size: 11px; white-space: nowrap; text-align: right; }
 table.uglist td.cmt { max-width: 220px; white-space: normal; }
 table.uglist .cmt-ng { color: #dc2626; font-size: 11px; font-weight: 600; }
@@ -9571,10 +9419,12 @@ table.mx th.agecol { position: sticky; left: 58px; z-index: 5; width: 92px; min-
 /* 隅（上＋左固定） */
 table.mx th.corner { position: sticky; top: 0; left: 0; z-index: 7; background: #e2e8ee; }
 table.mx .hp { font-size: 9px; font-weight: 400; color: #777; line-height: 1.15; margin-top: 1px; }
-td.mxc { cursor: pointer; position: relative; min-width: 64px; }
-td.mxc .exp-badge { font-weight: 700; font-size: 12px; color: #1d4ed8; line-height: 1.2; }
-td.mxc .adv { font-weight: 600; color: #be185d; }
-td.mxc .day { font-size: 10px; color: #b45309; }
+table.mx .hp-period { color: #999; white-space: nowrap; }
+td.mxc { cursor: pointer; position: relative; min-width: 76px; }
+/* 差額(先−元)・前売・当日は読み比べやすいよう文字サイズを統一 */
+td.mxc .exp-badge { font-weight: 700; font-size: 11px; color: #1d4ed8; line-height: 1.2; }
+td.mxc .adv { font-weight: 600; font-size: 11px; color: #16a34a; }
+td.mxc .day { font-size: 11px; color: #b45309; }
 td.mxc .per { font-size: 9px; color: #999; }
 td.mxc .l-ng { color: #dc2626; font-weight: 700; }
 td.mxc .rsn { font-size: 9px; color: #dc2626; font-weight: 700; margin-top: 1px; }
@@ -9588,6 +9438,8 @@ td.mxc.mx-na { background: #f5f5f5; }
 td.mxc.mx-na .adv, td.mxc.mx-na .day { color: #9ca3af; }
 td.mxc.marked { box-shadow: inset 0 0 0 3px var(--mk); }
 td.mxc.marked::after { content: "✓"; position: absolute; top: 1px; right: 3px; font-size: 10px; color: #16a34a; font-weight: 700; }
+/* NG/未チェックのみ: マトリクスは行ごと非表示にすると列がずれるため、対象外セルを薄く退色させる */
+td.mxc.mxc-done { opacity: 0.12; }
 .sub { font-size: 10px; color: #888; font-weight: 400; }
 td.na { color: #ccc; background: #fafafa; }
 .dg { font-size: 10px; color: #ea580c; font-weight: 700; }
@@ -9597,7 +9449,17 @@ td.na { color: #ccc; background: #fafafa; }
 tr.marked td { background: color-mix(in srgb, var(--mk) 38%, #ffffff); }
 tr[data-mid]:hover td { outline: 1px solid #b8c4d4; outline-offset: -1px; }
 /* 十字ハイライト（選択中の行・列） */
-body.crosshi .cross-col:not(.mk-cell), body.crosshi .cross-row:not(.mk-cell) { background: rgba(33, 115, 70, 0.08); }
+body.crosshi td.cross-col:not(.mk-cell), body.crosshi td.cross-row:not(.mk-cell) { background: rgba(33, 115, 70, 0.08); }
+/* 固定(sticky)ヘッダー/列はbackgroundを上書きするとスクロール時に下のセルが透けて見えるため、
+   ::afterの重ね描きで不透明な元背景を保ったままティントを乗せる */
+body.crosshi th.cross-col:not(.mk-cell), body.crosshi th.cross-row:not(.mk-cell) { position: relative; }
+body.crosshi th.cross-col:not(.mk-cell)::after, body.crosshi th.cross-row:not(.mk-cell)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(33, 115, 70, 0.08);
+  pointer-events: none;
+}
 .toolbar label.tg { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; color: #444; }
 .toolbar { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255,255,255,.97); border-top: 1px solid #d8dde4; padding: 8px 20px; display: flex; align-items: center; gap: 12px; font-size: 12px; z-index: 10; box-shadow: 0 -2px 8px rgba(0,0,0,.06); }
 .toolbar button { padding: 5px 14px; border: 1px solid #217346; color: #217346; background: #fff; border-radius: 5px; cursor: pointer; font-size: 12px; }
@@ -9615,6 +9477,8 @@ body.crosshi .cross-col:not(.mk-cell), body.crosshi .cross-row:not(.mk-cell) { b
 .ppane { display: none; }
 .ppane.on { display: block; }
 .seat-sep td, .seat-sep th { border-top: 2px solid #94a3b8 !important; }
+/* マトリクス: 先側の席種が変わる列の境目も太線で区切る（行のseat-sepと対になる列方向の区切り） */
+table.mx td.mx-colsep, table.mx th.mx-colsep { border-left: 2px solid #94a3b8 !important; }
 @media print { .toolbar, .filter-row, .ptabs { display: none; } .ppane { display: block !important; } .content { overflow: visible; } .scroll { overflow: visible; max-height: none; } }
 </style></head><body>
 <div class="header"><h1>💴 ${fname} <span style="font-size:12px;color:#666;font-weight:400">価格チェック</span></h1>
@@ -9644,7 +9508,20 @@ body.crosshi .cross-col:not(.mk-cell), body.crosshi .cross-row:not(.mk-cell) { b
         head += `</tr><tr class="filter-row"><th></th>`;
         labels.forEach((l, i) => { head += `<th><input data-fc="${i}" placeholder="絞込" aria-label="${escHtml(l)}で絞り込み"></th>`; });
         head += `</tr>`;
-        return `<div class="scroll"><table class="sortable"><thead>${head}</thead><tbody>${rowsHtml}</tbody></table></div>`;
+        // 列ヘッダークリックでの並べ替えがわかりにくいため、列名を検索・選択できる明示的なピッカーも用意
+        const pickerItems = labels.map((l, i) => `<label class="sort-picker-item"><input type="checkbox" data-sc="${i}"> ${escHtml(l)}</label>`).join("");
+        const sortPicker = `<div class="sort-picker-wrap">
+  <button type="button" class="sort-picker-btn" id="sort-picker-btn">🔀 並び替え列を選択 ▾</button>
+  <div class="sort-picker-dd" id="sort-picker-dd" style="display:none">
+    <input type="search" class="sort-picker-search" id="sort-picker-search" placeholder="列名で検索...">
+    <div class="sort-picker-list" id="sort-picker-list">${pickerItems}</div>
+    <div class="sort-picker-dir">
+      <label><input type="radio" name="sort-dir" value="asc" checked> 昇順 ▲</label>
+      <label><input type="radio" name="sort-dir" value="desc"> 降順 ▼</label>
+    </div>
+  </div>
+</div>`;
+        return `${sortPicker}<div class="scroll"><table class="sortable"><thead>${head}</thead><tbody>${rowsHtml}</tbody></table></div>`;
       }
 
       // 出力HTMLに埋め込むスクリプト（並べ替え・絞り込み・マーカー）
@@ -9755,29 +9632,84 @@ body.crosshi .cross-col:not(.mk-cell), body.crosshi .cross-row:not(.mk-cell) { b
   if (condSel) { condSel.value = curCond; condSel.addEventListener('change', function(){ curCond = condSel.value; applyAll(); }); }
 
   // 並べ替え
+  function runSort(tbody, ci, asc){
+    var rows = Array.from(tbody.querySelectorAll('tr'));
+    rows.sort(function(a, b){
+      var ca = a.cells[ci + 1], cb = b.cells[ci + 1];
+      var xa = ca.getAttribute('data-v'); if (xa === null) xa = ca.textContent.trim();
+      var xb = cb.getAttribute('data-v'); if (xb === null) xb = cb.textContent.trim();
+      var na = parseFloat(String(xa).replace(/[^0-9.\\-]/g, '')), nb = parseFloat(String(xb).replace(/[^0-9.\\-]/g, ''));
+      var bothNum = !isNaN(na) && !isNaN(nb) && xa !== '' && xb !== '';
+      var r = bothNum ? na - nb : String(xa).localeCompare(String(xb), 'ja');
+      return asc ? r : -r;
+    });
+    rows.forEach(function(r){ r.classList.remove('seat-sep'); tbody.appendChild(r); });
+  }
   document.querySelectorAll('table.sortable').forEach(function(tbl){
     var headRow = tbl.tHead.rows[0];
     var tbody = tbl.tBodies[0];
+    var pane = tbl.closest('.ppane') || document;
+    var pickerList = pane.querySelector('#sort-picker-list');
+    function setSortUI(ci, asc){
+      headRow.querySelectorAll('th[data-c]').forEach(function(h){ h.removeAttribute('data-asc'); var a = h.querySelector('.arr'); if (a) a.remove(); });
+      var th = headRow.querySelector('th[data-c="' + ci + '"]');
+      if (th) th.setAttribute('data-asc', asc);
+      if (pickerList) {
+        pickerList.querySelectorAll('input[type=checkbox]').forEach(function(cb){ cb.checked = (+cb.getAttribute('data-sc') === ci); });
+      }
+      var dirAsc = pane.querySelector('input[name="sort-dir"][value="asc"]');
+      var dirDesc = pane.querySelector('input[name="sort-dir"][value="desc"]');
+      if (dirAsc && dirDesc) { dirAsc.checked = asc; dirDesc.checked = !asc; }
+    }
     headRow.querySelectorAll('th[data-c]').forEach(function(th){
       th.addEventListener('click', function(){
         var ci = +th.getAttribute('data-c');
         var asc = th.getAttribute('data-asc') !== 'true';
-        headRow.querySelectorAll('th[data-c]').forEach(function(h){ h.removeAttribute('data-asc'); var a = h.querySelector('.arr'); if (a) a.remove(); });
-        th.setAttribute('data-asc', asc);
-        var rows = Array.from(tbody.querySelectorAll('tr'));
-        rows.sort(function(a, b){
-          var ca = a.cells[ci + 1], cb = b.cells[ci + 1];
-          var xa = ca.getAttribute('data-v'); if (xa === null) xa = ca.textContent.trim();
-          var xb = cb.getAttribute('data-v'); if (xb === null) xb = cb.textContent.trim();
-          var na = parseFloat(String(xa).replace(/[^0-9.\\-]/g, '')), nb = parseFloat(String(xb).replace(/[^0-9.\\-]/g, ''));
-          var bothNum = !isNaN(na) && !isNaN(nb) && xa !== '' && xb !== '';
-          var r = bothNum ? na - nb : String(xa).localeCompare(String(xb), 'ja');
-          return asc ? r : -r;
-        });
-        rows.forEach(function(r){ r.classList.remove('seat-sep'); tbody.appendChild(r); });
+        setSortUI(ci, asc);
+        runSort(tbody, ci, asc);
       });
     });
     tbl.querySelectorAll('.filter-row input[data-fc]').forEach(function(inp){ inp.addEventListener('input', applyAll); });
+
+    // 並び替え列ピッカー（列名クリックでの並べ替えがわかりにくいため、検索＋チェックボックスでも選べるようにする）
+    var pickerBtn = pane.querySelector('#sort-picker-btn');
+    var pickerDd = pane.querySelector('#sort-picker-dd');
+    var pickerSearch = pane.querySelector('#sort-picker-search');
+    if (pickerBtn && pickerDd && pickerList) {
+      pickerBtn.addEventListener('click', function(e){
+        e.stopPropagation();
+        pickerDd.style.display = pickerDd.style.display === 'none' ? 'block' : 'none';
+      });
+      document.addEventListener('click', function(e){
+        if (pickerDd.style.display !== 'none' && !pickerDd.contains(e.target) && e.target !== pickerBtn) pickerDd.style.display = 'none';
+      });
+      pickerSearch.addEventListener('input', function(){
+        var q = pickerSearch.value.trim().toLowerCase();
+        pickerList.querySelectorAll('.sort-picker-item').forEach(function(item){
+          var label = item.textContent.trim().toLowerCase();
+          item.style.display = (!q || label.indexOf(q) !== -1) ? '' : 'none';
+        });
+      });
+      var applyPickerSort = function(){
+        var checked = pickerList.querySelector('input[type=checkbox]:checked');
+        if (!checked) return;
+        var ci = +checked.getAttribute('data-sc');
+        var asc = pane.querySelector('input[name="sort-dir"][value="asc"]').checked;
+        setSortUI(ci, asc);
+        runSort(tbody, ci, asc);
+      };
+      pickerList.querySelectorAll('input[type=checkbox]').forEach(function(cb){
+        cb.addEventListener('change', function(){
+          if (cb.checked) {
+            pickerList.querySelectorAll('input[type=checkbox]').forEach(function(other){ if (other !== cb) other.checked = false; });
+          }
+          applyPickerSort();
+        });
+      });
+      pane.querySelectorAll('input[name="sort-dir"]').forEach(function(r){
+        r.addEventListener('change', applyPickerSort);
+      });
+    }
   });
 
   function fixUgRowspan(){
@@ -9792,8 +9724,20 @@ body.crosshi .cross-col:not(.mk-cell), body.crosshi .cross-row:not(.mk-cell) { b
     });
     groups.forEach(function(grp){
       if (!grp.length) return;
-      var hasVisible = grp.some(function(r){ return r.style.display !== 'none'; });
-      if (hasVisible) grp[0].style.display = '';
+      // 席種ペア見出し(rowspan th)は現在どの行に乗っていても再検出する（前回呼び出しで移動済みの場合に対応）
+      var seatTh = null;
+      for (var i = 0; i < grp.length; i++) { seatTh = grp[i].querySelector('th.seatpair'); if (seatTh) break; }
+      if (!seatTh) return;
+      var visibleRows = grp.filter(function(r){ return r.style.display !== 'none'; });
+      if (!visibleRows.length) return; // グループ全体が非表示なら見出しの位置はそのままで良い（描画されない）
+      var target = visibleRows[0];
+      // NG/未チェックのみ等のフィルターでこの行自体が非表示でも、見出しセルだけは
+      // 最初に表示される行へ退避させて表の縦の繋がり(rowspan)を保つ
+      if (seatTh.parentNode !== target) {
+        target.insertBefore(seatTh, target.children[1] || null);
+      }
+      // 非表示で間引かれた行の分だけrowspanを縮め、後続グループの行にまで跨がらないようにする
+      seatTh.setAttribute('rowspan', String(visibleRows.length));
     });
   }
 
@@ -9816,11 +9760,16 @@ body.crosshi .cross-col:not(.mk-cell), body.crosshi .cross-row:not(.mk-cell) { b
     });
     // UG一覧（グループ表・data-mid行）
     document.querySelectorAll('table.uglist tr[data-mid]').forEach(function(tr){ tr.style.display = rowVisible(tr, null) ? '' : 'none'; });
-    // rowspan保護: グループ内に可視行があれば先頭行(seatpair<th>保持)を表示に戻す
-    // （先頭行が非表示になると後続行の列がずれるため）
+    // rowspan調整: 非表示行があってもグループの縦の繋がりを保つ（seatpair見出しを可視行へ退避・rowspanを再計算）
     fixUgRowspan();
     // マトリクスは販売条件ブロック単位で表示
     document.querySelectorAll('.cond-block').forEach(function(b){ b.style.display = (curCond === '__all' || b.getAttribute('data-cond') === curCond) ? '' : 'none'; });
+    // マトリクスのセルは行ごと非表示にすると列がずれるため、NG/未チェックのみの対象外セルは退色表示にする
+    document.querySelectorAll('td.mxc[data-mid]').forEach(function(td){
+      var isNg = td.classList.contains('mx-ng');
+      var done = td.classList.contains('marked');
+      td.classList.toggle('mxc-done', ngOnly && !isNg && done);
+    });
   }
 
   // 2段ヘッダーの2行目stickyオフセットを1行目の高さに合わせる（行が隠れないように）
@@ -9876,6 +9825,7 @@ body.crosshi .cross-col:not(.mk-cell), body.crosshi .cross-row:not(.mk-cell) { b
           resale: col("リセール可否"),
           resaleMin: col("リセール用販売価格下限"),
           resaleMax: col("リセール用販売価格上限"),
+          priceFixed: col("リセール用券面価格固定フラグ"),
           solo: col("単体販売不可"),
           lim1: col("購入限定席種1"),
           lim2: col("購入限定席種2"),
@@ -9949,8 +9899,8 @@ body.crosshi .cross-col:not(.mk-cell), body.crosshi .cross-row:not(.mk-cell) { b
             }
           }
 
-          // 4) リセール可なら下限=1321
-          if (g(row, c.resale) === "可能") {
+          // 4) リセール可なら下限=1321（券面価格固定の場合は手数料割れの懸念がないため対象外）
+          if (g(row, c.resale) === "可能" && !g(row, c.priceFixed).includes("固定")) {
             const min = g(row, c.resaleMin);
             if (min !== "1321") {
               add("リセール下限", "NG", `リセール可能だがリセール用販売価格下限=「${min || "(空欄)"}」（1321であるべき：手数料1321円を下回ると赤字）`);
@@ -9973,7 +9923,7 @@ body.crosshi .cross-col:not(.mk-cell), body.crosshi .cross-row:not(.mk-cell) { b
           
           if (limSeatCodes.has(code)) {
             const solo = g(row, c.solo);
-            if (solo !== "不可" && solo !== "1") {
+            if (!solo.includes("不可")) {
               add("単体販売", "NG", `購入限定席種として他席から指定されているため、単体販売不可にする必要があります`);
             }
           }
@@ -10211,14 +10161,8 @@ ${findings.length
         // フィルター解除
         state.columnFilters = {};
         state.filteredIndices = null;
-        state.filterVisible = false;
         els.filterClear.style.display = "none";
         els.filterExport.style.display = "none";
-        els.filterToggle.style.background = "";
-        els.filterToggle.style.borderColor = "";
-        els.filterToggle.style.color = "";
-        els.filterToggle.setAttribute("aria-pressed", "false");
-        els.filterToggle.setAttribute("aria-label", "フィルター行を表示");
         // ソート解除
         state.sortCol = -1;
         state.sortAsc = true;
@@ -10328,96 +10272,6 @@ ${findings.length
         a.click();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
         setStatus(`絞込保存: ${indices.length}行をエクスポートしました`);
-      }
-
-      // ===== 最近開いたファイル =====
-      const RECENT_KEY = "tsv-editor-recent-files";
-      const RECENT_MAX = 8;
-
-      function getRecentFiles() {
-        try {
-          return JSON.parse(localStorage.getItem(RECENT_KEY) || "[]");
-        } catch {
-          return [];
-        }
-      }
-      function addRecentFile(fileName, filePath) {
-        const list = getRecentFiles().filter(
-          (r) => !(r.fileName === fileName && r.filePath === (filePath || "")),
-        );
-        list.unshift({ fileName, filePath: filePath || "", ts: Date.now() });
-        localStorage.setItem(
-          RECENT_KEY,
-          JSON.stringify(list.slice(0, RECENT_MAX)),
-        );
-      }
-      function clearRecentFiles() {
-        localStorage.removeItem(RECENT_KEY);
-        renderRecentMenu();
-      }
-      function renderRecentMenu() {
-        const menu = $("recent-menu");
-        const list = getRecentFiles();
-        if (!list.length) {
-          menu.innerHTML = `<div class="recent-empty">履歴がありません</div>`;
-          return;
-        }
-        menu.innerHTML =
-          `<div class="recent-header">最近開いたファイル</div>` +
-          list
-            .map(
-              (r, idx) =>
-                `<div class="recent-item" data-idx="${idx}" role="menuitem" tabindex="-1">
-              <span class="recent-name" title="${escHtml(r.filePath || r.fileName)}">${escHtml(r.fileName)}</span>
-              ${r.filePath ? `<span class="recent-path">${escHtml(r.filePath.length > 40 ? "…" + r.filePath.slice(-40) : r.filePath)}</span>` : ""}
-            </div>`,
-            )
-            .join("") +
-          `<button type="button" class="recent-clear" id="recent-clear-btn">履歴をクリア</button>`;
-        menu.querySelectorAll(".recent-item").forEach((el) => {
-          el.onclick = () => {
-            const item = list[parseInt(el.dataset.idx)];
-            closeRecentMenu();
-            setStatus(
-              `「${item.fileName}」はドラッグ&ドロップで再度開いてください`,
-            );
-            closeRecentMenu();
-          };
-        });
-        // キーボード操作
-        const items = [...menu.querySelectorAll(".recent-item")];
-        items.forEach((el, i) => {
-          el.onkeydown = (ev) => {
-            if (ev.key === "ArrowDown") {
-              ev.preventDefault();
-              const next = items[i + 1];
-              if (next) next.focus();
-            } else if (ev.key === "ArrowUp") {
-              ev.preventDefault();
-              const prev = items[i - 1];
-              if (prev) prev.focus();
-            } else if (ev.key === "Enter" || ev.key === " ") {
-              ev.preventDefault();
-              el.click();
-            } else if (ev.key === "Escape") {
-              ev.preventDefault();
-              closeRecentMenu();
-            }
-          };
-        });
-        const clearBtn = $("recent-clear-btn");
-        if (clearBtn) clearBtn.onclick = clearRecentFiles;
-      }
-      function openRecentMenu() {
-        renderRecentMenu();
-        $("recent-menu").classList.add("show");
-        $("btn-open-recent").setAttribute("aria-expanded", "true");
-        const firstItem = $("recent-menu").querySelector(".recent-item");
-        if (firstItem) firstItem.focus();
-      }
-      function closeRecentMenu() {
-        $("recent-menu").classList.remove("show");
-        $("btn-open-recent").setAttribute("aria-expanded", "false");
       }
 
       // ===== フォーカストラップユーティリティ =====
@@ -10539,6 +10393,11 @@ ${findings.length
       // ===== 条件付きハイライト =====
       function toggleConditionalHL() {
         state.conditionalHL = !state.conditionalHL;
+        const btn = $("btn-conditional-hl");
+        if (btn) {
+          btn.classList.toggle("active-state", state.conditionalHL);
+          btn.setAttribute("aria-pressed", String(state.conditionalHL));
+        }
         state.forceRender = true;
         renderBody();
         setStatus(
