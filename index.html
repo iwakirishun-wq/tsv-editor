@@ -2428,7 +2428,13 @@
         const key = state.sejMaster.fileName + "|" + state.data.length + "|" + _dataVersion + "|" + sejCodeColIdx;
         if (_ghostCache.key === key) return _ghostCache.list;
         const byCode = state.sejMaster.byCode;
-        const grpOf = (m) => ((m.grp_nm || m.seat_type_grp_nm1 || "") + "").trim();
+        const byGroup = state.sejMaster.byGroup;
+        const grpKey = state.sejMaster.grpKey;
+        // グループ名列が無い／インデックス未構築のマスタではゴーストを出さない
+        // （別グループ・別イベントの席種を誤って大量表示しないための安全側）
+        if (!grpKey || !byGroup) { _ghostCache = { key, list: [] }; return []; }
+        const grpOf = (m) => ((m && m[grpKey]) || "").toString().trim();
+        // 現データで使われているコードと、その所属グループ（=ソートに使うグループ名）を集める
         const usedCodes = new Set();
         const usedGroups = new Set();
         for (const r of state.data) {
@@ -2441,16 +2447,18 @@
             if (g) usedGroups.add(g);
           }
         }
+        // 現データに含まれるグループだけを走査（マスタ全件は見ない）。
+        // 同じグループのマスタ登録のうち、現データに無いコードだけをゴーストとして返す。
         const list = [];
-        if (usedGroups.size) {
-          for (const cd of Object.keys(byCode)) {
+        for (const g of usedGroups) {
+          const codes = byGroup[g];
+          if (!codes) continue;
+          for (const cd of codes) {
             if (usedCodes.has(cd)) continue;
             const m = byCode[cd];
-            const g = grpOf(m);
-            if (!g || !usedGroups.has(g)) continue;
             list.push({
               cd,
-              nm: m.seat_type_area_disp_nm || m.seat_type_area_control_nm || cd,
+              nm: (m && (m.seat_type_area_disp_nm || m.seat_type_area_control_nm)) || cd,
               grp: g,
             });
           }
@@ -2460,7 +2468,7 @@
       }
 
       // ===== UG差額の自動検算 =====
-      // 検算ルール（2026-06-13 ナレッジ突合で確定、2026-06-21 車椅子・大人料金ダウングレード規定を追加）:
+      // 検算ルール（2026-06-13 ナレッジ突合で確定、2026-06-21 車椅子・大人料金ダウングレード・子供例外を追加）:
       //  可否（これに反したら invalid）:
       //   ・一般販売（販売区分に「会員」を含まない）のUG行は不可
       //   ・年齢降格（先の年齢ランク < 元の年齢ランク）は不可
@@ -2469,9 +2477,12 @@
       //   ・大人料金が先<元（実質ダウングレード）のUGは不可。ただし大人以外の年齢区分は、
       //     その年齢自身の差額が500円以内（先が安い側）なら0円として許可する例外がある
       //  期待差額（前売・当日それぞれ・同年齢どうしで算出）:
-      //   ・同席種UG（指定席）→ 一律500円
-      //   ・異席種UG → diff = 先価格 − 元価格 で、 diff<=0→0円 / 1〜500→500円 / 500超→実差額
-      //  売止めダミー: 価格が 800,000 以上は売止め扱い（検算対象外）
+      //   ・同席種・同年齢区分UG（指定席）→ 一律500円
+      //   ・異席種だが同年齢区分どうしのUG:
+      //     - 大人・U23: diff = 先価格 − 元価格 で、 diff===0→500円（席変更手数料） / 1〜500→500円 / 500超→実差額
+      //     - 子供・幼児: 500円の下駄を履かせない。diff<0→0円 / diff>=0→実差額（0円もそのまま）
+      //   ・異年齢区分間のUG（子供→U23等）→ diff = 先価格 − 元価格 で、 diff<=0→0円 / 1〜500→500円 / 500超→実差額（従来どおり）
+      //  売止めダミー: 価格が 800,000 以上、または全桁が9（99999等）は売止め扱い（検算対象外）
       const UG_DUMMY_MIN = 800000;
       // seatMeta(code, name) -> { isFree, isReserved, found } | null（席種エリアマスタ連携時のみ）
       function buildUgValidator(rows, c, v, seatMeta) {
@@ -2514,6 +2525,7 @@
           return /自由席|エリア/.test(seat) ? "エリア" : "指定席";
         };
         const isWheelchair = (seat) => /車椅子|車いす/.test(seat || "");
+        const isChildLikeAge = (a) => { const r = ageRank(a); return r === 1 || r === 2; }; // 幼児・子供
         // 800,000以上、または全桁が9（99999等）はダミー値（売止め・その販売区分での取扱なし）として価格扱いしない
         const isDummyPrice = (n) => n != null && (n >= UG_DUMMY_MIN || /^9+$/.test(String(n)));
         const chargeFor = (diff) => diff <= 0 ? 0 : (diff <= 500 ? 500 : diff); // 0以下→0 / 1〜500→500 / 超→実差額
@@ -2590,7 +2602,18 @@
             const sp = s ? s[which] : null, dp = d ? d[which] : null;
             if (sp == null || dp == null) return { exp: null, note: "価格不明", dummy: false };
             if (isDummyPrice(sp) || isDummyPrice(dp)) return { exp: null, note: "売止め/その販売区分の取扱なし", dummy: true };
-            return { exp: chargeFor(dp - sp), note: "", dummy: false, srcPrice: sp, dstPrice: dp, rawDiff: dp - sp };
+            const diff = dp - sp;
+            if (srcAge === dstAge) {
+              // 子供・幼児は同年齢どうしの席変更でも500円の下駄を履かせない（マイナスなら0円、それ以外は実差額）
+              if (isChildLikeAge(srcAge)) {
+                return { exp: diff < 0 ? 0 : diff, note: "", dummy: false, srcPrice: sp, dstPrice: dp, rawDiff: diff };
+              }
+              // 大人・U23等は同年齢どうしで差額が0円でも、席変更の実務手数料として500円が必要
+              if (diff === 0) {
+                return { exp: 500, note: "同年齢どうしで差額0円→席変更手数料500円", dummy: false, srcPrice: sp, dstPrice: dp, rawDiff: diff };
+              }
+            }
+            return { exp: chargeFor(diff), note: "", dummy: false, srcPrice: sp, dstPrice: dp, rawDiff: diff };
           };
           const adv = calc("adv"), day = calc("day");
 
@@ -4051,10 +4074,13 @@
           }
         }
         // 開いた直後の行数と保存時の行数が異なる場合は事前に確認（予期せぬ行の増減チェック）
-        const savedRowsForCheck = state.filteredIndices ? state.filteredIndices.length : state.data.length;
-        if (state.originalRowCount > 0 && savedRowsForCheck !== state.originalRowCount) {
-          const diff = savedRowsForCheck - state.originalRowCount;
-          if (!confirm(`開いた時点では ${state.originalRowCount}行でしたが、保存時は ${savedRowsForCheck}行になります（${diff > 0 ? "+" : ""}${diff}行）。\n\n意図した変更でなければキャンセルして確認してください。続行しますか？`)) {
+        // フィルターで一部行のみ保存する場合は上の確認で足りるため、全行保存時のみ判定する
+        // （絞り込み中に「絞った行数≠開いた時の全行数」で誤警告を出さないため）
+        const isFullSave = !state.filteredIndices || state.filteredIndices.length === state.data.length;
+        const savedRows = state.filteredIndices ? state.filteredIndices.length : state.data.length;
+        if (isFullSave && state.originalRowCount > 0 && savedRows !== state.originalRowCount) {
+          const diff = savedRows - state.originalRowCount;
+          if (!confirm(`開いた時点では ${state.originalRowCount}行でしたが、保存時は ${savedRows}行になります（${diff > 0 ? "+" : ""}${diff}行）。\n\n意図した変更でなければキャンセルして確認してください。続行しますか？`)) {
             setStatus("保存をキャンセルしました");
             return;
           }
@@ -4070,9 +4096,8 @@
         a.click();
         setTimeout(() => URL.revokeObjectURL(objUrl), 1000);
         markClean();
-        const savedRows = state.filteredIndices ? state.filteredIndices.length : state.data.length;
-        const rowNote = savedRows !== state.originalRowCount ? `（元 ${state.originalRowCount}行→保存 ${savedRows}行）` : "";
-        state.originalRowCount = savedRows; // 保存後の行数を新たな基準にする
+        const rowNote = isFullSave && savedRows !== state.originalRowCount ? `（元 ${state.originalRowCount}行→保存 ${savedRows}行）` : "";
+        if (isFullSave) state.originalRowCount = savedRows; // 全行保存時のみ次回の基準を更新（フィルター保存では基準を保つ）
         setStatus(`保存しました（${savedRows}行${virtualNote}）${rowNote}`);
       }
 
@@ -8474,6 +8499,19 @@
               .map(k => normHeaders.indexOf(k))
               .find(i => i !== -1);
             const grpKey = grpKeyIdx != null ? headers[grpKeyIdx] : null;
+            // グループ名 → コード配列の事前インデックスをマスタに保持する。
+            // ゴースト行を「現データに含まれるグループ」だけに絞る際、マスタ全件を走査せず
+            // 該当グループのコードだけを見られるようにし、大規模マスタでも軽量に保つ。
+            // 仮想列ソートと同じ grpKey を使うため、絞り込み単位がソートのグループ名と必ず一致する。
+            const byGroup = {};
+            if (grpKey) {
+              for (const cd in byCode) {
+                const g = (byCode[cd][grpKey] || "").toString().trim();
+                if (g) (byGroup[g] = byGroup[g] || []).push(cd);
+              }
+            }
+            state.sejMaster.byGroup = byGroup;
+            state.sejMaster.grpKey = grpKey;
             console.log("[SEJ] 仮想列追加チェック:", {
               curCodeIdx,
               masterHeaders: normHeaders,
@@ -9185,13 +9223,15 @@ ${_sortableTable(labels, rowsHtml)}` };
             for (const ts of toSeats) for (const ta of toAges[ts]) toCols.push({ ts, ta });
 
             // ヘッダー: 行1=先席種(colspan,色,カテゴリ) / 行2=先券種＋先基準価格
+            // 販売期間（開始〜終了）はヘッダーが狭く横にはみ出るため、開始日と終了日の間で改行する
+            const periodHtml = (p) => p.period ? `<br><span class="hp-period">${escHtml(p.period).replace("〜", "<br>〜")}</span>` : "";
             let head = `<tr><th class="corner" colspan="2" rowspan="2">元＼先</th>`;
             for (const ts of toSeats) head += `<th class="seathdr" colspan="${toAges[ts].length}" style="background:${seatColor(ts)}">${escHtml(seatLabel(ts, seatCode[ts]))}${catBadge(seatCat(seatCode[ts], ts))}</th>`;
             head += `</tr><tr>`;
             let prevTsHead = null;
             for (const ts of toSeats) for (const ta of toAges[ts]) {
               const p = priceMap[ts + "|" + ta];
-              const pr = p ? `<div class="hp">前${money(p.adv)}<br>当${money(p.day)}${p.period ? `<br><span class="hp-period">${escHtml(p.period)}</span>` : ""}</div>` : "";
+              const pr = p ? `<div class="hp">前${money(p.adv)}<br>当${money(p.day)}${periodHtml(p)}</div>` : "";
               const colSep = ts !== prevTsHead ? " mx-colsep" : "";
               prevTsHead = ts;
               head += `<th class="agehdr${colSep}">${escHtml(ageLabel(ta))}${pr}</th>`;
@@ -9205,7 +9245,7 @@ ${_sortableTable(labels, rowsHtml)}` };
                 bodyRows += `<tr${i === 0 ? ' class="seat-sep"' : ""}>`;
                 if (i === 0) bodyRows += `<th class="rowh seatrow" rowspan="${fromAges[fs].length}" style="background:${seatColor(fs)}">${escHtml(seatLabel(fs, seatCode[fs]))}${catBadge(seatCat(seatCode[fs], fs))}</th>`;
                 const p = priceMap[fs + "|" + fa];
-                const pr = p ? `<div class="hp">前${money(p.adv)} 当${money(p.day)}${p.period ? `<br><span class="hp-period">${escHtml(p.period)}</span>` : ""}</div>` : "";
+                const pr = p ? `<div class="hp">前${money(p.adv)} 当${money(p.day)}${periodHtml(p)}</div>` : "";
                 bodyRows += `<th class="agehdr rowh agecol">${escHtml(ageLabel(fa))}${pr}</th>`;
                 let prevTsBody = null;
                 for (const { ts, ta } of toCols) {
@@ -9239,7 +9279,7 @@ ${_sortableTable(labels, rowsHtml)}` };
           }
           const ngBadge = ngTotal ? `　<span class="badge-ng">NG ${ngTotal}件</span>` : `　<span class="badge-ok">検算OK</span>`;
           sections.matrix = { title: "UGマトリクス", body: `<h2>🔢 アップグレードマトリクス（俯瞰）${ngBadge}</h2>
-<p class="legend">行=元席種/券種、列=先席種/券種（大人の前売価格の安い順）。見出しには通常価格の販売期間も併記。席種は表示略称＋区分（<span class="catb cat-r">指定席</span><span class="catb cat-a">数在庫</span><span class="catb cat-o">その他</span>）。各セル: 先－元=期待差額（緑） / 前売・当日=実際の金額 / 下=販売期間（曜日付き）。<b>不一致は文字が赤・セルが薄ピンク</b>。「NG/未チェックのみ」ON時は対象外セルを薄く退色表示。クリックでマーク</p>${mxBody}` };
+<p class="legend">行=元席種/券種、列=先席種/券種（大人の前売価格の安い順）。見出しには通常価格の販売期間も併記。席種は表示略称＋区分（<span class="catb cat-r">指定席</span><span class="catb cat-a">数在庫</span><span class="catb cat-o">その他</span>）。各セル: 先－元=期待差額（緑） / 前売・当日=実際の金額 / 下=販売期間（曜日付き）。<b>期待差額</b>は同区分なら大人・U23が差額0でも500・子供幼児はマイナス→0でその他は実差額、異区分間は0以下→0・1〜500→500・500超→実差額。<b>不一致は文字が赤・セルが薄ピンク</b>。「NG/未チェックのみ」ON時は対象外セルを薄く退色表示。クリックでマーク</p>${mxBody}` };
         }
 
         // --- UG一覧（席種ペアでセル結合・元⇒先・金額対比・差異強調） ---
@@ -9291,7 +9331,7 @@ ${_sortableTable(labels, rowsHtml)}` };
               bodyRows += `<td class="kenpair">${escHtml(ageLabel(v(row, c.ugAge)))}<span class="arrow">⇒</span>${escHtml(ageLabel(v(row, c.age)))}</td>`
                 + `<td class="prices">${dual(money(chk.srcAdv != null ? chk.srcAdv : ""), money(chk.srcDay != null ? chk.srcDay : ""))}</td>`
                 + `<td class="prices">${dual(money(chk.dstAdv != null ? chk.dstAdv : ""), money(chk.dstDay != null ? chk.dstDay : ""))}</td>`
-                + `<td class="exp" title="先−元の期待差額（同席種・同年齢区分=一律500／それ以外は実差額：0以下→0・1〜500→500・500超→実差額）">${escHtml(expStr)}${dgNote}</td>`
+                + `<td class="exp" title="先−元の期待差額（同席種同区分=一律500／異席種でも同区分どうしは大人・U23が差額0でも500・子供幼児はマイナス→0でその他は実差額／異区分間は0以下→0・1〜500→500・500超→実差額）">${escHtml(expStr)}${dgNote}</td>`
                 + `<td class="prices reg">${dual(money(v(row, c.adv)), money(v(row, c.day)), chk.advNg, chk.dayNg, chk.advNg ? "期待 " + (chk.expected != null ? chk.expected.toLocaleString("ja-JP") : "?") : "", chk.dayNg ? "期待 " + (chk.expectedDay != null ? chk.expectedDay.toLocaleString("ja-JP") : "?") : "")}</td>`
                 + cell(condOf(row), condOf(row))
                 + cell(periodOf(row), v(row, c.start), "dt")
@@ -9304,7 +9344,7 @@ ${_sortableTable(labels, rowsHtml)}` };
             + (inv ? `　<span class="badge-ng">設定不可 ${inv}件</span>` : "")
             + (na ? `　<span class="badge-na">価格不明 ${na}件</span>` : "");
           sections.ug = { title: "UG一覧", body: `<h2>🔀 アップグレード一覧（${ugs.length}件）${badges}</h2>
-<p class="legend">区間=元席種⇒先席種（セル結合）。期待差額=先−元（同席種・同年齢区分のみ一律500／それ以外は実差額で0以下→0・1〜500→500・500超→実差額、前売・当日とも）。車椅子は他席種との相互UG不可、大人料金が先&lt;元のUGも原則不可。登録差額が期待と違う項目は文字が赤、コメント欄に理由。${seatMeta ? "席種は表示略称・" : ""}券種は略称</p>
+<p class="legend">区間=元席種⇒先席種（セル結合）。期待差額=先−元（前売・当日とも）。同席種・同年齢区分は一律500。<b>異席種でも同年齢区分どうし</b>は、大人・U23は差額0でも500円（席変更手数料）、子供・幼児はマイナス→0・それ以外は実差額。<b>異年齢区分間</b>は0以下→0・1〜500→500・500超→実差額。車椅子は他席種との相互UG不可、大人料金が先&lt;元のUGも原則不可。登録差額が期待と違う項目は文字が赤、コメント欄に理由。${seatMeta ? "席種は表示略称・" : ""}券種は略称</p>
 <div class="scroll uglistscroll"><table class="uglist">${head}${bodyRows}</table></div>` };
         }
 
