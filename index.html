@@ -2484,19 +2484,45 @@
       //     - U23・子供・幼児（diff≠0）→ 500円に切り上げず実差額 / マイナス→0円
       //   ・異年齢区分間のUG（子供→U23等）→ diff = 先価格 − 元価格 で、 diff<=0→0円 / 1〜500→500円 / 500超→実差額（従来どおり）
       //  売止めダミー: 価格が 800,000 以上、または全桁が9（99999等）は売止め扱い（検算対象外）
-      const UG_DUMMY_MIN = 800000;
+      // ===PRICE_RULES_CORE_START=== UI/stateに依存しない純粋ロジック（tests/price_rules.test.js が抽出して検証する）
+      // 料金・検算ルールの定数（イベントや運用で変わりうる値を1か所に集約）
+      const PRICE_RULES = {
+        SEAT_CHANGE_FEE: 500,    // 同席種同区分／差額0円のUG手数料、および大人の1〜500円UGの下限
+        RESALE_MIN: 1321,        // リセール用販売価格下限（手数料割れ防止）
+        DUMMY_PRICE_MIN: 800000, // この額以上、または全桁9（99999等）は売止めダミー扱い
+      };
+      // 年齢区分ランク（1=幼児 2=子供 3=U23 4=大人 0=共通/不明）
+      function ugAgeRank(a) {
+        a = String(a);
+        if (/幼児|未就学|INFANT/i.test(a)) return 1;
+        if (/子供|こども|子ども|小中|小・中|小学|CHILD/i.test(a)) return 2;
+        if (/U23|ｱﾝﾀﾞｰ|アンダー/i.test(a)) return 3;
+        if (/大人|ADULT|高校/i.test(a)) return 4;
+        return 0; // 共通・不明はランク判定しない
+      }
+      // 売止め等のダミー価格（検算対象外）か
+      function ugIsDummyPrice(n) {
+        return n != null && (n >= PRICE_RULES.DUMMY_PRICE_MIN || /^9+$/.test(String(n)));
+      }
+      // 異席種UGの期待差額（diff = 先価格 − 元価格）。同席種同区分(sameSeat)は呼び出し側で別扱い。
+      //  ・同年齢区分: 差額0は全区分とも手数料(500)／大人は1〜500→500・500超→実差額／U23以下は実差額(マイナス→0)
+      //  ・異年齢区分: 0以下→0 ／ 1〜500→500 ／ 500超→実差額
+      function ugExpectedCharge(srcAge, dstAge, srcPrice, dstPrice) {
+        const fee = PRICE_RULES.SEAT_CHANGE_FEE;
+        const diff = dstPrice - srcPrice;
+        if (srcAge === dstAge) {
+          if (diff === 0) return fee;
+          if (ugAgeRank(srcAge) !== 4) return diff < 0 ? 0 : diff;
+        }
+        return diff <= 0 ? 0 : (diff <= fee ? fee : diff);
+      }
+      // ===PRICE_RULES_CORE_END===
+      const UG_DUMMY_MIN = PRICE_RULES.DUMMY_PRICE_MIN; // 既存参照の互換エイリアス
       // seatMeta(code, name) -> { isFree, isReserved, found } | null（席種エリアマスタ連携時のみ）
       function buildUgValidator(rows, c, v, seatMeta) {
         const num = (s) => { const n = Number(String(s).replace(/,/g, "")); return isNaN(n) ? null : n; };
         const condKey = (row) => [v(row, c.kbn), v(row, c.rank), v(row, c.route)].join("|");
-        const ageRank = (a) => {
-          a = String(a);
-          if (/幼児|未就学|INFANT/i.test(a)) return 1;
-          if (/子供|こども|子ども|小中|小・中|小学|CHILD/i.test(a)) return 2;
-          if (/U23|ｱﾝﾀﾞｰ|アンダー/i.test(a)) return 3;
-          if (/大人|ADULT|高校/i.test(a)) return 4;
-          return 0; // 共通・不明はランク判定しない
-        };
+        const ageRank = ugAgeRank;
         const byCond = new Map(), any = new Map();
         const adultByCond = new Map(), adultAny = new Map(); // 席ごとの大人料金（ランク4）を引くための索引
         for (const row of rows) {
@@ -2527,9 +2553,7 @@
         };
         const isWheelchair = (seat) => /車椅子|車いす/.test(seat || "");
         const isAdultAge = (a) => ageRank(a) === 4; // 大人（同年齢区分どうしで差額0でも500円の席変更手数料が必要なのは大人のみ）
-        // 800,000以上、または全桁が9（99999等）はダミー値（売止め・その販売区分での取扱なし）として価格扱いしない
-        const isDummyPrice = (n) => n != null && (n >= UG_DUMMY_MIN || /^9+$/.test(String(n)));
-        const chargeFor = (diff) => diff <= 0 ? 0 : (diff <= 500 ? 500 : diff); // 0以下→0 / 1〜500→500 / 超→実差額
+        const isDummyPrice = ugIsDummyPrice; // 売止め等のダミー価格判定（純粋ロジックを委譲）
         const lookup = (ck, seat, age) => byCond.get(ck + "|" + seat + "|" + age) || any.get(seat + "|" + age) || null;
         const lookupAdult = (ck, seat) => adultByCond.get(ck + "|" + seat) || adultAny.get(seat) || null;
 
@@ -2597,28 +2621,18 @@
           // --- 期待差額（前売・当日） ---
           // 戻り: { exp:number|null, note:string, dummy:bool }
           const calc = (which) => {
-            if (sameSeat) return { exp: 500, note: "同席種・同年齢区分=一律500（再発行等）", dummy: false };
+            if (sameSeat) return { exp: PRICE_RULES.SEAT_CHANGE_FEE, note: "同席種・同年齢区分=一律500（再発行等）", dummy: false };
             const ck = condKey(row);
             const s = lookup(ck, srcSeat, srcAge), d = lookup(ck, dstSeat, dstAge);
             const sp = s ? s[which] : null, dp = d ? d[which] : null;
             if (sp == null || dp == null) return { exp: null, note: "価格不明", dummy: false };
             if (isDummyPrice(sp) || isDummyPrice(dp)) return { exp: null, note: "売止め/その販売区分の取扱なし", dummy: true };
             const diff = dp - sp;
-            if (srcAge === dstAge) {
-              // 同年齢区分どうしの席変更:
-              // ・差額0円は全区分とも席変更手数料として500円
-              // ・差額プラスのとき、大人は500円に切り上げ（1〜500→500/500超→実差額）、U23以下は実差額をそのまま
-              // ・マイナスは全区分0円
-              if (diff === 0) {
-                return { exp: 500, note: "同年齢区分どうしで差額0円→席変更手数料500円", dummy: false, srcPrice: sp, dstPrice: dp, rawDiff: diff };
-              }
-              if (!isAdultAge(srcAge)) {
-                // U23・子供・幼児は500円に切り上げず実差額（マイナスなら0円）
-                return { exp: diff < 0 ? 0 : diff, note: "", dummy: false, srcPrice: sp, dstPrice: dp, rawDiff: diff };
-              }
-              // 大人で差額あり（diff≠0）は下の chargeFor へ（1〜500→500/500超→実差額/マイナス→0）
-            }
-            return { exp: chargeFor(diff), note: "", dummy: false, srcPrice: sp, dstPrice: dp, rawDiff: diff };
+            // 期待差額の写像は純粋関数 ugExpectedCharge に集約（同年齢: 差額0は全区分500・大人は1〜500→500/超→実差額・
+            // U23以下は実差額/マイナス0／異年齢: 0以下→0・1〜500→500・500超→実差額）
+            const exp = ugExpectedCharge(srcAge, dstAge, sp, dp);
+            const note = (srcAge === dstAge && diff === 0) ? "同年齢区分どうしで差額0円→席変更手数料500円" : "";
+            return { exp, note, dummy: false, srcPrice: sp, dstPrice: dp, rawDiff: diff };
           };
           const adv = calc("adv"), day = calc("day");
 
@@ -5042,9 +5056,9 @@
                 displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">✗ 上限9(非販売)なのにリセール可</span>`;
               }
               // リセール下限不正 (リセール用販売価格下限列)。券面価格固定の場合は手数料割れの懸念がないため対象外
-              if (j === ikkatsuCols.resaleMin && ik.resale === "可能" && !ik.priceFixed.includes("固定") && ik.resaleMin !== "1321") {
+              if (j === ikkatsuCols.resaleMin && ik.resale === "可能" && !ik.priceFixed.includes("固定") && ik.resaleMin !== String(PRICE_RULES.RESALE_MIN)) {
                 cls.push("cell-ng");
-                displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">✗ リセール可→1321必須</span>`;
+                displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">✗ リセール可→${PRICE_RULES.RESALE_MIN}必須</span>`;
               }
               // 上限9+SEJ支払可 (SEJ支払列)
               if (j === ikkatsuCols.sejPay && ik.limit === "9" && ik.sejPay === "支払可") {
@@ -9524,7 +9538,18 @@ body.crosshi th.cross-col:not(.mk-cell)::after, body.crosshi th.cross-row:not(.m
 .seat-sep td, .seat-sep th { border-top: 2px solid #94a3b8 !important; }
 /* マトリクス: 先側の席種が変わる列の境目も太線で区切る（行のseat-sepと対になる列方向の区切り） */
 table.mx td.mx-colsep, table.mx th.mx-colsep { border-left: 2px solid #94a3b8 !important; }
-@media print { .toolbar, .filter-row, .ptabs { display: none; } .ppane { display: block !important; } .content { overflow: visible; } .scroll { overflow: visible; max-height: none; } }
+/* PDF保存（印刷）時: マーカー・NG色などの背景を保持し、絞り込み行/スクロール領域も全て展開して出力する */
+@media print {
+  .toolbar, .ptabs { display: none; }
+  .sort-picker-wrap { display: none; }
+  .ppane { display: block !important; }
+  .content { overflow: visible; }
+  .scroll { overflow: visible; max-height: none; }
+  /* 全タブ（通常価格表/マトリクス/UG一覧）を連続出力（各 pane 内に既に h2 見出しあり） */
+  table { page-break-inside: auto; }
+  tr { page-break-inside: avoid; }
+}
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 </style></head><body>
 <div class="header"><h1>💴 ${fname} <span style="font-size:12px;color:#666;font-weight:400">価格チェック</span></h1>
 <div class="meta">${metaLine}　|　ヘッダー固定・列見出しで並べ替え・各列で絞り込み　${condSel}</div>
@@ -9537,6 +9562,7 @@ table.mx td.mx-colsep, table.mx th.mx-colsep { border-left: 2px solid #94a3b8 !i
   <button id="mk-ngonly" style="border-color:#dc2626;color:#dc2626">NG/未チェックのみ</button>
   <input type="color" id="mk-color" value="#fde047" title="マーカー色">
   <label class="tg"><input type="checkbox" id="mk-cross"${state.crossHi ? " checked" : ""}> 十字強調</label>
+  <button id="mk-pdf" title="この表をPDFとして保存（印刷ダイアログで「PDFに保存」を選択）。マーカー・NG色も保持されます">🖨 PDF保存</button>
   <span class="hint">行ダブルクリック / 左端✔クリックでもマーク</span>
 </div>
 <` + `script>var DEFAULT_COND=${JSON.stringify(defaultCond || "")};${_priceCheckScript()}<` + `/script>
@@ -9651,6 +9677,8 @@ table.mx td.mx-colsep, table.mx th.mx-colsep { border-left: 2px solid #94a3b8 !i
   }
   document.addEventListener('keydown', function(e){ if ((e.ctrlKey || e.metaKey) && (e.key === 'q' || e.key === 'Q')) { e.preventDefault(); markSelection(); } });
   document.getElementById('mk-btn').onclick = markSelection;
+  var _pdfBtn = document.getElementById('mk-pdf');
+  if (_pdfBtn) _pdfBtn.onclick = function(){ window.print(); };
   document.getElementById('mk-clear').onclick = function(){ if (!confirm('マークをすべて解除しますか？')) return; saved = {}; persist(); markables().forEach(paint); refreshCount(); };
   document.getElementById('mk-color').oninput = function(e){ document.documentElement.style.setProperty('--mk', e.target.value); try { localStorage.setItem(KEY + '|color', e.target.value); } catch(err){} };
   try { var cc = localStorage.getItem(KEY + '|color'); if (cc) { document.documentElement.style.setProperty('--mk', cc); document.getElementById('mk-color').value = cc; } } catch(e){}
@@ -9947,8 +9975,8 @@ table.mx td.mx-colsep, table.mx th.mx-colsep { border-left: 2px solid #94a3b8 !i
           // 4) リセール可なら下限=1321（券面価格固定の場合は手数料割れの懸念がないため対象外）
           if (g(row, c.resale) === "可能" && !g(row, c.priceFixed).includes("固定")) {
             const min = g(row, c.resaleMin);
-            if (min !== "1321") {
-              add("リセール下限", "NG", `リセール可能だがリセール用販売価格下限=「${min || "(空欄)"}」（1321であるべき：手数料1321円を下回ると赤字）`);
+            if (min !== String(PRICE_RULES.RESALE_MIN)) {
+              add("リセール下限", "NG", `リセール可能だがリセール用販売価格下限=「${min || "(空欄)"}」（${PRICE_RULES.RESALE_MIN}であるべき：手数料${PRICE_RULES.RESALE_MIN}円を下回ると赤字）`);
             }
           }
 
