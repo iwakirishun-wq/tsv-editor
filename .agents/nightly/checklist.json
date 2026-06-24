@@ -3,25 +3,25 @@
     {
       "id": "normal-table",
       "label": "通常価格表（前売/当日 行分割レイアウト）の表示",
-      "lastChecked": "2026-06-24T00:45:14.927Z",
+      "lastChecked": "2026-06-24T17:49:10.010Z",
       "lastResult": "ok"
     },
     {
       "id": "ug-matrix",
       "label": "UGマトリクス（俯瞰）の表示・列固定・期待差額バッジ",
-      "lastChecked": "2026-06-24T00:45:14.927Z",
+      "lastChecked": "2026-06-24T17:49:10.010Z",
       "lastResult": "ok"
     },
     {
       "id": "ug-list",
       "label": "UG一覧（差額NG検出・コメント表示）",
-      "lastChecked": "2026-06-24T00:42:31.207Z",
+      "lastChecked": "2026-06-24T01:41:05.858Z",
       "lastResult": "ok"
     },
     {
       "id": "dummy-price",
       "label": "売止めダミー価格(999999等)の表示が0円にならないか",
-      "lastChecked": "2026-06-24T00:42:31.207Z",
+      "lastChecked": "2026-06-24T01:41:05.858Z",
       "lastResult": "ok"
     },
     {
@@ -100,6 +100,22 @@
       "focusAreas": [
         "cross-highlight",
         "large-data-perf"
+      ]
+    },
+    {
+      "date": "2026-06-24",
+      "status": "ok",
+      "focusAreas": [
+        "ug-list",
+        "dummy-price"
+      ]
+    },
+    {
+      "date": "2026-06-24",
+      "status": "ok",
+      "focusAreas": [
+        "normal-table",
+        "ug-matrix"
       ]
     }
   ]
