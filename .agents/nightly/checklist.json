@@ -1,0 +1,106 @@
+{
+  "areas": [
+    {
+      "id": "normal-table",
+      "label": "通常価格表（前売/当日 行分割レイアウト）の表示",
+      "lastChecked": "2026-06-24T00:45:14.927Z",
+      "lastResult": "ok"
+    },
+    {
+      "id": "ug-matrix",
+      "label": "UGマトリクス（俯瞰）の表示・列固定・期待差額バッジ",
+      "lastChecked": "2026-06-24T00:45:14.927Z",
+      "lastResult": "ok"
+    },
+    {
+      "id": "ug-list",
+      "label": "UG一覧（差額NG検出・コメント表示）",
+      "lastChecked": "2026-06-24T00:42:31.207Z",
+      "lastResult": "ok"
+    },
+    {
+      "id": "dummy-price",
+      "label": "売止めダミー価格(999999等)の表示が0円にならないか",
+      "lastChecked": "2026-06-24T00:42:31.207Z",
+      "lastResult": "ok"
+    },
+    {
+      "id": "html-save",
+      "label": "HTML保存ボタンで非空ファイルが保存されるか",
+      "lastChecked": "2026-06-24T01:10:08.766Z",
+      "lastResult": "ok"
+    },
+    {
+      "id": "marker-persist",
+      "label": "チェックマーク・NG/未チェックのみフィルタの動作",
+      "lastChecked": "2026-06-24T01:10:08.766Z",
+      "lastResult": "ok"
+    },
+    {
+      "id": "sort-filter",
+      "label": "通常価格表の並べ替え/絞り込み（種別=前売/当日列含む）",
+      "lastChecked": "2026-06-24T01:11:58.565Z",
+      "lastResult": "ok"
+    },
+    {
+      "id": "master-unlinked",
+      "label": "席種エリアマスタ未連携時の挙動・案内メッセージ",
+      "lastChecked": "2026-06-24T01:11:58.565Z",
+      "lastResult": "ok"
+    },
+    {
+      "id": "cross-highlight",
+      "label": "十字ハイライト（マウスオーバーで行列強調）",
+      "lastChecked": "2026-06-24T01:14:36.190Z",
+      "lastResult": "ok"
+    },
+    {
+      "id": "large-data-perf",
+      "label": "大量行データでの表示・出力パフォーマンス",
+      "lastChecked": "2026-06-24T01:14:36.190Z",
+      "lastResult": "ok"
+    }
+  ],
+  "history": [
+    {
+      "date": "2026-06-24",
+      "status": "ok",
+      "focusAreas": [
+        "ug-list",
+        "dummy-price"
+      ]
+    },
+    {
+      "date": "2026-06-24",
+      "status": "ok",
+      "focusAreas": [
+        "normal-table",
+        "ug-matrix"
+      ]
+    },
+    {
+      "date": "2026-06-24",
+      "status": "ok",
+      "focusAreas": [
+        "html-save",
+        "marker-persist"
+      ]
+    },
+    {
+      "date": "2026-06-24",
+      "status": "ok",
+      "focusAreas": [
+        "sort-filter",
+        "master-unlinked"
+      ]
+    },
+    {
+      "date": "2026-06-24",
+      "status": "ok",
+      "focusAreas": [
+        "cross-highlight",
+        "large-data-perf"
+      ]
+    }
+  ]
+}

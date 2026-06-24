@@ -1,1 +1,6 @@
 dist/
+
+# 夜間UIチェック: 実際の業務マスターデータ・スクショ・保存HTMLが含まれるため公開リポジトリにコミットしない
+.agents/nightly/node_modules/
+.agents/nightly/log/
+.agents/nightly/package-lock.json

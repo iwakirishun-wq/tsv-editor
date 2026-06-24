@@ -60,6 +60,7 @@ const NORMALS = [
   priceRow(SEAT_A.name, SEAT_A.cd, "大人", 10000, 10500),
   priceRow(SEAT_A.name, SEAT_A.cd, "S指定席_子供", 5300, 5600), // ←先(A席)の子供ラベルがS席と表記違い
   priceRow(SEAT_FREE.name, SEAT_FREE.cd, "大人", 3000, 3200),
+  priceRow(SEAT_S.name, SEAT_S.cd, "3歳以上共通", 104200, 999999), // ランク判定不能(rank=0)な年齢ラベル
 ];
 
 const SCENARIOS = [
@@ -83,6 +84,21 @@ const SCENARIOS = [
     row: ugRow(SEAT_S.name, SEAT_S.cd, "幼児", SEAT_A.name, SEAT_A.cd, "大人", 999999, 999999),
     expectStatus: "ok",
     expectDummyAdv: true,
+  },
+  {
+    name: "元/先価格は通常価格だが、登録された当日差額が999999(売止め/当日販売なし) → システム上必須入力のため OK",
+    // 元(S席・大人)=8000/8500、先(A席・大人)=10000/10500 → 実差額(前売2000/当日2000)が正だが、
+    // 当日側だけ999999で登録されているケース（当日販売自体が無い時にシステムが要求する値）
+    row: ugRow(SEAT_S.name, SEAT_S.cd, "大人", SEAT_A.name, SEAT_A.cd, "大人", 2000, 999999),
+    expectStatus: "ok",
+  },
+  {
+    name: "同席種・同年齢ラベルだがランク判定不能(共通) → 再発行扱いで500円期待値(差額0でも0円にならない)",
+    // 元=先 とも同じ席・同じラベル「3歳以上共通」(rank=0)。文字列完全一致フォールバックがないと
+    // 「異区分」扱いになり diff=0→期待値0 と誤判定してしまう
+    row: ugRow(SEAT_S.name, SEAT_S.cd, "3歳以上共通", SEAT_S.name, SEAT_S.cd, "3歳以上共通", 500, 999999),
+    expectStatus: "ok",
+    expectExpected: 500,
   },
   {
     name: "年齢降格(大人→子供) → invalid",

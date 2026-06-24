@@ -2510,9 +2510,11 @@
       function ugExpectedCharge(srcAge, dstAge, srcPrice, dstPrice) {
         const fee = PRICE_RULES.SEAT_CHANGE_FEE;
         const diff = dstPrice - srcPrice;
-        // 年齢区分の同一判定はランク基準（席種ごとにラベル表記が違っても同じ区分として扱う）
+        // 年齢区分の同一判定はランク基準（席種ごとにラベル表記が違っても同じ区分として扱う）。
+        // 「3歳以上共通」等のランク判定不能(rank=0)なラベルは、文字列完全一致なら同区分とみなす
+        // （ランクのみで判定するとrank=0同士は常に「異区分」になってしまい、本当の同一ラベルの再発行を誤NGにする）
         const sr = ugAgeRank(srcAge), dr = ugAgeRank(dstAge);
-        const sameAgeCat = sr !== 0 && sr === dr;
+        const sameAgeCat = (sr !== 0 && sr === dr) || srcAge === dstAge;
         if (sameAgeCat) {
           if (diff === 0) return fee;
           if (sr !== 4) return diff < 0 ? 0 : diff;
@@ -2568,9 +2570,10 @@
           const kbn = v(row, c.kbn), rank = v(row, c.rank);
           const advActual = num(v(row, c.adv)), dayActual = num(v(row, c.day));
           // 年齢区分の同一判定はランク基準（席種ごとにラベル表記が違っても同じ区分として扱う。文字列完全一致だと
-          // 「子供」でも席によって表記が違うケースを異区分と誤認識してしまう）
+          // 「子供」でも席によって表記が違うケースを異区分と誤認識してしまう）。
+          // 「3歳以上共通」等のランク判定不能(rank=0)なラベルは文字列完全一致なら同区分とみなすフォールバックも持つ
           const sr = ageRank(srcAge), dr = ageRank(dstAge);
-          const sameAgeCat = sr !== 0 && sr === dr;
+          const sameAgeCat = (sr !== 0 && sr === dr) || srcAge === dstAge;
           // 一律500円は「席種も券種も同一」の場合のみ（再発行等）。
           // 同席種でも年齢区分が変わる場合（例: G席 U23→大人）は実差額で計算する
           // （もてぎMotoGPチェックリスト.xlsx「大人に変更」表で確認: G席 U23→大人=4,000円など、500円ではない）
@@ -2643,16 +2646,20 @@
           };
           const adv = calc("adv"), day = calc("day");
 
+          // 登録値（前売/当日）自体が売止めダミー(999999等)なら、システム上その値を入れないと登録できない
+          // ため、期待差額の計算結果に関わらず常にOKとする（元/先価格がダミーかどうかは問わない）
+          const matchOne = (a, actual) => {
+            if (a.note === "価格不明") return "unknown";
+            if (actual != null && isDummyPrice(actual)) return "ok";
+            if (a.dummy) return actual == null ? "ok" : "ng";
+            return actual === a.exp ? "ok" : "ng";
+          };
+
           // --- 判定 ---
           let status;
           if (problems.length) {
             status = "invalid";
           } else {
-            const matchOne = (a, actual) => {
-              if (a.note === "価格不明") return "unknown";
-              if (a.dummy) return (actual == null || isDummyPrice(actual)) ? "ok" : "ng"; // 売止め/取扱なしなら差額もダミーのはず
-              return actual === a.exp ? "ok" : "ng";
-            };
             const advR = matchOne(adv, advActual);
             const dayR = matchOne(day, dayActual);
             if (advR === "unknown" && dayR === "unknown") status = "unknown";
@@ -2661,8 +2668,8 @@
           }
 
           // 前売/当日それぞれの不一致フラグ
-          const advNg = !problems.length && adv.note !== "価格不明" && (adv.dummy ? !(advActual == null || isDummyPrice(advActual)) : advActual !== adv.exp);
-          const dayNg = !problems.length && day.note !== "価格不明" && (day.dummy ? !(dayActual == null || isDummyPrice(dayActual)) : dayActual !== day.exp);
+          const advNg = !problems.length && adv.note !== "価格不明" && matchOne(adv, advActual) === "ng";
+          const dayNg = !problems.length && day.note !== "価格不明" && matchOne(day, dayActual) === "ng";
           return {
             status, problems,
             expected: adv.exp, expectedDay: day.exp,
@@ -9097,7 +9104,8 @@
         const cell = (val, raw, cls, rowspan) => `<td${cls ? ` class="${cls}"` : ""}${rowspan ? ` rowspan="${rowspan}"` : ""}${raw != null ? ` data-v="${escHtml(String(raw))}"` : ""}>${escHtml(val)}</td>`;
 
         // --- 共通: 略称・色・期間ヘルパー（全表で使用） ---
-        const money = (s) => { const n = Number(String(s).replace(/,/g, "")); if (isNaN(n)) return ""; return n >= UG_DUMMY_MIN ? "販売無" : n.toLocaleString("ja-JP"); };
+        // マスタの登録金額をそのまま表示する（売止めダミー(999999等)も置換せず実値表示。判定ロジックには影響しない）
+        const money = (s) => { const n = Number(String(s).replace(/,/g, "")); if (isNaN(n)) return ""; return n.toLocaleString("ja-JP"); };
         const numOf = (s) => { const n = Number(String(s).replace(/,/g, "")); return isNaN(n) ? null : n; };
         // 席種名: マスタ連携時は表示略称、無ければ席種名
         const seatLabel = (seat, code) => { if (seatMeta) { const m = seatMeta(code, seat); if (m && m.found && m.dispAbb) return m.dispAbb; } return seat; };
@@ -9276,7 +9284,9 @@ ${_sortableTable(labels, rowsHtml)}` };
               fromAges[fs].forEach((fa, i) => {
                 // 席種ブロックの境目を太線で区切る（席種が変わる最初の年齢行）
                 bodyRows += `<tr${i === 0 ? ' class="seat-sep"' : ""}>`;
-                if (i === 0) bodyRows += `<th class="rowh seatrow" rowspan="${fromAges[fs].length}" style="background:${seatColor(fs)}">${escHtml(seatLabel(fs, seatCode[fs]))}${catBadge(seatCat(seatCode[fs], fs))}</th>`;
+                // rowspanにすると縦スクロールでブロック先頭行が画面外に出た瞬間に席種名が見えなくなるため、
+                // 各行に複製して常に表示する（見た目のグループ分けは背景色とseat-sep枠線で行う）
+                bodyRows += `<th class="rowh seatrow" style="background:${seatColor(fs)}">${escHtml(seatLabel(fs, seatCode[fs]))}${catBadge(seatCat(seatCode[fs], fs))}</th>`;
                 const p = priceMap[fs + "|" + fa];
                 const pr = p ? `<div class="hp">前${money(p.adv)} 当${money(p.day)}${periodHtml(p)}</div>` : "";
                 bodyRows += `<th class="agehdr rowh agecol">${escHtml(ageLabel(fa))}${pr}</th>`;
@@ -9312,7 +9322,7 @@ ${_sortableTable(labels, rowsHtml)}` };
           }
           const ngBadge = ngTotal ? `　<span class="badge-ng">NG ${ngTotal}件</span>` : `　<span class="badge-ok">検算OK</span>`;
           sections.matrix = { title: "UGマトリクス", body: `<h2>🔢 アップグレードマトリクス（俯瞰）${ngBadge}</h2>
-<p class="legend">行=元席種/券種、列=先席種/券種（大人の前売価格の安い順）。見出しには通常価格の販売期間も併記。席種は表示略称＋区分（<span class="catb cat-r">指定席</span><span class="catb cat-a">数在庫</span><span class="catb cat-o">その他</span>）。各セル: 先－元=期待差額（緑） / 前売・当日=実際の金額 / 下=販売期間（曜日付き）。<b>期待差額</b>は同区分なら差額0は全区分500・大人は1〜500も500・U23/子供/幼児は実差額(マイナス→0)、異区分間は0以下→0・1〜500→500・500超→実差額。<b>不一致は文字が赤・セルが薄ピンク</b>。「NG/未チェックのみ」ON時は対象外セルを薄く退色表示。クリックでマーク</p>${mxBody}` };
+<p class="legend">行=元席種/券種、列=先席種/券種（大人の前売価格の安い順）。見出しには通常価格の販売期間も併記。席種は表示略称＋区分（<span class="catb cat-r">指定席</span><span class="catb cat-a">数在庫</span><span class="catb cat-o">その他</span>）。各セル: 先－元=期待差額（緑） / 前売・当日=実際の金額 / 下=販売期間（曜日付き）。<b>期待差額</b>は同区分なら差額0は全区分500・大人は1〜500も500・U23/子供/幼児は実差額(マイナス→0)、異区分間は0以下→0・1〜500→500・500超→実差額。<b>不一致は文字が赤・セルが薄ピンク</b>。クリックでマーク</p>${mxBody}` };
         }
 
         // --- UG一覧（席種ペアでセル結合・元⇒先・金額対比・差異強調） ---
@@ -9512,8 +9522,6 @@ td.mxc.mx-na { background: #f5f5f5; }
 td.mxc.mx-na .adv, td.mxc.mx-na .day { color: #9ca3af; }
 td.mxc.marked { box-shadow: inset 0 0 0 3px var(--mk); }
 td.mxc.marked::after { content: "✓"; position: absolute; top: 1px; right: 3px; font-size: 10px; color: #16a34a; font-weight: 700; }
-/* NG/未チェックのみ: マトリクスは行ごと非表示にすると列がずれるため、対象外セルを薄く退色させる */
-td.mxc.mxc-done { opacity: 0.12; }
 .sub { font-size: 10px; color: #888; font-weight: 400; }
 td.na { color: #ccc; background: #fafafa; }
 .dg { font-size: 10px; color: #ea580c; font-weight: 700; }
@@ -9539,7 +9547,6 @@ body.crosshi th.cross-col:not(.mk-cell)::after, body.crosshi th.cross-row:not(.m
 .toolbar button { padding: 5px 14px; border: 1px solid #217346; color: #217346; background: #fff; border-radius: 5px; cursor: pointer; font-size: 12px; }
 .toolbar button:hover { background: #eaf4ee; }
 .toolbar #mk-clear { border-color: #dc2626; color: #dc2626; }
-.toolbar #mk-ngonly.on { background: #dc2626; color: #fff; }
 .toolbar .hint { color: #888; }
 #mk-count { font-weight: 700; color: #217346; }
 /* サブタブ・条件セレクタ */
@@ -9574,7 +9581,6 @@ html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   <span>チェック進捗: <span id="mk-count">0 / 0</span></span>
   <button id="mk-btn">選択した行をマーク（Ctrl+Q）</button>
   <button id="mk-clear">全解除</button>
-  <button id="mk-ngonly" style="border-color:#dc2626;color:#dc2626">NG/未チェックのみ</button>
   <input type="color" id="mk-color" value="#fde047" title="マーカー色">
   <label class="tg"><input type="checkbox" id="mk-cross"${state.crossHi ? " checked" : ""}> 十字強調</label>
   <button id="mk-html" title="このページをHTMLファイルとして保存（マトリクス表など、PDFより見やすく保存できます）">💾 HTML保存</button>
@@ -9707,15 +9713,6 @@ html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   document.getElementById('mk-clear').onclick = function(){ if (!confirm('マークをすべて解除しますか？')) return; saved = {}; persist(); markables().forEach(paint); refreshCount(); };
   document.getElementById('mk-color').oninput = function(e){ document.documentElement.style.setProperty('--mk', e.target.value); try { localStorage.setItem(KEY + '|color', e.target.value); } catch(err){} };
   try { var cc = localStorage.getItem(KEY + '|color'); if (cc) { document.documentElement.style.setProperty('--mk', cc); document.getElementById('mk-color').value = cc; } } catch(e){}
-  var ngOnly = false;
-  var ngBtn = document.getElementById('mk-ngonly');
-  if (ngBtn) ngBtn.onclick = function(){
-    ngOnly = !ngOnly;
-    document.body.classList.toggle('ngonly', ngOnly); ngBtn.classList.toggle('on', ngOnly);
-    ngBtn.textContent = ngOnly ? '全件表示に戻す' : 'NG/未チェックのみ';
-    applyAll();
-  };
-
   // サブタブ切替
   document.querySelectorAll('.ptab').forEach(function(tab){
     tab.addEventListener('click', function(){
@@ -9829,7 +9826,7 @@ html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       var visibleRows = grp.filter(function(r){ return r.style.display !== 'none'; });
       if (!visibleRows.length) return; // グループ全体が非表示なら見出しの位置はそのままで良い（描画されない）
       var target = visibleRows[0];
-      // NG/未チェックのみ等のフィルターでこの行自体が非表示でも、見出しセルだけは
+      // 絞り込みフィルターでこの行自体が非表示でも、見出しセルだけは
       // 最初に表示される行へ退避させて表の縦の繋がり(rowspan)を保つ
       if (seatTh.parentNode !== target) {
         target.insertBefore(seatTh, target.children[1] || null);
@@ -9841,7 +9838,6 @@ html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
   function rowVisible(tr, inputs){
     if (curCond !== '__all' && tr.getAttribute('data-cond') && tr.getAttribute('data-cond') !== curCond) return false;
-    if (ngOnly) { var ng = tr.classList.contains('ng-row'); var done = tr.classList.contains('marked'); if (!ng && done) return false; }
     if (inputs) for (var i = 0; i < inputs.length; i++) {
       var q = inputs[i].value.trim().toLowerCase(); if (!q) continue;
       var ci = +inputs[i].getAttribute('data-fc'); var cl = tr.cells[ci + 1]; if (!cl) continue;
@@ -9862,12 +9858,6 @@ html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     fixUgRowspan();
     // マトリクスは販売条件ブロック単位で表示
     document.querySelectorAll('.cond-block').forEach(function(b){ b.style.display = (curCond === '__all' || b.getAttribute('data-cond') === curCond) ? '' : 'none'; });
-    // マトリクスのセルは行ごと非表示にすると列がずれるため、NG/未チェックのみの対象外セルは退色表示にする
-    document.querySelectorAll('td.mxc[data-mid]').forEach(function(td){
-      var isNg = td.classList.contains('mx-ng');
-      var done = td.classList.contains('marked');
-      td.classList.toggle('mxc-done', ngOnly && !isNg && done);
-    });
   }
 
   // 2段ヘッダーの2行目stickyオフセットを1行目の高さに合わせる（行が隠れないように）
