@@ -2510,14 +2510,18 @@
       function ugExpectedCharge(srcAge, dstAge, srcPrice, dstPrice) {
         const fee = PRICE_RULES.SEAT_CHANGE_FEE;
         const diff = dstPrice - srcPrice;
-        if (srcAge === dstAge) {
+        // 年齢区分の同一判定はランク基準（席種ごとにラベル表記が違っても同じ区分として扱う）
+        const sr = ugAgeRank(srcAge), dr = ugAgeRank(dstAge);
+        const sameAgeCat = sr !== 0 && sr === dr;
+        if (sameAgeCat) {
           if (diff === 0) return fee;
-          if (ugAgeRank(srcAge) !== 4) return diff < 0 ? 0 : diff;
+          if (sr !== 4) return diff < 0 ? 0 : diff;
         }
         return diff <= 0 ? 0 : (diff <= fee ? fee : diff);
       }
       // ===PRICE_RULES_CORE_END===
       const UG_DUMMY_MIN = PRICE_RULES.DUMMY_PRICE_MIN; // 既存参照の互換エイリアス
+      // ===UG_VALIDATOR_CORE_START=== UI/stateに依存しない純粋ロジック（tests/ug_validator.test.js が抽出して検証する）
       // seatMeta(code, name) -> { isFree, isReserved, found } | null（席種エリアマスタ連携時のみ）
       function buildUgValidator(rows, c, v, seatMeta) {
         const num = (s) => { const n = Number(String(s).replace(/,/g, "")); return isNaN(n) ? null : n; };
@@ -2563,29 +2567,32 @@
           const srcCode = v(row, c.ugSeatCd), dstCode = v(row, c.seatCd);
           const kbn = v(row, c.kbn), rank = v(row, c.rank);
           const advActual = num(v(row, c.adv)), dayActual = num(v(row, c.day));
+          // 年齢区分の同一判定はランク基準（席種ごとにラベル表記が違っても同じ区分として扱う。文字列完全一致だと
+          // 「子供」でも席によって表記が違うケースを異区分と誤認識してしまう）
+          const sr = ageRank(srcAge), dr = ageRank(dstAge);
+          const sameAgeCat = sr !== 0 && sr === dr;
           // 一律500円は「席種も券種も同一」の場合のみ（再発行等）。
           // 同席種でも年齢区分が変わる場合（例: G席 U23→大人）は実差額で計算する
           // （もてぎMotoGPチェックリスト.xlsx「大人に変更」表で確認: G席 U23→大人=4,000円など、500円ではない）
-          const sameSeat = srcSeat === dstSeat && srcSeat !== "" && srcAge === dstAge;
+          const sameSeat = srcSeat === dstSeat && srcSeat !== "" && sameAgeCat;
           const problems = [];
           const notes = [];
 
           // --- 可否チェック ---
           if (!/会員/.test(kbn) && !/会員/.test(rank)) problems.push("一般販売にUG不可");
-          const sr = ageRank(srcAge), dr = ageRank(dstAge);
           // 年齢降格（先のランク < 元のランク）のみ不可。子供→大人など昇格・同ランクはOK
           if (sr && dr && dr < sr) problems.push("年齢降格(" + srcAge + "→" + dstAge + ")");
           // エリア席のみ「同席種・同券種UG不可」。その他(O・車椅子・パス等)/指定席は対象外
           const dstCat = seatCat(dstCode, dstSeat);
-          if (sameSeat && dstCat === "エリア" && srcAge === dstAge) problems.push("エリア席の同席種同券種UGは設定不可");
+          if (sameSeat && dstCat === "エリア") problems.push("エリア席の同席種同券種UGは設定不可");
           // 車椅子: 購入後の他席種への/からのUGは不可。車椅子内では「同年齢・指定席内の席変更」または「大人へのランクアップ」のみ可
           const srcWc = isWheelchair(srcSeat), dstWc = isWheelchair(dstSeat);
           if (srcWc || dstWc) {
             if (srcWc !== dstWc) {
               problems.push("車椅子は他席種とのUG不可");
             } else {
-              const sameAgeReserved = srcAge === dstAge && dstCat === "指定席";
-              const upgradeToAdult = srcAge !== dstAge && dr === 4 && dr > sr;
+              const sameAgeReserved = sameAgeCat && dstCat === "指定席";
+              const upgradeToAdult = !sameAgeCat && dr === 4 && dr > sr;
               if (!sameAgeReserved && !upgradeToAdult) problems.push("車椅子は同年齢の席変更または大人へのUGのみ可");
             }
           }
@@ -2626,12 +2633,12 @@
             const s = lookup(ck, srcSeat, srcAge), d = lookup(ck, dstSeat, dstAge);
             const sp = s ? s[which] : null, dp = d ? d[which] : null;
             if (sp == null || dp == null) return { exp: null, note: "価格不明", dummy: false };
-            if (isDummyPrice(sp) || isDummyPrice(dp)) return { exp: null, note: "売止め/その販売区分の取扱なし", dummy: true };
+            if (isDummyPrice(sp) || isDummyPrice(dp)) return { exp: null, note: "売止め/その販売区分の取扱なし", dummy: true, srcPrice: sp, dstPrice: dp };
             const diff = dp - sp;
             // 期待差額の写像は純粋関数 ugExpectedCharge に集約（同年齢: 差額0は全区分500・大人は1〜500→500/超→実差額・
             // U23以下は実差額/マイナス0／異年齢: 0以下→0・1〜500→500・500超→実差額）
             const exp = ugExpectedCharge(srcAge, dstAge, sp, dp);
-            const note = (srcAge === dstAge && diff === 0) ? "同年齢区分どうしで差額0円→席変更手数料500円" : "";
+            const note = (ageRank(srcAge) !== 0 && ageRank(srcAge) === ageRank(dstAge) && diff === 0) ? "同年齢区分どうしで差額0円→席変更手数料500円" : "";
             return { exp, note, dummy: false, srcPrice: sp, dstPrice: dp, rawDiff: diff };
           };
           const adv = calc("adv"), day = calc("day");
@@ -2670,6 +2677,7 @@
           };
         };
       }
+      // ===UG_VALIDATOR_CORE_END===
 
       // 十字ハイライト切り替え（選択セルの行・列を強調）
       function toggleCrossHi() {
@@ -9086,7 +9094,7 @@
         const validate = buildUgValidator(normals.concat(ugs), c, v, seatMeta);
 
         // セル: data-v に並べ替え用の生値を入れる（数値・日時はそのまま比較可能に）
-        const cell = (val, raw, cls) => `<td${cls ? ` class="${cls}"` : ""}${raw != null ? ` data-v="${escHtml(String(raw))}"` : ""}>${escHtml(val)}</td>`;
+        const cell = (val, raw, cls, rowspan) => `<td${cls ? ` class="${cls}"` : ""}${rowspan ? ` rowspan="${rowspan}"` : ""}${raw != null ? ` data-v="${escHtml(String(raw))}"` : ""}>${escHtml(val)}</td>`;
 
         // --- 共通: 略称・色・期間ヘルパー（全表で使用） ---
         const money = (s) => { const n = Number(String(s).replace(/,/g, "")); if (isNaN(n)) return ""; return n >= UG_DUMMY_MIN ? "販売無" : n.toLocaleString("ja-JP"); };
@@ -9149,7 +9157,8 @@
 
         // --- 通常価格表（フラット・並べ替え/絞り込み可） ---
         if (opt.normal && normals.length) {
-          const labels = ["席種名", "区分", "券種", "販売区分", "会員ランク", "販売経路", "前売", "当日", "販売開始", "販売終了"];
+          // 前売/当日は列ではなく行で分ける（同じ行に金額列が2本並ぶと見づらいため、種別＋金額の1列にまとめる）
+          const labels = ["席種名", "区分", "券種", "販売区分", "会員ランク", "販売経路", "販売開始", "販売終了", "種別", "金額"];
           // 並び: 席種(金額→コード) → 券種コード
           const nsorted = normals.slice().sort((x, y) => {
             const sk = seatSortKey(v(x, c.seat), v(x, c.seatCd)).localeCompare(seatSortKey(v(y, c.seat), v(y, c.seatCd)), "ja");
@@ -9163,17 +9172,22 @@
             const seat = v(row, c.seat), code = v(row, c.seatCd), sl = seatLabel(seat, code), al = ageLabel(v(row, c.age));
             const cat = seatCat(code, seat);
             const sep = (prevSeat !== null && prevSeat !== seat) ? " seat-sep" : ""; prevSeat = seat;
-            rowsHtml += `<tr data-mid="${mid}" data-cond="${escHtml(condOf(row))}" class="${sep.trim()}"><td class="mk-cell" title="クリックでマーク">✔</td>`
-              + `<td data-v="${escHtml(seatSortKey(seat, code))}" style="background:${seatColor(seat)};font-weight:600" title="${escHtml(seat)}">${escHtml(sl)}</td>`
+            // 並べ替え/絞り込みエンジンが列番号で各行のセルを直接参照するため、共通項目はrowspanせず両行に複製する
+            const shared = `<td data-v="${escHtml(seatSortKey(seat, code))}" style="background:${seatColor(seat)};font-weight:600" title="${escHtml(seat)}">${escHtml(sl)}</td>`
               + `<td data-v="${escHtml(cat)}">${catBadge(cat)}</td>`
               + cell(al, ageKey(v(row, c.age)))
               + cell(v(row, c.kbn), v(row, c.kbn))
               + cell(v(row, c.rank), v(row, c.rank))
               + cell(v(row, c.route), v(row, c.route))
-              + cell(fmt(v(row, c.adv)), Number(String(v(row, c.adv)).replace(/,/g, "")) || 0, "num adv")
-              + cell(fmt(v(row, c.day)), Number(String(v(row, c.day)).replace(/,/g, "")) || 0, "num day")
               + cell(dt(v(row, c.start)), v(row, c.start), "dt")
-              + cell(dt(v(row, c.end)), v(row, c.end), "dt")
+              + cell(dt(v(row, c.end)), v(row, c.end), "dt");
+            rowsHtml += `<tr data-mid="${mid}|ADV" data-cond="${escHtml(condOf(row))}" class="${sep.trim()}"><td class="mk-cell" title="クリックでマーク">✔</td>`
+              + shared
+              + `<td>前売</td>` + cell(fmt(v(row, c.adv)), Number(String(v(row, c.adv)).replace(/,/g, "")) || 0, "num")
+              + `</tr>`;
+            rowsHtml += `<tr data-mid="${mid}|DAY" data-cond="${escHtml(condOf(row))}"><td class="mk-cell" title="クリックでマーク">✔</td>`
+              + shared
+              + `<td>当日</td>` + cell(fmt(v(row, c.day)), Number(String(v(row, c.day)).replace(/,/g, "")) || 0, "num")
               + `</tr>`;
           }
           // 券種抜けの検出（他マスタが無いため、データ内の券種ユニバースから推定）
@@ -9391,7 +9405,8 @@ ${_sortableTable(labels, rowsHtml)}` };
         const html = _priceDoc(fname, metaLine, nav, panes, condSel, defaultCond);
         const blob = new Blob([html], { type: "text/html;charset=utf-8" });
         const url = URL.createObjectURL(blob);
-        const w = window.open(url, "_blank", "noopener");
+        // noopener指定だとBlob URLを新規タブが読み込めず、PDF印刷保存が空（0KB）になる不具合があるため外す
+        const w = window.open(url, "_blank");
         setTimeout(() => URL.revokeObjectURL(url), 60000);
         const names = order.map(k => tabLabels[k]).join("・");
         setStatus(w ? `価格チェックHTMLを出力しました（${names}）` : `ポップアップがブロックされました。ブラウザでこのサイトのポップアップを許可してください。`);
@@ -9562,7 +9577,7 @@ html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   <button id="mk-ngonly" style="border-color:#dc2626;color:#dc2626">NG/未チェックのみ</button>
   <input type="color" id="mk-color" value="#fde047" title="マーカー色">
   <label class="tg"><input type="checkbox" id="mk-cross"${state.crossHi ? " checked" : ""}> 十字強調</label>
-  <button id="mk-pdf" title="この表をPDFとして保存（印刷ダイアログで「PDFに保存」を選択）。マーカー・NG色も保持されます">🖨 PDF保存</button>
+  <button id="mk-html" title="このページをHTMLファイルとして保存（マトリクス表など、PDFより見やすく保存できます）">💾 HTML保存</button>
   <span class="hint">行ダブルクリック / 左端✔クリックでもマーク</span>
 </div>
 <` + `script>var DEFAULT_COND=${JSON.stringify(defaultCond || "")};${_priceCheckScript()}<` + `/script>
@@ -9573,7 +9588,7 @@ html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       function _sortableTable(labels, rowsHtml, ugHasNgClass) {
         let head = `<tr><th class="mk-h"></th>`;
         labels.forEach((l, i) => {
-          const numCls = ["前売", "当日", "前売差額", "当日差額", "期待差額"].includes(l) ? ' class="num"' : "";
+          const numCls = ["前売", "当日", "前売差額", "当日差額", "期待差額", "金額"].includes(l) ? ' class="num"' : "";
           head += `<th data-c="${i}"${numCls}>${escHtml(l)}</th>`;
         });
         head += `</tr><tr class="filter-row"><th></th>`;
@@ -9677,8 +9692,18 @@ html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
   document.addEventListener('keydown', function(e){ if ((e.ctrlKey || e.metaKey) && (e.key === 'q' || e.key === 'Q')) { e.preventDefault(); markSelection(); } });
   document.getElementById('mk-btn').onclick = markSelection;
-  var _pdfBtn = document.getElementById('mk-pdf');
-  if (_pdfBtn) _pdfBtn.onclick = function(){ window.print(); };
+  var _htmlBtn = document.getElementById('mk-html');
+  if (_htmlBtn) _htmlBtn.onclick = function(){
+    var htmlStr = '<!DOCTYPE html>\\n' + document.documentElement.outerHTML;
+    var blob = new Blob([htmlStr], { type: 'text/html;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (document.title || 'price-check').replace(/[\\\\/:*?"<>|]/g, '_') + '.html';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 5000);
+  };
   document.getElementById('mk-clear').onclick = function(){ if (!confirm('マークをすべて解除しますか？')) return; saved = {}; persist(); markables().forEach(paint); refreshCount(); };
   document.getElementById('mk-color').oninput = function(e){ document.documentElement.style.setProperty('--mk', e.target.value); try { localStorage.setItem(KEY + '|color', e.target.value); } catch(err){} };
   try { var cc = localStorage.getItem(KEY + '|color'); if (cc) { document.documentElement.style.setProperty('--mk', cc); document.getElementById('mk-color').value = cc; } } catch(e){}
