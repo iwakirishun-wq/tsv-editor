@@ -52,6 +52,8 @@ function ugRow(ugSeat, ugSeatCd, ugAge, seat, seatCd, age, regAdv, regDay) {
 const SEAT_S = { name: "S指定席", cd: "RESV01" };
 const SEAT_A = { name: "Aエリア席", cd: "RESV02" }; // ラベル表記をSEAT_Sと変える（同年齢でも文字列は違う想定）
 const SEAT_FREE = { name: "自由エリア", cd: "FREE03" }; // エリア(自由席)扱い
+const SEAT_FREE2 = { name: "自由席(3日通し前売)", cd: "RESV12" }; // 大人の当日価格がダミー（当日販売なし）
+const SEAT_VC = { name: "VC-2", cd: "RESV13" }; // 大人の前売/当日とも実価格（SEAT_FREE2より高い＝アップグレード）
 
 const NORMALS = [
   priceRow(SEAT_S.name, SEAT_S.cd, "大人", 8000, 8500),
@@ -61,6 +63,8 @@ const NORMALS = [
   priceRow(SEAT_A.name, SEAT_A.cd, "S指定席_子供", 5300, 5600), // ←先(A席)の子供ラベルがS席と表記違い
   priceRow(SEAT_FREE.name, SEAT_FREE.cd, "大人", 3000, 3200),
   priceRow(SEAT_S.name, SEAT_S.cd, "3歳以上共通", 104200, 999999), // ランク判定不能(rank=0)な年齢ラベル
+  priceRow(SEAT_FREE2.name, SEAT_FREE2.cd, "大人", 13000, 999999),
+  priceRow(SEAT_VC.name, SEAT_VC.cd, "大人", 19000, 23000),
 ];
 
 const SCENARIOS = [
@@ -114,6 +118,13 @@ const SCENARIOS = [
     name: "自由席(エリア)の同席種同年齢UG → invalid",
     row: ugRow(SEAT_FREE.name, SEAT_FREE.cd, "大人", SEAT_FREE.name, SEAT_FREE.cd, "大人", 500, 500),
     expectStatus: "invalid",
+  },
+  {
+    // 元(自由席3日通し)の大人当日価格がダミー(999999)。先(VC-2)は前売/当日とも実価格で元より高い(本当はアップグレード)。
+    // ダミー値をそのまま実数として比較すると「元(999999)>先(23000)」に見えて誤ってダウングレード扱いになるバグの再発防止
+    name: "元の大人当日価格がダミー(999999)でも、先の方が高いアップグレード → UG不可にならない",
+    row: ugRow(SEAT_FREE2.name, SEAT_FREE2.cd, "大人", SEAT_VC.name, SEAT_VC.cd, "大人", 6000, 999999),
+    expectStatus: "ok",
   },
 ];
 

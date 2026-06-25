@@ -2623,15 +2623,18 @@
           if (!sameSeat && !srcWc && !dstWc) {
             const ck0 = condKey(row);
             const as = lookupAdult(ck0, srcSeat), ad = lookupAdult(ck0, dstSeat);
+            // ダミー価格(999999等)は売止め/当日販売なしの記号にすぎず実際の金額ではないため、
+            // どちらかがダミーの組み合わせはダウングレード判定の対象外にする（実数どうしでのみ比較する）
             const adultDowngrade = ["adv", "day"].some((which) => {
               const asp = as ? as[which] : null, adp = ad ? ad[which] : null;
-              return asp != null && adp != null && asp > adp;
+              if (asp == null || adp == null || isDummyPrice(asp) || isDummyPrice(adp)) return false;
+              return asp > adp;
             });
             if (adultDowngrade && sr !== 4) {
               const s0 = lookup(ck0, srcSeat, srcAge), d0 = lookup(ck0, dstSeat, dstAge);
               const exempt = ["adv", "day"].every((which) => {
                 const sp = s0 ? s0[which] : null, dp = d0 ? d0[which] : null;
-                if (sp == null || dp == null) return false;
+                if (sp == null || dp == null || isDummyPrice(sp) || isDummyPrice(dp)) return false;
                 const diff = dp - sp;
                 return diff < 0 && diff >= -500;
               });
@@ -9284,7 +9287,7 @@ ${_sortableTable(labels, rowsHtml)}` };
             // 販売期間（開始〜終了）はヘッダーが狭く横にはみ出るため、開始日と終了日の間で改行する
             const periodHtml = (p) => p.period ? `<br><span class="hp-period">${escHtml(p.period).replace("〜", "<br>〜")}</span>` : "";
             let head = `<tr><th class="corner" colspan="2" rowspan="2">元＼先</th>`;
-            for (const ts of toSeats) head += `<th class="seathdr" colspan="${toAges[ts].length}" style="background:${seatColor(ts)}">${escHtml(seatLabel(ts, seatCode[ts]))}${catBadge(seatCat(seatCode[ts], ts))}</th>`;
+            for (const ts of toSeats) head += `<th class="seathdr" colspan="${toAges[ts].length}" style="background:${seatColor(ts)}"><span class="seathdr-label">${escHtml(seatLabel(ts, seatCode[ts]))}${catBadge(seatCat(seatCode[ts], ts))}</span></th>`;
             head += `</tr><tr>`;
             let prevTsHead = null;
             for (const ts of toSeats) for (const ta of toAges[ts]) {
@@ -9513,6 +9516,10 @@ table.mx { width: auto; border-collapse: separate; border-spacing: 0; }
 table.mx th, table.mx td { text-align: center; padding: 2px 6px; font-size: 11px; line-height: 1.25; }
 /* 列ヘッダー（先・上部固定）2段。左固定セル(z5)より前面に */
 table.mx th.seathdr { position: sticky; top: 0; z-index: 6; font-size: 11.5px; font-weight: 700; }
+/* 席種名(seathdr)はcolspanで複数列にまたがるため、文字は中央寄せのまま放置すると横スクロールで
+   画面外に出てしまい「先席種が分からなくなる」。ラベルだけ左固定列の右端(150px)に追従させ、
+   このth(その席種の列範囲)を抜けるまで画面内に留まるようにする */
+table.mx th.seathdr .seathdr-label { position: sticky; left: 150px; display: inline-block; }
 table.mx th.agehdr:not(.rowh) { position: sticky; z-index: 6; background: #eef2f6; font-weight: 600; color: #444; }
 /* 行ヘッダー（元・左固定）2列。隙間が透けないよう不透明・隣接 */
 table.mx th.seatrow { position: sticky; left: 0; z-index: 5; width: 58px; min-width: 58px; max-width: 58px; font-weight: 700; vertical-align: middle; white-space: normal; line-height: 1.2; }
