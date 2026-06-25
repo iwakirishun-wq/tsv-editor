@@ -498,6 +498,11 @@
         font-size: 11px;
         font-family: var(--font-ui);
       }
+      /* メイングリッドの列見出し行のみ高さを230pxに（辞書編集・一括設定チェック等の他のth表には影響させない）。
+         縦書きヘッダーモード時は専用の--vheader-hが優先される */
+      body:not(.vertical-headers) #thead th {
+        height: 230px;
+      }
       th.col-active {
         /* theadはsticky固定のため背景は不透明を維持（透明だとスクロール時に下の行が透けて見える） */
         background: linear-gradient(rgba(19, 100, 215, 0.12), rgba(19, 100, 215, 0.12)), var(--header-bg);
@@ -574,7 +579,7 @@
 
       /* ===ボディ=== */
       tbody tr {
-        height: var(--row-h, 230px);
+        height: var(--row-h, 22px);
         background: #fff;
       }
       /* ゼブラストライプ: Excelの交互行色に相当。ハイライト系はすべて!importantで上書きされる */
@@ -590,7 +595,7 @@
         cursor: cell;
         color: var(--text);
         font-size: 12px;
-        height: var(--row-h, 230px);
+        height: var(--row-h, 22px);
       }
 
 
@@ -1338,7 +1343,7 @@
       th.col-active .th-col-letter { color: #1b6ec2; opacity: 1; font-weight: 700; }
 
       /* ===縦書きヘッダー（列幅節約）=== */
-      body.vertical-headers thead tr:first-child th { height: var(--vheader-h, 120px); vertical-align: bottom; }
+      body.vertical-headers thead tr:first-child th { height: var(--vheader-h, 230px); vertical-align: bottom; }
       body.vertical-headers thead tr:first-child .th-inner {
         flex-direction: column-reverse;
         align-items: center;
@@ -1349,7 +1354,7 @@
       body.vertical-headers thead tr:first-child .th-label {
         writing-mode: vertical-rl;
         text-orientation: mixed;
-        max-height: calc(var(--vheader-h, 120px) - 28px);
+        max-height: calc(var(--vheader-h, 230px) - 28px);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -1770,7 +1775,7 @@
       <div class="rb-content" id="rb-pane-view" role="group" aria-label="表示設定">
         <div class="rb-group">
           <div class="rb-buttons">
-            <button class="rb-btn" id="btn-row-height" title="行の高さを順番に切り替え&#10;（230px → 22px → 30px → 40px → 230px）" aria-label="行の高さを変更">
+            <button class="rb-btn" id="btn-row-height" title="行の高さを順番に切り替え&#10;（22px → 30px → 40px → 22px）" aria-label="行の高さを変更">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="5" y1="6" x2="19" y2="6"></line><line x1="5" y1="12" x2="19" y2="12"></line><line x1="5" y1="18" x2="19" y2="18"></line><polyline points="2 3 2 21"></polyline><polyline points="22 3 22 21"></polyline></svg></span>
               <span>行高さ</span>
             </button>
@@ -2218,7 +2223,7 @@
         ikkatsuCheck: false, // 席種一括設定チェック（23列）のインライン検品
         bikoHtmlCheck: false, // 備考(nte)列のHTMLを表上で実際のHTML表示として再現（席種エリアマスタのみ）
         verticalHeader: true, // ヘッダー縦書き表示（既定でON・列幅節約）
-        vHeaderHeight: 120, // 縦書きヘッダーの行高さ(px・手動調整可能)
+        vHeaderHeight: 230, // 縦書きヘッダーの行高さ(px・手動調整可能)
         originalRowCount: 0, // ファイルを開いた直後の行数（保存時の予期せぬ増減チェック用）
         crossHi: true,        // 選択セルの行・列を十字ハイライト（localStorage保存）
         markerColor: "#facc15", // マーカー色（localStorageに保存）
@@ -2801,7 +2806,7 @@
         statusEncoding: $("status-encoding"),
       };
 
-      let ROW_H = 230;
+      let ROW_H = 22;
       const BUFFER = 20;
 
       // ===== セーフアクセス =====
@@ -8323,7 +8328,7 @@
       }
 
       // ===== 行の高さ変更 =====
-      const ROW_H_OPTIONS = [230, 22, 30, 40];
+      const ROW_H_OPTIONS = [22, 30, 40];
       function cycleRowHeight() {
         const idx = ROW_H_OPTIONS.indexOf(ROW_H);
         ROW_H = ROW_H_OPTIONS[(idx + 1) % ROW_H_OPTIONS.length];

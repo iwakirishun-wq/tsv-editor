@@ -27,25 +27,25 @@
     {
       "id": "html-save",
       "label": "HTML保存ボタンで非空ファイルが保存されるか",
-      "lastChecked": "2026-06-24T01:10:08.766Z",
+      "lastChecked": "2026-06-24T18:00:08.460Z",
       "lastResult": "ok"
     },
     {
       "id": "marker-persist",
       "label": "チェックマーク・NG/未チェックのみフィルタの動作",
-      "lastChecked": "2026-06-24T01:10:08.766Z",
+      "lastChecked": "2026-06-24T18:00:08.460Z",
       "lastResult": "ok"
     },
     {
       "id": "sort-filter",
       "label": "通常価格表の並べ替え/絞り込み（種別=前売/当日列含む）",
-      "lastChecked": "2026-06-24T01:11:58.565Z",
+      "lastChecked": "2026-06-25T01:15:53.054Z",
       "lastResult": "ok"
     },
     {
       "id": "master-unlinked",
       "label": "席種エリアマスタ未連携時の挙動・案内メッセージ",
-      "lastChecked": "2026-06-24T01:11:58.565Z",
+      "lastChecked": "2026-06-25T01:15:53.054Z",
       "lastResult": "ok"
     },
     {
@@ -116,6 +116,22 @@
       "focusAreas": [
         "normal-table",
         "ug-matrix"
+      ]
+    },
+    {
+      "date": "2026-06-24",
+      "status": "ok",
+      "focusAreas": [
+        "html-save",
+        "marker-persist"
+      ]
+    },
+    {
+      "date": "2026-06-25",
+      "status": "ok",
+      "focusAreas": [
+        "sort-filter",
+        "master-unlinked"
       ]
     }
   ]
