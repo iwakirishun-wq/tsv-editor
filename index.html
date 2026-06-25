@@ -9746,16 +9746,26 @@ html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     document.querySelectorAll('.cond-block').forEach(function(b){ b.style.display = (curCond === '__all' || b.getAttribute('data-cond') === curCond) ? '' : 'none'; });
   }
 
-  // 2段ヘッダーの2行目stickyオフセットを1行目の高さに合わせる（行が隠れないように）
+  // 2段ヘッダーの2行目stickyオフセットを1行目の高さに合わせる（行が隠れないように）。
+  // 1行目の高さはフォント読み込み・折り返し等で読み込み後に変わることがあり、
+  // 一度だけ測って固定すると2行目の位置がずれてスクロール時に本体行が透けて見える不具合になる。
+  // ResizeObserverで1行目の高さを継続的に監視し、変化するたびに2行目のオフセットを再計算する。
   function fixSticky(){
     document.querySelectorAll('table.mx').forEach(function(tbl){
       var r0 = tbl.rows[0]; if (!r0) return;
-      var h = r0.getBoundingClientRect().height;
-      tbl.querySelectorAll('th.agehdr:not(.rowh)').forEach(function(th){ th.style.top = h + 'px'; });
+      var apply = function(){
+        var h = r0.getBoundingClientRect().height;
+        tbl.querySelectorAll('th.agehdr:not(.rowh)').forEach(function(th){ th.style.top = h + 'px'; });
+      };
+      apply();
+      if (window.ResizeObserver) {
+        new ResizeObserver(apply).observe(r0);
+      }
     });
   }
   window.addEventListener('load', fixSticky);
   setTimeout(fixSticky, 50);
+  window.addEventListener('resize', fixSticky);
   applyAll();
   refreshCount();
 })();`;

@@ -15,13 +15,13 @@
     {
       "id": "ug-list",
       "label": "UG一覧（差額NG検出・コメント表示）",
-      "lastChecked": "2026-06-24T01:41:05.858Z",
+      "lastChecked": "2026-06-25T14:56:11.818Z",
       "lastResult": "ok"
     },
     {
       "id": "dummy-price",
       "label": "売止めダミー価格(999999等)の表示が0円にならないか",
-      "lastChecked": "2026-06-24T01:41:05.858Z",
+      "lastChecked": "2026-06-25T14:56:11.818Z",
       "lastResult": "ok"
     },
     {
@@ -51,13 +51,13 @@
     {
       "id": "cross-highlight",
       "label": "十字ハイライト（マウスオーバーで行列強調）",
-      "lastChecked": "2026-06-24T01:14:36.190Z",
+      "lastChecked": "2026-06-25T14:52:40.070Z",
       "lastResult": "ok"
     },
     {
       "id": "large-data-perf",
       "label": "大量行データでの表示・出力パフォーマンス",
-      "lastChecked": "2026-06-24T01:14:36.190Z",
+      "lastChecked": "2026-06-25T14:52:40.070Z",
       "lastResult": "ok"
     }
   ],
@@ -132,6 +132,22 @@
       "focusAreas": [
         "sort-filter",
         "master-unlinked"
+      ]
+    },
+    {
+      "date": "2026-06-25",
+      "status": "ok",
+      "focusAreas": [
+        "cross-highlight",
+        "large-data-perf"
+      ]
+    },
+    {
+      "date": "2026-06-25",
+      "status": "ok",
+      "focusAreas": [
+        "ug-list",
+        "dummy-price"
       ]
     }
   ]
