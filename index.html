@@ -2682,6 +2682,22 @@
             if (!md || !md.found) notes.push("先席種マスタ未登録");
             if (srcSeat && (!ms || !ms.found)) notes.push("元席種マスタ未登録");
           }
+          // UG行自体の販売期間が、元/先の通常価格の販売期間を超えて設定されていないか。
+          // 元(または先)がそもそも売っていない期間までUGの販売期間に含めるのは不整合（購入できないものを
+          // アップグレードできてしまうことになるため）
+          {
+            const ugStart = parseDt(v(row, c.start)), ugEnd = parseDt(v(row, c.end));
+            if (ugStart != null && ugEnd != null) {
+              const ckP = condKey(row);
+              const srcNormal = lookup(ckP, srcSeat, srcAge), dstNormal = lookup(ckP, dstSeat, dstAge);
+              if (srcNormal && srcNormal.start != null && srcNormal.end != null && (ugStart < srcNormal.start || ugEnd > srcNormal.end)) {
+                problems.push("UGの販売期間が元の通常販売期間を超えている");
+              }
+              if (dstNormal && dstNormal.start != null && dstNormal.end != null && (ugStart < dstNormal.start || ugEnd > dstNormal.end)) {
+                problems.push("UGの販売期間が先の通常販売期間を超えている");
+              }
+            }
+          }
 
           // 当日/前売それぞれの窓に「かぶっている」か（dayCutoff未指定なら常にnull=判定不能）。
           //  ・当日窓: 行の販売終了日時がdayCutoff以降まで続く（=当日まで売っている）
@@ -9386,10 +9402,15 @@ ${_sortableTable(labels, rowsHtml)}` };
                   const cls = (chk.status === "ng" || chk.status === "invalid") ? " mx-ng" : chk.status === "unknown" ? " mx-na" : "";
                   const dg = chk.isDown ? '<div class="dg">▼0</div>' : "";
                   const mid = encodeURIComponent(["M", k, fs, fa, ts, ta].join("|"));
-                  // 何がNGかを明示（前売/当日/設定不可）
+                  // 何がNGかを明示（前売/当日・期待差額も併記。「NG」だけでは何が違うか分からないため）
                   let reason = "";
                   if (chk.status === "invalid") reason = `<div class="rsn">${escHtml((chk.problems || []).join("/"))}</div>`;
-                  else { const rs = []; if (chk.advNg) rs.push("前売"); if (chk.dayNg) rs.push("当日"); if (rs.length) reason = `<div class="rsn">${rs.join("・")}NG</div>`; }
+                  else {
+                    const rs = [];
+                    if (chk.advNg) rs.push(`前売NG(期待${chk.expected != null ? chk.expected.toLocaleString("ja-JP") : "?"})`);
+                    if (chk.dayNg) rs.push(`当日NG(期待${chk.expectedDay != null ? chk.expectedDay.toLocaleString("ja-JP") : "?"})`);
+                    if (rs.length) reason = `<div class="rsn">${rs.join("・")}</div>`;
+                  }
                   // 期待差額をExcel(アップグレード表)同様に数字だけ大きく見せる（席種一覧での照合がしやすいように）
                   // 「差額」だけでは何の差か分からないため「先－元」と明示する
                   const expBadge = (chk.status !== "invalid" && chk.expected != null)

@@ -39,11 +39,12 @@ function priceRow(seat, seatCd, age, adv, day) {
 // UG行（元席種/元年齢→先=seat/age）を作るヘルパー。
 // regAdv/regDay は「実際に登録されている差額（前売/当日）」。先チケット自体の価格ではない点に注意
 // （元/先の通常価格は NORMALS から席種・年齢で引かれ、ugExpectedCharge の期待差額と regAdv/regDay を比較する）
-function ugRow(ugSeat, ugSeatCd, ugAge, seat, seatCd, age, regAdv, regDay) {
+function ugRow(ugSeat, ugSeatCd, ugAge, seat, seatCd, age, regAdv, regDay, start, end) {
   return {
     [c.seat]: seat, [c.seatCd]: seatCd, [c.age]: age,
     [c.ugSeat]: ugSeat, [c.ugSeatCd]: ugSeatCd, [c.ugAge]: ugAge,
     [c.kbn]: KBN, [c.rank]: RANK, [c.route]: ROUTE, [c.adv]: regAdv, [c.day]: regDay, [c.ugFlag]: "該当",
+    [c.start]: start, [c.end]: end,
   };
 }
 
@@ -73,6 +74,13 @@ const SEAT_X = { name: "X席", cd: "RESV14" };
 const SEAT_Y = { name: "Y席", cd: "RESV15" };
 NORMALS.push({ ...priceRow(SEAT_X.name, SEAT_X.cd, "大人", 25000, 25000), [c.route]: "店頭" });
 NORMALS.push(priceRow(SEAT_Y.name, SEAT_Y.cd, "大人", 19000, 23000));
+
+// UG行自体の販売期間が元/先の通常販売期間を超えていないかの回帰テスト用データ。
+// PERIOD元は07/05に売り終わるが、PERIOD先は07/10まで売っている（元のほうが先に終わる）
+const SEAT_PERIOD_SRC = { name: "PERIOD元", cd: "RESV16" };
+const SEAT_PERIOD_DST = { name: "PERIOD先", cd: "RESV17" };
+NORMALS.push({ ...priceRow(SEAT_PERIOD_SRC.name, SEAT_PERIOD_SRC.cd, "大人", 8000, 8500), [c.start]: "2026/06/01 11:00", [c.end]: "2026/07/05 21:00" });
+NORMALS.push({ ...priceRow(SEAT_PERIOD_DST.name, SEAT_PERIOD_DST.cd, "大人", 10000, 10500), [c.start]: "2026/06/01 11:00", [c.end]: "2026/07/10 21:00" });
 
 const SCENARIOS = [
   {
@@ -157,6 +165,27 @@ eqCU(validate.canUpgrade(SEAT_FREE2.name, SEAT_FREE2.cd, "大人", SEAT_VC.name,
   if (chkXY.problems.some((p) => p.includes("大人料金が先<元"))) {
     fail++;
     console.error(`NG [条件違いの大人料金で誤ダウングレード]: problems=${JSON.stringify(chkXY.problems)}`);
+  } else pass++;
+}
+
+// UG行自体の販売期間が元の通常販売期間(〜07/05)を超えて07/10まで設定されている → invalid
+{
+  const chkOver = validate(ugRow(
+    SEAT_PERIOD_SRC.name, SEAT_PERIOD_SRC.cd, "大人", SEAT_PERIOD_DST.name, SEAT_PERIOD_DST.cd, "大人",
+    2000, 2000, "2026/06/01 11:00", "2026/07/10 21:00",
+  ));
+  if (chkOver.status === "invalid" && chkOver.problems.some((p) => p.includes("元の通常販売期間"))) pass++;
+  else { fail++; console.error(`NG [UG期間が元の通常販売期間を超える]: status=${chkOver.status} problems=${JSON.stringify(chkOver.problems)}`); }
+}
+// UG行自体の販売期間が元の通常販売期間(〜07/05)に収まっている → このチェックでは引っかからない
+{
+  const chkIn = validate(ugRow(
+    SEAT_PERIOD_SRC.name, SEAT_PERIOD_SRC.cd, "大人", SEAT_PERIOD_DST.name, SEAT_PERIOD_DST.cd, "大人",
+    2000, 2000, "2026/06/01 11:00", "2026/07/05 21:00",
+  ));
+  if (chkIn.problems.some((p) => p.includes("通常販売期間"))) {
+    fail++;
+    console.error(`NG [UG期間が元の通常販売期間内なのに誤検知]: problems=${JSON.stringify(chkIn.problems)}`);
   } else pass++;
 }
 
