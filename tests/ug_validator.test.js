@@ -132,6 +132,17 @@ let pass = 0, fail = 0;
 const seatMeta = null; // マスタ未連携でも動く（コード6桁目のO/P判定のみでカテゴリ推定）
 const validate = buildUgValidator(NORMALS, c, v, seatMeta);
 
+// --- canUpgrade（UG未登録セルが「登録漏れ候補」かどうかの構造チェック）---
+function eqCU(actual, expected, desc) {
+  if (actual === expected) pass++;
+  else { fail++; console.error(`NG canUpgrade[${desc}]: 期待 ${expected} / 実際 ${actual}`); }
+}
+eqCU(validate.canUpgrade(SEAT_S.name, SEAT_S.cd, "大人", SEAT_A.name, SEAT_A.cd, "大人"), true, "通常の異席種同年齢UGは可");
+eqCU(validate.canUpgrade(SEAT_A.name, SEAT_A.cd, "大人", SEAT_S.name, SEAT_S.cd, "子供"), false, "年齢降格は不可");
+eqCU(validate.canUpgrade(SEAT_FREE.name, SEAT_FREE.cd, "大人", SEAT_FREE.name, SEAT_FREE.cd, "大人"), false, "エリア席の同席種同年齢は不可");
+eqCU(validate.canUpgrade(SEAT_VC.name, SEAT_VC.cd, "大人", SEAT_FREE2.name, SEAT_FREE2.cd, "大人"), false, "大人料金ダウングレード(先<元)は不可");
+eqCU(validate.canUpgrade(SEAT_FREE2.name, SEAT_FREE2.cd, "大人", SEAT_VC.name, SEAT_VC.cd, "大人"), true, "ダミー当日価格を挟んでも実価格(前売)でアップグレードなら可");
+
 for (const s of SCENARIOS) {
   const chk = validate(s.row);
   const checks = [];

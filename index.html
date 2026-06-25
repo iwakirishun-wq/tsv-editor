@@ -2582,7 +2582,37 @@
         const lookup = (ck, seat, age) => byCond.get(ck + "|" + seat + "|" + age) || any.get(seat + "|" + age) || null;
         const lookupAdult = (ck, seat) => adultByCond.get(ck + "|" + seat) || adultAny.get(seat) || null;
 
-        return function validate(row) {
+        // UG行が実在しなくても「この席種×券種の組み合わせは構造的にUG可能か」を判定する。
+        // 実在する行のkbn/rank/条件には依存しない（条件キーがないので大人料金は"any"索引のみ参照）。
+        // マトリクスの「—」セル（登録なし）が、本来UGが成立しうるのに登録漏れなのか、
+        // そもそも対象外（車椅子/エリア/年齢降格/大人ダウングレード）なのかを区別するために使う。
+        function canUpgrade(srcSeat, srcCode, srcAge, dstSeat, dstCode, dstAge) {
+          const sr = ageRank(srcAge), dr = ageRank(dstAge);
+          if (sr && dr && dr < sr) return false; // 年齢降格
+          const sameAgeCat = (sr !== 0 && sr === dr) || srcAge === dstAge;
+          const sameSeat = srcSeat === dstSeat && srcSeat !== "" && sameAgeCat;
+          const dstCat = seatCat(dstCode, dstSeat);
+          if (sameSeat && dstCat === "エリア") return false;
+          const srcWc = isWheelchair(srcSeat), dstWc = isWheelchair(dstSeat);
+          if (srcWc || dstWc) {
+            if (srcWc !== dstWc) return false;
+            const sameAgeReserved = sameAgeCat && dstCat === "指定席";
+            const upgradeToAdult = !sameAgeCat && dr === 4 && dr > sr;
+            if (!sameAgeReserved && !upgradeToAdult) return false;
+          }
+          if (!sameSeat && !srcWc && !dstWc) {
+            const as = adultAny.get(srcSeat), ad = adultAny.get(dstSeat);
+            const adultDowngrade = ["adv", "day"].some((which) => {
+              const asp = as ? as[which] : null, adp = ad ? ad[which] : null;
+              if (asp == null || adp == null || isDummyPrice(asp) || isDummyPrice(adp)) return false;
+              return asp > adp;
+            });
+            if (adultDowngrade) return false;
+          }
+          return true;
+        }
+
+        return Object.assign(function validate(row) {
           const srcSeat = v(row, c.ugSeat), dstSeat = v(row, c.seat);
           const srcAge = v(row, c.ugAge), dstAge = v(row, c.age);
           const srcCode = v(row, c.ugSeatCd), dstCode = v(row, c.seatCd);
@@ -2721,7 +2751,7 @@
             advActual, dayActual, notes, advNg, dayNg,
             note: [problems.join(" / "), notes.join(" / "), problems.length ? "" : (adv.note || "")].filter(Boolean).join(" / "),
           };
-        };
+        }, { canUpgrade });
       }
       // ===UG_VALIDATOR_CORE_END===
 
@@ -9254,6 +9284,7 @@ ${_sortableTable(labels, rowsHtml)}` };
           const byCond = new Map();
           for (const row of ugs) { const k = condOf(row); if (!byCond.has(k)) byCond.set(k, []); byCond.get(k).push(row); }
           let ngTotal = 0;
+          let missingTotal = 0;
           let mxBody = "";
           for (const [k, list] of byCond) {
             // 基準価格マップ（席種|券種 → {adv,day}）
@@ -9316,7 +9347,23 @@ ${_sortableTable(labels, rowsHtml)}` };
                   const colSep = ts !== prevTsBody ? " mx-colsep" : "";
                   prevTsBody = ts;
                   const e = map.get(fs + "|" + fa + "=>" + ts + "|" + ta);
-                  if (!e) { bodyRows += `<td class="na${colSep}">—</td>`; continue; }
+                  if (!e) {
+                    // UG登録が無いセル。同年齢区分どうしで先のほうが高く、車椅子/エリア/年齢降格/大人ダウングレード等の
+                    // 対象外ルールにも当たらない場合は「本来UGが成立しうるのに登録漏れの可能性」として目立たせる。
+                    const sameRank = ugAgeRank(fa) !== 0 && ugAgeRank(fa) === ugAgeRank(ta);
+                    let missing = false;
+                    if (sameRank && validate.canUpgrade(fs, seatCode[fs], fa, ts, seatCode[ts], ta)) {
+                      const sp = priceMap[fs + "|" + fa], dp = priceMap[ts + "|" + ta];
+                      const spAdv = sp ? numOf(sp.adv) : null, dpAdv = dp ? numOf(dp.adv) : null;
+                      if (spAdv != null && dpAdv != null && !ugIsDummyPrice(spAdv) && !ugIsDummyPrice(dpAdv) && dpAdv > spAdv) missing = true;
+                    }
+                    if (missing) missingTotal++;
+                    const missTip = "先のほうが価格が高く、車椅子/エリア/年齢降格等の対象外ルールにも該当しないため、UG登録漏れの可能性があります（要確認）";
+                    bodyRows += missing
+                      ? `<td class="na mx-missing${colSep}" title="${escHtml(missTip)}">？<div class="rsn">登録漏れ?</div></td>`
+                      : `<td class="na${colSep}">—</td>`;
+                    continue;
+                  }
                   const { row, chk } = e;
                   const tip = (chk.status === "invalid" ? chk.note
                     : chk.expected != null ? `期待差額 前${chk.expected.toLocaleString("ja-JP")}/当${chk.expectedDay != null ? chk.expectedDay.toLocaleString("ja-JP") : "?"}` + (chk.sameSeat ? "（同席種・同年齢区分=一律500）" : `（先${fmt(String(chk.dstPrice))} − 元${fmt(String(chk.srcPrice))}）`)
@@ -9341,8 +9388,9 @@ ${_sortableTable(labels, rowsHtml)}` };
             mxBody += `<div class="cond-block" data-cond="${escHtml(k)}"><h3>${escHtml(k)}</h3><div class="scroll mxscroll"><table class="mx">${head}${bodyRows}</table></div></div>`;
           }
           const ngBadge = ngTotal ? `　<span class="badge-ng">NG ${ngTotal}件</span>` : `　<span class="badge-ok">検算OK</span>`;
-          sections.matrix = { title: "UGマトリクス", body: `<h2>🔢 アップグレードマトリクス（俯瞰）${ngBadge}</h2>
-<p class="legend">行=元席種/券種、列=先席種/券種（大人の前売価格の安い順）。見出しには通常価格の販売期間も併記。席種は表示略称＋区分（<span class="catb cat-r">指定席</span><span class="catb cat-a">数在庫</span><span class="catb cat-o">その他</span>）。各セル: 先－元=期待差額（緑） / 前売・当日=実際の金額 / 下=販売期間（曜日付き）。<b>期待差額</b>は同区分なら差額0は全区分500・大人は1〜500も500・U23/子供/幼児は実差額(マイナス→0)、異区分間は0以下→0・1〜500→500・500超→実差額。<b>不一致は文字が赤・セルが薄ピンク</b>。クリックでマーク</p>${mxBody}` };
+          const missingBadge = missingTotal ? `　<span class="badge-ng" style="background:#b45309">登録漏れ?候補 ${missingTotal}件</span>` : "";
+          sections.matrix = { title: "UGマトリクス", body: `<h2>🔢 アップグレードマトリクス（俯瞰）${ngBadge}${missingBadge}</h2>
+<p class="legend">行=元席種/券種、列=先席種/券種（大人の前売価格の安い順）。見出しには通常価格の販売期間も併記。席種は表示略称＋区分（<span class="catb cat-r">指定席</span><span class="catb cat-a">数在庫</span><span class="catb cat-o">その他</span>）。各セル: 先－元=期待差額（緑） / 前売・当日=実際の金額 / 下=販売期間（曜日付き）。<b>期待差額</b>は同区分なら差額0は全区分500・大人は1〜500も500・U23/子供/幼児は実差額(マイナス→0)、異区分間は0以下→0・1〜500→500・500超→実差額。<b>不一致は文字が赤・セルが薄ピンク</b>。<b>「？」の橙セル</b>はUG登録が無いセルのうち、先のほうが価格が高く対象外ルールにも当たらないため登録漏れの可能性がある候補（推測なので必ず人が確認してください）。クリックでマーク</p>${mxBody}` };
         }
 
         // --- UG一覧（席種ペアでセル結合・元⇒先・金額対比・差異強調） ---
@@ -9548,6 +9596,8 @@ td.mxc.marked { box-shadow: inset 0 0 0 3px var(--mk); }
 td.mxc.marked::after { content: "✓"; position: absolute; top: 1px; right: 3px; font-size: 10px; color: #16a34a; font-weight: 700; }
 .sub { font-size: 10px; color: #888; font-weight: 400; }
 td.na { color: #ccc; background: #fafafa; }
+td.na.mx-missing { color: #b45309; background: #fef3c7; font-weight: 700; }
+td.na.mx-missing .rsn { color: #b45309; font-size: 10px; font-weight: 700; }
 .dg { font-size: 10px; color: #ea580c; font-weight: 700; }
 .badge-ng { background: #dc2626; color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 999px; vertical-align: middle; }
 .badge-ok { background: #16a34a; color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 999px; vertical-align: middle; }

@@ -51,13 +51,13 @@
     {
       "id": "cross-highlight",
       "label": "十字ハイライト（マウスオーバーで行列強調）",
-      "lastChecked": "2026-06-25T14:52:40.070Z",
+      "lastChecked": "2026-06-25T16:00:16.542Z",
       "lastResult": "ok"
     },
     {
       "id": "large-data-perf",
       "label": "大量行データでの表示・出力パフォーマンス",
-      "lastChecked": "2026-06-25T14:52:40.070Z",
+      "lastChecked": "2026-06-25T16:00:16.542Z",
       "lastResult": "ok"
     }
   ],
@@ -172,6 +172,14 @@
       "focusAreas": [
         "sort-filter",
         "master-unlinked"
+      ]
+    },
+    {
+      "date": "2026-06-25",
+      "status": "ok",
+      "focusAreas": [
+        "cross-highlight",
+        "large-data-perf"
       ]
     }
   ]
