@@ -2536,10 +2536,18 @@
       const UG_DUMMY_MIN = PRICE_RULES.DUMMY_PRICE_MIN; // 既存参照の互換エイリアス
       // ===UG_VALIDATOR_CORE_START=== UI/stateに依存しない純粋ロジック（tests/ug_validator.test.js が抽出して検証する）
       // seatMeta(code, name) -> { isFree, isReserved, found } | null（席種エリアマスタ連携時のみ）
-      function buildUgValidator(rows, c, v, seatMeta) {
+      // dayCutoff: 当日/前売の境界タイムスタンプ（出力ダイアログでユーザーが選択。未指定ならnull=判定なし）。
+      // 行の販売終了日時がdayCutoff以降なら「当日に かぶっている」、販売開始日時がdayCutoff未満なら「前売に かぶっている」。
+      function buildUgValidator(rows, c, v, seatMeta, dayCutoff) {
         const num = (s) => { const n = Number(String(s).replace(/,/g, "")); return isNaN(n) ? null : n; };
         const condKey = (row) => [v(row, c.kbn), v(row, c.rank), v(row, c.route)].join("|");
         const ageRank = ugAgeRank;
+        const parseDt = (s) => {
+          const m = String(s || "").match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);
+          if (!m) return null;
+          const t = new Date(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0)).getTime();
+          return isNaN(t) ? null : t;
+        };
         const byCond = new Map(), any = new Map();
         const adultByCond = new Map(), adultAny = new Map(); // 席ごとの大人料金（ランク4）を引くための索引
         for (const row of rows) {
@@ -2547,7 +2555,7 @@
           if (flag === "該当" || flag === "1") continue;
           const seat = v(row, c.seat), age = v(row, c.age);
           if (!seat) continue;
-          const rec = { adv: num(v(row, c.adv)), day: num(v(row, c.day)) };
+          const rec = { adv: num(v(row, c.adv)), day: num(v(row, c.day)), start: parseDt(v(row, c.start)), end: parseDt(v(row, c.end)) };
           byCond.set(condKey(row) + "|" + seat + "|" + age, rec);
           if (!any.has(seat + "|" + age)) any.set(seat + "|" + age, rec);
           if (ageRank(age) === 4) {
@@ -2639,15 +2647,30 @@
             if (srcSeat && (!ms || !ms.found)) notes.push("元席種マスタ未登録");
           }
 
+          // 当日/前売それぞれの窓に「かぶっている」か（dayCutoff未指定なら常にnull=判定不能）。
+          //  ・当日窓: 行の販売終了日時がdayCutoff以降まで続く（=当日まで売っている）
+          //  ・前売窓: 行の販売開始日時がdayCutoff未満（=当日より前から売っている）
+          const overlapsDay = (rec) => (dayCutoff == null || !rec || rec.end == null) ? null : rec.end >= dayCutoff;
+          const overlapsAdv = (rec) => (dayCutoff == null || !rec || rec.start == null) ? null : rec.start < dayCutoff;
+
           // --- 期待差額（前売・当日） ---
-          // 戻り: { exp:number|null, note:string, dummy:bool }
+          // 戻り: { exp:number|null, note:string, dummy:bool, dummyError:bool }
           const calc = (which) => {
             if (sameSeat) return { exp: PRICE_RULES.SEAT_CHANGE_FEE, note: "同席種・同年齢区分=一律500（再発行等）", dummy: false };
             const ck = condKey(row);
             const s = lookup(ck, srcSeat, srcAge), d = lookup(ck, dstSeat, dstAge);
             const sp = s ? s[which] : null, dp = d ? d[which] : null;
             if (sp == null || dp == null) return { exp: null, note: "価格不明", dummy: false };
-            if (isDummyPrice(sp) || isDummyPrice(dp)) return { exp: null, note: "売止め/その販売区分の取扱なし", dummy: true, srcPrice: sp, dstPrice: dp };
+            if (isDummyPrice(sp) || isDummyPrice(dp)) {
+              // 元・先どちらも対象の窓（当日/前売）に かぶっているのにダミー値のまま→エラー。
+              // どちらか一方でも窓にかぶっていなければ（その期間はそもそも対象外）、まだ未確定なだけでエラーではない。
+              const overlapFn = which === "day" ? overlapsDay : overlapsAdv;
+              const bothOverlap = overlapFn(s) === true && overlapFn(d) === true;
+              const note = bothOverlap
+                ? `販売期間が${which === "day" ? "当日" : "前売"}にかぶっているのに価格がダミー値（売止め等）のまま設定不可`
+                : "ダミー金額に変換が後程必要（境界日時を指定していない、または対象期間が重なっていないため現時点ではエラーではありません）";
+              return { exp: null, note, dummy: true, dummyError: bothOverlap, srcPrice: sp, dstPrice: dp };
+            }
             const diff = dp - sp;
             // 期待差額の写像は純粋関数 ugExpectedCharge に集約（同年齢: 差額0は全区分500・大人は1〜500→500/超→実差額・
             // U23以下は実差額/マイナス0／異年齢: 0以下→0・1〜500→500・500超→実差額）
@@ -2657,12 +2680,14 @@
           };
           const adv = calc("adv"), day = calc("day");
 
-          // 登録値（前売/当日）自体が売止めダミー(999999等)なら、システム上その値を入れないと登録できない
-          // ため、期待差額の計算結果に関わらず常にOKとする（元/先価格がダミーかどうかは問わない）
+          // 元/先どちらかの通常価格がダミーの場合: 対象の窓(当日/前売)に両方かぶっているのにダミーのままならエラー、
+          // そうでなければ（まだ未確定なだけなので）登録値が何であってもOK。
+          // 通常価格は確定しているが登録された差額自体がダミー(999999等)の場合は、
+          // システム上その値を入れないと登録できないため常にOKとする。
           const matchOne = (a, actual) => {
             if (a.note === "価格不明") return "unknown";
+            if (a.dummy) return a.dummyError ? "ng" : "ok";
             if (actual != null && isDummyPrice(actual)) return "ok";
-            if (a.dummy) return actual == null ? "ok" : "ng";
             return actual === a.exp ? "ok" : "ng";
           };
 
@@ -8958,19 +8983,57 @@
         if (!rowIndices.length) { setStatus("⚠ 表示する行がありません"); return; }
         const isFiltered = rowIndices.length < state.data.length;
 
+        // イベント最終日の推定: 販売終了日時の「日付」部分で最も件数が多い日（同数なら遅い方）を候補にする。
+        // 当日/前売の境界はイベントごとに違う（時刻も様々）ため、ここでは候補日を出すだけにして、
+        // 実際の境界日時は出力ダイアログでユーザーに選択・確認してもらう（指定ミス防止のため曜日も表示）。
+        const endIdx = H.indexOf("販売終了日時");
+        let candidateDate = "", candidateTime = "11:00";
+        if (endIdx !== -1) {
+          const counts = new Map();
+          for (const i of rowIndices) {
+            const raw = String(state.data[i]?.[endIdx] || "");
+            const m = raw.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);
+            if (!m) continue;
+            const dateKey = `${m[1]}-${String(m[2]).padStart(2, "0")}-${String(m[3]).padStart(2, "0")}`;
+            const rec = counts.get(dateKey) || { n: 0, time: `${String(m[4] || 11).padStart(2, "0")}:${String(m[5] || 0).padStart(2, "0")}` };
+            rec.n++;
+            counts.set(dateKey, rec);
+          }
+          let best = null;
+          for (const [k, rec] of counts) {
+            if (!best || rec.n > best.rec.n || (rec.n === best.rec.n && k > best.k)) best = { k, rec };
+          }
+          if (best) { candidateDate = best.k; candidateTime = best.rec.time; }
+        }
+        const weekdayLabel = (dateStr) => {
+          if (!dateStr) return "";
+          const d = new Date(dateStr + "T00:00:00");
+          if (isNaN(d.getTime())) return "";
+          return "（" + ["日", "月", "火", "水", "木", "金", "土"][d.getDay()] + "）";
+        };
+
         document.querySelector("#price-export-choice")?.remove();
         const ov = document.createElement("div");
         ov.id = "price-export-choice";
         ov.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1600;display:flex;align-items:center;justify-content:center;";
         ov.innerHTML = `
-          <div style="background:#fff;border-radius:8px;padding:22px 26px;width:min(400px,90vw);box-shadow:0 8px 30px rgba(0,0,0,.25);font-size:13px">
+          <div style="background:#fff;border-radius:8px;padding:22px 26px;width:min(440px,90vw);box-shadow:0 8px 30px rgba(0,0,0,.25);font-size:13px">
             <h3 style="margin:0 0 6px;font-size:14px">価格チェック表の出力</h3>
             <p style="color:#737373;font-size:12px;margin-bottom:8px">${rowIndices.length}件${isFiltered ? "・フィルター適用中" : ""}　/　会員ランクは全件出力（出力先で絞り込み・並べ替え可）</p>
             <p style="font-size:12px;margin-bottom:14px;padding:6px 10px;border-radius:6px;background:#e8f7ee;color:#16a34a">✓ 席種エリアマスタ参照中（指定席/エリア/その他をマスタで判定・席種は表示略称）</p>
-            <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
+            <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px">
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="px-normal" checked> 📋 通常価格表（席種×券種の設定一覧）</label>
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="px-matrix" checked> 🔢 アップグレードマトリクス（俯瞰）</label>
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="px-ug" checked> 🔀 アップグレード一覧（検算・チェック用）</label>
+            </div>
+            <div style="border:1px solid #e2e8ee;border-radius:6px;padding:10px 12px;margin-bottom:16px;background:#f8fafc">
+              <div style="font-weight:600;margin-bottom:4px">当日／前売の境界日時（999999ダミー判定に使用）</div>
+              <div style="color:#737373;font-size:11.5px;margin-bottom:8px">この日時より後を「当日」、前を「前売り」として999999(ダミー価格)の検算に使います。候補はチェック対象データの販売終了日時から自動推定したものです。日付は必ずカレンダーで確認し、曜日が想定と合っているか確認してください。</div>
+              <div style="display:flex;align-items:center;gap:6px">
+                <input type="date" id="px-cutoff-date" value="${candidateDate}" style="font-size:13px;padding:4px 6px">
+                <input type="time" id="px-cutoff-time" value="${candidateTime}" style="font-size:13px;padding:4px 6px">
+                <span id="px-cutoff-weekday" style="font-weight:600;color:#1b6ec2">${weekdayLabel(candidateDate)}</span>
+              </div>
             </div>
             <div style="display:flex;justify-content:flex-end;gap:8px">
               <button id="px-cancel" style="padding:7px 14px;border:none;color:#999;background:none;cursor:pointer;font-size:12px">キャンセル</button>
@@ -8980,19 +9043,25 @@
         document.body.appendChild(ov);
         ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
         ov.querySelector("#px-cancel").onclick = () => ov.remove();
+        const dateInput = ov.querySelector("#px-cutoff-date");
+        const weekdaySpan = ov.querySelector("#px-cutoff-weekday");
+        dateInput.addEventListener("input", () => { weekdaySpan.textContent = weekdayLabel(dateInput.value); });
         ov.querySelector("#px-go").onclick = () => {
           const opt = {
             normal: ov.querySelector("#px-normal").checked,
             matrix: ov.querySelector("#px-matrix").checked,
             ug: ov.querySelector("#px-ug").checked,
           };
+          const cutoffDate = ov.querySelector("#px-cutoff-date").value;
+          const cutoffTime = ov.querySelector("#px-cutoff-time").value || "00:00";
+          const dayCutoff = cutoffDate ? new Date(`${cutoffDate}T${cutoffTime}:00`).getTime() : null;
           ov.remove();
           if (!opt.normal && !opt.matrix && !opt.ug) { alert("出力する表を1つ以上選択してください。"); return; }
-          _buildPriceCheckHtml(rowIndices, isFiltered, opt);
+          _buildPriceCheckHtml(rowIndices, isFiltered, opt, dayCutoff);
         };
       }
 
-      function _buildPriceCheckHtml(rowIndices, isFiltered, opt) {
+      function _buildPriceCheckHtml(rowIndices, isFiltered, opt, dayCutoff) {
         const H = state.headers.map(h => String(h).trim());
         const ix = (n) => H.indexOf(n);
         const ixAny = (...names) => { for (const n of names) { const i = ix(n); if (i !== -1) return i; } return -1; };
@@ -9046,7 +9115,7 @@
           const flag = v(row, c.ugFlag);
           (flag === "該当" || flag === "1" ? ugs : normals).push(row);
         }
-        const validate = buildUgValidator(normals.concat(ugs), c, v, seatMeta);
+        const validate = buildUgValidator(normals.concat(ugs), c, v, seatMeta, dayCutoff);
 
         // セル: data-v に並べ替え用の生値を入れる（数値・日時はそのまま比較可能に）
         const cell = (val, raw, cls, rowspan) => `<td${cls ? ` class="${cls}"` : ""}${rowspan ? ` rowspan="${rowspan}"` : ""}${raw != null ? ` data-v="${escHtml(String(raw))}"` : ""}>${escHtml(val)}</td>`;

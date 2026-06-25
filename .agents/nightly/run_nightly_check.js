@@ -155,9 +155,13 @@ async function main() {
     await page.waitForTimeout(1500);
 
     // 3. 価格チェック表出力
+    // 当日/前売の境界日時は自動推定された候補のまま出力する（人が確認して選び直す前提のUIのため、
+    // 夜間チェックでは候補が実際のイベント最終日と異なる可能性がある＝差額NG件数が多めに出ることがある）
     await page.click("#btn-price-sheet");
     const goBtn = page.locator("#px-go");
     await goBtn.waitFor({ state: "visible", timeout: 5000 });
+    report.dayCutoffUsed = await page.locator("#px-cutoff-date").inputValue().catch(() => null);
+    report.dayCutoffNote = "自動推定の候補日（人が選び直す前提のUI）。実際のイベント最終日と異なる場合、差額NG件数が実態より多く出ます";
     const [popup] = await Promise.all([
       page.waitForEvent("popup"),
       goBtn.click(),
@@ -232,6 +236,7 @@ async function main() {
     `- コンソールエラー: ${report.consoleErrors.length}件`,
     `- 異常検出: ${report.anomalies.length ? report.anomalies.join(" / ") : "なし"}`,
     `- NGバッジ: ${(report.ngBadges || []).join(", ") || "なし"}`,
+    report.dayCutoffUsed ? `- 当日/前売の境界日時（自動候補）: ${report.dayCutoffUsed} ※${report.dayCutoffNote}` : "",
     `- HTML保存サイズ: ${report.htmlSaveSizeBytes != null ? report.htmlSaveSizeBytes + " bytes" : "未測定"}`,
     report.error ? `- エラー: ${report.error}` : "",
   ].filter(Boolean).join("\n");

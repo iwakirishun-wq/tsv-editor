@@ -3,13 +3,13 @@
     {
       "id": "normal-table",
       "label": "通常価格表（前売/当日 行分割レイアウト）の表示",
-      "lastChecked": "2026-06-24T17:49:10.010Z",
+      "lastChecked": "2026-06-25T15:15:28.035Z",
       "lastResult": "ok"
     },
     {
       "id": "ug-matrix",
       "label": "UGマトリクス（俯瞰）の表示・列固定・期待差額バッジ",
-      "lastChecked": "2026-06-24T17:49:10.010Z",
+      "lastChecked": "2026-06-25T15:15:28.035Z",
       "lastResult": "ok"
     },
     {
@@ -27,13 +27,13 @@
     {
       "id": "html-save",
       "label": "HTML保存ボタンで非空ファイルが保存されるか",
-      "lastChecked": "2026-06-24T18:00:08.460Z",
+      "lastChecked": "2026-06-25T15:16:29.701Z",
       "lastResult": "ok"
     },
     {
       "id": "marker-persist",
       "label": "チェックマーク・NG/未チェックのみフィルタの動作",
-      "lastChecked": "2026-06-24T18:00:08.460Z",
+      "lastChecked": "2026-06-25T15:16:29.701Z",
       "lastResult": "ok"
     },
     {
@@ -148,6 +148,22 @@
       "focusAreas": [
         "ug-list",
         "dummy-price"
+      ]
+    },
+    {
+      "date": "2026-06-25",
+      "status": "ok",
+      "focusAreas": [
+        "normal-table",
+        "ug-matrix"
+      ]
+    },
+    {
+      "date": "2026-06-25",
+      "status": "ok",
+      "focusAreas": [
+        "html-save",
+        "marker-persist"
       ]
     }
   ]
