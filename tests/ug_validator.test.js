@@ -67,6 +67,13 @@ const NORMALS = [
   priceRow(SEAT_VC.name, SEAT_VC.cd, "大人", 19000, 23000),
 ];
 
+// 条件(会員ランク/販売経路)をまたいだ大人料金の取り違えを防ぐ回帰テスト用データ。
+// SEAT_X の大人料金は「店頭」経路にしかなく、UG行は既定条件(ネット)で登録される＝条件が一致しない。
+const SEAT_X = { name: "X席", cd: "RESV14" };
+const SEAT_Y = { name: "Y席", cd: "RESV15" };
+NORMALS.push({ ...priceRow(SEAT_X.name, SEAT_X.cd, "大人", 25000, 25000), [c.route]: "店頭" });
+NORMALS.push(priceRow(SEAT_Y.name, SEAT_Y.cd, "大人", 19000, 23000));
+
 const SCENARIOS = [
   {
     name: "異席種・同年齢ラベル違い(子供)・実差額300円を正しく登録 → OK（表記違いでも同ランクなら同区分）",
@@ -142,6 +149,16 @@ eqCU(validate.canUpgrade(SEAT_A.name, SEAT_A.cd, "大人", SEAT_S.name, SEAT_S.c
 eqCU(validate.canUpgrade(SEAT_FREE.name, SEAT_FREE.cd, "大人", SEAT_FREE.name, SEAT_FREE.cd, "大人"), false, "エリア席の同席種同年齢は不可");
 eqCU(validate.canUpgrade(SEAT_VC.name, SEAT_VC.cd, "大人", SEAT_FREE2.name, SEAT_FREE2.cd, "大人"), false, "大人料金ダウングレード(先<元)は不可");
 eqCU(validate.canUpgrade(SEAT_FREE2.name, SEAT_FREE2.cd, "大人", SEAT_VC.name, SEAT_VC.cd, "大人"), true, "ダミー当日価格を挟んでも実価格(前売)でアップグレードなら可");
+
+// 大人料金ダウングレード判定が、条件(会員ランク/販売経路)の異なる無関係な価格を拾って
+// 誤判定しないことの回帰テスト（X席の大人料金は「店頭」経路にしかなく、UG行は既定条件で登録）
+{
+  const chkXY = validate(ugRow(SEAT_X.name, SEAT_X.cd, "大人", SEAT_Y.name, SEAT_Y.cd, "大人", 0, 0));
+  if (chkXY.problems.some((p) => p.includes("大人料金が先<元"))) {
+    fail++;
+    console.error(`NG [条件違いの大人料金で誤ダウングレード]: problems=${JSON.stringify(chkXY.problems)}`);
+  } else pass++;
+}
 
 for (const s of SCENARIOS) {
   const chk = validate(s.row);

@@ -2580,7 +2580,10 @@
         const isAdultAge = (a) => ageRank(a) === 4; // 大人（同年齢区分どうしで差額0でも500円の席変更手数料が必要なのは大人のみ）
         const isDummyPrice = ugIsDummyPrice; // 売止め等のダミー価格判定（純粋ロジックを委譲）
         const lookup = (ck, seat, age) => byCond.get(ck + "|" + seat + "|" + age) || any.get(seat + "|" + age) || null;
-        const lookupAdult = (ck, seat) => adultByCond.get(ck + "|" + seat) || adultAny.get(seat) || null;
+        // 条件（会員ランク/販売経路）が完全一致する大人料金のみを使う。"any"フォールバックで他条件の
+        // 価格に化けると、表示上の価格と矛盾するダウングレード誤判定（先<元なのに先のほうが高く見える等）
+        // を引き起こすため、ここでは厳密一致のみとし、見つからなければ判定不能（null）にする
+        const lookupAdult = (ck, seat) => adultByCond.get(ck + "|" + seat) || null;
 
         // UG行が実在しなくても「この席種×券種の組み合わせは構造的にUG可能か」を判定する。
         // 実在する行のkbn/rank/条件には依存しない（条件キーがないので大人料金は"any"索引のみ参照）。
@@ -9036,7 +9039,18 @@
           for (const [k, rec] of counts) {
             if (!best || rec.n > best.rec.n || (rec.n === best.rec.n && k > best.k)) best = { k, rec };
           }
-          if (best) { candidateDate = best.k; candidateTime = best.rec.time; }
+          if (best) {
+            candidateDate = best.k;
+            candidateTime = best.rec.time;
+            // 切り替えのタイミングは00:00のため、販売終了が23:59(その日の最後の1分)の場合は
+            // 「翌日00:00」を境界候補にする（木曜23:59で終わる前売は、実質的に金曜0時から当日扱いになる）
+            if (candidateTime === "23:59") {
+              const d = new Date(candidateDate + "T00:00:00");
+              d.setDate(d.getDate() + 1);
+              candidateDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+              candidateTime = "00:00";
+            }
+          }
         }
         const weekdayLabel = (dateStr) => {
           if (!dateStr) return "";
