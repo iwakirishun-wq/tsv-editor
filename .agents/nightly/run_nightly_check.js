@@ -357,9 +357,15 @@ async function main() {
   saveChecklist(checklist);
 
   const report = { date: today, finishedAt, status: overallStatus, error: fatalError, scenarios };
-  fs.writeFileSync(path.join(LOG_DIR, `${today}.json`), JSON.stringify(report, null, 2), "utf8");
+  // 実行ごとにタイムスタンプ付きファイルへ記録する（日付のみのファイル名だと、同じ日に手動で
+  // 再実行した際に深夜3時の本来の結果が上書きされて消えてしまうため）。
+  // 加えて "latest" を常に最新の結果で上書きし、直近の結果をすぐ確認できるようにする。
+  const hhmmss = finishedAt.slice(11, 19).replace(/:/g, "");
+  const stamp = `${today}_${hhmmss}`;
+  fs.writeFileSync(path.join(LOG_DIR, `${stamp}.json`), JSON.stringify(report, null, 2), "utf8");
+  fs.writeFileSync(path.join(LOG_DIR, "latest.json"), JSON.stringify(report, null, 2), "utf8");
 
-  const lines = [`# 夜間UIチェック ${today}`, "", `- ステータス: **${overallStatus}**`];
+  const lines = [`# 夜間UIチェック ${stamp}`, "", `- ステータス: **${overallStatus}**`];
   if (fatalError) lines.push(`- 致命的エラー: ${fatalError}`);
   for (const sc of scenarios) {
     lines.push("", `## ${sc.name}`);
@@ -374,7 +380,8 @@ async function main() {
     if (sc.dayCutoffUsed) lines.push(`- 境界日時（自動候補）: ${sc.dayCutoffUsed} ※${sc.dayCutoffNote}`);
   }
   const md = lines.join("\n");
-  fs.writeFileSync(path.join(LOG_DIR, `${today}.md`), md, "utf8");
+  fs.writeFileSync(path.join(LOG_DIR, `${stamp}.md`), md, "utf8");
+  fs.writeFileSync(path.join(LOG_DIR, "latest.md"), md, "utf8");
 
   console.log(md);
   process.exit(overallStatus === "ok" ? 0 : 1);
