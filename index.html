@@ -219,6 +219,43 @@
         border-color: var(--rb-accent);
       }
       .rb-btn.active-state .rb-icon svg { color: #fff; }
+      /* 統合ボタン(席種エリアマスタチェック/SEJチェック)の個別ON/OFFドロップダウン。
+         フロント側の見た目は今まで通りのボタンのままにし、▾で個別制御の階層を開く */
+      .rb-btn-wrap { position: relative; display: flex; flex-direction: column; align-items: center; }
+      .rb-caret {
+        position: absolute;
+        top: 2px;
+        right: 2px;
+        width: 16px;
+        height: 16px;
+        border: none;
+        background: rgba(0, 0, 0, 0.06);
+        border-radius: 2px;
+        cursor: pointer;
+        font-size: 9px;
+        line-height: 16px;
+        color: var(--rb-dim);
+        padding: 0;
+      }
+      .rb-caret:hover { background: rgba(0, 0, 0, 0.14); }
+      .rb-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        z-index: 50;
+        background: #fff;
+        border: 1px solid var(--rb-border);
+        border-radius: 4px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        padding: 6px 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        white-space: nowrap;
+        font-size: 12px;
+        color: var(--rb-text);
+      }
+      .rb-dropdown label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-weight: 400; }
       .rb-icon {
         width: 24px;
         height: 24px;
@@ -1734,14 +1771,32 @@
         <!-- Group: 検品表示（トグル） -->
         <div class="rb-group">
           <div class="rb-buttons">
-            <button class="rb-btn" id="btn-seatmaster-check" title="席種エリアマスタに関連するチェックをまとめて切り替えます&#10;カラー表示・ゲート表示・駐車券検査・区画席検査・カナ検査・備考HTML変換&#10;前提条件を満たさない項目（ゲート対応表なし等）は自動でスキップされます" aria-label="席種エリアマスタチェックの切り替え" aria-pressed="false">
-              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="3" y1="12" x2="21" y2="12"></line><line x1="12" y1="3" x2="12" y2="21"></line><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor"></circle><circle cx="16.5" cy="7.5" r="1.2" fill="currentColor"></circle><circle cx="7.5" cy="16.5" r="1.2" fill="currentColor"></circle><circle cx="16.5" cy="16.5" r="1.2" fill="currentColor"></circle></svg></span>
-              <span>席種エリアマスタチェック</span>
-            </button>
-            <button class="rb-btn" id="btn-sej-check" title="SEJデータのチェックをまとめて切り替えます&#10;カナ検査・備考HTML変換&#10;前提条件を満たさない項目は自動でスキップされます" aria-label="SEJチェックの切り替え" aria-pressed="false">
-              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 6h8M8 6v12"></path><path d="M14 18l3.5-10L21 18"></path><path d="M15.5 14h4"></path></svg></span>
-              <span>SEJチェック</span>
-            </button>
+            <div class="rb-btn-wrap">
+              <button class="rb-btn" id="btn-seatmaster-check" title="席種エリアマスタに関連するチェックをまとめて切り替えます&#10;カラー表示・ゲート表示・駐車券検査・区画席検査・カナ検査・備考HTML変換&#10;前提条件を満たさない項目（ゲート対応表なし等）は自動でスキップされます" aria-label="席種エリアマスタチェックの切り替え" aria-pressed="false">
+                <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="3" y1="12" x2="21" y2="12"></line><line x1="12" y1="3" x2="12" y2="21"></line><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor"></circle><circle cx="16.5" cy="7.5" r="1.2" fill="currentColor"></circle><circle cx="7.5" cy="16.5" r="1.2" fill="currentColor"></circle><circle cx="16.5" cy="16.5" r="1.2" fill="currentColor"></circle></svg></span>
+                <span>席種エリアマスタチェック</span>
+              </button>
+              <button class="rb-caret" id="caret-seatmaster-check" type="button" title="個別に機能を選んでON/OFF" aria-label="席種エリアマスタチェックの詳細設定を開く" aria-expanded="false">▾</button>
+              <div class="rb-dropdown" id="dd-seatmaster-check" hidden>
+                <label><input type="checkbox" data-flag="colorView"> カラー表示</label>
+                <label><input type="checkbox" data-flag="gateView"> ゲート表示</label>
+                <label><input type="checkbox" data-flag="parkingCheck"> 駐車券検査</label>
+                <label><input type="checkbox" data-flag="boxCheck"> 区画席検査</label>
+                <label><input type="checkbox" data-flag="kanaCheck"> カナ検査</label>
+                <label><input type="checkbox" data-flag="bikoHtmlCheck"> 備考HTML変換</label>
+              </div>
+            </div>
+            <div class="rb-btn-wrap">
+              <button class="rb-btn" id="btn-sej-check" title="SEJデータのチェックをまとめて切り替えます&#10;カナ検査・備考HTML変換&#10;前提条件を満たさない項目は自動でスキップされます" aria-label="SEJチェックの切り替え" aria-pressed="false">
+                <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 6h8M8 6v12"></path><path d="M14 18l3.5-10L21 18"></path><path d="M15.5 14h4"></path></svg></span>
+                <span>SEJチェック</span>
+              </button>
+              <button class="rb-caret" id="caret-sej-check" type="button" title="個別に機能を選んでON/OFF" aria-label="SEJチェックの詳細設定を開く" aria-expanded="false">▾</button>
+              <div class="rb-dropdown" id="dd-sej-check" hidden>
+                <label><input type="checkbox" data-flag="kanaCheck"> カナ検査</label>
+                <label><input type="checkbox" data-flag="bikoHtmlCheck"> 備考HTML変換</label>
+              </div>
+            </div>
             <button class="rb-btn" id="btn-ikkatsu-check" title="席種一括設定TSV(23列)の設定整合チェックを表にインライン表示（切り替え）&#10;NG（赤）: マスタ未登録・席種名不一致・指定席整合・上限9+リセール可・リセール下限1321・購入限定あり+単体不可・P+他種混在&#10;注意（橙）: 上限9+SEJ可&#10;席種エリアマスタを連携すると席種名/指定席チェックも有効になります" aria-label="席種一括設定チェックの切り替え" aria-pressed="false">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"></path><rect x="9" y="3" width="6" height="4" rx="1"></rect><path d="M9 12l2 2 4-4"></path></svg></span>
               <span>一括設定チェック</span>
@@ -2294,6 +2349,34 @@
         setStatus(msg);
       }
 
+      // 検品トグル各項目のラベルと、統合ボタンが束ねている項目一覧（ドロップダウンUIと共有）
+      const INSPECT_FLAG_LABELS = {
+        colorView: "カラー表示", gateView: "ゲート表示", parkingCheck: "駐車券検査",
+        boxCheck: "区画席検査", kanaCheck: "カナ検査", bikoHtmlCheck: "備考HTML変換",
+      };
+      const INSPECT_GROUPS = {
+        "btn-seatmaster-check": ["colorView", "gateView", "parkingCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck"],
+        "btn-sej-check": ["kanaCheck", "bikoHtmlCheck"],
+      };
+      // 個別項目をONにする前の前提条件チェック。問題なければnull、問題があれば理由文字列を返す
+      function _inspectFlagPrecondition(key) {
+        if (key === "gateView") {
+          const gateColExists = state.headers.some((h) => h.trim() === "gate_stage_typ1");
+          const gateMapNow = gateColExists ? getGateMap() : {};
+          if (!gateColExists || !Object.keys(gateMapNow).length) return "ゲート表示（対応表なし）";
+        }
+        if (key === "parkingCheck") {
+          const hasNte = state.headers.some((h) => h.trim() === "nte");
+          if (!hasNte) return "駐車券検査（席種エリアマスタ未読込）";
+        }
+        if (key === "bikoHtmlCheck") {
+          const hasNte = state.headers.some((h) => h.trim() === "nte");
+          const isSej = isSejData();
+          if (!hasNte && !isSej) return "備考HTML変換（対象データ外）";
+          if (isSej && !state.sejMaster) return "備考HTML変換（マスタ未連携）";
+        }
+        return null;
+      }
       // 複数の検品トグルをまとめて1ボタンで切り替える（席種エリアマスタチェック/SEJチェック用）。
       // 現在すべてONなら一括OFF、そうでなければ一括ON（前提条件を満たさない項目は自動スキップ）。
       // kanaCheck/bikoHtmlCheckは2つのグループボタンから共有される（重複あり・どちらからでも同じ状態を操作する）
@@ -2304,21 +2387,8 @@
         let needAutoFit = false;
         for (const k of keys) {
           if (!turnOn) { state[k] = false; continue; }
-          if (k === "gateView") {
-            const gateColExists = state.headers.some((h) => h.trim() === "gate_stage_typ1");
-            const gateMapNow = gateColExists ? getGateMap() : {};
-            if (!gateColExists || !Object.keys(gateMapNow).length) { skipped.push("ゲート表示（対応表なし）"); continue; }
-          }
-          if (k === "parkingCheck") {
-            const hasNte = state.headers.some((h) => h.trim() === "nte");
-            if (!hasNte) { skipped.push("駐車券検査（席種エリアマスタ未読込）"); continue; }
-          }
-          if (k === "bikoHtmlCheck") {
-            const hasNte = state.headers.some((h) => h.trim() === "nte");
-            const isSej = isSejData();
-            if (!hasNte && !isSej) { skipped.push("備考HTML変換（対象データ外）"); continue; }
-            if (isSej && !state.sejMaster) { skipped.push("備考HTML変換（マスタ未連携）"); continue; }
-          }
+          const reason = _inspectFlagPrecondition(k);
+          if (reason) { skipped.push(reason); continue; }
           state[k] = true;
           if (k !== "colorView" && k !== "bikoHtmlCheck") needAutoFit = true;
         }
@@ -2332,14 +2402,51 @@
         }
         const nowAllOn = keys.every((k) => state[k]);
         const nowAnyOn = keys.some((k) => state[k]);
-        const btn = $(btnId);
-        if (btn) { btn.classList.toggle("active-state", nowAllOn); btn.setAttribute("aria-pressed", String(nowAllOn)); }
         if (needAutoFit) { autoFitAllColumnsQuiet(); renderHeader(); }
         state.forceRender = true;
         renderBody();
+        syncInspectUI();
         let msg = `${label}: ${nowAllOn ? "ON" : nowAnyOn ? "一部ON" : "OFF"}`;
         if (skipped.length) msg += `（スキップ: ${skipped.join("・")}）`;
         setStatus(msg);
+      }
+      // 個別項目を1つだけON/OFFする（統合ボタンのドロップダウン用）。kanaCheck/bikoHtmlCheckは
+      // 2つのグループで共有されるため、変更後は両方のドロップダウン・ボタン表示を同期する
+      function setInspectFlag(key, on) {
+        if (on) {
+          const reason = _inspectFlagPrecondition(key);
+          if (reason) {
+            setStatus(`${INSPECT_FLAG_LABELS[key] || key}: 前提条件を満たしていないためONにできません（${reason}）`);
+            syncInspectUI();
+            return;
+          }
+        }
+        state[key] = on;
+        if (on && key !== "colorView" && key !== "bikoHtmlCheck") { autoFitAllColumnsQuiet(); renderHeader(); }
+        if (on && key === "bikoHtmlCheck" && !state.wrapCells) {
+          state.wrapCells = true;
+          state.wrapRows.clear();
+          document.body.classList.add("wrap-cells");
+          const bw = $("btn-wrap");
+          if (bw) { bw.classList.add("active-state"); bw.setAttribute("aria-pressed", "true"); }
+        }
+        state.forceRender = true;
+        renderBody();
+        setStatus(`${INSPECT_FLAG_LABELS[key] || key}: ${on ? "ON" : "OFF"}`);
+        syncInspectUI();
+      }
+      // ドロップダウンのチェックボックス・統合ボタンのON/OFF表示を、実際のstateの値に同期する
+      function syncInspectUI() {
+        document.querySelectorAll(".rb-dropdown input[data-flag]").forEach((cb) => {
+          cb.checked = !!state[cb.dataset.flag];
+        });
+        for (const [btnId, keys] of Object.entries(INSPECT_GROUPS)) {
+          const btn = $(btnId);
+          if (!btn) continue;
+          const allOn = keys.every((k) => state[k]);
+          btn.classList.toggle("active-state", allOn);
+          btn.setAttribute("aria-pressed", String(allOn));
+        }
       }
 
       // ゲート用公演種別: ヘッダーコメントの「名称：番号」行から 番号→名称 の対応表を作る
@@ -3360,6 +3467,31 @@
         $("btn-sej-check").onclick = () => {
           toggleInspectGroup(["kanaCheck", "bikoHtmlCheck"], "btn-sej-check", "SEJチェック");
         };
+        // 統合ボタンの▾: 個別ON/OFFドロップダウンを開閉する（フロント側のメインボタンの見た目・動作は変えない）
+        document.querySelectorAll(".rb-caret").forEach((caret) => {
+          caret.onclick = (e) => {
+            e.stopPropagation();
+            const dd = caret.nextElementSibling;
+            if (!dd || !dd.classList.contains("rb-dropdown")) return;
+            const willOpen = dd.hidden;
+            document.querySelectorAll(".rb-dropdown").forEach((d) => { d.hidden = true; });
+            document.querySelectorAll(".rb-caret").forEach((c) => c.setAttribute("aria-expanded", "false"));
+            if (willOpen) {
+              syncInspectUI();
+              dd.hidden = false;
+              caret.setAttribute("aria-expanded", "true");
+            }
+          };
+        });
+        document.querySelectorAll(".rb-dropdown input[data-flag]").forEach((cb) => {
+          cb.addEventListener("click", (e) => e.stopPropagation());
+          cb.addEventListener("change", () => setInspectFlag(cb.dataset.flag, cb.checked));
+        });
+        document.addEventListener("click", (e) => {
+          if (e.target.closest(".rb-btn-wrap")) return;
+          document.querySelectorAll(".rb-dropdown").forEach((d) => { d.hidden = true; });
+          document.querySelectorAll(".rb-caret").forEach((c) => c.setAttribute("aria-expanded", "false"));
+        });
         $("btn-ikkatsu-check").onclick = () => {
           if (!state.ikkatsuCheck && !state.sejMaster) {
             alert("一括設定チェックには席種エリアマスタの連携が必要です。\n\n「席種エリアマスタ連携」から席種エリアマスタ(TSV)を連携してから有効化してください。");
