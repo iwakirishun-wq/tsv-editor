@@ -27,14 +27,14 @@
     {
       "id": "sort-filter",
       "label": "通常価格表の並べ替え/絞り込み（種別=前売/当日列含む）",
-      "lastChecked": null,
-      "lastResult": null
+      "lastChecked": "2026-06-26T10:31:08.596Z",
+      "lastResult": "ok"
     },
     {
       "id": "master-unlinked",
       "label": "席種エリアマスタ未連携時の挙動・案内メッセージ",
-      "lastChecked": null,
-      "lastResult": null
+      "lastChecked": "2026-06-26T10:31:08.596Z",
+      "lastResult": "ok"
     },
     {
       "id": "large-data-perf",
@@ -64,6 +64,14 @@
       "focusAreas": [
         "ikkatsu-dummy",
         "html-save"
+      ]
+    },
+    {
+      "date": "2026-06-26",
+      "status": "ok",
+      "focusAreas": [
+        "sort-filter",
+        "master-unlinked"
       ]
     }
   ]

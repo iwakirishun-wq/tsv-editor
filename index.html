@@ -2068,7 +2068,7 @@
           <div class="man-btn-row"><span class="man-btn-label">ゲート表示</span><span class="man-btn-desc">ゲート用公演種別の番号にゲート名を併記。対応表は列ヘッダーのコメントから読み取り（切替）。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">駐車券検査</span><span class="man-btn-desc">エリアコード6桁目P ⇔ 駐車券フラグ1 を検査。✓OK / ✗NG どちらも表示（切替）。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">カナ検査</span><span class="man-btn-desc">全角カタカナが残っているセルをオレンジ表示。システム取込は半角ｶﾅ必須のため（切替）。</span></div>
-          <div class="man-btn-row"><span class="man-btn-label">区画席検査</span><span class="man-btn-desc">席種名に「（〇名）」がある行は、6桁目E・BOX席フラグ1・席数2以上が揃っているか検査。✓OK / ✗不足項目を表示（切替）。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">区画席検査</span><span class="man-btn-desc">席種名に「（〇名）」がある行は、6桁目E/P・BOX席フラグ1・席数2以上が揃っているか検査。✓OK / ✗不足項目を表示（切替）。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">一括設定検査</span><span class="man-btn-desc">席種一括設定TSV(23列)の設定整合をインライン表示（切替）。マスタ未登録・席種名不一致・指定席整合・リセール下限1321（券面価格固定の場合は対象外）・購入限定P混在×複数購入可・<b>他席から購入限定席種として指定されているのに単体販売可になっている場合はNG</b>を検査。複数日入場の開始日・終了日には曜日も併記。席種エリアマスタ連携が必要。</span></div>
         </div>
 
@@ -5052,19 +5052,19 @@
               cls.push("cell-warn");
               displayVal += `<span style="color:#ea580c;margin-left:5px;font-size:10px">✗ 全角カナ</span>`;
             }
-            // 区画席検査: 席種名に「（〇名）」がある行は E + BOXフラグ1 + 席数2以上 が必要
+            // 区画席検査: 席種名に「（〇名）」がある行は E/P + BOXフラグ1 + 席数2以上 が必要
             if (j === boxNmIdx && boxNmIdx !== -1 && /[（(]\s*\d+\s*名\s*[）)]/.test(cellVal)) {
               const code = boxCodeIdx !== -1 ? (row[boxCodeIdx] ?? "").trim() : "";
-              const isE = code.length >= 6 && code[5].toUpperCase() === "E";
+              const isEP = code.length >= 6 && ["E", "P"].includes(code[5].toUpperCase());
               const flg = boxFlgIdx !== -1 ? (row[boxFlgIdx] ?? "").trim() === "1" : false;
               const cnt = boxCntIdx !== -1 ? parseInt((row[boxCntIdx] ?? "").trim()) : NaN;
               const cntOk = !isNaN(cnt) && cnt >= 2;
-              if (isE && flg && cntOk) {
+              if (isEP && flg && cntOk) {
                 displayVal += `<span style="color:#16a34a;margin-left:5px;font-size:10px">✓ 区画席OK</span>`;
               } else {
                 cls.push("cell-ng");
                 const ng = [];
-                if (!isE) ng.push("6桁目E");
+                if (!isEP) ng.push("6桁目E/P");
                 if (!flg) ng.push("BOXフラグ1");
                 if (!cntOk) ng.push("席数2以上");
                 displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">✗ ${ng.join("・")}が必要</span>`;

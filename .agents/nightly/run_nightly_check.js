@@ -53,6 +53,7 @@ function loadChecklist() {
       { id: "price-schedule-dummy", label: "価格スケジュール(ダミー): 通常価格表/UGマトリクス/UG一覧", lastChecked: null, lastResult: null },
       { id: "sej-dummy", label: "SEJデータ(ダミー): カナ検査・備考HTML変換・SEJチェック", lastChecked: null, lastResult: null },
       { id: "ikkatsu-dummy", label: "一括設定TSV(ダミー): 一括設定チェックのNG検出", lastChecked: null, lastResult: null },
+      { id: "seatmaster-maingrid-dummy", label: "席種エリアマスタ(ダミー・メイングリッド): 区画席検査(E/P判定)・駐車券検査", lastChecked: null, lastResult: null },
       { id: "html-save", label: "HTML保存ボタンで非空ファイルが保存されるか", lastChecked: null, lastResult: null },
       { id: "sort-filter", label: "通常価格表の並べ替え/絞り込み（種別=前売/当日列含む）", lastChecked: null, lastResult: null },
       { id: "master-unlinked", label: "席種エリアマスタ未連携時の挙動・案内メッセージ", lastChecked: null, lastResult: null },
@@ -247,7 +248,38 @@ async function runIkkatsuScenario(browser, today) {
   });
 }
 
-// --- シナリオ4(任意): MAIN内の実マスターが見つかった場合の参考チェック ---
+// --- シナリオ4: 席種エリアマスタをメイングリッドとして開いた場合（席種エリアマスタチェックの動作確認） ---
+async function runSeatMasterMainGridScenario(browser, today) {
+  return withPage(browser, async (page) => {
+    const anomalies = [];
+    const seatMasterPath = path.join(LOG_DIR, `_dummy_seatmeta_maingrid_${today}.tsv`);
+    fs.writeFileSync(seatMasterPath, dummy.buildDummySeatMasterMainGrid(), "utf8");
+
+    await page.goto("file:///" + INDEX_HTML.replace(/\\/g, "/"));
+    await page.waitForSelector("#file-input", { state: "attached" });
+    await page.setInputFiles("#file-input", seatMasterPath);
+    await page.waitForTimeout(800);
+
+    await page.click('.rb-tab[data-tab="ticket"]');
+    const btn = page.locator("#btn-seatmaster-check");
+    let ngCellCount = 0, okCellCount = 0;
+    if (await btn.count()) {
+      await btn.click();
+      await page.waitForTimeout(500);
+      ngCellCount = await page.locator("td.cell-ng").count();
+      okCellCount = await page.locator("body").locator("text=区画席OK").count();
+      // ダミーデータには区画席NG1件(席数不足)・駐車券NG1件を仕込んでいる。区画席OKはE/Pの2件。
+      if (ngCellCount === 0) anomalies.push("席種エリアマスタチェックでNGセルが1件も検出されなかった（区画席の席数不足・駐車券フラグ不一致を仕込んでいる）");
+      if (okCellCount < 2) anomalies.push(`区画席OK（E/P）の検出数が想定より少ない: ${okCellCount}件（E席・P席の2件を仕込んでいる）`);
+    } else {
+      anomalies.push("席種エリアマスタチェックボタン(#btn-seatmaster-check)が見つからない");
+    }
+
+    return { name: "seatmaster-maingrid-dummy", anomalies, ngCellCount, okCellCount };
+  });
+}
+
+// --- シナリオ5(任意): MAIN内の実マスターが見つかった場合の参考チェック ---
 async function runRealDataScenarioIfAvailable(browser, today) {
   const boPath = findLatest(BO_GLOB_DIR, /^BO-F-21030_.*\.tsv$/i);
   const seatMetaPath = findLatest(MAIN_ROOT, /m_seat_type_area.*\.tsv$/i);
@@ -300,6 +332,7 @@ async function main() {
     scenarios.push(await runPriceScheduleScenario(browser, today));
     scenarios.push(await runSejScenario(browser, today));
     scenarios.push(await runIkkatsuScenario(browser, today));
+    scenarios.push(await runSeatMasterMainGridScenario(browser, today));
     const real = await runRealDataScenarioIfAvailable(browser, today);
     if (real) scenarios.push(real);
   } catch (e) {
@@ -334,6 +367,7 @@ async function main() {
     lines.push(`- 異常検出: ${sc.anomalies && sc.anomalies.length ? sc.anomalies.join(" / ") : "なし"}`);
     if (sc.counts) lines.push(`- 件数: 差額NG=${sc.counts.actualNg} / 登録漏れ?候補=${sc.counts.missingCount} / 設定不可=${sc.counts.actualInvalid}`);
     if (sc.ngCellCount != null) lines.push(`- NGセル数: ${sc.ngCellCount}`);
+    if (sc.okCellCount != null) lines.push(`- OKセル数: ${sc.okCellCount}`);
     if (sc.warnCellCount != null) lines.push(`- 警告セル数: ${sc.warnCellCount}`);
     if (sc.htmlSaveSizeBytes != null) lines.push(`- HTML保存サイズ: ${sc.htmlSaveSizeBytes} bytes`);
     if (sc.dataSource) lines.push(`- データ源: ${sc.dataSource.boPath} / ${sc.dataSource.seatMetaPath}（参考チェック・全体結果には影響しません）`);

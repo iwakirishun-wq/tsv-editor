@@ -100,6 +100,30 @@ function buildDummySeatMaster() {
   return [headers.join("\t"), ...rows.map((r) => r.join("\t"))].join("\n");
 }
 
+// --- 席種エリアマスタをメイングリッドとして直接開いた場合（席種エリアマスタチェックの動作確認用）。
+// box_seat_flg/seat_cnt/parking_ticket_flg列を持つ。区画席検査(E/P判定)・駐車券検査の検証データを仕込む。
+function buildDummySeatMasterMainGrid() {
+  const headers = [
+    "tenant_cd", "club_cd", "seat_type_area_cd", "seat_type_area_control_nm", "seat_type_area_disp_nm",
+    "disp_abb", "rsve_unrsve_kbn", "nte", "box_seat_flg", "seat_cnt", "parking_ticket_flg", "disp_color_cd",
+  ];
+  const rows = [
+    // 6桁目=E、BOXフラグ1、席数2以上 → OK
+    ["T1", "C1", "RSV01E", "ボックスE（4名）", "ボックスE（4名）", "BoxE", "1", "", "1", "4", "0", "FF0000"],
+    // 6桁目=P、BOXフラグ1、席数2以上 → OK（今回追加したE/P両対応の確認）
+    ["T1", "C1", "RSV02P", "ボックスP（4名）", "ボックスP（4名）", "BoxP", "1", "", "1", "4", "0", "00FF00"],
+    // 6桁目=E、BOXフラグ1だが席数1 → NG（席数2以上が必要）
+    ["T1", "C1", "RSV03E", "不足ボックス（4名）", "不足ボックス（4名）", "BoxNG", "1", "", "1", "1", "0", ""],
+    // （〇名）を含まない通常席 → 区画席検査の対象外
+    ["T1", "C1", "RSV04Q", "通常席", "通常席", "通常", "1", "", "0", "", "0", ""],
+    // 駐車券検査用: 6桁目=P・駐車券フラグ1 → OK
+    ["T1", "C1", "RSV05P", "駐車場A", "駐車場A", "ParkA", "1", "1", "0", "", "1", ""],
+    // 駐車券検査用: 6桁目=P・駐車券フラグ0 → NG
+    ["T1", "C1", "RSV06P", "駐車場B", "駐車場B", "ParkB", "1", "1", "0", "", "0", ""],
+  ];
+  return [headers.join("\t"), ...rows.map((r) => r.join("\t"))].join("\n");
+}
+
 // --- SEJデータ（word1〜7 / sej_template_cd 形式。カナ検査・備考HTML変換・SEJチェックの動作確認用） ---
 function buildDummySejData() {
   const headers = [
@@ -143,6 +167,7 @@ module.exports = {
   DAY_CUTOFF_TIME,
   buildDummyPriceSchedule,
   buildDummySeatMaster,
+  buildDummySeatMasterMainGrid,
   buildDummySejData,
   buildDummyIkkatsuData,
 };
