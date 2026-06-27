@@ -236,6 +236,13 @@
         line-height: 16px;
         color: var(--rb-dim);
         padding: 0;
+        opacity: 0;
+        transition: opacity 0.12s ease;
+      }
+      .rb-btn-wrap:hover .rb-caret,
+      .rb-btn-wrap:focus-within .rb-caret,
+      .rb-caret[aria-expanded="true"] {
+        opacity: 1;
       }
       .rb-caret:hover { background: rgba(0, 0, 0, 0.14); }
       .rb-dropdown {
