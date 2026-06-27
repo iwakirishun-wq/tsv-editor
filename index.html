@@ -262,6 +262,19 @@
         white-space: nowrap;
         font-size: 12px;
         color: var(--rb-text);
+        transform-origin: top center;
+        transform: scaleY(0.85) translateY(-6px);
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transition: transform 0.16s ease, opacity 0.16s ease, visibility 0.16s step-end;
+      }
+      .rb-dropdown.open {
+        transform: scaleY(1) translateY(0);
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+        transition: transform 0.16s ease, opacity 0.16s ease, visibility 0.16s step-start;
       }
       .rb-dropdown label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-weight: 400; }
       .rb-icon {
@@ -680,14 +693,16 @@
       }
 
       /* ===ハイライト（Excel互換・青系）=== */
+      /* background を !important で塗ると、カラー表示(disp_color_cd)やマーカー等のインライン背景色が
+         選択時に完全に消えてしまうため、box-shadowの内側塗りで「重ねる」形にして元の色を透過させる */
       td.selected {
-        background: rgba(19, 100, 215, 0.16) !important;
+        box-shadow: inset 0 0 0 1000px rgba(19, 100, 215, 0.16);
         outline: 2px solid #1b6ec2;
         outline-offset: -1px;
         z-index: 2;
       }
       td.in-range {
-        background: rgba(19, 100, 215, 0.07) !important;
+        box-shadow: inset 0 0 0 1000px rgba(19, 100, 215, 0.07);
       }
       td.col-highlight {
         background: rgba(19, 100, 215, 0.03);
@@ -1785,7 +1800,7 @@
                 <span>席種エリアマスタチェック</span>
               </button>
               <button class="rb-caret" id="caret-seatmaster-check" type="button" title="個別に機能を選んでON/OFF" aria-label="席種エリアマスタチェックの詳細設定を開く" aria-expanded="false">▾</button>
-              <div class="rb-dropdown" id="dd-seatmaster-check" hidden>
+              <div class="rb-dropdown" id="dd-seatmaster-check">
                 <label><input type="checkbox" data-flag="colorView"> カラー表示</label>
                 <label><input type="checkbox" data-flag="gateView"> ゲート表示</label>
                 <label><input type="checkbox" data-flag="parkingCheck"> 駐車券検査</label>
@@ -1800,7 +1815,7 @@
                 <span>SEJチェック</span>
               </button>
               <button class="rb-caret" id="caret-sej-check" type="button" title="個別に機能を選んでON/OFF" aria-label="SEJチェックの詳細設定を開く" aria-expanded="false">▾</button>
-              <div class="rb-dropdown" id="dd-sej-check" hidden>
+              <div class="rb-dropdown" id="dd-sej-check">
                 <label><input type="checkbox" data-flag="kanaCheck"> カナ検査</label>
                 <label><input type="checkbox" data-flag="bikoHtmlCheck"> 備考HTML変換</label>
               </div>
@@ -2692,6 +2707,8 @@
           return /自由席|エリア/.test(seat) ? "エリア" : "指定席";
         };
         const isWheelchair = (seat) => /車椅子|車いす/.test(seat || "");
+        // 車椅子の同伴席は「自分の席の年齢区分変更」のみ可（他の車椅子席へのUGは不可）
+        const isCompanion = (seat) => /同伴/.test(seat || "");
         const isAdultAge = (a) => ageRank(a) === 4; // 大人（同年齢区分どうしで差額0でも500円の席変更手数料が必要なのは大人のみ）
         const isDummyPrice = ugIsDummyPrice; // 売止め等のダミー価格判定（純粋ロジックを委譲）
         const lookup = (ck, seat, age) => byCond.get(ck + "|" + seat + "|" + age) || any.get(seat + "|" + age) || null;
@@ -2709,6 +2726,8 @@
           if (sr && dr && dr < sr) return false; // 年齢降格
           const sameAgeCat = (sr !== 0 && sr === dr) || srcAge === dstAge;
           const sameSeat = srcSeat === dstSeat && srcSeat !== "" && sameAgeCat;
+          // 同伴席は自分の席の年齢区分変更のみ可（別の車椅子席へのUGは不可）
+          if (isCompanion(srcSeat) && srcSeat !== dstSeat) return false;
           const dstCat = seatCat(dstCode, dstSeat);
           if (sameSeat && dstCat === "エリア") return false;
           const srcWc = isWheelchair(srcSeat), dstWc = isWheelchair(dstSeat);
@@ -3481,12 +3500,12 @@
             e.stopPropagation();
             const dd = caret.nextElementSibling;
             if (!dd || !dd.classList.contains("rb-dropdown")) return;
-            const willOpen = dd.hidden;
-            document.querySelectorAll(".rb-dropdown").forEach((d) => { d.hidden = true; });
+            const willOpen = !dd.classList.contains("open");
+            document.querySelectorAll(".rb-dropdown").forEach((d) => { d.classList.remove("open"); });
             document.querySelectorAll(".rb-caret").forEach((c) => c.setAttribute("aria-expanded", "false"));
             if (willOpen) {
               syncInspectUI();
-              dd.hidden = false;
+              dd.classList.add("open");
               caret.setAttribute("aria-expanded", "true");
             }
           };
@@ -3497,7 +3516,7 @@
         });
         document.addEventListener("click", (e) => {
           if (e.target.closest(".rb-btn-wrap")) return;
-          document.querySelectorAll(".rb-dropdown").forEach((d) => { d.hidden = true; });
+          document.querySelectorAll(".rb-dropdown").forEach((d) => { d.classList.remove("open"); });
           document.querySelectorAll(".rb-caret").forEach((c) => c.setAttribute("aria-expanded", "false"));
         });
         $("btn-ikkatsu-check").onclick = () => {
@@ -4119,23 +4138,8 @@
           });
           gateBufferQuiet += 20;
         }
-        const parkFlagIdxQuiet = state.parkingCheck ? _hIdxQuiet("parking_ticket_flg") : -1;
-        const GHOST_BUFFER_PARK = 150; // 「✗ 駐車券(P)は1必須」想定
-        let ikkatsuMarkerCols = null;
-        if (state.ikkatsuCheck && isIkkatsuData()) {
-          const _ikNormQ = (s) => String(s ?? "").trim().replace(/（/g,"(").replace(/）/g,")").replace(/[０-９]/g,(d)=>"０１２３４５６７８９".indexOf(d));
-          const _ikHsQ = state.headers.map(_ikNormQ);
-          const _ikCQ = (n) => _ikHsQ.indexOf(_ikNormQ(n));
-          ikkatsuMarkerCols = new Set([
-            _ikCQ("席種エリアコード"), _ikCQ("席種エリア管理名"), _ikCQ("座席指定不可フラグ"),
-            _ikCQ("リセール可否"), _ikCQ("リセール用販売価格下限"), _ikCQ("単体販売不可"),
-            _ikCQ("購入限定区分"), _ikCQ("SEJ支払"), _ikCQ("SEJ発券"),
-            _ikCQ("複数日入場開始日"), _ikCQ("複数日入場終了日"),
-          ].filter(idx => idx !== -1));
-        }
         const GHOST_BUFFER_KANA = 80;   // 「✗ 全角カナ」（カナ検査は列を問わず付与されうる）
         const GHOST_BUFFER_BOX = 220;   // 「✗ 6桁目E・BOXフラグ1・席数2以上が必要」想定
-        const GHOST_BUFFER_IKKATSU = 180; // 一括設定検査の各マーカー想定
 
         for (let c = 0; c < state.headers.length; c++) {
           const displayH = getDisplayHeader(c);
@@ -4151,9 +4155,7 @@
           }
           if (state.kanaCheck) maxW += GHOST_BUFFER_KANA;
           if (c === boxNmIdxQuiet) maxW += GHOST_BUFFER_BOX;
-          if (ikkatsuMarkerCols && ikkatsuMarkerCols.has(c)) maxW += GHOST_BUFFER_IKKATSU;
           if (c === gateColIdxQuiet) maxW += gateBufferQuiet;
-          if (c === parkFlagIdxQuiet) maxW += GHOST_BUFFER_PARK;
           state.colWidths[c] = Math.max(40, Math.min(maxW, 600));
         }
       }
@@ -5173,18 +5175,19 @@
               }
             }
             // 駐車券フラグ検査: コード6桁目P ⇔ フラグ1（OK/NGどちらも表示）
+            // 列幅を広げず行高だけ伸ばすため、値の横ではなく下に改行して表示する
             if (j === parkFlagIdx && parkCodeIdx !== -1) {
               const code = (row[parkCodeIdx] ?? "").trim();
               const isP = code.length >= 6 && code[5].toUpperCase() === "P";
               const flagIs1 = cellVal.trim() === "1";
               if (isP && flagIs1) {
-                displayVal += `<span style="color:#16a34a;margin-left:5px;font-size:10px">✓ 駐車券OK</span>`;
+                displayVal += `<br><span style="color:#16a34a;font-size:10px">✓ 駐車券OK</span>`;
               } else if (isP && !flagIs1) {
                 cls.push("cell-ng");
-                displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">✗ 駐車券(P)は1必須</span>`;
+                displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ 駐車券(P)は1必須</span>`;
               } else if (!isP && flagIs1) {
                 cls.push("cell-warn");
-                displayVal += `<span style="color:#ea580c;margin-left:5px;font-size:10px">✗ Pでないのに1</span>`;
+                displayVal += `<br><span style="color:#ea580c;font-size:10px">✗ Pでないのに1</span>`;
               }
             }
             // 半角カナ検査: 全角カタカナを含むセルを警告表示（半角ｶﾅ必須フィールド用）
@@ -5210,64 +5213,64 @@
                 displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">✗ ${ng.join("・")}が必要</span>`;
               }
             }
-            // 席種一括設定チェック: 各列に NG/WARN をインライン表示
+            // 席種一括設定チェック: 各列に NG/WARN を表示（列幅を広げず行高だけ伸ばすため、値の下に改行して表示する）
             if (ikRow) {
               const ik = ikRow;
               // マスタ未登録 (席種エリアコード列)
               if (j === ikkatsuCols.code && ik.code && !ik.master) {
                 cls.push("cell-ng");
-                displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">✗ マスタ未登録</span>`;
+                displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ マスタ未登録</span>`;
               }
               // 席種名不一致 (席種エリア管理名列)
               if (j === ikkatsuCols.name && ik.master && ik.mName && ik.name && ik.mName !== ik.name) {
                 cls.push("cell-ng");
-                displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">✗ マスタ「${escHtml(ik.mName)}」</span>`;
+                displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ マスタ「${escHtml(ik.mName)}」</span>`;
               }
               // 指定席/自由席整合 (座席指定不可フラグ列)
               if (j === ikkatsuCols.design && ik.master && ik.design) {
                 if (ik.kbn === "1" && ik.design !== "指定可") {
                   cls.push("cell-ng");
-                  displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">✗ 指定席(区分1)→指定可</span>`;
+                  displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ 指定席(区分1)→指定可</span>`;
                 } else if (ik.kbn === "2" && ik.design !== "指定不可") {
                   cls.push("cell-ng");
-                  displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">✗ 自由席(区分2)→指定不可</span>`;
+                  displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ 自由席(区分2)→指定不可</span>`;
                 }
               }
               // 上限9+リセール可 (リセール可否列)
               if (j === ikkatsuCols.resale && ik.limit === "9" && ik.resale === "可能") {
                 cls.push("cell-ng");
-                displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">✗ 上限9(非販売)なのにリセール可</span>`;
+                displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ 上限9(非販売)なのにリセール可</span>`;
               }
               // リセール下限不正 (リセール用販売価格下限列)。券面価格固定の場合は手数料割れの懸念がないため対象外
               if (j === ikkatsuCols.resaleMin && ik.resale === "可能" && !ik.priceFixed.includes("固定") && ik.resaleMin !== String(PRICE_RULES.RESALE_MIN)) {
                 cls.push("cell-ng");
-                displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">✗ リセール可→${PRICE_RULES.RESALE_MIN}必須</span>`;
+                displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ リセール可→${PRICE_RULES.RESALE_MIN}必須</span>`;
               }
               // 上限9+SEJ支払可 (SEJ支払列)
               if (j === ikkatsuCols.sejPay && ik.limit === "9" && ik.sejPay === "支払可") {
                 cls.push("cell-warn");
-                displayVal += `<span style="color:#ea580c;margin-left:5px;font-size:10px">⚠ 上限9なのにSEJ支払可</span>`;
+                displayVal += `<br><span style="color:#ea580c;font-size:10px">⚠ 上限9なのにSEJ支払可</span>`;
               }
               // 上限9+SEJ発券可 (SEJ発券列)
               if (j === ikkatsuCols.sejIssue && ik.limit === "9" && ik.sejIssue === "発券可") {
                 cls.push("cell-warn");
-                displayVal += `<span style="color:#ea580c;margin-left:5px;font-size:10px">⚠ 上限9なのにSEJ発券可</span>`;
+                displayVal += `<br><span style="color:#ea580c;font-size:10px">⚠ 上限9なのにSEJ発券可</span>`;
               }
               // 他席から購入限定席種として指定されているのに単体販売可になっている (単体販売不可列)
               // ※自分自身が購入限定席種を持つ（他席を要求する）側は対象外。指定「される」側だけが不可必須。
               if (j === ikkatsuCols.solo && ik.isLimTarget && !ik.solo.includes("不可")) {
                 cls.push("cell-ng");
-                displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">✗ 購入限定対象→単体販売不可必須</span>`;
+                displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ 購入限定対象→単体販売不可必須</span>`;
               }
               // 購入限定P+他種混在なのに複数区分でない (購入限定区分列)
               if (j === ikkatsuCols.kubun && ik.limCodes.length > 0 && ik.hasP && ik.hasNonP && !ik.kubun.includes("複数")) {
                 cls.push("cell-ng");
-                displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">✗ P+他種混在→複数購入可にすべき</span>`;
+                displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ P+他種混在→複数購入可にすべき</span>`;
               }
               // 複数日入場の開始日・終了日に曜日を併記（ゴースト）
               if ((j === ikkatsuCols.dateFrom || j === ikkatsuCols.dateTo) && cellVal.trim()) {
                 const wd = weekdayJa(cellVal);
-                if (wd) displayVal += `<span style="color:#6b7280;margin-left:5px;font-size:10px">(${wd})</span>`;
+                if (wd) displayVal += `<br><span style="color:#6b7280;font-size:10px">(${wd})</span>`;
               }
             }
             // SEJ備考差分: wordN列にマスタnteのN番目項目を併記し、差分を強調表示
@@ -9373,6 +9376,11 @@
           const cd = code || _seatCodeMap[seat] || seat;
           return String(price).padStart(12, "0") + "|" + cd;
         };
+        // 通常価格表用: 席種エリアコード順（席種マスタ＝ホームページの並びと一致させ、見比べやすくする）
+        const seatCodeSortKey = (seat, code) => (code || _seatCodeMap[seat] || seat);
+        // マトリクス用: パドックパス・車椅子席はその席自身しかUGできない特殊席のため、価格順の最後尾に固定する
+        const isMatrixTailSeat = (seat) => /パドック|車椅子|車いす/.test(seat || "");
+        const matrixSortKey = (seat, code) => (isMatrixTailSeat(seat) ? "1|" : "0|") + seatSortKey(seat, code);
         // 券種コード順
         const ageCode = {};
         for (const row of normals.concat(ugs)) {
@@ -9387,9 +9395,9 @@
         if (opt.normal && normals.length) {
           // 前売/当日は列ではなく行で分ける（同じ行に金額列が2本並ぶと見づらいため、種別＋金額の1列にまとめる）
           const labels = ["席種名", "区分", "券種", "販売区分", "会員ランク", "販売経路", "販売開始", "販売終了", "種別", "金額"];
-          // 並び: 席種(金額→コード) → 券種コード
+          // 並び: 席種(エリアコード順＝席種マスタ/ホームページの並び) → 券種コード
           const nsorted = normals.slice().sort((x, y) => {
-            const sk = seatSortKey(v(x, c.seat), v(x, c.seatCd)).localeCompare(seatSortKey(v(y, c.seat), v(y, c.seatCd)), "ja");
+            const sk = seatCodeSortKey(v(x, c.seat), v(x, c.seatCd)).localeCompare(seatCodeSortKey(v(y, c.seat), v(y, c.seatCd)), "ja");
             if (sk) return sk;
             return String(ageKey(v(x, c.age))).localeCompare(String(ageKey(v(y, c.age))), "ja");
           });
@@ -9401,7 +9409,7 @@
             const cat = seatCat(code, seat);
             const sep = (prevSeat !== null && prevSeat !== seat) ? " seat-sep" : ""; prevSeat = seat;
             // 並べ替え/絞り込みエンジンが列番号で各行のセルを直接参照するため、共通項目はrowspanせず両行に複製する
-            const shared = `<td data-v="${escHtml(seatSortKey(seat, code))}" style="background:${seatColor(seat)};font-weight:600" title="${escHtml(seat)}">${escHtml(sl)}</td>`
+            const shared = `<td data-v="${escHtml(seatCodeSortKey(seat, code))}" style="background:${seatColor(seat)};font-weight:600" title="${escHtml(seat)}">${escHtml(sl)}</td>`
               + `<td data-v="${escHtml(cat)}">${catBadge(cat)}</td>`
               + cell(al, ageKey(v(row, c.age)))
               + cell(v(row, c.kbn), v(row, c.kbn))
@@ -9479,8 +9487,8 @@ ${_sortableTable(labels, rowsHtml)}` };
             for (const s of fromSeats) fromAges[s] = sortAges(fromAges[s]);
             for (const s of toSeats) toAges[s] = sortAges(toAges[s]);
             // 席種を金額→コード順に並べる（金額照準）
-            fromSeats.sort((a, b) => seatSortKey(a, seatCode[a]).localeCompare(seatSortKey(b, seatCode[b]), "ja"));
-            toSeats.sort((a, b) => seatSortKey(a, seatCode[a]).localeCompare(seatSortKey(b, seatCode[b]), "ja"));
+            fromSeats.sort((a, b) => matrixSortKey(a, seatCode[a]).localeCompare(matrixSortKey(b, seatCode[b]), "ja"));
+            toSeats.sort((a, b) => matrixSortKey(a, seatCode[a]).localeCompare(matrixSortKey(b, seatCode[b]), "ja"));
             const toCols = [];
             for (const ts of toSeats) for (const ta of toAges[ts]) toCols.push({ ts, ta });
 
