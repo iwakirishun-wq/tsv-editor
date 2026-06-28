@@ -157,6 +157,11 @@ eqCU(validate.canUpgrade(SEAT_A.name, SEAT_A.cd, "大人", SEAT_S.name, SEAT_S.c
 eqCU(validate.canUpgrade(SEAT_FREE.name, SEAT_FREE.cd, "大人", SEAT_FREE.name, SEAT_FREE.cd, "大人"), false, "エリア席の同席種同年齢は不可");
 eqCU(validate.canUpgrade(SEAT_VC.name, SEAT_VC.cd, "大人", SEAT_FREE2.name, SEAT_FREE2.cd, "大人"), false, "大人料金ダウングレード(先<元)は不可");
 eqCU(validate.canUpgrade(SEAT_FREE2.name, SEAT_FREE2.cd, "大人", SEAT_VC.name, SEAT_VC.cd, "大人"), true, "ダミー当日価格を挟んでも実価格(前売)でアップグレードなら可");
+// UG対象は指定席/エリアのみ。その他(コード6桁目O)・駐車券(P)・BOX席(（〇名）)は登録漏れ候補に含めない
+eqCU(validate.canUpgrade(SEAT_S.name, SEAT_S.cd, "大人", "パドックパス", "MMTGPO25011", "大人"), false, "先がその他(6桁目O)は対象外");
+eqCU(validate.canUpgrade("パドックパス", "MMTGPO25011", "大人", SEAT_A.name, SEAT_A.cd, "大人"), false, "元がその他(6桁目O)は対象外");
+eqCU(validate.canUpgrade(SEAT_S.name, SEAT_S.cd, "大人", "もてぎ駐車券", "MMTGPP25011", "大人"), false, "先が駐車券(6桁目P)は対象外");
+eqCU(validate.canUpgrade(SEAT_S.name, SEAT_S.cd, "大人", "T5デッキ(5名)", "RESV20", "大人"), false, "先がBOX席(（〇名）)は対象外");
 
 // 大人料金ダウングレード判定が、条件(会員ランク/販売経路)の異なる無関係な価格を拾って
 // 誤判定しないことの回帰テスト（X席の大人料金は「店頭」経路にしかなく、UG行は既定条件で登録）

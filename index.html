@@ -2722,6 +2722,11 @@
         const isWheelchair = (seat) => /車椅子|車いす/.test(seat || "");
         // 車椅子の同伴席は「自分の席の年齢区分変更」のみ可（他の車椅子席へのUGは不可）
         const isCompanion = (seat) => /同伴/.test(seat || "");
+        // BOX席（区画席）判定。マスタのbox_seat_flg優先、無ければ席種名の「（〇名）」で判定。
+        const isBoxSeat = (code, seat) => {
+          if (seatMeta) { const m = seatMeta(code, seat); if (m && m.found) return !!m.box; }
+          return /[（(]\s*[0-9０-９]+\s*名\s*[）)]/.test(seat || "");
+        };
         const isAdultAge = (a) => ageRank(a) === 4; // 大人（同年齢区分どうしで差額0でも500円の席変更手数料が必要なのは大人のみ）
         const isDummyPrice = ugIsDummyPrice; // 売止め等のダミー価格判定（純粋ロジックを委譲）
         const lookup = (ck, seat, age) => byCond.get(ck + "|" + seat + "|" + age) || any.get(seat + "|" + age) || null;
@@ -2737,11 +2742,15 @@
         function canUpgrade(srcSeat, srcCode, srcAge, dstSeat, dstCode, dstAge) {
           const sr = ageRank(srcAge), dr = ageRank(dstAge);
           if (sr && dr && dr < sr) return false; // 年齢降格
+          // UG対象は基本「指定席」または「エリア席」。その他(パドックパス等)・駐車券・BOX席(区画席)は
+          // 登録漏れ候補に含めない（これらの席種間のUGは想定しないため）。
+          const srcCat = seatCat(srcCode, srcSeat), dstCat = seatCat(dstCode, dstSeat);
+          if ((srcCat !== "指定席" && srcCat !== "エリア") || (dstCat !== "指定席" && dstCat !== "エリア")) return false;
+          if (isBoxSeat(srcCode, srcSeat) || isBoxSeat(dstCode, dstSeat)) return false;
           const sameAgeCat = (sr !== 0 && sr === dr) || srcAge === dstAge;
           const sameSeat = srcSeat === dstSeat && srcSeat !== "" && sameAgeCat;
           // 同伴席は自分の席の年齢区分変更のみ可（別の車椅子席へのUGは不可）
           if (isCompanion(srcSeat) && srcSeat !== dstSeat) return false;
-          const dstCat = seatCat(dstCode, dstSeat);
           if (sameSeat && dstCat === "エリア") return false;
           const srcWc = isWheelchair(srcSeat), dstWc = isWheelchair(dstSeat);
           if (srcWc || dstWc) {
@@ -9628,7 +9637,7 @@ ${_sortableTable(labels, rowsHtml)}` };
                       if (sp && dp && (cmp(sp.adv, dp.adv) || cmp(sp.day, dp.day))) missing = true;
                     }
                     if (missing) missingTotal++;
-                    const missTip = "先のほうが価格が高く、車椅子/エリア/年齢降格等の対象外ルールにも該当しないため、UG登録漏れの可能性があります（要確認）";
+                    const missTip = "先のほうが価格が高く、車椅子/エリア/年齢降格/その他席/駐車券/区画席等の対象外ルールにも該当しないため、UG登録漏れの可能性があります（要確認）";
                     bodyRows += missing
                       ? `<td class="na mx-missing${colSep}" title="${escHtml(missTip)}">？<div class="rsn">登録漏れ?</div></td>`
                       : `<td class="na${colSep}">—</td>`;
