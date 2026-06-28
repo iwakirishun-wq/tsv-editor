@@ -1840,7 +1840,7 @@
         <!-- Group: HTML出力 -->
         <div class="rb-group">
           <div class="rb-buttons">
-            <button class="rb-btn" id="btn-price-sheet" title="経路価格スケジュール（BO-F-21030）をチェック用HTMLとして出力&#10;通常価格表 / UGマトリクス / UG一覧 を選んで出力&#10;UG差額は自動検算（NG赤表示）、出力先で並べ替え・絞り込み可能&#10;※席種エリアマスタ連携が必須" aria-label="価格チェック表を出力">
+            <button class="rb-btn" id="btn-price-sheet" title="経路価格スケジュール（BO-F-21030）をチェック用HTMLとして出力&#10;通常価格表 / UGマトリクス / UG一覧 を選んで出力&#10;UG差額は自動検算（NG赤表示）&#10;出力先で絞り込み可能（通常価格表とUG一覧）・並べ替えは通常価格表&#10;※席種エリアマスタ連携が必須" aria-label="価格チェック表を出力">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="17" rx="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="8" y1="4" x2="8" y2="2"></line><line x1="16" y1="4" x2="16" y2="2"></line><path d="M7 13h4M7 17h7"></path><circle cx="16.5" cy="15" r="2.5"></circle><path d="M16.5 14v1l.8.8"></path></svg></span>
               <span>価格チェック表</span>
             </button>
@@ -2381,22 +2381,33 @@
         "btn-seatmaster-check": ["colorView", "gateView", "parkingCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck"],
         "btn-sej-check": ["kanaCheck", "bikoHtmlCheck"],
       };
-      // 個別項目をONにする前の前提条件チェック。問題なければnull、問題があれば理由文字列を返す
+      // 個別項目をONにする前の前提条件チェック。問題なければnull、問題があれば理由（原因のみ）を返す。
+      // 返す文字列にラベル名は含めない（呼び出し側でラベルを付ける。重複表示を避けるため）。
+      const _hasHeader = (name) => state.headers.some((h) => h.trim() === name);
       function _inspectFlagPrecondition(key) {
+        if (key === "colorView") {
+          if (!_hasHeader("disp_color_cd")) return "カラーコード列(disp_color_cd)がありません";
+        }
         if (key === "gateView") {
-          const gateColExists = state.headers.some((h) => h.trim() === "gate_stage_typ1");
-          const gateMapNow = gateColExists ? getGateMap() : {};
-          if (!gateColExists || !Object.keys(gateMapNow).length) return "ゲート表示（対応表なし）";
+          const gateColExists = _hasHeader("gate_stage_typ1");
+          if (!gateColExists) return "ゲート種別列(gate_stage_typ1)がありません";
+          if (!Object.keys(getGateMap()).length) return "ゲート対応表が読み込まれていません";
         }
         if (key === "parkingCheck") {
-          const hasNte = state.headers.some((h) => h.trim() === "nte");
-          if (!hasNte) return "駐車券検査（席種エリアマスタ未読込）";
+          if (!_hasHeader("seat_type_area_cd") || !_hasHeader("parking_ticket_flg")) {
+            return "対象列(席種エリアコード/駐車券フラグ)がありません";
+          }
+        }
+        if (key === "boxCheck") {
+          if (!_hasHeader("seat_type_area_disp_nm") && !_hasHeader("seat_type_area_control_nm")) {
+            return "席種名列がありません";
+          }
         }
         if (key === "bikoHtmlCheck") {
-          const hasNte = state.headers.some((h) => h.trim() === "nte");
+          const hasNte = _hasHeader("nte");
           const isSej = isSejData();
-          if (!hasNte && !isSej) return "備考HTML変換（対象データ外）";
-          if (isSej && !state.sejMaster) return "備考HTML変換（マスタ未連携）";
+          if (!hasNte && !isSej) return "備考列(nte)がありません";
+          if (isSej && !state.sejMaster) return "SEJマスタが未連携です";
         }
         return null;
       }
@@ -2411,7 +2422,7 @@
         for (const k of keys) {
           if (!turnOn) { state[k] = false; continue; }
           const reason = _inspectFlagPrecondition(k);
-          if (reason) { skipped.push(reason); continue; }
+          if (reason) { skipped.push(`${INSPECT_FLAG_LABELS[k] || k}（${reason}）`); continue; }
           state[k] = true;
           if (k !== "colorView" && k !== "bikoHtmlCheck") needAutoFit = true;
         }
@@ -2696,13 +2707,15 @@
         // 席種カテゴリ: 指定席 / エリア / その他 / 駐車券
         //  判定はマスタ・コードを正とする（席種名での決め打ちはしない）:
         //   コード6桁目 O=その他（パドック/パス等・UG例外的に可）/ P=駐車券
-        //   それ以外はマスタの指定席自由席区分(1=指定席,2=エリア)
+        //   それ以外はマスタの在庫管理種別(1=座席在庫→指定席,2=数在庫→エリア)または指定席自由席区分(1/2)
         //  ※車椅子でもエリア区分なら席移動なし＝同席種UG不可（区分どおりに扱う）
+        //  ※表示側(_buildPriceCheckHtml)のseatCatと同じ判定条件にして、画面表示と検算のカテゴリがずれないようにする
+        //    （表示ラベルは「エリア」=「数在庫」で表記が異なるだけ）
         const seatCat = (code, seat) => {
           const ch6 = (code && String(code).length >= 6) ? String(code)[5].toUpperCase() : "";
           if (ch6 === "O") return "その他";
           if (ch6 === "P") return "駐車券";
-          if (seatMeta) { const m = seatMeta(code, seat); if (m && m.found) { if (m.isReserved) return "指定席"; if (m.isFree) return "エリア"; } }
+          if (seatMeta) { const m = seatMeta(code, seat); if (m && m.found) { if (m.stockTyp === "1" || m.isReserved) return "指定席"; if (m.stockTyp === "2" || m.isFree) return "エリア"; } }
           if (/駐車/.test(seat)) return "駐車券";
           return /自由席|エリア/.test(seat) ? "エリア" : "指定席";
         };
@@ -4120,27 +4133,8 @@
 
       // ステータス表示なしの自動幅調整（ロード時用）
       function autoFitAllColumnsQuiet() {
-        // 検品チェックがONの時、セル末尾に付くゴースト表示（✓/✗マーカー）の分だけ
-        // 余白を加算する（マーカーは生データに含まれないため通常の幅計算では拾えない）
-        const _hIdxQuiet = (name) => state.headers.findIndex(h => h.trim() === name);
-        const boxNmIdxQuiet = state.boxCheck
-          ? (_hIdxQuiet("seat_type_area_disp_nm") !== -1 ? _hIdxQuiet("seat_type_area_disp_nm") : _hIdxQuiet("seat_type_area_control_nm"))
-          : -1;
-        // ゲート名表示: 対応表中の最長名から必要幅を実測（名前の長さは現場ごとに異なるため固定値にしない）
-        const gateColIdxQuiet = state.gateView ? _hIdxQuiet("gate_stage_typ1") : -1;
-        let gateBufferQuiet = 0;
-        if (gateColIdxQuiet !== -1) {
-          const gmap = getGateMap();
-          const names = Object.values(gmap).concat(["対応表になし"]);
-          names.forEach((n) => {
-            const w = measureText("▸ " + n, "11px system-ui");
-            if (w > gateBufferQuiet) gateBufferQuiet = w;
-          });
-          gateBufferQuiet += 20;
-        }
-        const GHOST_BUFFER_KANA = 80;   // 「✗ 全角カナ」（カナ検査は列を問わず付与されうる）
-        const GHOST_BUFFER_BOX = 220;   // 「✗ 6桁目E・BOXフラグ1・席数2以上が必要」想定
-
+        // 検品表示の各注記（カラー/ゲート名/駐車券/区画席/カナ/一括設定/SEJ対訳）は、
+        // すべて値の下に改行表示するため列幅には影響しない＝列幅は生データの実測のみで決める。
         for (let c = 0; c < state.headers.length; c++) {
           const displayH = getDisplayHeader(c);
           // 縦ヘッダー時はヘッダー文字幅を列幅に含めない（列幅節約）
@@ -4153,9 +4147,6 @@
               if (w > maxW) maxW = w;
             }
           }
-          if (state.kanaCheck) maxW += GHOST_BUFFER_KANA;
-          if (c === boxNmIdxQuiet) maxW += GHOST_BUFFER_BOX;
-          if (c === gateColIdxQuiet) maxW += gateBufferQuiet;
           state.colWidths[c] = Math.max(40, Math.min(maxW, 600));
         }
       }
@@ -4328,6 +4319,12 @@
       // ===== ソート =====
       function sortByColumn(col, shiftKey = false) {
         if (col < 0 || col >= state.headers.length) return;
+        // 並び替えると行の並びが変わり、マーカー（要確認の目印）の位置が無意味になるため一括解除される。
+        // 黙って消すと検品の目印を失うため、マーカーがある場合のみ確認する。
+        if (state.markedCells.size > 0 &&
+            !confirm(`並び替えると、付けてあるマーカー（要確認の目印）${state.markedCells.size}個はすべて解除されます。\n\n並び替えますか？`)) {
+          return;
+        }
         saveUndo();
         if (shiftKey) {
           const existing = state.sortKeys.findIndex((k) => k.col === col);
@@ -4957,6 +4954,9 @@
         // aria-rowcount を総行数（ヘッダー行+1）に更新
         $("main-table").setAttribute("aria-rowcount", String(rows.length + 1));
 
+        // 席種コード→席種名の対訳バッジは「SEJのTSVを開いているとき」だけ表示する。
+        // 席種エリアマスタ自体や席種一括設定を開いているときはコード列に名前を併記しない（冗長なため）。
+        const isSejFile = isSejData();
         // SEJ連携: 席種エリアコード列のインデックス
         const sejCodeColIdx = state.sejMaster
           ? state.headers.findIndex(h => h.trim() === "seat_type_area_cd")
@@ -4975,6 +4975,19 @@
 
         // 検品表示: 対象列インデックスをキャッシュ
         const _hIdx = (name) => state.headers.findIndex(h => h.trim() === name);
+        // カナ検査の対象列: 半角カナが必須の列のみ（表示略称・グループ名略称・備考・SEJ word）。
+        // 席種名/管理名/試合名/会員ランク名などのフルネーム列は全角カナが正しいので対象外にする
+        // （これらを検査すると正常な全角カナに大量の誤警告が出てノイズになるため）。
+        const KANA_TEXT_COLS = new Set([
+          "disp_abb", "seat_type_grp_nm1", "seat_type_grp_nm2", "nte",
+        ]);
+        const kanaCheckCols = new Set();
+        if (state.kanaCheck) {
+          state.headers.forEach((h, hi) => {
+            const ht = String(h).trim();
+            if (KANA_TEXT_COLS.has(ht) || /^word[1-9]$/.test(ht)) kanaCheckCols.add(hi);
+          });
+        }
         const colorColIdx = state.colorView ? _hIdx("disp_color_cd") : -1;
         const nteColIdx = state.bikoHtmlCheck ? _hIdx("nte") : -1;
         const gateColIdx = state.gateView ? _hIdx("gate_stage_typ1") : -1;
@@ -4999,6 +5012,7 @@
             limit:     _ikC("購入上限数(決済毎)"),
             resale:    _ikC("リセール可否"),
             resaleMin: _ikC("リセール用販売価格下限"),
+            resaleMax: _ikC("リセール用販売価格上限"),
             priceFixed:_ikC("リセール用券面価格固定フラグ"),
             solo:      _ikC("単体販売不可"),
             lim1:      _ikC("購入限定席種1"),
@@ -5049,6 +5063,7 @@
               limit:     _ikg(ikkatsuCols.limit),
               resale:    _ikg(ikkatsuCols.resale),
               resaleMin: _ikg(ikkatsuCols.resaleMin),
+              resaleMax: _ikg(ikkatsuCols.resaleMax),
               priceFixed:_ikg(ikkatsuCols.priceFixed),
               solo:      _ikg(ikkatsuCols.solo),
               kubun:     _ikg(ikkatsuCols.kubun),
@@ -5137,22 +5152,23 @@
                 }
               }
             }
-            // SEJ連携: 席種エリアコード列・購入限定席種列に席種名を併記
+            // SEJ連携: 席種エリアコード列・購入限定席種列に席種名を併記（SEJのTSVを開いている時だけ）。
             // 主コード列は青の対訳、購入限定席種列はゴースト（淡いグレー斜体）で
             // 「補助参照」だと一目で分かるようにする。未登録は両者とも赤で警告。
-            if ((j === sejCodeColIdx || sejExtraCodeCols.has(j)) && cellVal) {
+            if (isSejFile && (j === sejCodeColIdx || sejExtraCodeCols.has(j)) && cellVal) {
               const m = state.sejMaster.byCode[cellVal.trim()];
               const ghost = sejExtraCodeCols.has(j) && j !== sejCodeColIdx;
               if (m) {
                 const nm = m.seat_type_area_disp_nm || m.seat_type_area_control_nm || "";
                 if (nm) {
+                  // 列幅を狭く保つため対訳は値の横ではなく下に表示する
                   const st = ghost
-                    ? "color:#9ca3af;font-style:italic;margin-left:6px;font-size:11px"
-                    : "color:#2563eb;margin-left:6px;font-size:11px";
-                  displayVal += `<span style="${st}">▸ ${escHtml(nm)}</span>`;
+                    ? "color:#9ca3af;font-style:italic;font-size:11px"
+                    : "color:#2563eb;font-size:11px";
+                  displayVal += `<br><span style="${st}">▸ ${escHtml(nm)}</span>`;
                 }
               } else {
-                displayVal += `<span style="color:#dc2626;margin-left:6px;font-size:11px">▸ 未登録</span>`;
+                displayVal += `<br><span style="color:#dc2626;font-size:11px">▸ 未登録</span>`;
               }
             }
             // カラーコード表示: disp_color_cd 列のセル背景をコード色にする
@@ -5165,13 +5181,13 @@
                 extraStyle += `background-color:#${hex};color:${lum > 145 ? "#171717" : "#ffffff"};`;
               }
             }
-            // ゲート名表示: gate_stage_typ1 の番号にゲート名を併記
+            // ゲート名表示: gate_stage_typ1 の番号にゲート名を併記（列幅を狭く保つため値の下に表示）
             if (j === gateColIdx && gateMap && cellVal.trim()) {
               const gname = gateMap[cellVal.trim()];
               if (gname) {
-                displayVal += `<span style="color:#2563eb;margin-left:6px;font-size:11px">▸ ${escHtml(gname)}</span>`;
+                displayVal += `<br><span style="color:#2563eb;font-size:11px">▸ ${escHtml(gname)}</span>`;
               } else {
-                displayVal += `<span style="color:#dc2626;margin-left:6px;font-size:11px">▸ 対応表になし</span>`;
+                displayVal += `<br><span style="color:#dc2626;font-size:11px">▸ 対応表になし</span>`;
               }
             }
             // 駐車券フラグ検査: コード6桁目P ⇔ フラグ1（OK/NGどちらも表示）
@@ -5190,27 +5206,30 @@
                 displayVal += `<br><span style="color:#ea580c;font-size:10px">✗ Pでないのに1</span>`;
               }
             }
-            // 半角カナ検査: 全角カタカナを含むセルを警告表示（半角ｶﾅ必須フィールド用）
-            if (state.kanaCheck && cellVal && /[ァ-ヶー]/.test(cellVal)) {
+            // 半角カナ検査: 全角カタカナを含むセルを警告表示（半角ｶﾅ必須のテキスト列のみ対象）。
+            // 他の検査と揃え、列幅を広げず行高だけ伸ばすため値の下に改行して表示する。
+            if (state.kanaCheck && kanaCheckCols.has(j) && cellVal && /[ァ-ヶー]/.test(cellVal)) {
               cls.push("cell-warn");
-              displayVal += `<span style="color:#ea580c;margin-left:5px;font-size:10px">✗ 全角カナ</span>`;
+              displayVal += `<br><span style="color:#ea580c;font-size:10px">✗ 全角カナ</span>`;
             }
-            // 区画席検査: 席種名に「（〇名）」がある行は E/P + BOXフラグ1 + 席数2以上 が必要
-            if (j === boxNmIdx && boxNmIdx !== -1 && /[（(]\s*\d+\s*名\s*[）)]/.test(cellVal)) {
+            // 区画席検査: 席種名に「（〇名）」がある行は E/P + BOXフラグ1 + 席数2以上 が必要。
+            // Excel由来データは全角数字「（３名）」が混在しやすいため、検出前に全角数字を半角化する。
+            const _toHankakuNum = (s) => String(s ?? "").replace(/[０-９]/g, (d) => "０１２３４５６７８９".indexOf(d));
+            if (j === boxNmIdx && boxNmIdx !== -1 && /[（(]\s*\d+\s*名\s*[）)]/.test(_toHankakuNum(cellVal))) {
               const code = boxCodeIdx !== -1 ? (row[boxCodeIdx] ?? "").trim() : "";
               const isEP = code.length >= 6 && ["E", "P"].includes(code[5].toUpperCase());
               const flg = boxFlgIdx !== -1 ? (row[boxFlgIdx] ?? "").trim() === "1" : false;
-              const cnt = boxCntIdx !== -1 ? parseInt((row[boxCntIdx] ?? "").trim()) : NaN;
+              const cnt = boxCntIdx !== -1 ? parseInt(_toHankakuNum((row[boxCntIdx] ?? "").trim())) : NaN;
               const cntOk = !isNaN(cnt) && cnt >= 2;
               if (isEP && flg && cntOk) {
-                displayVal += `<span style="color:#16a34a;margin-left:5px;font-size:10px">✓ 区画席OK</span>`;
+                displayVal += `<br><span style="color:#16a34a;font-size:10px">✓ 区画席OK</span>`;
               } else {
                 cls.push("cell-ng");
                 const ng = [];
                 if (!isEP) ng.push("6桁目E/P");
                 if (!flg) ng.push("BOXフラグ1");
                 if (!cntOk) ng.push("席数2以上");
-                displayVal += `<span style="color:#dc2626;margin-left:5px;font-size:10px">✗ ${ng.join("・")}が必要</span>`;
+                displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ ${ng.join("・")}が必要</span>`;
               }
             }
             // 席種一括設定チェック: 各列に NG/WARN を表示（列幅を広げず行高だけ伸ばすため、値の下に改行して表示する）
@@ -5245,6 +5264,18 @@
               if (j === ikkatsuCols.resaleMin && ik.resale === "可能" && !ik.priceFixed.includes("固定") && ik.resaleMin !== String(PRICE_RULES.RESALE_MIN)) {
                 cls.push("cell-ng");
                 displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ リセール可→${PRICE_RULES.RESALE_MIN}必須</span>`;
+              }
+              // リセール上限不正 (リセール用販売価格上限列)。価格経路スケジュール連携時のみ：
+              // リセール上限金額が価格マスタのチケットアカウント最高額と一致するか検算する
+              if (j === ikkatsuCols.resaleMax && ikkatsuCols.resaleMax !== -1 && state.priceMaster && ik.resale === "可能" && ik.code) {
+                const maxPrice = state.priceMaster.maxPrices?.[ik.code];
+                if (maxPrice > 0) {
+                  const cur = ik.resaleMax || ik.resaleMin || "";
+                  if (String(cur) !== String(maxPrice)) {
+                    cls.push("cell-ng");
+                    displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ 上限は最高額${maxPrice}と一致必須</span>`;
+                  }
+                }
               }
               // 上限9+SEJ支払可 (SEJ支払列)
               if (j === ikkatsuCols.sejPay && ik.limit === "9" && ik.sejPay === "支払可") {
@@ -5290,7 +5321,7 @@
                     : `<span style="color:#aaa">—</span>`;
                   if (cur !== masterVal.trim()) cls.push("cell-diff");
                 } else if (cur === masterVal.trim()) {
-                  if (cur) displayVal += `<span style="color:#16a34a;margin-left:5px;font-size:10px">✓</span>`;
+                  if (cur) displayVal += `<br><span style="color:#16a34a;font-size:10px">✓</span>`;
                 } else {
                   cls.push("cell-diff");
                   displayVal += `<br><span style="color:#888;font-size:10px">マスタ:</span> <span style="font-size:11px">${diffEmphasis(cur, masterVal)}</span>`;
@@ -6836,6 +6867,15 @@
       }
 
       function doPasteOverwrite(startR, startC, cb) {
+        // 貼り付け範囲が右にはみ出すと列が自動追加される。黙って増やすと気づかないため確認する
+        // （行方向は元々データ末尾に追記される仕様のため確認なし）。
+        const neededCols = startC + cb.cols;
+        if (neededCols > state.headers.length) {
+          const addN = neededCols - state.headers.length;
+          if (!confirm(`貼り付け範囲が右にはみ出すため、列が ${addN}列 追加されます（「列${state.headers.length + 1}」など）。\n\n列を追加して貼り付けますか？`)) {
+            return;
+          }
+        }
         saveUndo();
         const vr = getVisibleRows();
         if (!vr._direct) {
@@ -7618,6 +7658,11 @@
         const _bm = $("btn-marker");
         if (_bm) { _bm.classList.remove("active-state"); _bm.setAttribute("aria-pressed","false"); }
         document.body.classList.remove("marker-mode");
+        // 検品表示トグルは現在のデータの列構成に紐づくため、別ファイル/タブへ持ち越さずリセットする
+        ["colorView", "gateView", "parkingCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck", "ikkatsuCheck"].forEach((k) => { state[k] = false; });
+        const _bik = $("btn-ikkatsu-check");
+        if (_bik) { _bik.classList.remove("active-state"); _bik.setAttribute("aria-pressed", "false"); }
+        syncInspectUI();
         state.dirty = false;
         document.body.classList.remove("wrap-cells");
         $("btn-wrap").classList.remove("active-state");
@@ -8028,13 +8073,14 @@
       }
       const MAX_UNDO = 50;
       const MAX_UNDO_CELLS = 500000; // undo履歴全体の最大セル数（メモリリーク防止）
-      function saveUndo() {
+      function saveUndo(snap) {
         // データ量に応じて動的にundo上限を設定（大規模データでのメモリリーク防止）
         const totalCells = state.data.length * (state.headers.length || 1);
         const dynamicMax = totalCells > 10000
           ? Math.max(5, Math.floor(MAX_UNDO_CELLS / totalCells))
           : MAX_UNDO;
-        state.undoStack.push(cloneState());
+        // 列幅リサイズ等、変更前に取得したスナップショットを渡せる（省略時は現在の状態を記録）
+        state.undoStack.push(snap || cloneState());
         while (state.undoStack.length > dynamicMax) state.undoStack.shift();
         state.redoStack = [];
       }
@@ -8198,9 +8244,13 @@
         const targetCols = getSelectedCols(col);
         const origWidths = {};
         targetCols.forEach((c) => { origWidths[c] = state.colWidths[c]; });
+        // リサイズ前の状態スナップショット。大きなデータでの無駄な全行コピーを避けるため、
+        // 実際にドラッグで幅が変わる最初の瞬間にだけ取得する（掴んだだけ・クリックだけでは取得しない）。
+        let _preResize = null;
         document.body.classList.add("col-resizing");
         let _rafPending = false;
         const move = (em) => {
+          if (!_preResize) _preResize = cloneState();
           const newW = Math.max(minW, startW + (em.pageX - startX));
           targetCols.forEach((c) => { state.colWidths[c] = newW; });
           if (!_rafPending) {
@@ -8231,6 +8281,9 @@
           document.removeEventListener("mousemove", move);
           document.removeEventListener("mouseup", up);
           document.removeEventListener("keydown", onKey);
+          // 幅が実際に変わった場合のみUndo履歴に記録（Escapeキャンセル時はorigWidthsに戻っているため記録しない）
+          const changed = _preResize && targetCols.some((c) => state.colWidths[c] !== origWidths[c]);
+          if (changed) saveUndo(_preResize);
           renderHeader();
           state.forceRender = true;
           renderBody();
@@ -8267,7 +8320,9 @@
             if (w > maxW) maxW = w;
           }
         }
-        state.colWidths[col] = Math.max(40, Math.min(maxW, 400));
+        const newW = Math.max(40, Math.min(maxW, 400));
+        if (newW !== state.colWidths[col]) saveUndo(); // 変更があるときだけUndoに記録
+        state.colWidths[col] = newW;
         renderHeader();
         state.forceRender = true;
         renderBody();
@@ -8529,6 +8584,8 @@
 
       // ===== 全列の自動幅調整 =====
       function autoFitAllColumns() {
+        const _pre = cloneState(); // 変更前の状態（実際に幅が変わった場合のみUndoへ）
+        let changed = false;
         for (let c = 0; c < state.headers.length; c++) {
           let maxW = state.verticalHeader ? 40 : measureText(getDisplayHeader(c) || "", "600 13px system-ui") + 60;
           const sample = Math.min(state.data.length, 300);
@@ -8539,8 +8596,11 @@
               if (w > maxW) maxW = w;
             }
           }
-          state.colWidths[c] = Math.max(40, Math.min(maxW, 500));
+          const newW = Math.max(40, Math.min(maxW, 500));
+          if (newW !== state.colWidths[c]) changed = true;
+          state.colWidths[c] = newW;
         }
+        if (changed) saveUndo(_pre); // 変化があったときだけ記録（無駄なredo破棄を防ぐ）
         renderHeader();
         state.forceRender = true;
         renderBody();
@@ -8614,6 +8674,9 @@
           }
           
           const maxPrices = {};
+          // 桁区切りカンマを除いて数値化。0/空欄や売止めダミー(999999等)は「最高額」の対象外にする
+          // （これらを混ぜるとリセール上限検算が常に誤NGになるため）。
+          const _parsePM = (s) => { const n = parseInt(String(s ?? "").replace(/[^0-9]/g, ""), 10); return isNaN(n) ? 0 : n; };
           for (let i=1; i<rows.length; i++) {
              const row = rows[i];
              if (!row || row.length < 2 || codeIdx < 0) continue;
@@ -8621,9 +8684,9 @@
              const rank = String(rankIdx >= 0 ? row[rankIdx] : "");
              const route = String(routeIdx >= 0 ? row[routeIdx] : "");
              if (rank.includes("チケットアカウント") || route.includes("チケットアカウント")) {
-                const p1 = parseInt(row[dayIdx]||"0", 10)||0;
-                const p2 = parseInt(row[advIdx]||"0", 10)||0;
-                const mx = Math.max(p1, p2);
+                const cand = [_parsePM(row[dayIdx]), _parsePM(row[advIdx])].filter((n) => n > 0 && !ugIsDummyPrice(n));
+                if (!cand.length) continue;
+                const mx = Math.max(...cand);
                 if (!maxPrices[code] || mx > maxPrices[code]) {
                    maxPrices[code] = mx;
                 }
@@ -9261,8 +9324,15 @@
           const cutoffDate = ov.querySelector("#px-cutoff-date").value;
           const cutoffTime = ov.querySelector("#px-cutoff-time").value || "00:00";
           const dayCutoff = cutoffDate ? new Date(`${cutoffDate}T${cutoffTime}:00`).getTime() : null;
-          ov.remove();
           if (!opt.normal && !opt.matrix && !opt.ug) { alert("出力する表を1つ以上選択してください。"); return; }
+          // 境界日時が空だと当日/前売の判定ができず、999999(ダミー価格)の検算が全てスキップされる。
+          // 黙って無効化すると見逃しにつながるため、明示的に確認する。
+          if (!cutoffDate) {
+            if (!confirm("当日／前売の境界日時が未入力です。\n\nこのまま出力すると、999999（ダミー価格）が正しく設定されているかの検算がすべてスキップされます。\n（境界日時を入れると、当日/前売にかぶる期間のダミー価格をエラー検出できます）\n\n境界日時なしで出力しますか？")) {
+              return;
+            }
+          }
+          ov.remove();
           _buildPriceCheckHtml(rowIndices, isFiltered, opt, dayCutoff);
         };
       }
@@ -9455,6 +9525,24 @@ ${_sortableTable(labels, rowsHtml)}` };
         // --- UGマトリクス（販売条件ごと・席種でセル結合・凍結ヘッダー・俯瞰用） ---
         if (opt.matrix && ugs.length) {
           const period = periodOf; // 共通ヘルパーを使用
+          // ツールチップ用: 前売/当日それぞれの「登録／期待／先−元=差額」を1行で説明する。
+          // セルは略称（前売NG/当日NG）だけにし、なぜその期待値かはホバーで分かるようにするため
+          // （例: 子供で先<元のとき 期待0円 ＝ 差額がマイナスのため0 ということが読み取れる）。
+          const _yen = (n) => n != null ? n.toLocaleString("ja-JP") + "円" : "?";
+          const winTipLine = (label, src, dst, exp, actual, ng, note) => {
+            // 期待値が出せない（価格不明 or ダミー価格）場合は、その理由（noteに「販売期間がかぶっているのに
+            // ダミー値のまま設定不可」等）をそのまま見せる。NGなのに「検算不能」とだけ出して誤解させない。
+            if (exp == null) return `${label}: ${note || "検算不能（通常価格が不明/ダミー）"}`;
+            let s = `${label}: 登録${_yen(actual)} / 期待${_yen(exp)}`;
+            if (src != null && dst != null) {
+              const raw = dst - src;
+              s += `（先${_yen(dst)} − 元${_yen(src)} = 差額${raw.toLocaleString("ja-JP")}円`;
+              if (exp === 0 && raw <= 0) s += " → マイナス/0のため期待0円";
+              s += "）";
+            }
+            if (ng) s += "  ← 不一致";
+            return s;
+          };
           // 条件ごとの通常価格マップ
           const normalsByCond = {};
           for (const row of normals) { const k = condOf(row); (normalsByCond[k] = normalsByCond[k] || []).push(row); }
@@ -9532,8 +9620,12 @@ ${_sortableTable(labels, rowsHtml)}` };
                     let missing = false;
                     if (sameRank && validate.canUpgrade(fs, seatCode[fs], fa, ts, seatCode[ts], ta)) {
                       const sp = priceMap[fs + "|" + fa], dp = priceMap[ts + "|" + ta];
-                      const spAdv = sp ? numOf(sp.adv) : null, dpAdv = dp ? numOf(dp.adv) : null;
-                      if (spAdv != null && dpAdv != null && !ugIsDummyPrice(spAdv) && !ugIsDummyPrice(dpAdv) && dpAdv > spAdv) missing = true;
+                      // 前売・当日いずれかで先のほうが高ければ登録漏れ候補（前売だけ見ると当日のみ高いケースを取りこぼす）
+                      const cmp = (sv, dv) => {
+                        const s = sv != null ? numOf(sv) : null, d = dv != null ? numOf(dv) : null;
+                        return s != null && d != null && !ugIsDummyPrice(s) && !ugIsDummyPrice(d) && d > s;
+                      };
+                      if (sp && dp && (cmp(sp.adv, dp.adv) || cmp(sp.day, dp.day))) missing = true;
                     }
                     if (missing) missingTotal++;
                     const missTip = "先のほうが価格が高く、車椅子/エリア/年齢降格等の対象外ルールにも該当しないため、UG登録漏れの可能性があります（要確認）";
@@ -9543,26 +9635,33 @@ ${_sortableTable(labels, rowsHtml)}` };
                     continue;
                   }
                   const { row, chk } = e;
+                  // ホバーで見せる詳細（セル本体は略称のみ）。前売・当日それぞれの期待値の根拠を併記する。
                   const tip = (chk.status === "invalid" ? chk.note
-                    : chk.expected != null ? `期待差額 前${chk.expected.toLocaleString("ja-JP")}/当${chk.expectedDay != null ? chk.expectedDay.toLocaleString("ja-JP") : "?"}` + (chk.sameSeat ? "（同席種・同年齢区分=一律500）" : `（先${fmt(String(chk.dstPrice))} − 元${fmt(String(chk.srcPrice))}）`)
-                    : "通常価格が見つからず検算不能")
+                    : (chk.expected != null || chk.expectedDay != null)
+                      ? (chk.sameSeat ? "同席種・同年齢区分 = 一律500円（再発行等）\n" : "")
+                        + winTipLine("前売", chk.srcAdv, chk.dstAdv, chk.expected, chk.advActual, chk.advNg, chk.advNote) + "\n"
+                        + winTipLine("当日", chk.srcDay, chk.dstDay, chk.expectedDay, chk.dayActual, chk.dayNg, chk.dayNote)
+                      : "通常価格が見つからず検算不能")
                     + `\n販売期間 ${v(row, c.start)} 〜 ${v(row, c.end)}`;
                   const cls = (chk.status === "ng" || chk.status === "invalid") ? " mx-ng" : chk.status === "unknown" ? " mx-na" : "";
                   const dg = chk.isDown ? '<div class="dg">▼0</div>' : "";
                   const mid = encodeURIComponent(["M", k, fs, fa, ts, ta].join("|"));
-                  // 何がNGかを明示（前売/当日・期待差額も併記。「NG」だけでは何が違うか分からないため）
+                  // セル本体は略称のみ（前売NG/当日NG）。何が期待値でなぜNGかの詳細はホバー(title)で見せる。
                   let reason = "";
                   if (chk.status === "invalid") reason = `<div class="rsn">${escHtml((chk.problems || []).join("/"))}</div>`;
                   else {
                     const rs = [];
-                    if (chk.advNg) rs.push(`前売NG(期待${chk.expected != null ? chk.expected.toLocaleString("ja-JP") : "?"})`);
-                    if (chk.dayNg) rs.push(`当日NG(期待${chk.expectedDay != null ? chk.expectedDay.toLocaleString("ja-JP") : "?"})`);
+                    if (chk.advNg) rs.push("前売NG");
+                    if (chk.dayNg) rs.push("当日NG");
                     if (rs.length) reason = `<div class="rsn">${rs.join("・")}</div>`;
                   }
-                  // 期待差額をExcel(アップグレード表)同様に数字だけ大きく見せる（席種一覧での照合がしやすいように）
-                  // 「差額」だけでは何の差か分からないため「先－元」と明示する
+                  // 期待差額バッジ: 本来の差額（先−元）を表示する。先<元でマイナス等になり登録すべき額（期待）が
+                  // 本来差額と異なる場合は「本来差額→期待」を併記（例: 先<元で −200→0 = 実差額は−200だが登録は0円）。
+                  const rawAdvDiff = (chk.dstAdv != null && chk.srcAdv != null) ? chk.dstAdv - chk.srcAdv : null;
                   const expBadge = (chk.status !== "invalid" && chk.expected != null)
-                    ? `<div class="exp-badge">先－元 ${chk.expected.toLocaleString("ja-JP")}</div>` : "";
+                    ? `<div class="exp-badge">先－元 ${(!chk.sameSeat && rawAdvDiff != null && rawAdvDiff !== chk.expected)
+                        ? `${rawAdvDiff.toLocaleString("ja-JP")}→${chk.expected.toLocaleString("ja-JP")}`
+                        : chk.expected.toLocaleString("ja-JP")}</div>` : "";
                   bodyRows += `<td class="mxc${cls}${colSep}" data-mid="${mid}" title="${escHtml(tip)}">${expBadge}<div class="adv${chk.advNg ? " l-ng" : ""}">前売 ${escHtml(money(v(row, c.adv)))}</div><div class="day${chk.dayNg ? " l-ng" : ""}">当日 ${escHtml(money(v(row, c.day)))}</div><div class="per">${escHtml(period(row))}</div>${dg}${reason}</td>`;
                 }
                 bodyRows += `</tr>`;
@@ -9620,7 +9719,12 @@ ${_sortableTable(labels, rowsHtml)}` };
                 : (chk.advNote || "—");
               const dgNote = chk.isDown ? `<div class="dg-note">▼ダウングレード</div>` : "";
               const sep = i === 0 ? " seat-sep" : "";
-              bodyRows += `<tr data-mid="${mid}" data-cond="${escHtml(condOf(row))}" class="${isNg ? "ng-row" : ""}${sep}"><td class="mk-cell" title="クリックでマーク">✔</td>`;
+              // 列ごとの絞り込み用に検索対象テキストを各行のデータ属性へ持たせる（区間セルはrowspanで
+              // 全行に存在しないため、cells[index]ではなくデータ属性で照合する）
+              const fSeat = `${fsl} ${tsl} ${pc.fs} ${pc.ts}`;
+              const fKen = `${ageLabel(v(row, c.ugAge))} ${ageLabel(v(row, c.age))}`;
+              const fPeriod = periodOf(row);
+              bodyRows += `<tr data-mid="${mid}" data-cond="${escHtml(condOf(row))}" data-fseat="${escHtml(fSeat)}" data-fken="${escHtml(fKen)}" data-fperiod="${escHtml(fPeriod)}" data-fcmt="${escHtml(comment)}" class="${isNg ? "ng-row" : ""}${sep}"><td class="mk-cell" title="クリックでマーク">✔</td>`;
               if (i === 0) bodyRows += `<th class="rowh seatpair" rowspan="${list.length}" style="background:${seatColor(pc.fs)}" title="${escHtml(pc.fs + " ⇒ " + pc.ts)}"><b>${escHtml(fsl)}</b><span class="arrow">⇒</span><b>${escHtml(tsl)}</b></th>`;
               bodyRows += `<td class="kenpair">${escHtml(ageLabel(v(row, c.ugAge)))}<span class="arrow">⇒</span>${escHtml(ageLabel(v(row, c.age)))}</td>`
                 + `<td class="prices">${dual(money(chk.srcAdv != null ? chk.srcAdv : ""), money(chk.srcDay != null ? chk.srcDay : ""))}</td>`
@@ -9633,12 +9737,20 @@ ${_sortableTable(labels, rowsHtml)}` };
                 + `</tr>`;
             });
           }
-          const head = `<tr><th class="mk-h"></th><th>区間（元⇒先）</th><th>券種（元⇒先）</th><th>元価格</th><th>先価格</th><th>期待差額</th><th>登録差額</th><th>販売条件</th><th>販売期間</th><th>コメント</th></tr>`;
+          const head = `<tr><th class="mk-h"></th><th>区間（元⇒先）</th><th>券種（元⇒先）</th><th>元価格</th><th>先価格</th><th>期待差額</th><th>登録差額</th><th>販売条件</th><th>販売期間</th><th>コメント</th></tr>`
+            + `<tr class="uf-row"><th></th>`
+            + `<th><input data-uf="fseat" placeholder="絞込" aria-label="区間で絞り込み"></th>`
+            + `<th><input data-uf="fken" placeholder="絞込" aria-label="券種で絞り込み"></th>`
+            + `<th></th><th></th><th></th><th></th>`
+            + `<th><input data-uf="cond" placeholder="絞込" aria-label="販売条件で絞り込み"></th>`
+            + `<th><input data-uf="fperiod" placeholder="絞込" aria-label="販売期間で絞り込み"></th>`
+            + `<th><input data-uf="fcmt" placeholder="絞込" aria-label="コメントで絞り込み"></th>`
+            + `</tr>`;
           const badges = (ng ? `　<span class="badge-ng">差額NG ${ng}件</span>` : `　<span class="badge-ok">検算OK</span>`)
             + (inv ? `　<span class="badge-ng">設定不可 ${inv}件</span>` : "")
             + (na ? `　<span class="badge-na">価格不明 ${na}件</span>` : "");
           sections.ug = { title: "UG一覧", body: `<h2>🔀 アップグレード一覧（${ugs.length}件）${badges}</h2>
-<p class="legend">区間=元席種⇒先席種（セル結合）。期待差額=先−元（前売・当日とも）。同席種・同年齢区分は一律500。<b>異席種でも同年齢区分どうし</b>は、差額0円なら全区分とも500円（席変更手数料）、差額ありは大人が1〜500→500・500超→実差額、U23・子供・幼児は実差額のまま（マイナス→0）。<b>異年齢区分間</b>は0以下→0・1〜500→500・500超→実差額。車椅子は他席種との相互UG不可、大人料金が先&lt;元のUGも原則不可。登録差額が期待と違う項目は文字が赤、コメント欄に理由。${seatMeta ? "席種は表示略称・" : ""}券種は略称</p>
+<p class="legend">見出し下の入力欄で区間・券種・販売条件・販売期間・コメントを絞り込み。区間=元席種⇒先席種（セル結合）。期待差額=先−元（前売・当日とも）。同席種・同年齢区分は一律500。<b>異席種でも同年齢区分どうし</b>は、差額0円なら全区分とも500円（席変更手数料）、差額ありは大人が1〜500→500・500超→実差額、U23・子供・幼児は実差額のまま（マイナス→0）。<b>異年齢区分間</b>は0以下→0・1〜500→500・500超→実差額。車椅子は他席種との相互UG不可、大人料金が先&lt;元のUGも原則不可。登録差額が期待と違う項目は文字が赤、コメント欄に理由。${seatMeta ? "席種は表示略称・" : ""}券種は略称</p>
 <div class="scroll uglistscroll"><table class="uglist">${head}${bodyRows}</table></div>` };
         }
 
@@ -9727,6 +9839,9 @@ td.day-ng { background: #fee2e2; outline: 2px solid #dc2626; outline-offset: -2p
 table.uglist { border-collapse: separate; border-spacing: 0; }
 table.uglist thead { }
 table.uglist tr:first-child th { position: sticky; top: 0; z-index: 3; background: #eef2f6; }
+/* 列ごとの絞り込み行（ヘッダー直下にスティッキー） */
+table.uglist tr.uf-row th { position: sticky; top: 28px; z-index: 3; background: #f6f8fb; padding: 2px; }
+table.uglist tr.uf-row input { width: 100%; min-width: 60px; border: 1px solid #cfd6df; border-radius: 3px; padding: 2px 4px; font-size: 11px; box-sizing: border-box; }
 table.uglist th.seatpair { position: sticky; left: 0; z-index: 2; vertical-align: middle; text-align: center; min-width: 120px; font-size: 11.5px; }
 table.uglist th.seatpair .arrow { color: #be185d; margin: 0 5px; font-weight: 700; }
 table.uglist td.kenpair { white-space: nowrap; font-weight: 600; }
@@ -10002,6 +10117,9 @@ html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
   });
 
+  // UG一覧の列ごとの絞り込み入力
+  document.querySelectorAll('table.uglist input[data-uf]').forEach(function(inp){ inp.addEventListener('input', applyAll); });
+
   function fixUgRowspan(){
     var ugBody = document.querySelector('table.uglist tbody');
     if (!ugBody) return;
@@ -10041,14 +10159,26 @@ html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
     return true;
   }
+  // UG一覧専用: 区間セルがrowspanで全行に無いため、cells[index]ではなく行のデータ属性で照合する
+  function ugRowVisible(tr, ufs){
+    if (curCond !== '__all' && tr.getAttribute('data-cond') && tr.getAttribute('data-cond') !== curCond) return false;
+    for (var i = 0; i < ufs.length; i++) {
+      var q = ufs[i].value.trim().toLowerCase(); if (!q) continue;
+      var key = ufs[i].getAttribute('data-uf');
+      var val = (key === 'cond') ? (tr.getAttribute('data-cond') || '') : (tr.getAttribute('data-' + key) || '');
+      if (val.toLowerCase().indexOf(q) === -1) return false;
+    }
+    return true;
+  }
   function applyAll(){
     // sortable（通常価格表）
     document.querySelectorAll('table.sortable').forEach(function(tbl){
       var inputs = tbl.querySelectorAll('.filter-row input[data-fc]');
       tbl.tBodies[0].querySelectorAll('tr').forEach(function(tr){ tr.style.display = rowVisible(tr, inputs) ? '' : 'none'; });
     });
-    // UG一覧（グループ表・data-mid行）
-    document.querySelectorAll('table.uglist tr[data-mid]').forEach(function(tr){ tr.style.display = rowVisible(tr, null) ? '' : 'none'; });
+    // UG一覧（グループ表・data-mid行）。列ごとの絞り込みinputをデータ属性で照合
+    var ugUf = document.querySelectorAll('table.uglist input[data-uf]');
+    document.querySelectorAll('table.uglist tr[data-mid]').forEach(function(tr){ tr.style.display = ugRowVisible(tr, ugUf) ? '' : 'none'; });
     // rowspan調整: 非表示行があってもグループの縦の繋がりを保つ（seatpair見出しを可視行へ退避・rowspanを再計算）
     fixUgRowspan();
     // マトリクスは販売条件ブロック単位で表示
