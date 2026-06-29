@@ -5161,10 +5161,11 @@
                 }
               }
             }
-            // SEJ連携: 席種エリアコード列・購入限定席種列に席種名を併記（SEJのTSVを開いている時だけ）。
-            // 主コード列は青の対訳、購入限定席種列はゴースト（淡いグレー斜体）で
-            // 「補助参照」だと一目で分かるようにする。未登録は両者とも赤で警告。
-            if (isSejFile && (j === sejCodeColIdx || sejExtraCodeCols.has(j)) && cellVal) {
+            // 席種コード→席種名の対訳。
+            //  ・主コード列(seat_type_area_cd): 隣に名前列があるマスタ等では冗長なので「SEJのTSV」を開いた時だけ表示。
+            //  ・購入限定席種列(席種一括設定の限定席種1〜3): 隣に名前が無く参照に必須なので、ファイル種別に関わらず常に表示。
+            // 主コード列は青の対訳、購入限定席種列はゴースト（淡いグレー斜体）。未登録は両者とも赤で警告。
+            if ((sejExtraCodeCols.has(j) || (isSejFile && j === sejCodeColIdx)) && cellVal) {
               const m = state.sejMaster.byCode[cellVal.trim()];
               const ghost = sejExtraCodeCols.has(j) && j !== sejCodeColIdx;
               if (m) {
