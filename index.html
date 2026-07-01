@@ -5227,7 +5227,7 @@
             const _toHankakuNum = (s) => String(s ?? "").replace(/[０-９]/g, (d) => "０１２３４５６７８９".indexOf(d));
             if (j === boxNmIdx && boxNmIdx !== -1 && /[（(]\s*\d+\s*名\s*[）)]/.test(_toHankakuNum(cellVal))) {
               const code = boxCodeIdx !== -1 ? (row[boxCodeIdx] ?? "").trim() : "";
-              const isEP = code.length >= 6 && ["E", "P"].includes(code[5].toUpperCase());
+              const isEP = code.length >= 6 && ["E", "O", "P"].includes(code[5].toUpperCase());
               const flg = boxFlgIdx !== -1 ? (row[boxFlgIdx] ?? "").trim() === "1" : false;
               const cnt = boxCntIdx !== -1 ? parseInt(_toHankakuNum((row[boxCntIdx] ?? "").trim())) : NaN;
               const cntOk = !isNaN(cnt) && cnt >= 2;
@@ -5236,7 +5236,7 @@
               } else {
                 cls.push("cell-ng");
                 const ng = [];
-                if (!isEP) ng.push("6桁目E/P");
+                if (!isEP) ng.push("6桁目E/O/P");
                 if (!flg) ng.push("BOXフラグ1");
                 if (!cntOk) ng.push("席数2以上");
                 displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ ${ng.join("・")}が必要</span>`;
