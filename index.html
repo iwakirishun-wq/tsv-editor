@@ -2060,7 +2060,7 @@
     <input
       type="file"
       id="file-input"
-      accept=".tsv,.csv,.txt"
+      accept=".tsv,.csv,.txt,text/tab-separated-values,text/csv,text/plain"
       aria-label="TSV/CSVファイルを開く"
       style="display: none"
     />
@@ -8715,7 +8715,7 @@
       function _openPriceMasterPicker(onDone) {
         const input = document.createElement("input");
         input.type = "file";
-        input.accept = ".tsv,.csv,.txt";
+        input.accept = ".tsv,.csv,.txt,text/tab-separated-values,text/csv,text/plain";
         input.onchange = () => {
           if (input.files && input.files[0]) loadPriceMasterFile(input.files[0], null, onDone);
         };
@@ -8902,7 +8902,7 @@
         setStatus("席種エリアマスタTSVを選択してください...");
         const input = document.createElement("input");
         input.type = "file";
-        input.accept = ".tsv,.txt,text/plain";
+        input.accept = ".tsv,.txt,text/tab-separated-values,text/plain";
         input.onchange = () => {
           if (input.files && input.files[0]) loadSejMasterFile(input.files[0], null, onDone);
           else setStatus("ファイルが選択されませんでした");
