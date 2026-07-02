@@ -2672,21 +2672,20 @@
         return n != null && (n >= PRICE_RULES.DUMMY_PRICE_MIN || /^9+$/.test(String(n)));
       }
       // 異席種UGの期待差額（diff = 先価格 − 元価格）。同席種同区分(sameSeat)は呼び出し側で別扱い。
-      //  ・同年齢区分: 差額0は全区分とも手数料(500)／大人は1〜500→500・500超→実差額／U23以下は実差額(マイナス→0)
-      //  ・異年齢区分: 0以下→0 ／ 1〜500→500 ／ 500超→実差額
+      //  ・差額0円は年齢区分の組合せに関わらず手数料(500)（2026-07-03確定: 異区分間も500円）
+      //  ・同年齢区分: 大人は1〜500→500・500超→実差額／U23以下は実差額(マイナス→0)
+      //  ・異年齢区分: マイナス→0 ／ 1〜500→500 ／ 500超→実差額
       function ugExpectedCharge(srcAge, dstAge, srcPrice, dstPrice) {
         const fee = PRICE_RULES.SEAT_CHANGE_FEE;
         const diff = dstPrice - srcPrice;
+        if (diff === 0) return fee; // 差額0円は全組合せで席変更手数料500円
         // 年齢区分の同一判定はランク基準（席種ごとにラベル表記が違っても同じ区分として扱う）。
         // 「3歳以上共通」等のランク判定不能(rank=0)なラベルは、文字列完全一致なら同区分とみなす
         // （ランクのみで判定するとrank=0同士は常に「異区分」になってしまい、本当の同一ラベルの再発行を誤NGにする）
         const sr = ugAgeRank(srcAge), dr = ugAgeRank(dstAge);
         const sameAgeCat = (sr !== 0 && sr === dr) || srcAge === dstAge;
-        if (sameAgeCat) {
-          if (diff === 0) return fee;
-          if (sr !== 4) return diff < 0 ? 0 : diff;
-        }
-        return diff <= 0 ? 0 : (diff <= fee ? fee : diff);
+        if (sameAgeCat && sr !== 4) return diff < 0 ? 0 : diff;
+        return diff < 0 ? 0 : (diff <= fee ? fee : diff);
       }
       // ===PRICE_RULES_CORE_END===
       const UG_DUMMY_MIN = PRICE_RULES.DUMMY_PRICE_MIN; // 既存参照の互換エイリアス
@@ -2901,7 +2900,7 @@
             }
             const diff = dp - sp;
             // 期待差額の写像は純粋関数 ugExpectedCharge に集約（同年齢: 差額0は全区分500・大人は1〜500→500/超→実差額・
-            // U23以下は実差額/マイナス0／異年齢: 0以下→0・1〜500→500・500超→実差額）
+            // U23以下は実差額/マイナス0／異年齢: マイナス→0・0円→500・1〜500→500・500超→実差額）
             const exp = ugExpectedCharge(srcAge, dstAge, sp, dp);
             const note = (ageRank(srcAge) !== 0 && ageRank(srcAge) === ageRank(dstAge) && diff === 0) ? "同年齢区分どうしで差額0円→席変更手数料500円" : "";
             return { exp, note, dummy: false, srcPrice: sp, dstPrice: dp, rawDiff: diff };
@@ -9705,7 +9704,7 @@ ${_sortableTable(labels, rowsHtml)}` };
           const ngBadge = ngTotal ? `　<span class="badge-ng">NG ${ngTotal}件</span>` : `　<span class="badge-ok">検算OK</span>`;
           const missingBadge = missingTotal ? `　<span class="badge-ng" style="background:#b45309">登録漏れ?候補 ${missingTotal}件</span>` : "";
           sections.matrix = { title: "UGマトリクス", body: `<h2>🔢 アップグレードマトリクス（俯瞰）${ngBadge}${missingBadge}</h2>
-<p class="legend">行=元席種/券種、列=先席種/券種（大人の前売価格の安い順）。見出しには通常価格の販売期間も併記。席種は表示略称＋区分（<span class="catb cat-r">指定席</span><span class="catb cat-a">数在庫</span><span class="catb cat-o">その他</span>）。各セル: 先－元=期待差額（緑） / 前売・当日=実際の金額 / 下=販売期間（曜日付き）。<b>期待差額</b>は同区分なら差額0は全区分500・大人は1〜500も500・U23/子供/幼児は実差額(マイナス→0)、異区分間は0以下→0・1〜500→500・500超→実差額。<b>不一致は文字が赤・セルが薄ピンク</b>。<b>「？」の橙セル</b>はUG登録が無いセルのうち、先のほうが価格が高く対象外ルールにも当たらないため登録漏れの可能性がある候補（推測なので必ず人が確認してください）。クリックでマーク</p>${mxBody}` };
+<p class="legend">行=元席種/券種、列=先席種/券種（大人の前売価格の安い順）。見出しには通常価格の販売期間も併記。席種は表示略称＋区分（<span class="catb cat-r">指定席</span><span class="catb cat-a">数在庫</span><span class="catb cat-o">その他</span>）。各セル: 先－元=期待差額（緑） / 前売・当日=実際の金額 / 下=販売期間（曜日付き）。<b>期待差額</b>は差額0円なら全組合せ500（手数料）・同区分の大人は1〜500も500・U23/子供/幼児は実差額(マイナス→0)、異区分間はマイナス→0・1〜500→500・500超→実差額。<b>不一致は文字が赤・セルが薄ピンク</b>。<b>「？」の橙セル</b>はUG登録が無いセルのうち、先のほうが価格が高く対象外ルールにも当たらないため登録漏れの可能性がある候補（推測なので必ず人が確認してください）。クリックでマーク</p>${mxBody}` };
         }
 
         // --- UG一覧（席種ペアでセル結合・元⇒先・金額対比・差異強調） ---
@@ -9762,7 +9761,7 @@ ${_sortableTable(labels, rowsHtml)}` };
               bodyRows += `<td class="kenpair">${escHtml(ageLabel(v(row, c.ugAge)))}<span class="arrow">⇒</span>${escHtml(ageLabel(v(row, c.age)))}</td>`
                 + `<td class="prices">${dual(money(chk.srcAdv != null ? chk.srcAdv : ""), money(chk.srcDay != null ? chk.srcDay : ""))}</td>`
                 + `<td class="prices">${dual(money(chk.dstAdv != null ? chk.dstAdv : ""), money(chk.dstDay != null ? chk.dstDay : ""))}</td>`
-                + `<td class="exp" title="先−元の期待差額（同席種同区分=一律500／異席種でも同区分どうしは差額0なら全区分500・大人は1〜500も500・U23/子供/幼児は実差額(マイナス→0)／異区分間は0以下→0・1〜500→500・500超→実差額）">${escHtml(expStr)}${dgNote}</td>`
+                + `<td class="exp" title="先−元の期待差額（同席種同区分=一律500／差額0円は全組合せ500・大人は1〜500も500・U23/子供/幼児は実差額(マイナス→0)／異区分間はマイナス→0・1〜500→500・500超→実差額）">${escHtml(expStr)}${dgNote}</td>`
                 + `<td class="prices reg">${dual(money(v(row, c.adv)), money(v(row, c.day)), chk.advNg, chk.dayNg, chk.advNg ? "期待 " + (chk.expected != null ? chk.expected.toLocaleString("ja-JP") : "?") : "", chk.dayNg ? "期待 " + (chk.expectedDay != null ? chk.expectedDay.toLocaleString("ja-JP") : "?") : "")}</td>`
                 + cell(condOf(row), condOf(row))
                 + cell(periodOf(row), v(row, c.start), "dt")
@@ -9783,7 +9782,7 @@ ${_sortableTable(labels, rowsHtml)}` };
             + (inv ? `　<span class="badge-ng">設定不可 ${inv}件</span>` : "")
             + (na ? `　<span class="badge-na">価格不明 ${na}件</span>` : "");
           sections.ug = { title: "UG一覧", body: `<h2>🔀 アップグレード一覧（${ugs.length}件）${badges}</h2>
-<p class="legend">見出し下の入力欄で区間・券種・販売条件・販売期間・コメントを絞り込み。区間=元席種⇒先席種（セル結合）。期待差額=先−元（前売・当日とも）。同席種・同年齢区分は一律500。<b>異席種でも同年齢区分どうし</b>は、差額0円なら全区分とも500円（席変更手数料）、差額ありは大人が1〜500→500・500超→実差額、U23・子供・幼児は実差額のまま（マイナス→0）。<b>異年齢区分間</b>は0以下→0・1〜500→500・500超→実差額。車椅子は他席種との相互UG不可、大人料金が先&lt;元のUGも原則不可。登録差額が期待と違う項目は文字が赤、コメント欄に理由。${seatMeta ? "席種は表示略称・" : ""}券種は略称</p>
+<p class="legend">見出し下の入力欄で区間・券種・販売条件・販売期間・コメントを絞り込み。区間=元席種⇒先席種（セル結合）。期待差額=先−元（前売・当日とも）。同席種・同年齢区分は一律500。<b>異席種でも同年齢区分どうし</b>は、差額0円なら全区分とも500円（席変更手数料）、差額ありは大人が1〜500→500・500超→実差額、U23・子供・幼児は実差額のまま（マイナス→0）。<b>異年齢区分間</b>はマイナス→0・0円→500・1〜500→500・500超→実差額。車椅子は他席種との相互UG不可、大人料金が先&lt;元のUGも原則不可。登録差額が期待と違う項目は文字が赤、コメント欄に理由。${seatMeta ? "席種は表示略称・" : ""}券種は略称</p>
 <div class="scroll uglistscroll"><table class="uglist">${head}${bodyRows}</table></div>` };
         }
 
