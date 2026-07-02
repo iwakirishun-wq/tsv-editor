@@ -1840,7 +1840,7 @@
         <!-- Group: HTML出力 -->
         <div class="rb-group">
           <div class="rb-buttons">
-            <button class="rb-btn" id="btn-price-sheet" title="経路価格スケジュール（BO-F-21030）をチェック用HTMLとして出力&#10;通常価格表 / UGマトリクス / UG一覧 を選んで出力&#10;UG差額は自動検算（NG赤表示）&#10;出力先で絞り込み可能（通常価格表とUG一覧）・並べ替えは通常価格表&#10;※席種エリアマスタ連携が必須" aria-label="価格チェック表を出力">
+            <button class="rb-btn" id="btn-price-sheet" title="開いているファイルに応じてチェック用HTMLを自動切替で出力&#10;・経路価格スケジュール（BO-F-21030）→ 価格チェック表（通常価格表/UGマトリクス/UG一覧、UG差額は自動検算）&#10;・SEJデータ → マスタ照合カード&#10;・席種一括設定 → チェックレポート&#10;※席種エリアマスタ連携が必須" aria-label="チェック用HTMLを出力">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="17" rx="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="8" y1="4" x2="8" y2="2"></line><line x1="16" y1="4" x2="16" y2="2"></line><path d="M7 13h4M7 17h7"></path><circle cx="16.5" cy="15" r="2.5"></circle><path d="M16.5 14v1l.8.8"></path></svg></span>
               <span>価格チェック表</span>
             </button>
@@ -2381,10 +2381,23 @@
         "btn-seatmaster-check": ["colorView", "gateView", "parkingCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck"],
         "btn-sej-check": ["kanaCheck", "bikoHtmlCheck"],
       };
+      // カナ検査の対象列（半角カナ必須の略称/備考系のみ。席種名・試合名等のフルネーム列は全角カナが正しいため対象外）。
+      // 前提条件チェックと描画ロジックで共用する。
+      const KANA_TEXT_COLS = new Set([
+        "disp_abb", "seat_type_grp_nm1", "seat_type_grp_nm2", "nte",
+      ]);
+      const isKanaTargetHeader = (h) => {
+        const ht = String(h).trim();
+        return KANA_TEXT_COLS.has(ht) || /^word[1-9]$/.test(ht);
+      };
       // 個別項目をONにする前の前提条件チェック。問題なければnull、問題があれば理由（原因のみ）を返す。
       // 返す文字列にラベル名は含めない（呼び出し側でラベルを付ける。重複表示を避けるため）。
       const _hasHeader = (name) => state.headers.some((h) => h.trim() === name);
       function _inspectFlagPrecondition(key) {
+        if (key === "kanaCheck") {
+          // 対象列が1つも無いままONにしても何も検査されず「動いていない」ように見えるため、理由付きでブロックする
+          if (!state.headers.some(isKanaTargetHeader)) return "対象列(表示略称/グループ名/備考/word)がありません";
+        }
         if (key === "colorView") {
           if (!_hasHeader("disp_color_cd")) return "カラーコード列(disp_color_cd)がありません";
         }
@@ -3554,7 +3567,18 @@
         document.documentElement.style.setProperty("--row-h", ROW_H + "px");
         setRbLabel("btn-row-height", `行高:${ROW_H}`);
         // 価格スケジュールチェック表
-        $("btn-price-sheet").onclick = exportPriceMatrixHtml;
+        // HTML出力: 開いているファイルの種別で自動切替（マニュアル記載どおりに復元）
+        //   SEJデータ → マスタ照合カード / 席種一括設定 → チェックレポート / 経路価格スケジュール → 価格チェック表
+        $("btn-price-sheet").onclick = () => {
+          const vr = getVisibleRows();
+          const rowIndices = vr._direct
+            ? Array.from({ length: state.data.length }, (_, i) => i)
+            : [...vr._indices];
+          const isFiltered = rowIndices.length < state.data.length;
+          if (isSejData()) { exportSejHtml(rowIndices, isFiltered); return; }
+          if (isIkkatsuData()) { exportIkkatsuCheckHtml(rowIndices, isFiltered); return; }
+          exportPriceMatrixHtml();
+        };
         // 縦書きヘッダー
         $("btn-vertical-header").onclick = toggleVerticalHeader;
         // 縦書きヘッダーの行高さ（手動調整）
@@ -4984,18 +5008,10 @@
 
         // 検品表示: 対象列インデックスをキャッシュ
         const _hIdx = (name) => state.headers.findIndex(h => h.trim() === name);
-        // カナ検査の対象列: 半角カナが必須の列のみ（表示略称・グループ名略称・備考・SEJ word）。
-        // 席種名/管理名/試合名/会員ランク名などのフルネーム列は全角カナが正しいので対象外にする
-        // （これらを検査すると正常な全角カナに大量の誤警告が出てノイズになるため）。
-        const KANA_TEXT_COLS = new Set([
-          "disp_abb", "seat_type_grp_nm1", "seat_type_grp_nm2", "nte",
-        ]);
+        // カナ検査の対象列インデックス（対象列の定義はモジュール共通の KANA_TEXT_COLS / isKanaTargetHeader を使用）
         const kanaCheckCols = new Set();
         if (state.kanaCheck) {
-          state.headers.forEach((h, hi) => {
-            const ht = String(h).trim();
-            if (KANA_TEXT_COLS.has(ht) || /^word[1-9]$/.test(ht)) kanaCheckCols.add(hi);
-          });
+          state.headers.forEach((h, hi) => { if (isKanaTargetHeader(h)) kanaCheckCols.add(hi); });
         }
         const colorColIdx = state.colorView ? _hIdx("disp_color_cd") : -1;
         const nteColIdx = state.bikoHtmlCheck ? _hIdx("nte") : -1;
@@ -10205,6 +10221,19 @@ html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       var apply = function(){
         var h = r0.getBoundingClientRect().height;
         tbl.querySelectorAll('th.agehdr:not(.rowh)').forEach(function(th){ th.style.top = h + 'px'; });
+      };
+      apply();
+      if (window.ResizeObserver) {
+        new ResizeObserver(apply).observe(r0);
+      }
+    });
+    // UG一覧の絞り込み行も同様に、1行目ヘッダーの実高に合わせて動的に追従させる
+    // （固定28pxだとブラウザ拡大やヘッダー折返しでズレて本体行が透ける）
+    document.querySelectorAll('table.uglist').forEach(function(tbl){
+      var r0 = tbl.rows[0]; if (!r0) return;
+      var apply = function(){
+        var h = r0.getBoundingClientRect().height;
+        tbl.querySelectorAll('tr.uf-row th').forEach(function(th){ th.style.top = h + 'px'; });
       };
       apply();
       if (window.ResizeObserver) {
