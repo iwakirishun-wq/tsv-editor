@@ -2660,7 +2660,9 @@
       function ugAgeRank(a) {
         a = String(a);
         if (/幼児|未就学|INFANT/i.test(a)) return 1;
-        if (/子供|こども|子ども|小中|小・中|小学|CHILD/i.test(a)) return 2;
+        // 「3歳〜中学生」「中学生以下」等の上限が中学生のラベルは子供区分として扱う
+        // （ナレッジの年齢マッチング表: U23/大人→「3歳〜中学生」は年齢が下がるため不可、を降格判定で拾えるように）
+        if (/子供|こども|子ども|小中|小・中|小学|CHILD|中学生以下|〜中学生|～中学生/i.test(a)) return 2;
         if (/U23|ｱﾝﾀﾞｰ|アンダー/i.test(a)) return 3;
         if (/大人|ADULT|高校/i.test(a)) return 4;
         return 0; // 共通・不明はランク判定しない
@@ -2819,6 +2821,11 @@
               const upgradeToAdult = !sameAgeCat && dr === 4 && dr > sr;
               if (!sameAgeReserved && !upgradeToAdult) problems.push("車椅子は同年齢の席変更または大人へのUGのみ可");
             }
+          }
+          // 同一席種内の年齢区分変更は「→大人」のみ（幼児→子供・子供→U23等の中間昇格は設定不可）。
+          // 別席種間の昇格は可のため同席種の場合だけ制限する。降格は上の年齢降格チェック、車椅子は車椅子ルールで判定済み
+          if (srcSeat === dstSeat && srcSeat !== "" && !srcWc && sr && dr && dr > sr && dr !== 4) {
+            problems.push("同席種の年齢区分変更は大人へのみ可(" + srcAge + "→" + dstAge + ")");
           }
           // 大人料金が先<元（実質ダウングレード）のUGは不可。
           // 大人以外の年齢区分は、その年齢自身の差額が500円以内（先が安い側）なら例外的に許可（fee=0）

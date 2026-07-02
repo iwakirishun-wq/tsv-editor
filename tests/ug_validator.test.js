@@ -19,7 +19,7 @@ if (!m) {
 }
 const core = m[1];
 const factory = new Function(core + "\nreturn { buildUgValidator, ugAgeRank, ugIsDummyPrice, ugExpectedCharge, PRICE_RULES };");
-const { buildUgValidator } = factory();
+const { buildUgValidator, ugAgeRank } = factory();
 
 // --- 列構成（実アプリの c.xxx に対応する仮想カラムID） ---
 const c = {
@@ -82,6 +82,10 @@ const SEAT_PERIOD_DST = { name: "PERIOD先", cd: "RESV17" };
 NORMALS.push({ ...priceRow(SEAT_PERIOD_SRC.name, SEAT_PERIOD_SRC.cd, "大人", 8000, 8500), [c.start]: "2026/06/01 11:00", [c.end]: "2026/07/05 21:00" });
 NORMALS.push({ ...priceRow(SEAT_PERIOD_DST.name, SEAT_PERIOD_DST.cd, "大人", 10000, 10500), [c.start]: "2026/06/01 11:00", [c.end]: "2026/07/10 21:00" });
 
+// 「3歳〜中学生」ラベル（上限が中学生＝子供ランク扱い）の降格/横移動判定テスト用データ
+const SEAT_M = { name: "M席", cd: "RESV18" };
+NORMALS.push(priceRow(SEAT_M.name, SEAT_M.cd, "3歳〜中学生", 5300, 5600));
+
 const SCENARIOS = [
   {
     name: "異席種・同年齢ラベル違い(子供)・実差額300円を正しく登録 → OK（表記違いでも同ランクなら同区分）",
@@ -141,6 +145,32 @@ const SCENARIOS = [
     row: ugRow(SEAT_FREE2.name, SEAT_FREE2.cd, "大人", SEAT_VC.name, SEAT_VC.cd, "大人", 6000, 999999),
     expectStatus: "ok",
   },
+  {
+    // ナレッジ: 同一券種内の年齢区分変更は「→大人」のみ（幼児→U23、小中→U23等は不可）
+    name: "同席種の年齢区分変更(子供→U23) → invalid（→大人のみ可）",
+    row: ugRow(SEAT_S.name, SEAT_S.cd, "子供", SEAT_S.name, SEAT_S.cd, "U23", 500, 500),
+    expectStatus: "invalid",
+  },
+  {
+    name: "同席種の年齢区分変更(子供→大人) → OK（実差額3000円）",
+    // 元(S席・子供)=5000、先(S席・大人)=8000 → 同席種でも→大人は可、diff=3000
+    row: ugRow(SEAT_S.name, SEAT_S.cd, "子供", SEAT_S.name, SEAT_S.cd, "大人", 3000, 3200),
+    expectStatus: "ok",
+    expectExpected: 3000,
+  },
+  {
+    // ナレッジの年齢マッチング表: 先「3歳〜中学生」にU23/大人は不可（年齢が下がるため）
+    name: "大人→「3歳〜中学生」(別席種) → invalid（年齢降格として検出）",
+    row: ugRow(SEAT_S.name, SEAT_S.cd, "大人", SEAT_M.name, SEAT_M.cd, "3歳〜中学生", 300, 300),
+    expectStatus: "invalid",
+  },
+  {
+    name: "子供→「3歳〜中学生」(別席種・同ランク横移動) → OK（実差額300円）",
+    // 元(S席・子供)=5000/5300、先(M席・3歳〜中学生)=5300/5600 → 同ランクなので実差額300
+    row: ugRow(SEAT_S.name, SEAT_S.cd, "子供", SEAT_M.name, SEAT_M.cd, "3歳〜中学生", 300, 300),
+    expectStatus: "ok",
+    expectExpected: 300,
+  },
 ];
 
 let pass = 0, fail = 0;
@@ -162,6 +192,12 @@ eqCU(validate.canUpgrade(SEAT_S.name, SEAT_S.cd, "大人", "パドックパス",
 eqCU(validate.canUpgrade("パドックパス", "MMTGPO25011", "大人", SEAT_A.name, SEAT_A.cd, "大人"), false, "元がその他(6桁目O)は対象外");
 eqCU(validate.canUpgrade(SEAT_S.name, SEAT_S.cd, "大人", "もてぎ駐車券", "MMTGPP25011", "大人"), false, "先が駐車券(6桁目P)は対象外");
 eqCU(validate.canUpgrade(SEAT_S.name, SEAT_S.cd, "大人", "T5デッキ(5名)", "RESV20", "大人"), false, "先がBOX席(（〇名）)は対象外");
+
+// --- ugAgeRank（共通/範囲ラベルのランク判定）---
+eqCU(ugAgeRank("3歳〜中学生"), 2, "「3歳〜中学生」は子供ランク(上限が中学生)");
+eqCU(ugAgeRank("中学生以下"), 2, "「中学生以下」は子供ランク");
+eqCU(ugAgeRank("3歳以上共通"), 0, "「3歳以上共通」はランク判定しない(全年齢OK)");
+eqCU(ugAgeRank("高校生〜大人"), 4, "「高校生〜大人」は大人ランク");
 
 // 大人料金ダウングレード判定が、条件(会員ランク/販売経路)の異なる無関係な価格を拾って
 // 誤判定しないことの回帰テスト（X席の大人料金は「店頭」経路にしかなく、UG行は既定条件で登録）
