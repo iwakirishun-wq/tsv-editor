@@ -106,6 +106,7 @@
         --rb-text: #171717;
         --rb-dim: #737373;
         --rb-accent: #217346;
+        --rb-accent-hover: #1a5c38;
       }
       .rb-ribbon {
         background: var(--rb-bg-base);
@@ -137,6 +138,19 @@
         font-family: var(--font-ui);
       }
       .rb-tab:hover { background: var(--rb-bg-hover); }
+      /* Excelの「ファイル」タブに相当。バックステージ領域への入口として単色の塗りで視覚的に分離する */
+      .rb-tab[data-tab="file"] {
+        background: var(--rb-accent);
+        color: #fff;
+        font-weight: 600;
+      }
+      .rb-tab[data-tab="file"]:hover {
+        background: var(--rb-accent-hover);
+      }
+      .rb-tab[data-tab="file"].rb-tab-active {
+        background: var(--rb-accent-hover);
+        border-bottom-color: #fff;
+      }
       .rb-tab.rb-tab-active {
         border-bottom-color: var(--rb-accent);
         background: var(--rb-bg-hover);
@@ -528,6 +542,12 @@
         overflow: auto;
         position: relative;
         display: none;
+        /* データ末尾より右・下の余白にもExcelの方眼紙のような薄いグリッド線を敷く。
+           実データのセルはtable自体の罫線が不透明に覆うため、この背景は「何もない場所」にのみ見える */
+        background-color: #fff;
+        background-image:
+          repeating-linear-gradient(to right, var(--cell-border) 0 1px, transparent 1px 100px),
+          repeating-linear-gradient(to bottom, var(--cell-border) 0 1px, transparent 1px 22px);
       }
       table {
         border-collapse: collapse;
@@ -563,9 +583,9 @@
       }
       th.col-active {
         /* theadはsticky固定のため背景は不透明を維持（透明だとスクロール時に下の行が透けて見える） */
-        background: linear-gradient(rgba(19, 100, 215, 0.12), rgba(19, 100, 215, 0.12)), var(--header-bg);
-        color: #1b6ec2;
-        border-bottom-color: #1b6ec2;
+        background: linear-gradient(rgba(33, 115, 70, 0.12), rgba(33, 115, 70, 0.12)), var(--header-bg);
+        color: #217346;
+        border-bottom-color: #217346;
       }
       th.col-sorted {
         color: var(--accent);
@@ -686,26 +706,26 @@
       }
       .row-num.row-selected {
         /* 固定列のため背景は不透明を維持（透明だとスクロール時に下のセルが透けて見える） */
-        background: linear-gradient(rgba(19, 100, 215, 0.14), rgba(19, 100, 215, 0.14)), var(--header-bg);
-        color: #1b6ec2;
+        background: linear-gradient(rgba(33, 115, 70, 0.14), rgba(33, 115, 70, 0.14)), var(--header-bg);
+        color: #217346;
         font-weight: 700;
-        border-right-color: #1b6ec2;
+        border-right-color: #217346;
       }
 
-      /* ===ハイライト（Excel互換・青系）=== */
+      /* ===ハイライト（Excel互換・グリーン系）=== */
       /* background を !important で塗ると、カラー表示(disp_color_cd)やマーカー等のインライン背景色が
          選択時に完全に消えてしまうため、box-shadowの内側塗りで「重ねる」形にして元の色を透過させる */
       td.selected {
-        box-shadow: inset 0 0 0 1000px rgba(19, 100, 215, 0.16);
-        outline: 2px solid #1b6ec2;
+        box-shadow: inset 0 0 0 1000px rgba(33, 115, 70, 0.16);
+        outline: 2px solid #217346;
         outline-offset: -1px;
         z-index: 2;
       }
       td.in-range {
-        box-shadow: inset 0 0 0 1000px rgba(19, 100, 215, 0.07);
+        box-shadow: inset 0 0 0 1000px rgba(33, 115, 70, 0.07);
       }
       td.col-highlight {
-        background: rgba(19, 100, 215, 0.03);
+        background: rgba(33, 115, 70, 0.03);
       }
       /* 十字ハイライト（選択セルの行・列）。
          背景 + box-shadow の罫線のみで描画 → レイアウトに一切影響しない＝列ぶれゼロ。
@@ -729,7 +749,7 @@
           inset 0 -2px 0 0 rgba(33, 115, 70, 0.6);
       }
       tr.cross-row .row-num.row-selected {
-        background: linear-gradient(rgba(33, 115, 70, 0.12), rgba(33, 115, 70, 0.12)), linear-gradient(rgba(19, 100, 215, 0.14), rgba(19, 100, 215, 0.14)), var(--header-bg);
+        background: linear-gradient(rgba(33, 115, 70, 0.12), rgba(33, 115, 70, 0.12)), linear-gradient(rgba(33, 115, 70, 0.14), rgba(33, 115, 70, 0.14)), var(--header-bg);
         box-shadow: inset 0 2px 0 0 rgba(33, 115, 70, 0.6),
           inset 0 -2px 0 0 rgba(33, 115, 70, 0.6);
       }
@@ -741,18 +761,18 @@
         color: #000;
         font-weight: bold;
       }
-      /* 選択セルと検索ヒットが重なる場合: 背景は検索色のまま、青枠線を明示 */
+      /* 選択セルと検索ヒットが重なる場合: 背景は検索色のまま、緑枠線を明示 */
       td.selected.search-hit {
         position: relative;
         background: var(--hit) !important;
-        outline: 2px solid #1b6ec2;
+        outline: 2px solid #217346;
         outline-offset: -1px;
         z-index: 3;
       }
       td.selected.search-hit.current {
         position: relative;
         background: var(--hit-current) !important;
-        outline: 2px solid #1b6ec2;
+        outline: 2px solid #217346;
         outline-offset: -1px;
         z-index: 3;
       }
@@ -842,7 +862,7 @@
       }
       #fbar-val:focus {
         background: #fff;
-        box-shadow: inset 0 0 0 1px #1b6ec2;
+        box-shadow: inset 0 0 0 1px #217346;
       }
 
       /* ===ステータスバー=== */
@@ -1400,7 +1420,7 @@
         text-align: center;
         opacity: 0.7;
       }
-      th.col-active .th-col-letter { color: #1b6ec2; opacity: 1; font-weight: 700; }
+      th.col-active .th-col-letter { color: #217346; opacity: 1; font-weight: 700; }
 
       /* ===縦書きヘッダー（列幅節約）=== */
       body.vertical-headers thead tr:first-child th { height: var(--vheader-h, 230px); vertical-align: bottom; }
@@ -2243,6 +2263,18 @@
     </div>
 
     <script>
+      // ===== 目次（このファイル内を `// ===== 名前 =====` で検索すると各セクション先頭へジャンプできる）=====
+      //   状態 / DOM / UG差額の自動検算 / セーフアクセス / 未保存管理 / タブ管理 / 初期化 / ファイル
+      //   ヘッダー自動変換 / リロード警告ダイアログ / ソート / フィルター / フィルタードロップダウン
+      //   描画 / theadイベント委譲 / マウス / ドラッグ中の自動スクロール / 編集 / 辞書エディター
+      //   キーボード / クリップボード（セル） / 行コピー&ペースト / 置換 / 右クリックメニュー
+      //   ユーティリティ / リサイズ / 非表示 / 空行の一括削除 / セルの前後空白トリム / 行の上下移動
+      //   行の複製 / 全列の自動幅調整 / 行の高さ変更 / SEJ連携 / SEJ HTML出力
+      //   経路価格スケジュール→チェック用HTML出力 / 席種一括設定チェック / セル折り返し
+      //   表示リセット / カラーコードプレビュー
+      //
+      // 新しい「セル単位の検査」を追加する場合は、renderBody() 内の cellNote() 呼び出し群
+      // （検索: "cellNote(cls,"）に条件分岐を1つ足すだけでよい（バッジHTMLやcls付与を個別に書く必要はない）。
       // ===== 状態 =====
       const state = {
         data: [[""]],
@@ -2528,21 +2560,17 @@
       }
 
       // SEJ備考の分割（<br>・改行区切り、タグ除去）— グリッド表示とHTML出力で共用
-      function sejSplitNte(s) {
+      // SEJ備考の分割（<br>・改行区切り）。keepTags=false（既定）はタグ除去済みの平文項目を返し、
+      // keepTags=true は備考HTML変換でのHTML再現用にタグを保持したまま返す。
+      function sejSplitNte(s, keepTags = false) {
         if (!s) return [];
         return s
           .split(/<br\s*\/?>|\r?\n/i)
-          .map(x => x.replace(/<[^>]+>/g, "").replace(/&nbsp;/gi, " ").trim())
+          .map(x => keepTags ? x.trim() : x.replace(/<[^>]+>/g, "").replace(/&nbsp;/gi, " ").trim())
           .filter(x => x);
       }
-
-      // SEJ備考の分割（<br>・改行区切り、タグは保持）— 備考HTML変換でのHTML再現用
       function sejSplitNteHtml(s) {
-        if (!s) return [];
-        return s
-          .split(/<br\s*\/?>|\r?\n/i)
-          .map(x => x.trim())
-          .filter(x => x);
+        return sejSplitNte(s, true);
       }
 
       // "YYYY/MM/DD"等の日付文字列から日本語の曜日（1文字）を返す。解釈できない場合は空文字
@@ -3929,38 +3957,7 @@
           state.encoding = "utf8";
         }
         detectNewline(text);
-        const rows = [];
-        let row = [],
-          cur = "",
-          inQuote = false;
-        for (let i = 0; i < text.length; i++) {
-          const c = text[i],
-            next = text[i + 1];
-          if (inQuote) {
-            if (c === '"' && next === '"') {
-              cur += '"';
-              i++;
-            } else if (c === '"') inQuote = false;
-            else if (c === '\r') { cur += '\n'; if (next === '\n') i++; }
-            else cur += c;
-          } else {
-            if (c === '"') inQuote = true;
-            else if (c === state.delimiter) {
-              row.push(cur);
-              cur = "";
-            } else if (c === "\r" || c === "\n") {
-              if (c === "\r" && next === "\n") i++;
-              row.push(cur);
-              rows.push(row);
-              row = [];
-              cur = "";
-            } else cur += c;
-          }
-        }
-        if (cur || row.length) {
-          row.push(cur);
-          rows.push(row);
-        }
+        const rows = parseQuotedRows(text, state.delimiter);
         if (!rows.length) {
           state.headers = ["A"];
           state.data = [[""]];
@@ -4958,6 +4955,23 @@
         return cols;
       }
 
+      // セル単位の検査結果を displayVal へバッジHTMLとして追記する共通ヘルパー。
+      // severity: "ok"（緑✓）/ "ng"（赤✗、cls に cell-ng を付与）/ "warn"（橙⚠、cls に cell-warn を付与）/ "info"（グレー、フラグなし）
+      // 新しいセル検査を追加する場合、条件分岐の中でこの関数を呼ぶだけでよい（cls.push とバッジHTMLを個別に書く必要がない）。
+      const CELL_NOTE_STYLE = {
+        ok: { color: "#16a34a", icon: "✓" },
+        ng: { color: "#dc2626", icon: "✗" },
+        warn: { color: "#ea580c", icon: "⚠" },
+        info: { color: "#6b7280", icon: "" },
+      };
+      function cellNote(cls, displayVal, severity, message) {
+        const s = CELL_NOTE_STYLE[severity] || CELL_NOTE_STYLE.info;
+        if (severity === "ng") cls.push("cell-ng");
+        else if (severity === "warn") cls.push("cell-warn");
+        const icon = s.icon ? `${s.icon} ` : "";
+        return displayVal + `<br><span style="color:${s.color};font-size:10px">${icon}${message}</span>`;
+      }
+
       function renderBody() {
         const rows = getVisibleRows();
         const scrollTop = els.container.scrollTop;
@@ -5223,26 +5237,17 @@
               }
             }
             // 駐車券フラグ検査: コード6桁目P ⇔ フラグ1（OK/NGどちらも表示）
-            // 列幅を広げず行高だけ伸ばすため、値の横ではなく下に改行して表示する
             if (j === parkFlagIdx && parkCodeIdx !== -1) {
               const code = (row[parkCodeIdx] ?? "").trim();
               const isP = code.length >= 6 && code[5].toUpperCase() === "P";
               const flagIs1 = cellVal.trim() === "1";
-              if (isP && flagIs1) {
-                displayVal += `<br><span style="color:#16a34a;font-size:10px">✓ 駐車券OK</span>`;
-              } else if (isP && !flagIs1) {
-                cls.push("cell-ng");
-                displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ 駐車券(P)は1必須</span>`;
-              } else if (!isP && flagIs1) {
-                cls.push("cell-warn");
-                displayVal += `<br><span style="color:#ea580c;font-size:10px">✗ Pでないのに1</span>`;
-              }
+              if (isP && flagIs1) displayVal = cellNote(cls, displayVal, "ok", "駐車券OK");
+              else if (isP && !flagIs1) displayVal = cellNote(cls, displayVal, "ng", "駐車券(P)は1必須");
+              else if (!isP && flagIs1) displayVal = cellNote(cls, displayVal, "warn", "Pでないのに1");
             }
-            // 半角カナ検査: 全角カタカナを含むセルを警告表示（半角ｶﾅ必須のテキスト列のみ対象）。
-            // 他の検査と揃え、列幅を広げず行高だけ伸ばすため値の下に改行して表示する。
+            // 半角カナ検査: 全角カタカナを含むセルを警告表示（半角ｶﾅ必須のテキスト列のみ対象）
             if (state.kanaCheck && kanaCheckCols.has(j) && cellVal && /[ァ-ヶー]/.test(cellVal)) {
-              cls.push("cell-warn");
-              displayVal += `<br><span style="color:#ea580c;font-size:10px">✗ 全角カナ</span>`;
+              displayVal = cellNote(cls, displayVal, "warn", "全角カナ");
             }
             // 区画席検査: 席種名に「（〇名）」がある行は E/P + BOXフラグ1 + 席数2以上 が必要。
             // Excel由来データは全角数字「（３名）」が混在しやすいため、検出前に全角数字を半角化する。
@@ -5254,48 +5259,41 @@
               const cnt = boxCntIdx !== -1 ? parseInt(_toHankakuNum((row[boxCntIdx] ?? "").trim())) : NaN;
               const cntOk = !isNaN(cnt) && cnt >= 2;
               if (isEP && flg && cntOk) {
-                displayVal += `<br><span style="color:#16a34a;font-size:10px">✓ 区画席OK</span>`;
+                displayVal = cellNote(cls, displayVal, "ok", "区画席OK");
               } else {
-                cls.push("cell-ng");
                 const ng = [];
                 if (!isEP) ng.push("6桁目E/O/P");
                 if (!flg) ng.push("BOXフラグ1");
                 if (!cntOk) ng.push("席数2以上");
-                displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ ${ng.join("・")}が必要</span>`;
+                displayVal = cellNote(cls, displayVal, "ng", `${ng.join("・")}が必要`);
               }
             }
-            // 席種一括設定チェック: 各列に NG/WARN を表示（列幅を広げず行高だけ伸ばすため、値の下に改行して表示する）
+            // 席種一括設定チェック: 各列に NG/WARN を表示
             if (ikRow) {
               const ik = ikRow;
               // マスタ未登録 (席種エリアコード列)
               if (j === ikkatsuCols.code && ik.code && !ik.master) {
-                cls.push("cell-ng");
-                displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ マスタ未登録</span>`;
+                displayVal = cellNote(cls, displayVal, "ng", "マスタ未登録");
               }
               // 席種名不一致 (席種エリア管理名列)
               if (j === ikkatsuCols.name && ik.master && ik.mName && ik.name && ik.mName !== ik.name) {
-                cls.push("cell-ng");
-                displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ マスタ「${escHtml(ik.mName)}」</span>`;
+                displayVal = cellNote(cls, displayVal, "ng", `マスタ「${escHtml(ik.mName)}」`);
               }
               // 指定席/自由席整合 (座席指定不可フラグ列)
               if (j === ikkatsuCols.design && ik.master && ik.design) {
                 if (ik.kbn === "1" && ik.design !== "指定可") {
-                  cls.push("cell-ng");
-                  displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ 指定席(区分1)→指定可</span>`;
+                  displayVal = cellNote(cls, displayVal, "ng", "指定席(区分1)→指定可");
                 } else if (ik.kbn === "2" && ik.design !== "指定不可") {
-                  cls.push("cell-ng");
-                  displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ 自由席(区分2)→指定不可</span>`;
+                  displayVal = cellNote(cls, displayVal, "ng", "自由席(区分2)→指定不可");
                 }
               }
               // 上限9+リセール可 (リセール可否列)
               if (j === ikkatsuCols.resale && ik.limit === "9" && ik.resale === "可能") {
-                cls.push("cell-ng");
-                displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ 上限9(非販売)なのにリセール可</span>`;
+                displayVal = cellNote(cls, displayVal, "ng", "上限9(非販売)なのにリセール可");
               }
               // リセール下限不正 (リセール用販売価格下限列)。券面価格固定の場合は手数料割れの懸念がないため対象外
               if (j === ikkatsuCols.resaleMin && ik.resale === "可能" && !ik.priceFixed.includes("固定") && ik.resaleMin !== String(PRICE_RULES.RESALE_MIN)) {
-                cls.push("cell-ng");
-                displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ リセール可→${PRICE_RULES.RESALE_MIN}必須</span>`;
+                displayVal = cellNote(cls, displayVal, "ng", `リセール可→${PRICE_RULES.RESALE_MIN}必須`);
               }
               // リセール上限不正 (リセール用販売価格上限列)。価格経路スケジュール連携時のみ：
               // リセール上限金額が価格マスタのチケットアカウント最高額と一致するか検算する
@@ -5304,36 +5302,31 @@
                 if (maxPrice > 0) {
                   const cur = ik.resaleMax || ik.resaleMin || "";
                   if (String(cur) !== String(maxPrice)) {
-                    cls.push("cell-ng");
-                    displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ 上限は最高額${maxPrice}と一致必須</span>`;
+                    displayVal = cellNote(cls, displayVal, "ng", `上限は最高額${maxPrice}と一致必須`);
                   }
                 }
               }
               // 上限9+SEJ支払可 (SEJ支払列)
               if (j === ikkatsuCols.sejPay && ik.limit === "9" && ik.sejPay === "支払可") {
-                cls.push("cell-warn");
-                displayVal += `<br><span style="color:#ea580c;font-size:10px">⚠ 上限9なのにSEJ支払可</span>`;
+                displayVal = cellNote(cls, displayVal, "warn", "上限9なのにSEJ支払可");
               }
               // 上限9+SEJ発券可 (SEJ発券列)
               if (j === ikkatsuCols.sejIssue && ik.limit === "9" && ik.sejIssue === "発券可") {
-                cls.push("cell-warn");
-                displayVal += `<br><span style="color:#ea580c;font-size:10px">⚠ 上限9なのにSEJ発券可</span>`;
+                displayVal = cellNote(cls, displayVal, "warn", "上限9なのにSEJ発券可");
               }
               // 他席から購入限定席種として指定されているのに単体販売可になっている (単体販売不可列)
               // ※自分自身が購入限定席種を持つ（他席を要求する）側は対象外。指定「される」側だけが不可必須。
               if (j === ikkatsuCols.solo && ik.isLimTarget && !ik.solo.includes("不可")) {
-                cls.push("cell-ng");
-                displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ 購入限定対象→単体販売不可必須</span>`;
+                displayVal = cellNote(cls, displayVal, "ng", "購入限定対象→単体販売不可必須");
               }
               // 購入限定P+他種混在なのに複数区分でない (購入限定区分列)
               if (j === ikkatsuCols.kubun && ik.limCodes.length > 0 && ik.hasP && ik.hasNonP && !ik.kubun.includes("複数")) {
-                cls.push("cell-ng");
-                displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ P+他種混在→複数購入可にすべき</span>`;
+                displayVal = cellNote(cls, displayVal, "ng", "P+他種混在→複数購入可にすべき");
               }
               // 複数日入場の開始日・終了日に曜日を併記（ゴースト）
               if ((j === ikkatsuCols.dateFrom || j === ikkatsuCols.dateTo) && cellVal.trim()) {
                 const wd = weekdayJa(cellVal);
-                if (wd) displayVal += `<br><span style="color:#6b7280;font-size:10px">(${wd})</span>`;
+                if (wd) displayVal = cellNote(cls, displayVal, "info", `(${wd})`);
               }
             }
             // SEJ備考差分: wordN列にマスタnteのN番目項目を併記し、差分を強調表示
@@ -6751,7 +6744,9 @@
 
       // 単一行のCSV/TSVをクオート対応で分割する（ペースト用）
       // セル内改行（quoted fields）を正しく扱う汎用パーサー
-      function parseDelimited(text, delim) {
+      // クォート("...")対応の区切り文字パース共通コア。クォート内の\rは\nに正規化し、
+      // クォート外の改行で行を区切る。parseData / parseDelimited の両方から使われる。
+      function parseQuotedRows(text, delim) {
         const rows = [];
         let row = [], cur = "", inQuote = false;
         for (let i = 0; i < text.length; i++) {
@@ -6771,6 +6766,11 @@
           }
         }
         if (cur || row.length) { row.push(cur); rows.push(row); }
+        return rows;
+      }
+
+      function parseDelimited(text, delim) {
+        const rows = parseQuotedRows(text, delim);
         while (rows.length > 0 && rows[rows.length - 1].every(c => c === "")) rows.pop();
         return rows;
       }
@@ -9333,7 +9333,7 @@
               <div style="display:flex;align-items:center;gap:6px">
                 <input type="date" id="px-cutoff-date" value="${candidateDate}" style="font-size:13px;padding:4px 6px">
                 <input type="time" id="px-cutoff-time" value="${candidateTime}" style="font-size:13px;padding:4px 6px">
-                <span id="px-cutoff-weekday" style="font-weight:600;color:#1b6ec2">${weekdayLabel(candidateDate)}</span>
+                <span id="px-cutoff-weekday" style="font-weight:600;color:#217346">${weekdayLabel(candidateDate)}</span>
               </div>
             </div>
             <div style="display:flex;justify-content:flex-end;gap:8px">
