@@ -106,6 +106,7 @@
         --rb-text: #171717;
         --rb-dim: #737373;
         --rb-accent: #217346;
+        --rb-accent-hover: #1a5c38;
       }
       .rb-ribbon {
         background: var(--rb-bg-base);
@@ -137,6 +138,19 @@
         font-family: var(--font-ui);
       }
       .rb-tab:hover { background: var(--rb-bg-hover); }
+      /* Excelの「ファイル」タブに相当。バックステージ領域への入口として単色の塗りで視覚的に分離する */
+      .rb-tab[data-tab="file"] {
+        background: var(--rb-accent);
+        color: #fff;
+        font-weight: 600;
+      }
+      .rb-tab[data-tab="file"]:hover {
+        background: var(--rb-accent-hover);
+      }
+      .rb-tab[data-tab="file"].rb-tab-active {
+        background: var(--rb-accent-hover);
+        border-bottom-color: #fff;
+      }
       .rb-tab.rb-tab-active {
         border-bottom-color: var(--rb-accent);
         background: var(--rb-bg-hover);
@@ -528,6 +542,12 @@
         overflow: auto;
         position: relative;
         display: none;
+        /* データ末尾より右・下の余白にもExcelの方眼紙のような薄いグリッド線を敷く。
+           実データのセルはtable自体の罫線が不透明に覆うため、この背景は「何もない場所」にのみ見える */
+        background-color: #fff;
+        background-image:
+          repeating-linear-gradient(to right, var(--cell-border) 0 1px, transparent 1px 100px),
+          repeating-linear-gradient(to bottom, var(--cell-border) 0 1px, transparent 1px 22px);
       }
       table {
         border-collapse: collapse;
@@ -563,9 +583,9 @@
       }
       th.col-active {
         /* theadはsticky固定のため背景は不透明を維持（透明だとスクロール時に下の行が透けて見える） */
-        background: linear-gradient(rgba(19, 100, 215, 0.12), rgba(19, 100, 215, 0.12)), var(--header-bg);
-        color: #1b6ec2;
-        border-bottom-color: #1b6ec2;
+        background: linear-gradient(rgba(33, 115, 70, 0.12), rgba(33, 115, 70, 0.12)), var(--header-bg);
+        color: #217346;
+        border-bottom-color: #217346;
       }
       th.col-sorted {
         color: var(--accent);
@@ -686,26 +706,26 @@
       }
       .row-num.row-selected {
         /* 固定列のため背景は不透明を維持（透明だとスクロール時に下のセルが透けて見える） */
-        background: linear-gradient(rgba(19, 100, 215, 0.14), rgba(19, 100, 215, 0.14)), var(--header-bg);
-        color: #1b6ec2;
+        background: linear-gradient(rgba(33, 115, 70, 0.14), rgba(33, 115, 70, 0.14)), var(--header-bg);
+        color: #217346;
         font-weight: 700;
-        border-right-color: #1b6ec2;
+        border-right-color: #217346;
       }
 
-      /* ===ハイライト（Excel互換・青系）=== */
+      /* ===ハイライト（Excel互換・グリーン系）=== */
       /* background を !important で塗ると、カラー表示(disp_color_cd)やマーカー等のインライン背景色が
          選択時に完全に消えてしまうため、box-shadowの内側塗りで「重ねる」形にして元の色を透過させる */
       td.selected {
-        box-shadow: inset 0 0 0 1000px rgba(19, 100, 215, 0.16);
-        outline: 2px solid #1b6ec2;
+        box-shadow: inset 0 0 0 1000px rgba(33, 115, 70, 0.16);
+        outline: 2px solid #217346;
         outline-offset: -1px;
         z-index: 2;
       }
       td.in-range {
-        box-shadow: inset 0 0 0 1000px rgba(19, 100, 215, 0.07);
+        box-shadow: inset 0 0 0 1000px rgba(33, 115, 70, 0.07);
       }
       td.col-highlight {
-        background: rgba(19, 100, 215, 0.03);
+        background: rgba(33, 115, 70, 0.03);
       }
       /* 十字ハイライト（選択セルの行・列）。
          背景 + box-shadow の罫線のみで描画 → レイアウトに一切影響しない＝列ぶれゼロ。
@@ -729,7 +749,7 @@
           inset 0 -2px 0 0 rgba(33, 115, 70, 0.6);
       }
       tr.cross-row .row-num.row-selected {
-        background: linear-gradient(rgba(33, 115, 70, 0.12), rgba(33, 115, 70, 0.12)), linear-gradient(rgba(19, 100, 215, 0.14), rgba(19, 100, 215, 0.14)), var(--header-bg);
+        background: linear-gradient(rgba(33, 115, 70, 0.12), rgba(33, 115, 70, 0.12)), linear-gradient(rgba(33, 115, 70, 0.14), rgba(33, 115, 70, 0.14)), var(--header-bg);
         box-shadow: inset 0 2px 0 0 rgba(33, 115, 70, 0.6),
           inset 0 -2px 0 0 rgba(33, 115, 70, 0.6);
       }
@@ -741,18 +761,18 @@
         color: #000;
         font-weight: bold;
       }
-      /* 選択セルと検索ヒットが重なる場合: 背景は検索色のまま、青枠線を明示 */
+      /* 選択セルと検索ヒットが重なる場合: 背景は検索色のまま、緑枠線を明示 */
       td.selected.search-hit {
         position: relative;
         background: var(--hit) !important;
-        outline: 2px solid #1b6ec2;
+        outline: 2px solid #217346;
         outline-offset: -1px;
         z-index: 3;
       }
       td.selected.search-hit.current {
         position: relative;
         background: var(--hit-current) !important;
-        outline: 2px solid #1b6ec2;
+        outline: 2px solid #217346;
         outline-offset: -1px;
         z-index: 3;
       }
@@ -842,7 +862,7 @@
       }
       #fbar-val:focus {
         background: #fff;
-        box-shadow: inset 0 0 0 1px #1b6ec2;
+        box-shadow: inset 0 0 0 1px #217346;
       }
 
       /* ===ステータスバー=== */
@@ -1400,7 +1420,7 @@
         text-align: center;
         opacity: 0.7;
       }
-      th.col-active .th-col-letter { color: #1b6ec2; opacity: 1; font-weight: 700; }
+      th.col-active .th-col-letter { color: #217346; opacity: 1; font-weight: 700; }
 
       /* ===縦書きヘッダー（列幅節約）=== */
       body.vertical-headers thead tr:first-child th { height: var(--vheader-h, 230px); vertical-align: bottom; }
@@ -1817,7 +1837,7 @@
               <button class="rb-caret" id="caret-sej-check" type="button" title="個別に機能を選んでON/OFF" aria-label="SEJチェックの詳細設定を開く" aria-expanded="false">▾</button>
               <div class="rb-dropdown" id="dd-sej-check">
                 <label><input type="checkbox" data-flag="kanaCheck"> カナ検査</label>
-                <label><input type="checkbox" data-flag="bikoHtmlCheck"> 備考HTML変換</label>
+                <label><input type="checkbox" data-flag="sejBikoCheck"> 備考HTML変換(SEJ)</label>
               </div>
             </div>
             <button class="rb-btn" id="btn-ikkatsu-check" title="席種一括設定TSV(23列)の設定整合チェックを表にインライン表示（切り替え）&#10;NG（赤）: マスタ未登録・席種名不一致・指定席整合・上限9+リセール可・リセール下限1321・購入限定あり+単体不可・P+他種混在&#10;注意（橙）: 上限9+SEJ可&#10;席種エリアマスタを連携すると席種名/指定席チェックも有効になります" aria-label="席種一括設定チェックの切り替え" aria-pressed="false">
@@ -1886,6 +1906,10 @@
             <button class="rb-btn" id="btn-cross-hi" title="選択中のセルの行と列を太い罫線＋淡い背景で強調します（十字ハイライト）&#10;列ぶれしない方式（罫線は box-shadow 描画でレイアウト非干渉）&#10;設定はブラウザに保存されます（エディタ画面のみ。価格チェック表のHTML出力には含まれません）" aria-label="十字ハイライトの切り替え" aria-pressed="true">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="1"></rect><rect x="3" y="9" width="18" height="6" fill="currentColor" opacity="0.15"></rect><rect x="9" y="3" width="6" height="18" fill="currentColor" opacity="0.15"></rect></svg></span>
               <span>十字強調</span>
+            </button>
+            <button class="rb-btn" id="btn-space-check" title="セル値の前後に余分な空白（半角/全角スペース、タブ）がある場合に警告表示します&#10;マスタ連携不要・全列が対象です（切り替え）" aria-label="前後空白検査の切り替え" aria-pressed="false">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 8v8M20 8v8M4 12h4M16 12h4" stroke-dasharray="2 2"></path><rect x="8" y="9" width="8" height="6" rx="1"></rect></svg></span>
+              <span>前後空白</span>
             </button>
           </div>
           <span class="rb-group-label">補助</span>
@@ -2243,6 +2267,18 @@
     </div>
 
     <script>
+      // ===== 目次（このファイル内を `// ===== 名前 =====` で検索すると各セクション先頭へジャンプできる）=====
+      //   状態 / DOM / UG差額の自動検算 / セーフアクセス / 未保存管理 / タブ管理 / 初期化 / ファイル
+      //   ヘッダー自動変換 / リロード警告ダイアログ / ソート / フィルター / フィルタードロップダウン
+      //   描画 / theadイベント委譲 / マウス / ドラッグ中の自動スクロール / 編集 / 辞書エディター
+      //   キーボード / クリップボード（セル） / 行コピー&ペースト / 置換 / 右クリックメニュー
+      //   ユーティリティ / リサイズ / 非表示 / 空行の一括削除 / セルの前後空白トリム / 行の上下移動
+      //   行の複製 / 全列の自動幅調整 / 行の高さ変更 / SEJ連携 / SEJ HTML出力
+      //   経路価格スケジュール→チェック用HTML出力 / 席種一括設定チェック / セル折り返し
+      //   表示リセット / カラーコードプレビュー
+      //
+      // 新しい「セル単位の検査」を追加する場合は、renderBody() 内の cellNote() 呼び出し群
+      // （検索: "cellNote(cls,"）に条件分岐を1つ足すだけでよい（バッジHTMLやcls付与を個別に書く必要はない）。
       // ===== 状態 =====
       const state = {
         data: [[""]],
@@ -2300,6 +2336,8 @@
         boxCheck: false,     // 区画席（（〇名）席種）の設定検査
         ikkatsuCheck: false, // 席種一括設定チェック（23列）のインライン検品
         bikoHtmlCheck: false, // 備考(nte)列のHTMLを表上で実際のHTML表示として再現（席種エリアマスタのみ）
+        sejBikoCheck: false, // SEJのwordNセルをマスタ備考のHTML表示に切替（SEJデータ＋マスタ連携時のみ。備考差分表示と競合しないよう bikoHtmlCheck から分離）
+        spaceCheck: false,   // セル値の前後空白検査（マスタ非依存・全列対象）
         verticalHeader: true, // ヘッダー縦書き表示（既定でON・列幅節約）
         vHeaderHeight: 230, // 縦書きヘッダーの行高さ(px・手動調整可能)
         originalRowCount: 0, // ファイルを開いた直後の行数（保存時の予期せぬ増減チェック用）
@@ -2376,10 +2414,11 @@
       const INSPECT_FLAG_LABELS = {
         colorView: "カラー表示", gateView: "ゲート表示", parkingCheck: "駐車券検査",
         boxCheck: "区画席検査", kanaCheck: "カナ検査", bikoHtmlCheck: "備考HTML変換",
+        sejBikoCheck: "備考HTML変換(SEJ)",
       };
       const INSPECT_GROUPS = {
         "btn-seatmaster-check": ["colorView", "gateView", "parkingCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck"],
-        "btn-sej-check": ["kanaCheck", "bikoHtmlCheck"],
+        "btn-sej-check": ["kanaCheck", "sejBikoCheck"],
       };
       // カナ検査の対象列（半角カナ必須の略称/備考系のみ。席種名・試合名等のフルネーム列は全角カナが正しいため対象外）。
       // 前提条件チェックと描画ロジックで共用する。
@@ -2417,16 +2456,19 @@
           }
         }
         if (key === "bikoHtmlCheck") {
-          const hasNte = _hasHeader("nte");
-          const isSej = isSejData();
-          if (!hasNte && !isSej) return "備考列(nte)がありません";
-          if (isSej && !state.sejMaster) return "SEJマスタが未連携です";
+          // 席種エリアマスタ等の自データnte列をHTML表示する機能。SEJのwordNセルは sejBikoCheck が担当
+          if (!_hasHeader("nte")) return "備考列(nte)がありません";
+        }
+        if (key === "sejBikoCheck") {
+          if (!isSejData()) return "SEJデータではありません";
+          if (!state.sejMaster) return "SEJマスタが未連携です";
         }
         return null;
       }
       // 複数の検品トグルをまとめて1ボタンで切り替える（席種エリアマスタチェック/SEJチェック用）。
       // 現在すべてONなら一括OFF、そうでなければ一括ON（前提条件を満たさない項目は自動スキップ）。
-      // kanaCheck/bikoHtmlCheckは2つのグループボタンから共有される（重複あり・どちらからでも同じ状態を操作する）
+      // kanaCheckのみ2つのグループボタンから共有される（同一機能のため）。備考HTMLは
+      // マスタ用(bikoHtmlCheck)とSEJ用(sejBikoCheck)で別フラグ（SEJ備考差分表示との競合防止）
       function toggleInspectGroup(keys, btnId, label) {
         const allOn = keys.every((k) => state[k]);
         const turnOn = !allOn;
@@ -2437,10 +2479,10 @@
           const reason = _inspectFlagPrecondition(k);
           if (reason) { skipped.push(`${INSPECT_FLAG_LABELS[k] || k}（${reason}）`); continue; }
           state[k] = true;
-          if (k !== "colorView" && k !== "bikoHtmlCheck") needAutoFit = true;
+          if (k !== "colorView" && k !== "bikoHtmlCheck" && k !== "sejBikoCheck") needAutoFit = true;
         }
         // 備考HTML変換ON時は読みやすさのため折り返し表示も自動で有効化する（既存仕様を維持）
-        if (state.bikoHtmlCheck && !state.wrapCells) {
+        if ((state.bikoHtmlCheck || state.sejBikoCheck) && !state.wrapCells) {
           state.wrapCells = true;
           state.wrapRows.clear();
           document.body.classList.add("wrap-cells");
@@ -2457,7 +2499,7 @@
         if (skipped.length) msg += `（スキップ: ${skipped.join("・")}）`;
         setStatus(msg);
       }
-      // 個別項目を1つだけON/OFFする（統合ボタンのドロップダウン用）。kanaCheck/bikoHtmlCheckは
+      // 個別項目を1つだけON/OFFする（統合ボタンのドロップダウン用）。kanaCheckは
       // 2つのグループで共有されるため、変更後は両方のドロップダウン・ボタン表示を同期する
       function setInspectFlag(key, on) {
         if (on) {
@@ -2469,8 +2511,8 @@
           }
         }
         state[key] = on;
-        if (on && key !== "colorView" && key !== "bikoHtmlCheck") { autoFitAllColumnsQuiet(); renderHeader(); }
-        if (on && key === "bikoHtmlCheck" && !state.wrapCells) {
+        if (on && key !== "colorView" && key !== "bikoHtmlCheck" && key !== "sejBikoCheck") { autoFitAllColumnsQuiet(); renderHeader(); }
+        if (on && (key === "bikoHtmlCheck" || key === "sejBikoCheck") && !state.wrapCells) {
           state.wrapCells = true;
           state.wrapRows.clear();
           document.body.classList.add("wrap-cells");
@@ -2528,21 +2570,17 @@
       }
 
       // SEJ備考の分割（<br>・改行区切り、タグ除去）— グリッド表示とHTML出力で共用
-      function sejSplitNte(s) {
+      // SEJ備考の分割（<br>・改行区切り）。keepTags=false（既定）はタグ除去済みの平文項目を返し、
+      // keepTags=true は備考HTML変換でのHTML再現用にタグを保持したまま返す。
+      function sejSplitNte(s, keepTags = false) {
         if (!s) return [];
         return s
           .split(/<br\s*\/?>|\r?\n/i)
-          .map(x => x.replace(/<[^>]+>/g, "").replace(/&nbsp;/gi, " ").trim())
+          .map(x => keepTags ? x.trim() : x.replace(/<[^>]+>/g, "").replace(/&nbsp;/gi, " ").trim())
           .filter(x => x);
       }
-
-      // SEJ備考の分割（<br>・改行区切り、タグは保持）— 備考HTML変換でのHTML再現用
       function sejSplitNteHtml(s) {
-        if (!s) return [];
-        return s
-          .split(/<br\s*\/?>|\r?\n/i)
-          .map(x => x.trim())
-          .filter(x => x);
+        return sejSplitNte(s, true);
       }
 
       // "YYYY/MM/DD"等の日付文字列から日本語の曜日（1文字）を返す。解釈できない場合は空文字
@@ -3262,6 +3300,8 @@
         state.newlineMixed = t.newlineMixed || false;
         state.markedCells = t.markedCells ? new Set(t.markedCells) : new Set();
         applyHeaderMapping();
+        // マスタ連携済みなら、仮想列が無いタブにもグループ名を追加する
+        applySejGroupVirtualCol();
         if (state.dirty) {
           els.dirty.classList.add("show");
           document.title = "● TSV/CSV Editor";
@@ -3533,7 +3573,7 @@
           toggleInspectGroup(["colorView", "gateView", "parkingCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck"], "btn-seatmaster-check", "席種エリアマスタチェック");
         };
         $("btn-sej-check").onclick = () => {
-          toggleInspectGroup(["kanaCheck", "bikoHtmlCheck"], "btn-sej-check", "SEJチェック");
+          toggleInspectGroup(["kanaCheck", "sejBikoCheck"], "btn-sej-check", "SEJチェック");
         };
         // 統合ボタンの▾: 個別ON/OFFドロップダウンを開閉する（フロント側のメインボタンの見た目・動作は変えない）
         document.querySelectorAll(".rb-caret").forEach((caret) => {
@@ -3567,6 +3607,8 @@
           }
           toggleInspect("ikkatsuCheck", "btn-ikkatsu-check", "席種一括設定チェック", true);
         };
+        // 前後空白検査（マスタ非依存・全列対象）
+        $("btn-space-check").onclick = () => toggleInspect("spaceCheck", "btn-space-check", "前後空白検査", false);
         // 辞書・ヘッダーメモ編集
         $("btn-dict-edit").onclick = openDictEditor;
         // 行の高さ（初期値はROW_Hに合わせてCSS変数を設定）
@@ -3818,6 +3860,8 @@
           state.originalRowCount = state.data.length; // 開いた直後の行数（保存時の予期せぬ増減チェック用）
           clearAutoDropColumns();
           applyHeaderMapping();
+          // マスタ連携済みなら、開いたファイルにもグループ名仮想列を追加する
+          applySejGroupVirtualCol();
           // 前タブの表示状態が新ファイルに引き継がれないようリセット
           state.cellColors = {};
           state.hiddenRows = new Set();
@@ -3929,38 +3973,7 @@
           state.encoding = "utf8";
         }
         detectNewline(text);
-        const rows = [];
-        let row = [],
-          cur = "",
-          inQuote = false;
-        for (let i = 0; i < text.length; i++) {
-          const c = text[i],
-            next = text[i + 1];
-          if (inQuote) {
-            if (c === '"' && next === '"') {
-              cur += '"';
-              i++;
-            } else if (c === '"') inQuote = false;
-            else if (c === '\r') { cur += '\n'; if (next === '\n') i++; }
-            else cur += c;
-          } else {
-            if (c === '"') inQuote = true;
-            else if (c === state.delimiter) {
-              row.push(cur);
-              cur = "";
-            } else if (c === "\r" || c === "\n") {
-              if (c === "\r" && next === "\n") i++;
-              row.push(cur);
-              rows.push(row);
-              row = [];
-              cur = "";
-            } else cur += c;
-          }
-        }
-        if (cur || row.length) {
-          row.push(cur);
-          rows.push(row);
-        }
+        const rows = parseQuotedRows(text, state.delimiter);
         if (!rows.length) {
           state.headers = ["A"];
           state.data = [[""]];
@@ -4958,6 +4971,23 @@
         return cols;
       }
 
+      // セル単位の検査結果を displayVal へバッジHTMLとして追記する共通ヘルパー。
+      // severity: "ok"（緑✓）/ "ng"（赤✗、cls に cell-ng を付与）/ "warn"（橙⚠、cls に cell-warn を付与）/ "info"（グレー、フラグなし）
+      // 新しいセル検査を追加する場合、条件分岐の中でこの関数を呼ぶだけでよい（cls.push とバッジHTMLを個別に書く必要がない）。
+      const CELL_NOTE_STYLE = {
+        ok: { color: "#16a34a", icon: "✓" },
+        ng: { color: "#dc2626", icon: "✗" },
+        warn: { color: "#ea580c", icon: "⚠" },
+        info: { color: "#6b7280", icon: "" },
+      };
+      function cellNote(cls, displayVal, severity, message) {
+        const s = CELL_NOTE_STYLE[severity] || CELL_NOTE_STYLE.info;
+        if (severity === "ng") cls.push("cell-ng");
+        else if (severity === "warn") cls.push("cell-warn");
+        const icon = s.icon ? `${s.icon} ` : "";
+        return displayVal + `<br><span style="color:${s.color};font-size:10px">${icon}${message}</span>`;
+      }
+
       function renderBody() {
         const rows = getVisibleRows();
         const scrollTop = els.container.scrollTop;
@@ -5222,27 +5252,29 @@
                 displayVal += `<br><span style="color:#dc2626;font-size:11px">▸ 対応表になし</span>`;
               }
             }
+            // 前後空白検査: セル値の先頭/末尾に空白（半角/全角スペース・タブ等）がある場合に警告表示。
+            // マスタ連携不要・全列が対象（trim()はUnicode空白全般・タブ・改行を除去するため全角スペースも検出できる）。
+            if (state.spaceCheck && cellVal) {
+              const trimmed = cellVal.trim();
+              if (trimmed !== cellVal) {
+                const parts = [];
+                if (cellVal.length !== cellVal.trimStart().length) parts.push("先頭");
+                if (cellVal.length !== cellVal.trimEnd().length) parts.push("末尾");
+                displayVal = cellNote(cls, displayVal, "warn", `${parts.join("・")}に空白`);
+              }
+            }
             // 駐車券フラグ検査: コード6桁目P ⇔ フラグ1（OK/NGどちらも表示）
-            // 列幅を広げず行高だけ伸ばすため、値の横ではなく下に改行して表示する
             if (j === parkFlagIdx && parkCodeIdx !== -1) {
               const code = (row[parkCodeIdx] ?? "").trim();
               const isP = code.length >= 6 && code[5].toUpperCase() === "P";
               const flagIs1 = cellVal.trim() === "1";
-              if (isP && flagIs1) {
-                displayVal += `<br><span style="color:#16a34a;font-size:10px">✓ 駐車券OK</span>`;
-              } else if (isP && !flagIs1) {
-                cls.push("cell-ng");
-                displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ 駐車券(P)は1必須</span>`;
-              } else if (!isP && flagIs1) {
-                cls.push("cell-warn");
-                displayVal += `<br><span style="color:#ea580c;font-size:10px">✗ Pでないのに1</span>`;
-              }
+              if (isP && flagIs1) displayVal = cellNote(cls, displayVal, "ok", "駐車券OK");
+              else if (isP && !flagIs1) displayVal = cellNote(cls, displayVal, "ng", "駐車券(P)は1必須");
+              else if (!isP && flagIs1) displayVal = cellNote(cls, displayVal, "warn", "Pでないのに1");
             }
-            // 半角カナ検査: 全角カタカナを含むセルを警告表示（半角ｶﾅ必須のテキスト列のみ対象）。
-            // 他の検査と揃え、列幅を広げず行高だけ伸ばすため値の下に改行して表示する。
+            // 半角カナ検査: 全角カタカナを含むセルを警告表示（半角ｶﾅ必須のテキスト列のみ対象）
             if (state.kanaCheck && kanaCheckCols.has(j) && cellVal && /[ァ-ヶー]/.test(cellVal)) {
-              cls.push("cell-warn");
-              displayVal += `<br><span style="color:#ea580c;font-size:10px">✗ 全角カナ</span>`;
+              displayVal = cellNote(cls, displayVal, "warn", "全角カナ");
             }
             // 区画席検査: 席種名に「（〇名）」がある行は E/P + BOXフラグ1 + 席数2以上 が必要。
             // Excel由来データは全角数字「（３名）」が混在しやすいため、検出前に全角数字を半角化する。
@@ -5254,48 +5286,41 @@
               const cnt = boxCntIdx !== -1 ? parseInt(_toHankakuNum((row[boxCntIdx] ?? "").trim())) : NaN;
               const cntOk = !isNaN(cnt) && cnt >= 2;
               if (isEP && flg && cntOk) {
-                displayVal += `<br><span style="color:#16a34a;font-size:10px">✓ 区画席OK</span>`;
+                displayVal = cellNote(cls, displayVal, "ok", "区画席OK");
               } else {
-                cls.push("cell-ng");
                 const ng = [];
                 if (!isEP) ng.push("6桁目E/O/P");
                 if (!flg) ng.push("BOXフラグ1");
                 if (!cntOk) ng.push("席数2以上");
-                displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ ${ng.join("・")}が必要</span>`;
+                displayVal = cellNote(cls, displayVal, "ng", `${ng.join("・")}が必要`);
               }
             }
-            // 席種一括設定チェック: 各列に NG/WARN を表示（列幅を広げず行高だけ伸ばすため、値の下に改行して表示する）
+            // 席種一括設定チェック: 各列に NG/WARN を表示
             if (ikRow) {
               const ik = ikRow;
               // マスタ未登録 (席種エリアコード列)
               if (j === ikkatsuCols.code && ik.code && !ik.master) {
-                cls.push("cell-ng");
-                displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ マスタ未登録</span>`;
+                displayVal = cellNote(cls, displayVal, "ng", "マスタ未登録");
               }
               // 席種名不一致 (席種エリア管理名列)
               if (j === ikkatsuCols.name && ik.master && ik.mName && ik.name && ik.mName !== ik.name) {
-                cls.push("cell-ng");
-                displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ マスタ「${escHtml(ik.mName)}」</span>`;
+                displayVal = cellNote(cls, displayVal, "ng", `マスタ「${escHtml(ik.mName)}」`);
               }
               // 指定席/自由席整合 (座席指定不可フラグ列)
               if (j === ikkatsuCols.design && ik.master && ik.design) {
                 if (ik.kbn === "1" && ik.design !== "指定可") {
-                  cls.push("cell-ng");
-                  displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ 指定席(区分1)→指定可</span>`;
+                  displayVal = cellNote(cls, displayVal, "ng", "指定席(区分1)→指定可");
                 } else if (ik.kbn === "2" && ik.design !== "指定不可") {
-                  cls.push("cell-ng");
-                  displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ 自由席(区分2)→指定不可</span>`;
+                  displayVal = cellNote(cls, displayVal, "ng", "自由席(区分2)→指定不可");
                 }
               }
               // 上限9+リセール可 (リセール可否列)
               if (j === ikkatsuCols.resale && ik.limit === "9" && ik.resale === "可能") {
-                cls.push("cell-ng");
-                displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ 上限9(非販売)なのにリセール可</span>`;
+                displayVal = cellNote(cls, displayVal, "ng", "上限9(非販売)なのにリセール可");
               }
               // リセール下限不正 (リセール用販売価格下限列)。券面価格固定の場合は手数料割れの懸念がないため対象外
               if (j === ikkatsuCols.resaleMin && ik.resale === "可能" && !ik.priceFixed.includes("固定") && ik.resaleMin !== String(PRICE_RULES.RESALE_MIN)) {
-                cls.push("cell-ng");
-                displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ リセール可→${PRICE_RULES.RESALE_MIN}必須</span>`;
+                displayVal = cellNote(cls, displayVal, "ng", `リセール可→${PRICE_RULES.RESALE_MIN}必須`);
               }
               // リセール上限不正 (リセール用販売価格上限列)。価格経路スケジュール連携時のみ：
               // リセール上限金額が価格マスタのチケットアカウント最高額と一致するか検算する
@@ -5304,36 +5329,31 @@
                 if (maxPrice > 0) {
                   const cur = ik.resaleMax || ik.resaleMin || "";
                   if (String(cur) !== String(maxPrice)) {
-                    cls.push("cell-ng");
-                    displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ 上限は最高額${maxPrice}と一致必須</span>`;
+                    displayVal = cellNote(cls, displayVal, "ng", `上限は最高額${maxPrice}と一致必須`);
                   }
                 }
               }
               // 上限9+SEJ支払可 (SEJ支払列)
               if (j === ikkatsuCols.sejPay && ik.limit === "9" && ik.sejPay === "支払可") {
-                cls.push("cell-warn");
-                displayVal += `<br><span style="color:#ea580c;font-size:10px">⚠ 上限9なのにSEJ支払可</span>`;
+                displayVal = cellNote(cls, displayVal, "warn", "上限9なのにSEJ支払可");
               }
               // 上限9+SEJ発券可 (SEJ発券列)
               if (j === ikkatsuCols.sejIssue && ik.limit === "9" && ik.sejIssue === "発券可") {
-                cls.push("cell-warn");
-                displayVal += `<br><span style="color:#ea580c;font-size:10px">⚠ 上限9なのにSEJ発券可</span>`;
+                displayVal = cellNote(cls, displayVal, "warn", "上限9なのにSEJ発券可");
               }
               // 他席から購入限定席種として指定されているのに単体販売可になっている (単体販売不可列)
               // ※自分自身が購入限定席種を持つ（他席を要求する）側は対象外。指定「される」側だけが不可必須。
               if (j === ikkatsuCols.solo && ik.isLimTarget && !ik.solo.includes("不可")) {
-                cls.push("cell-ng");
-                displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ 購入限定対象→単体販売不可必須</span>`;
+                displayVal = cellNote(cls, displayVal, "ng", "購入限定対象→単体販売不可必須");
               }
               // 購入限定P+他種混在なのに複数区分でない (購入限定区分列)
               if (j === ikkatsuCols.kubun && ik.limCodes.length > 0 && ik.hasP && ik.hasNonP && !ik.kubun.includes("複数")) {
-                cls.push("cell-ng");
-                displayVal += `<br><span style="color:#dc2626;font-size:10px">✗ P+他種混在→複数購入可にすべき</span>`;
+                displayVal = cellNote(cls, displayVal, "ng", "P+他種混在→複数購入可にすべき");
               }
               // 複数日入場の開始日・終了日に曜日を併記（ゴースト）
               if ((j === ikkatsuCols.dateFrom || j === ikkatsuCols.dateTo) && cellVal.trim()) {
                 const wd = weekdayJa(cellVal);
-                if (wd) displayVal += `<br><span style="color:#6b7280;font-size:10px">(${wd})</span>`;
+                if (wd) displayVal = cellNote(cls, displayVal, "info", `(${wd})`);
               }
             }
             // SEJ備考差分: wordN列にマスタnteのN番目項目を併記し、差分を強調表示
@@ -5344,8 +5364,8 @@
                 const parts = sejSplitNte(m.nte || "");
                 const masterVal = parts[nteWordCols[j] - 1] || "";
                 const cur = cellVal.trim();
-                if (state.bikoHtmlCheck) {
-                  // 備考HTML変換: 表示のみマスタ備考のN番目項目をHTML表記に切り替える（元データは書き換えない）
+                if (state.sejBikoCheck) {
+                  // 備考HTML変換(SEJ): 表示のみマスタ備考のN番目項目をHTML表記に切り替える（元データは書き換えない）
                   const htmlParts = sejSplitNteHtml(m.nte || "");
                   const masterHtml = htmlParts[nteWordCols[j] - 1] || "";
                   displayVal = masterHtml
@@ -6751,7 +6771,9 @@
 
       // 単一行のCSV/TSVをクオート対応で分割する（ペースト用）
       // セル内改行（quoted fields）を正しく扱う汎用パーサー
-      function parseDelimited(text, delim) {
+      // クォート("...")対応の区切り文字パース共通コア。クォート内の\rは\nに正規化し、
+      // クォート外の改行で行を区切る。parseData / parseDelimited の両方から使われる。
+      function parseQuotedRows(text, delim) {
         const rows = [];
         let row = [], cur = "", inQuote = false;
         for (let i = 0; i < text.length; i++) {
@@ -6771,6 +6793,11 @@
           }
         }
         if (cur || row.length) { row.push(cur); rows.push(row); }
+        return rows;
+      }
+
+      function parseDelimited(text, delim) {
+        const rows = parseQuotedRows(text, delim);
         while (rows.length > 0 && rows[rows.length - 1].every(c => c === "")) rows.pop();
         return rows;
       }
@@ -7691,7 +7718,7 @@
         if (_bm) { _bm.classList.remove("active-state"); _bm.setAttribute("aria-pressed","false"); }
         document.body.classList.remove("marker-mode");
         // 検品表示トグルは現在のデータの列構成に紐づくため、別ファイル/タブへ持ち越さずリセットする
-        ["colorView", "gateView", "parkingCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck", "ikkatsuCheck"].forEach((k) => { state[k] = false; });
+        ["colorView", "gateView", "parkingCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck", "sejBikoCheck", "ikkatsuCheck"].forEach((k) => { state[k] = false; });
         const _bik = $("btn-ikkatsu-check");
         if (_bik) { _bik.classList.remove("active-state"); _bik.setAttribute("aria-pressed", "false"); }
         syncInspectUI();
@@ -8744,6 +8771,43 @@
         input.click();
       }
 
+      // 仮想列「グループ名」を現在のタブへ追加（保存時除外・フィルター/ソート可能）。
+      // マスタ連携時だけでなく、連携済みの状態で新しいファイルを開いた時・タブを切り替えた時にも
+      // 呼ばれる（以前は連携した瞬間のタブにしか追加されず、その後開いたファイルでグループ名が
+      // 出ない＝チームで参照できない問題があった）。
+      function applySejGroupVirtualCol() {
+        const m = state.sejMaster;
+        if (!m || !m.grpKey) return;
+        // 復元されたメタが実データと食い違っている場合は作り直す。
+        // （タブ切替時のメモリ解放→rawText再パースで仮想列だけが消え、メタが残ると
+        //   グループ名列が二度と復元されない＝チームで参照できない問題の自己修復）
+        if (state.sejVirtualCols) {
+          const ok = state.sejVirtualCols.indices.every(i => state.headers[i] === "グループ名");
+          if (ok) return;
+          state.sejVirtualCols = null;
+        }
+        const curCodeIdx = state.headers.findIndex(h => String(h).trim() === "seat_type_area_cd");
+        if (curCodeIdx === -1) return;
+        // 席種エリアマスタ自身などグループ名の実列を持つデータには追加しない（重複防止）
+        const norm = state.headers.map(h => String(h ?? "").replace(/^﻿/, "").trim());
+        if (norm.includes("グループ名") || norm.includes(m.grpKey)) return;
+        const byCode = m.byCode;
+        const vIdx = state.headers.length;
+        state.headers.push("グループ名");
+        let maxLen = 8;
+        state.data.forEach(row => {
+          const cd = (row[curCodeIdx] ?? "").trim();
+          const rec = byCode[cd];
+          const v = rec && rec[m.grpKey] ? rec[m.grpKey] : "";
+          row.push(v);
+          if (String(v).length > maxLen) maxLen = String(v).length;
+        });
+        state.sejVirtualCols = { indices: [vIdx], keys: [m.grpKey] };
+        if (state.displayHeaders) state.displayHeaders.push("グループ名");
+        state.colWidths[vIdx] = Math.min(maxLen * 12 + 24, 260);
+        console.log("[SEJ] グループ名仮想列を追加 index=" + vIdx);
+      }
+
       function loadSejMasterFile(file, _encoding, onDone) {
         const reader = new FileReader();
         reader.onload = () => {
@@ -8809,29 +8873,10 @@
             }
             state.sejMaster.byGroup = byGroup;
             state.sejMaster.grpKey = grpKey;
-            console.log("[SEJ] 仮想列追加チェック:", {
-              curCodeIdx,
-              masterHeaders: normHeaders,
-              grpKey,
-              hasExistingVirtual: !!state.sejVirtualCols,
-              dataRows: state.data.length,
-            });
-            if (curCodeIdx !== -1 && grpKey && !state.sejVirtualCols) {
-              const vIdx = state.headers.length;
-              state.headers.push("グループ名");
-              state.data.forEach(row => {
-                const cd = (row[curCodeIdx] ?? "").trim();
-                const m = byCode[cd];
-                row.push(m && m[grpKey] ? m[grpKey] : "");
-              });
-              state.sejVirtualCols = { indices: [vIdx], keys: [grpKey] };
-              if (state.displayHeaders) state.displayHeaders.push("グループ名");
-              console.log("[SEJ] 仮想列追加完了 index=" + vIdx);
-            } else if (!grpKey) {
+            if (!grpKey) {
               console.warn("[SEJ] マスタにグループ名列が見つかりません。利用可能な列:", normHeaders);
-            } else if (state.sejVirtualCols) {
-              console.warn("[SEJ] 既に仮想列が存在するためスキップ:", state.sejVirtualCols);
             }
+            applySejGroupVirtualCol();
             // 備考(nte)の差分は wordN セル内に併記する方式（renderBody側で処理）
             $("btn-sej-link").classList.add("active-state");
             setRbLabel("btn-sej-link", `マスタ:${cnt}`);
@@ -9333,7 +9378,7 @@
               <div style="display:flex;align-items:center;gap:6px">
                 <input type="date" id="px-cutoff-date" value="${candidateDate}" style="font-size:13px;padding:4px 6px">
                 <input type="time" id="px-cutoff-time" value="${candidateTime}" style="font-size:13px;padding:4px 6px">
-                <span id="px-cutoff-weekday" style="font-weight:600;color:#1b6ec2">${weekdayLabel(candidateDate)}</span>
+                <span id="px-cutoff-weekday" style="font-weight:600;color:#217346">${weekdayLabel(candidateDate)}</span>
               </div>
             </div>
             <div style="display:flex;justify-content:flex-end;gap:8px">
