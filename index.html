@@ -1907,6 +1907,10 @@
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="1"></rect><rect x="3" y="9" width="18" height="6" fill="currentColor" opacity="0.15"></rect><rect x="9" y="3" width="6" height="18" fill="currentColor" opacity="0.15"></rect></svg></span>
               <span>十字強調</span>
             </button>
+            <button class="rb-btn" id="btn-space-check" title="セル値の前後に余分な空白（半角/全角スペース、タブ）がある場合に警告表示します&#10;マスタ連携不要・全列が対象です（切り替え）" aria-label="前後空白検査の切り替え" aria-pressed="false">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 8v8M20 8v8M4 12h4M16 12h4" stroke-dasharray="2 2"></path><rect x="8" y="9" width="8" height="6" rx="1"></rect></svg></span>
+              <span>前後空白</span>
+            </button>
           </div>
           <span class="rb-group-label">補助</span>
         </div>
@@ -2332,6 +2336,7 @@
         boxCheck: false,     // 区画席（（〇名）席種）の設定検査
         ikkatsuCheck: false, // 席種一括設定チェック（23列）のインライン検品
         bikoHtmlCheck: false, // 備考(nte)列のHTMLを表上で実際のHTML表示として再現（席種エリアマスタのみ）
+        spaceCheck: false,   // セル値の前後空白検査（マスタ非依存・全列対象）
         verticalHeader: true, // ヘッダー縦書き表示（既定でON・列幅節約）
         vHeaderHeight: 230, // 縦書きヘッダーの行高さ(px・手動調整可能)
         originalRowCount: 0, // ファイルを開いた直後の行数（保存時の予期せぬ増減チェック用）
@@ -3595,6 +3600,8 @@
           }
           toggleInspect("ikkatsuCheck", "btn-ikkatsu-check", "席種一括設定チェック", true);
         };
+        // 前後空白検査（マスタ非依存・全列対象）
+        $("btn-space-check").onclick = () => toggleInspect("spaceCheck", "btn-space-check", "前後空白検査", false);
         // 辞書・ヘッダーメモ編集
         $("btn-dict-edit").onclick = openDictEditor;
         // 行の高さ（初期値はROW_Hに合わせてCSS変数を設定）
@@ -5234,6 +5241,17 @@
                 displayVal += `<br><span style="color:#2563eb;font-size:11px">▸ ${escHtml(gname)}</span>`;
               } else {
                 displayVal += `<br><span style="color:#dc2626;font-size:11px">▸ 対応表になし</span>`;
+              }
+            }
+            // 前後空白検査: セル値の先頭/末尾に空白（半角/全角スペース・タブ等）がある場合に警告表示。
+            // マスタ連携不要・全列が対象（trim()はUnicode空白全般・タブ・改行を除去するため全角スペースも検出できる）。
+            if (state.spaceCheck && cellVal) {
+              const trimmed = cellVal.trim();
+              if (trimmed !== cellVal) {
+                const parts = [];
+                if (cellVal.length !== cellVal.trimStart().length) parts.push("先頭");
+                if (cellVal.length !== cellVal.trimEnd().length) parts.push("末尾");
+                displayVal = cellNote(cls, displayVal, "warn", `${parts.join("・")}に空白`);
               }
             }
             // 駐車券フラグ検査: コード6桁目P ⇔ フラグ1（OK/NGどちらも表示）
