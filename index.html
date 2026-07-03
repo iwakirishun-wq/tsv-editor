@@ -1837,7 +1837,7 @@
               <button class="rb-caret" id="caret-sej-check" type="button" title="個別に機能を選んでON/OFF" aria-label="SEJチェックの詳細設定を開く" aria-expanded="false">▾</button>
               <div class="rb-dropdown" id="dd-sej-check">
                 <label><input type="checkbox" data-flag="kanaCheck"> カナ検査</label>
-                <label><input type="checkbox" data-flag="bikoHtmlCheck"> 備考HTML変換</label>
+                <label><input type="checkbox" data-flag="sejBikoCheck"> 備考HTML変換(SEJ)</label>
               </div>
             </div>
             <button class="rb-btn" id="btn-ikkatsu-check" title="席種一括設定TSV(23列)の設定整合チェックを表にインライン表示（切り替え）&#10;NG（赤）: マスタ未登録・席種名不一致・指定席整合・上限9+リセール可・リセール下限1321・購入限定あり+単体不可・P+他種混在&#10;注意（橙）: 上限9+SEJ可&#10;席種エリアマスタを連携すると席種名/指定席チェックも有効になります" aria-label="席種一括設定チェックの切り替え" aria-pressed="false">
@@ -2336,6 +2336,7 @@
         boxCheck: false,     // 区画席（（〇名）席種）の設定検査
         ikkatsuCheck: false, // 席種一括設定チェック（23列）のインライン検品
         bikoHtmlCheck: false, // 備考(nte)列のHTMLを表上で実際のHTML表示として再現（席種エリアマスタのみ）
+        sejBikoCheck: false, // SEJのwordNセルをマスタ備考のHTML表示に切替（SEJデータ＋マスタ連携時のみ。備考差分表示と競合しないよう bikoHtmlCheck から分離）
         spaceCheck: false,   // セル値の前後空白検査（マスタ非依存・全列対象）
         verticalHeader: true, // ヘッダー縦書き表示（既定でON・列幅節約）
         vHeaderHeight: 230, // 縦書きヘッダーの行高さ(px・手動調整可能)
@@ -2413,10 +2414,11 @@
       const INSPECT_FLAG_LABELS = {
         colorView: "カラー表示", gateView: "ゲート表示", parkingCheck: "駐車券検査",
         boxCheck: "区画席検査", kanaCheck: "カナ検査", bikoHtmlCheck: "備考HTML変換",
+        sejBikoCheck: "備考HTML変換(SEJ)",
       };
       const INSPECT_GROUPS = {
         "btn-seatmaster-check": ["colorView", "gateView", "parkingCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck"],
-        "btn-sej-check": ["kanaCheck", "bikoHtmlCheck"],
+        "btn-sej-check": ["kanaCheck", "sejBikoCheck"],
       };
       // カナ検査の対象列（半角カナ必須の略称/備考系のみ。席種名・試合名等のフルネーム列は全角カナが正しいため対象外）。
       // 前提条件チェックと描画ロジックで共用する。
@@ -2454,16 +2456,19 @@
           }
         }
         if (key === "bikoHtmlCheck") {
-          const hasNte = _hasHeader("nte");
-          const isSej = isSejData();
-          if (!hasNte && !isSej) return "備考列(nte)がありません";
-          if (isSej && !state.sejMaster) return "SEJマスタが未連携です";
+          // 席種エリアマスタ等の自データnte列をHTML表示する機能。SEJのwordNセルは sejBikoCheck が担当
+          if (!_hasHeader("nte")) return "備考列(nte)がありません";
+        }
+        if (key === "sejBikoCheck") {
+          if (!isSejData()) return "SEJデータではありません";
+          if (!state.sejMaster) return "SEJマスタが未連携です";
         }
         return null;
       }
       // 複数の検品トグルをまとめて1ボタンで切り替える（席種エリアマスタチェック/SEJチェック用）。
       // 現在すべてONなら一括OFF、そうでなければ一括ON（前提条件を満たさない項目は自動スキップ）。
-      // kanaCheck/bikoHtmlCheckは2つのグループボタンから共有される（重複あり・どちらからでも同じ状態を操作する）
+      // kanaCheckのみ2つのグループボタンから共有される（同一機能のため）。備考HTMLは
+      // マスタ用(bikoHtmlCheck)とSEJ用(sejBikoCheck)で別フラグ（SEJ備考差分表示との競合防止）
       function toggleInspectGroup(keys, btnId, label) {
         const allOn = keys.every((k) => state[k]);
         const turnOn = !allOn;
@@ -2474,10 +2479,10 @@
           const reason = _inspectFlagPrecondition(k);
           if (reason) { skipped.push(`${INSPECT_FLAG_LABELS[k] || k}（${reason}）`); continue; }
           state[k] = true;
-          if (k !== "colorView" && k !== "bikoHtmlCheck") needAutoFit = true;
+          if (k !== "colorView" && k !== "bikoHtmlCheck" && k !== "sejBikoCheck") needAutoFit = true;
         }
         // 備考HTML変換ON時は読みやすさのため折り返し表示も自動で有効化する（既存仕様を維持）
-        if (state.bikoHtmlCheck && !state.wrapCells) {
+        if ((state.bikoHtmlCheck || state.sejBikoCheck) && !state.wrapCells) {
           state.wrapCells = true;
           state.wrapRows.clear();
           document.body.classList.add("wrap-cells");
@@ -2494,7 +2499,7 @@
         if (skipped.length) msg += `（スキップ: ${skipped.join("・")}）`;
         setStatus(msg);
       }
-      // 個別項目を1つだけON/OFFする（統合ボタンのドロップダウン用）。kanaCheck/bikoHtmlCheckは
+      // 個別項目を1つだけON/OFFする（統合ボタンのドロップダウン用）。kanaCheckは
       // 2つのグループで共有されるため、変更後は両方のドロップダウン・ボタン表示を同期する
       function setInspectFlag(key, on) {
         if (on) {
@@ -2506,8 +2511,8 @@
           }
         }
         state[key] = on;
-        if (on && key !== "colorView" && key !== "bikoHtmlCheck") { autoFitAllColumnsQuiet(); renderHeader(); }
-        if (on && key === "bikoHtmlCheck" && !state.wrapCells) {
+        if (on && key !== "colorView" && key !== "bikoHtmlCheck" && key !== "sejBikoCheck") { autoFitAllColumnsQuiet(); renderHeader(); }
+        if (on && (key === "bikoHtmlCheck" || key === "sejBikoCheck") && !state.wrapCells) {
           state.wrapCells = true;
           state.wrapRows.clear();
           document.body.classList.add("wrap-cells");
@@ -3295,6 +3300,8 @@
         state.newlineMixed = t.newlineMixed || false;
         state.markedCells = t.markedCells ? new Set(t.markedCells) : new Set();
         applyHeaderMapping();
+        // マスタ連携済みなら、仮想列が無いタブにもグループ名を追加する
+        applySejGroupVirtualCol();
         if (state.dirty) {
           els.dirty.classList.add("show");
           document.title = "● TSV/CSV Editor";
@@ -3566,7 +3573,7 @@
           toggleInspectGroup(["colorView", "gateView", "parkingCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck"], "btn-seatmaster-check", "席種エリアマスタチェック");
         };
         $("btn-sej-check").onclick = () => {
-          toggleInspectGroup(["kanaCheck", "bikoHtmlCheck"], "btn-sej-check", "SEJチェック");
+          toggleInspectGroup(["kanaCheck", "sejBikoCheck"], "btn-sej-check", "SEJチェック");
         };
         // 統合ボタンの▾: 個別ON/OFFドロップダウンを開閉する（フロント側のメインボタンの見た目・動作は変えない）
         document.querySelectorAll(".rb-caret").forEach((caret) => {
@@ -3853,6 +3860,8 @@
           state.originalRowCount = state.data.length; // 開いた直後の行数（保存時の予期せぬ増減チェック用）
           clearAutoDropColumns();
           applyHeaderMapping();
+          // マスタ連携済みなら、開いたファイルにもグループ名仮想列を追加する
+          applySejGroupVirtualCol();
           // 前タブの表示状態が新ファイルに引き継がれないようリセット
           state.cellColors = {};
           state.hiddenRows = new Set();
@@ -5355,8 +5364,8 @@
                 const parts = sejSplitNte(m.nte || "");
                 const masterVal = parts[nteWordCols[j] - 1] || "";
                 const cur = cellVal.trim();
-                if (state.bikoHtmlCheck) {
-                  // 備考HTML変換: 表示のみマスタ備考のN番目項目をHTML表記に切り替える（元データは書き換えない）
+                if (state.sejBikoCheck) {
+                  // 備考HTML変換(SEJ): 表示のみマスタ備考のN番目項目をHTML表記に切り替える（元データは書き換えない）
                   const htmlParts = sejSplitNteHtml(m.nte || "");
                   const masterHtml = htmlParts[nteWordCols[j] - 1] || "";
                   displayVal = masterHtml
@@ -7709,7 +7718,7 @@
         if (_bm) { _bm.classList.remove("active-state"); _bm.setAttribute("aria-pressed","false"); }
         document.body.classList.remove("marker-mode");
         // 検品表示トグルは現在のデータの列構成に紐づくため、別ファイル/タブへ持ち越さずリセットする
-        ["colorView", "gateView", "parkingCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck", "ikkatsuCheck"].forEach((k) => { state[k] = false; });
+        ["colorView", "gateView", "parkingCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck", "sejBikoCheck", "ikkatsuCheck"].forEach((k) => { state[k] = false; });
         const _bik = $("btn-ikkatsu-check");
         if (_bik) { _bik.classList.remove("active-state"); _bik.setAttribute("aria-pressed", "false"); }
         syncInspectUI();
@@ -8762,6 +8771,43 @@
         input.click();
       }
 
+      // 仮想列「グループ名」を現在のタブへ追加（保存時除外・フィルター/ソート可能）。
+      // マスタ連携時だけでなく、連携済みの状態で新しいファイルを開いた時・タブを切り替えた時にも
+      // 呼ばれる（以前は連携した瞬間のタブにしか追加されず、その後開いたファイルでグループ名が
+      // 出ない＝チームで参照できない問題があった）。
+      function applySejGroupVirtualCol() {
+        const m = state.sejMaster;
+        if (!m || !m.grpKey) return;
+        // 復元されたメタが実データと食い違っている場合は作り直す。
+        // （タブ切替時のメモリ解放→rawText再パースで仮想列だけが消え、メタが残ると
+        //   グループ名列が二度と復元されない＝チームで参照できない問題の自己修復）
+        if (state.sejVirtualCols) {
+          const ok = state.sejVirtualCols.indices.every(i => state.headers[i] === "グループ名");
+          if (ok) return;
+          state.sejVirtualCols = null;
+        }
+        const curCodeIdx = state.headers.findIndex(h => String(h).trim() === "seat_type_area_cd");
+        if (curCodeIdx === -1) return;
+        // 席種エリアマスタ自身などグループ名の実列を持つデータには追加しない（重複防止）
+        const norm = state.headers.map(h => String(h ?? "").replace(/^﻿/, "").trim());
+        if (norm.includes("グループ名") || norm.includes(m.grpKey)) return;
+        const byCode = m.byCode;
+        const vIdx = state.headers.length;
+        state.headers.push("グループ名");
+        let maxLen = 8;
+        state.data.forEach(row => {
+          const cd = (row[curCodeIdx] ?? "").trim();
+          const rec = byCode[cd];
+          const v = rec && rec[m.grpKey] ? rec[m.grpKey] : "";
+          row.push(v);
+          if (String(v).length > maxLen) maxLen = String(v).length;
+        });
+        state.sejVirtualCols = { indices: [vIdx], keys: [m.grpKey] };
+        if (state.displayHeaders) state.displayHeaders.push("グループ名");
+        state.colWidths[vIdx] = Math.min(maxLen * 12 + 24, 260);
+        console.log("[SEJ] グループ名仮想列を追加 index=" + vIdx);
+      }
+
       function loadSejMasterFile(file, _encoding, onDone) {
         const reader = new FileReader();
         reader.onload = () => {
@@ -8827,29 +8873,10 @@
             }
             state.sejMaster.byGroup = byGroup;
             state.sejMaster.grpKey = grpKey;
-            console.log("[SEJ] 仮想列追加チェック:", {
-              curCodeIdx,
-              masterHeaders: normHeaders,
-              grpKey,
-              hasExistingVirtual: !!state.sejVirtualCols,
-              dataRows: state.data.length,
-            });
-            if (curCodeIdx !== -1 && grpKey && !state.sejVirtualCols) {
-              const vIdx = state.headers.length;
-              state.headers.push("グループ名");
-              state.data.forEach(row => {
-                const cd = (row[curCodeIdx] ?? "").trim();
-                const m = byCode[cd];
-                row.push(m && m[grpKey] ? m[grpKey] : "");
-              });
-              state.sejVirtualCols = { indices: [vIdx], keys: [grpKey] };
-              if (state.displayHeaders) state.displayHeaders.push("グループ名");
-              console.log("[SEJ] 仮想列追加完了 index=" + vIdx);
-            } else if (!grpKey) {
+            if (!grpKey) {
               console.warn("[SEJ] マスタにグループ名列が見つかりません。利用可能な列:", normHeaders);
-            } else if (state.sejVirtualCols) {
-              console.warn("[SEJ] 既に仮想列が存在するためスキップ:", state.sejVirtualCols);
             }
+            applySejGroupVirtualCol();
             // 備考(nte)の差分は wordN セル内に併記する方式（renderBody側で処理）
             $("btn-sej-link").classList.add("active-state");
             setRbLabel("btn-sej-link", `マスタ:${cnt}`);
