@@ -2696,12 +2696,14 @@
       };
       // 年齢区分ランク（1=幼児 2=子供 3=U23 4=大人 0=共通/不明）
       function ugAgeRank(a) {
-        a = String(a);
+        // NFKCで半角カナ（例:「ｱﾝﾀﾞｰ」）を全角に正規化してから判定。英数字は変化しないため安全
+        // （2026-07-04発見: 半角カナ表記が全角前提の正規表現から漏れる不具合の再発防止）
+        a = String(a).normalize("NFKC");
         if (/幼児|未就学|INFANT/i.test(a)) return 1;
         // 「3歳〜中学生」「中学生以下」等の上限が中学生のラベルは子供区分として扱う
         // （ナレッジの年齢マッチング表: U23/大人→「3歳〜中学生」は年齢が下がるため不可、を降格判定で拾えるように）
         if (/子供|こども|子ども|小中|小・中|小学|CHILD|中学生以下|〜中学生|～中学生/i.test(a)) return 2;
-        if (/U23|ｱﾝﾀﾞｰ|アンダー/i.test(a)) return 3;
+        if (/U23|アンダー/i.test(a)) return 3;
         if (/大人|ADULT|高校/i.test(a)) return 4;
         return 0; // 共通・不明はランク判定しない
       }
@@ -2768,8 +2770,11 @@
           if (ch6 === "O") return "その他";
           if (ch6 === "P") return "駐車券";
           if (seatMeta) { const m = seatMeta(code, seat); if (m && m.found) { if (m.stockTyp === "1" || m.isReserved) return "指定席"; if (m.stockTyp === "2" || m.isFree) return "エリア"; } }
-          if (/駐車/.test(seat)) return "駐車券";
-          return /自由席|エリア/.test(seat) ? "エリア" : "指定席";
+          // NFKCで半角カナ（「ｴﾘｱ」等）を全角化してから判定（2026-07-04発見: マスタ未連携時の
+          // フォールバック判定が半角カナ表記の席名でエリア扱い漏れになる不具合の再発防止）
+          const sn = String(seat || "").normalize("NFKC");
+          if (/駐車/.test(sn)) return "駐車券";
+          return /自由席|エリア/.test(sn) ? "エリア" : "指定席";
         };
         const isWheelchair = (seat) => /車椅子|車いす/.test(seat || "");
         // 車椅子の同伴席は「自分の席の年齢区分変更」のみ可（他の車椅子席へのUGは不可）
@@ -2777,7 +2782,7 @@
         // BOX席（区画席）判定。マスタのbox_seat_flg優先、無ければ席種名の「（〇名）」で判定。
         const isBoxSeat = (code, seat) => {
           if (seatMeta) { const m = seatMeta(code, seat); if (m && m.found) return !!m.box; }
-          return /[（(]\s*[0-9０-９]+\s*名\s*[）)]/.test(seat || "");
+          return /[（(]\s*[0-9０-９]+\s*名\s*[）)]/.test(String(seat || "").normalize("NFKC"));
         };
         const isAdultAge = (a) => ageRank(a) === 4; // 大人（同年齢区分どうしで差額0でも500円の席変更手数料が必要なのは大人のみ）
         const isDummyPrice = ugIsDummyPrice; // 売止め等のダミー価格判定（純粋ロジックを委譲）
@@ -9489,8 +9494,10 @@
           if (ch6 === "O") return "その他";
           if (ch6 === "P") return "駐車券";
           if (seatMeta) { const m = seatMeta(code, seat); if (m && m.found) { if (m.stockTyp === "1" || m.isReserved) return "指定席"; if (m.stockTyp === "2" || m.isFree) return "数在庫"; } }
-          if (/駐車/.test(seat)) return "駐車券";
-          return /自由席|エリア/.test(seat) ? "数在庫" : "指定席";
+          // NFKCで半角カナ（「ｴﾘｱ」等）を全角化してから判定（buildUgValidator内のseatCatと同一化）
+          const sn = String(seat || "").normalize("NFKC");
+          if (/駐車/.test(sn)) return "駐車券";
+          return /自由席|エリア/.test(sn) ? "数在庫" : "指定席";
         };
         const catBadge = (cat) => `<span class="catb cat-${cat === "指定席" ? "r" : cat === "数在庫" ? "a" : cat === "駐車券" ? "p" : "o"}">${cat}</span>`;
         // 日時 → MM/DD(曜)HH:MM（分単位まで）。"YYYY/MM/DD HH:MM" 等を想定
