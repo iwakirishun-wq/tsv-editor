@@ -2794,6 +2794,7 @@
         function canUpgrade(srcSeat, srcCode, srcAge, dstSeat, dstCode, dstAge) {
           const sr = ageRank(srcAge), dr = ageRank(dstAge);
           if (sr && dr && dr < sr) return false; // 年齢降格
+          if (sr && dr && dr > sr && dr !== 4) return false; // 中間昇格（幼児→U23等）は別席種でも不可
           // UG対象は基本「指定席」または「エリア席」。その他(パドックパス等)・駐車券・BOX席(区画席)は
           // 登録漏れ候補に含めない（これらの席種間のUGは想定しないため）。
           const srcCat = seatCat(srcCode, srcSeat), dstCat = seatCat(dstCode, dstSeat);
@@ -2859,10 +2860,11 @@
               if (!sameAgeReserved && !upgradeToAdult) problems.push("車椅子は同年齢の席変更または大人へのUGのみ可");
             }
           }
-          // 同一席種内の年齢区分変更は「→大人」のみ（幼児→子供・子供→U23等の中間昇格は設定不可）。
-          // 別席種間の昇格は可のため同席種の場合だけ制限する。降格は上の年齢降格チェック、車椅子は車椅子ルールで判定済み
-          if (srcSeat === dstSeat && srcSeat !== "" && !srcWc && sr && dr && dr > sr && dr !== 4) {
-            problems.push("同席種の年齢区分変更は大人へのみ可(" + srcAge + "→" + dstAge + ")");
+          // 年齢区分の昇格は「→大人」のみ（幼児→子供・子供→U23等の中間昇格は設定不可）。
+          // 2026-07-04確定: 別席種間でも中間昇格は不可（従来は同席種のみ制限で、
+          // 3歳～中学生→U23等の別席種UGが素通しになっていた）。降格は上の年齢降格チェックで判定済み
+          if (sr && dr && dr > sr && dr !== 4) {
+            problems.push("年齢区分の昇格は大人へのみ可(" + srcAge + "→" + dstAge + ")");
           }
           // 大人料金が先<元（実質ダウングレード）のUGは不可。
           // 大人以外の年齢区分は、その年齢自身の差額が500円以内（先が安い側）なら例外的に許可（fee=0）
