@@ -2696,12 +2696,14 @@
       };
       // 年齢区分ランク（1=幼児 2=子供 3=U23 4=大人 0=共通/不明）
       function ugAgeRank(a) {
-        a = String(a);
+        // NFKCで半角カナ（例:「ｱﾝﾀﾞｰ」）を全角に正規化してから判定。英数字は変化しないため安全
+        // （2026-07-04発見: 半角カナ表記が全角前提の正規表現から漏れる不具合の再発防止）
+        a = String(a).normalize("NFKC");
         if (/幼児|未就学|INFANT/i.test(a)) return 1;
         // 「3歳〜中学生」「中学生以下」等の上限が中学生のラベルは子供区分として扱う
         // （ナレッジの年齢マッチング表: U23/大人→「3歳〜中学生」は年齢が下がるため不可、を降格判定で拾えるように）
         if (/子供|こども|子ども|小中|小・中|小学|CHILD|中学生以下|〜中学生|～中学生/i.test(a)) return 2;
-        if (/U23|ｱﾝﾀﾞｰ|アンダー/i.test(a)) return 3;
+        if (/U23|アンダー/i.test(a)) return 3;
         if (/大人|ADULT|高校/i.test(a)) return 4;
         return 0; // 共通・不明はランク判定しない
       }
@@ -2768,8 +2770,11 @@
           if (ch6 === "O") return "その他";
           if (ch6 === "P") return "駐車券";
           if (seatMeta) { const m = seatMeta(code, seat); if (m && m.found) { if (m.stockTyp === "1" || m.isReserved) return "指定席"; if (m.stockTyp === "2" || m.isFree) return "エリア"; } }
-          if (/駐車/.test(seat)) return "駐車券";
-          return /自由席|エリア/.test(seat) ? "エリア" : "指定席";
+          // NFKCで半角カナ（「ｴﾘｱ」等）を全角化してから判定（2026-07-04発見: マスタ未連携時の
+          // フォールバック判定が半角カナ表記の席名でエリア扱い漏れになる不具合の再発防止）
+          const sn = String(seat || "").normalize("NFKC");
+          if (/駐車/.test(sn)) return "駐車券";
+          return /自由席|エリア/.test(sn) ? "エリア" : "指定席";
         };
         const isWheelchair = (seat) => /車椅子|車いす/.test(seat || "");
         // 車椅子の同伴席は「自分の席の年齢区分変更」のみ可（他の車椅子席へのUGは不可）
@@ -2777,7 +2782,7 @@
         // BOX席（区画席）判定。マスタのbox_seat_flg優先、無ければ席種名の「（〇名）」で判定。
         const isBoxSeat = (code, seat) => {
           if (seatMeta) { const m = seatMeta(code, seat); if (m && m.found) return !!m.box; }
-          return /[（(]\s*[0-9０-９]+\s*名\s*[）)]/.test(seat || "");
+          return /[（(]\s*[0-9０-９]+\s*名\s*[）)]/.test(String(seat || "").normalize("NFKC"));
         };
         const isAdultAge = (a) => ageRank(a) === 4; // 大人（同年齢区分どうしで差額0でも500円の席変更手数料が必要なのは大人のみ）
         const isDummyPrice = ugIsDummyPrice; // 売止め等のダミー価格判定（純粋ロジックを委譲）
@@ -2794,6 +2799,7 @@
         function canUpgrade(srcSeat, srcCode, srcAge, dstSeat, dstCode, dstAge) {
           const sr = ageRank(srcAge), dr = ageRank(dstAge);
           if (sr && dr && dr < sr) return false; // 年齢降格
+          if (sr && dr && dr > sr && dr !== 4) return false; // 中間昇格（幼児→U23等）は別席種でも不可
           // UG対象は基本「指定席」または「エリア席」。その他(パドックパス等)・駐車券・BOX席(区画席)は
           // 登録漏れ候補に含めない（これらの席種間のUGは想定しないため）。
           const srcCat = seatCat(srcCode, srcSeat), dstCat = seatCat(dstCode, dstSeat);
@@ -2859,10 +2865,11 @@
               if (!sameAgeReserved && !upgradeToAdult) problems.push("車椅子は同年齢の席変更または大人へのUGのみ可");
             }
           }
-          // 同一席種内の年齢区分変更は「→大人」のみ（幼児→子供・子供→U23等の中間昇格は設定不可）。
-          // 別席種間の昇格は可のため同席種の場合だけ制限する。降格は上の年齢降格チェック、車椅子は車椅子ルールで判定済み
-          if (srcSeat === dstSeat && srcSeat !== "" && !srcWc && sr && dr && dr > sr && dr !== 4) {
-            problems.push("同席種の年齢区分変更は大人へのみ可(" + srcAge + "→" + dstAge + ")");
+          // 年齢区分の昇格は「→大人」のみ（幼児→子供・子供→U23等の中間昇格は設定不可）。
+          // 2026-07-04確定: 別席種間でも中間昇格は不可（従来は同席種のみ制限で、
+          // 3歳～中学生→U23等の別席種UGが素通しになっていた）。降格は上の年齢降格チェックで判定済み
+          if (sr && dr && dr > sr && dr !== 4) {
+            problems.push("年齢区分の昇格は大人へのみ可(" + srcAge + "→" + dstAge + ")");
           }
           // 大人料金が先<元（実質ダウングレード）のUGは不可。
           // 大人以外の年齢区分は、その年齢自身の差額が500円以内（先が安い側）なら例外的に許可（fee=0）
@@ -9487,8 +9494,10 @@
           if (ch6 === "O") return "その他";
           if (ch6 === "P") return "駐車券";
           if (seatMeta) { const m = seatMeta(code, seat); if (m && m.found) { if (m.stockTyp === "1" || m.isReserved) return "指定席"; if (m.stockTyp === "2" || m.isFree) return "数在庫"; } }
-          if (/駐車/.test(seat)) return "駐車券";
-          return /自由席|エリア/.test(seat) ? "数在庫" : "指定席";
+          // NFKCで半角カナ（「ｴﾘｱ」等）を全角化してから判定（buildUgValidator内のseatCatと同一化）
+          const sn = String(seat || "").normalize("NFKC");
+          if (/駐車/.test(sn)) return "駐車券";
+          return /自由席|エリア/.test(sn) ? "数在庫" : "指定席";
         };
         const catBadge = (cat) => `<span class="catb cat-${cat === "指定席" ? "r" : cat === "数在庫" ? "a" : cat === "駐車券" ? "p" : "o"}">${cat}</span>`;
         // 日時 → MM/DD(曜)HH:MM（分単位まで）。"YYYY/MM/DD HH:MM" 等を想定
@@ -9540,14 +9549,15 @@
 
         // --- 通常価格表（フラット・並べ替え/絞り込み可） ---
         if (opt.normal && normals.length) {
-          // 前売/当日は列ではなく行で分ける（同じ行に金額列が2本並ぶと見づらいため、種別＋金額の1列にまとめる）
-          const labels = ["席種名", "区分", "券種", "販売区分", "会員ランク", "販売経路", "販売開始", "販売終了", "種別", "金額"];
+          // 前売・当日は別列で1行にまとめる（データベース(前売価格/当日価格)と表記を揃え、1行で見やすく）
+          const labels = ["席種名", "区分", "券種", "販売区分", "会員ランク", "販売経路", "販売開始", "販売終了", "前売", "当日"];
           // 並び: 席種(エリアコード順＝席種マスタ/ホームページの並び) → 券種コード
           const nsorted = normals.slice().sort((x, y) => {
             const sk = seatCodeSortKey(v(x, c.seat), v(x, c.seatCd)).localeCompare(seatCodeSortKey(v(y, c.seat), v(y, c.seatCd)), "ja");
             if (sk) return sk;
             return String(ageKey(v(x, c.age))).localeCompare(String(ageKey(v(y, c.age))), "ja");
           });
+          const numOfCell = (val) => Number(String(val).replace(/,/g, "")) || 0;
           let rowsHtml = "";
           let prevSeat = null;
           for (const row of nsorted) {
@@ -9555,7 +9565,6 @@
             const seat = v(row, c.seat), code = v(row, c.seatCd), sl = seatLabel(seat, code), al = ageLabel(v(row, c.age));
             const cat = seatCat(code, seat);
             const sep = (prevSeat !== null && prevSeat !== seat) ? " seat-sep" : ""; prevSeat = seat;
-            // 並べ替え/絞り込みエンジンが列番号で各行のセルを直接参照するため、共通項目はrowspanせず両行に複製する
             const shared = `<td data-v="${escHtml(seatCodeSortKey(seat, code))}" style="background:${seatColor(seat)};font-weight:600" title="${escHtml(seat)}">${escHtml(sl)}</td>`
               + `<td data-v="${escHtml(cat)}">${catBadge(cat)}</td>`
               + cell(al, ageKey(v(row, c.age)))
@@ -9564,13 +9573,11 @@
               + cell(v(row, c.route), v(row, c.route))
               + cell(dt(v(row, c.start)), v(row, c.start), "dt")
               + cell(dt(v(row, c.end)), v(row, c.end), "dt");
-            rowsHtml += `<tr data-mid="${mid}|ADV" data-cond="${escHtml(condOf(row))}" class="${sep.trim()}"><td class="mk-cell" title="クリックでマーク">✔</td>`
+            // 1席種×券種＝1行。前売・当日を別列に。
+            rowsHtml += `<tr data-mid="${mid}" data-cond="${escHtml(condOf(row))}" class="${sep.trim()}"><td class="mk-cell" title="クリックでマーク">✔</td>`
               + shared
-              + `<td>前売</td>` + cell(fmt(v(row, c.adv)), Number(String(v(row, c.adv)).replace(/,/g, "")) || 0, "num")
-              + `</tr>`;
-            rowsHtml += `<tr data-mid="${mid}|DAY" data-cond="${escHtml(condOf(row))}"><td class="mk-cell" title="クリックでマーク">✔</td>`
-              + shared
-              + `<td>当日</td>` + cell(fmt(v(row, c.day)), Number(String(v(row, c.day)).replace(/,/g, "")) || 0, "num")
+              + cell(fmt(v(row, c.adv)), numOfCell(v(row, c.adv)), "num")
+              + cell(fmt(v(row, c.day)), numOfCell(v(row, c.day)), "num")
               + `</tr>`;
           }
           // 券種抜けの検出（他マスタが無いため、データ内の券種ユニバースから推定）
