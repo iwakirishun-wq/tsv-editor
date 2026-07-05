@@ -9549,14 +9549,15 @@
 
         // --- 通常価格表（フラット・並べ替え/絞り込み可） ---
         if (opt.normal && normals.length) {
-          // 前売/当日は列ではなく行で分ける（同じ行に金額列が2本並ぶと見づらいため、種別＋金額の1列にまとめる）
-          const labels = ["席種名", "区分", "券種", "販売区分", "会員ランク", "販売経路", "販売開始", "販売終了", "種別", "金額"];
+          // 前売・当日は別列で1行にまとめる（データベース(前売価格/当日価格)と表記を揃え、1行で見やすく）
+          const labels = ["席種名", "区分", "券種", "販売区分", "会員ランク", "販売経路", "販売開始", "販売終了", "前売", "当日"];
           // 並び: 席種(エリアコード順＝席種マスタ/ホームページの並び) → 券種コード
           const nsorted = normals.slice().sort((x, y) => {
             const sk = seatCodeSortKey(v(x, c.seat), v(x, c.seatCd)).localeCompare(seatCodeSortKey(v(y, c.seat), v(y, c.seatCd)), "ja");
             if (sk) return sk;
             return String(ageKey(v(x, c.age))).localeCompare(String(ageKey(v(y, c.age))), "ja");
           });
+          const numOfCell = (val) => Number(String(val).replace(/,/g, "")) || 0;
           let rowsHtml = "";
           let prevSeat = null;
           for (const row of nsorted) {
@@ -9564,7 +9565,6 @@
             const seat = v(row, c.seat), code = v(row, c.seatCd), sl = seatLabel(seat, code), al = ageLabel(v(row, c.age));
             const cat = seatCat(code, seat);
             const sep = (prevSeat !== null && prevSeat !== seat) ? " seat-sep" : ""; prevSeat = seat;
-            // 並べ替え/絞り込みエンジンが列番号で各行のセルを直接参照するため、共通項目はrowspanせず両行に複製する
             const shared = `<td data-v="${escHtml(seatCodeSortKey(seat, code))}" style="background:${seatColor(seat)};font-weight:600" title="${escHtml(seat)}">${escHtml(sl)}</td>`
               + `<td data-v="${escHtml(cat)}">${catBadge(cat)}</td>`
               + cell(al, ageKey(v(row, c.age)))
@@ -9573,13 +9573,11 @@
               + cell(v(row, c.route), v(row, c.route))
               + cell(dt(v(row, c.start)), v(row, c.start), "dt")
               + cell(dt(v(row, c.end)), v(row, c.end), "dt");
-            rowsHtml += `<tr data-mid="${mid}|ADV" data-cond="${escHtml(condOf(row))}" class="${sep.trim()}"><td class="mk-cell" title="クリックでマーク">✔</td>`
+            // 1席種×券種＝1行。前売・当日を別列に。
+            rowsHtml += `<tr data-mid="${mid}" data-cond="${escHtml(condOf(row))}" class="${sep.trim()}"><td class="mk-cell" title="クリックでマーク">✔</td>`
               + shared
-              + `<td>前売</td>` + cell(fmt(v(row, c.adv)), Number(String(v(row, c.adv)).replace(/,/g, "")) || 0, "num")
-              + `</tr>`;
-            rowsHtml += `<tr data-mid="${mid}|DAY" data-cond="${escHtml(condOf(row))}"><td class="mk-cell" title="クリックでマーク">✔</td>`
-              + shared
-              + `<td>当日</td>` + cell(fmt(v(row, c.day)), Number(String(v(row, c.day)).replace(/,/g, "")) || 0, "num")
+              + cell(fmt(v(row, c.adv)), numOfCell(v(row, c.adv)), "num")
+              + cell(fmt(v(row, c.day)), numOfCell(v(row, c.day)), "num")
               + `</tr>`;
           }
           // 券種抜けの検出（他マスタが無いため、データ内の券種ユニバースから推定）
