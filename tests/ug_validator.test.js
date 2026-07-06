@@ -193,6 +193,14 @@ eqCU(validate.canUpgrade("パドックパス", "MMTGPO25011", "大人", SEAT_A.n
 eqCU(validate.canUpgrade(SEAT_S.name, SEAT_S.cd, "大人", "もてぎ駐車券", "MMTGPP25011", "大人"), false, "先が駐車券(6桁目P)は対象外");
 eqCU(validate.canUpgrade(SEAT_S.name, SEAT_S.cd, "大人", "T5デッキ(5名)", "RESV20", "大人"), false, "先がBOX席(（〇名）)は対象外");
 
+// --- 車椅子席: 同一席種内の年齢区分変更のみ可（別の車椅子席V1→V2へのUGは不可・2026-07-06確定）---
+eqCU(validate.canUpgrade("車椅子席V1", "RESV31", "子供", "車椅子席V1", "RESV31", "大人"), true, "車椅子: 同一席種内の子供→大人(年齢変更)は可");
+eqCU(validate.canUpgrade("車椅子席V1", "RESV31", "大人", "車椅子席V2", "RESV32", "大人"), false, "車椅子: 別の車椅子席(V1→V2)へのUGは不可");
+eqCU(validate.canUpgrade("車椅子席V1", "RESV31", "子供", "車椅子席V2", "RESV32", "大人"), false, "車椅子: 別席への年齢変更(V1子供→V2大人)も不可");
+eqCU(validate.canUpgrade("車椅子席V1", "RESV31", "子供", "車椅子席V1", "RESV31", "U23"), false, "車椅子: 同一席でも中間昇格(子供→U23)は不可");
+eqCU(validate.canUpgrade("車椅子席V1", "RESV31", "大人", SEAT_S.name, SEAT_S.cd, "大人"), false, "車椅子→一般席のUGは不可");
+eqCU(validate.canUpgrade(SEAT_S.name, SEAT_S.cd, "大人", "車椅子席V1", "RESV31", "大人"), false, "一般席→車椅子のUGは不可");
+
 // --- ugAgeRank（共通/範囲ラベルのランク判定）---
 eqCU(ugAgeRank("3歳〜中学生"), 2, "「3歳〜中学生」は子供ランク(上限が中学生)");
 eqCU(ugAgeRank("中学生以下"), 2, "「中学生以下」は子供ランク");
