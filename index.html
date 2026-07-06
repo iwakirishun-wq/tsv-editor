@@ -2812,10 +2812,8 @@
           if (sameSeat && dstCat === "エリア") return false;
           const srcWc = isWheelchair(srcSeat), dstWc = isWheelchair(dstSeat);
           if (srcWc || dstWc) {
-            if (srcWc !== dstWc) return false;
-            const sameAgeReserved = sameAgeCat && dstCat === "指定席";
-            const upgradeToAdult = !sameAgeCat && dr === 4 && dr > sr;
-            if (!sameAgeReserved && !upgradeToAdult) return false;
+            if (srcWc !== dstWc) return false;         // 片方だけ車椅子→不可
+            if (srcSeat !== dstSeat) return false;     // 車椅子は同一席種内の年齢区分変更のみ（V1→V2等の別車椅子席UG不可・2026-07-06確定）
           }
           if (!sameSeat && !srcWc && !dstWc) {
             const as = adultAny.get(srcSeat), ad = adultAny.get(dstSeat);
@@ -2854,15 +2852,14 @@
           // エリア席のみ「同席種・同券種UG不可」。その他(O・車椅子・パス等)/指定席は対象外
           const dstCat = seatCat(dstCode, dstSeat);
           if (sameSeat && dstCat === "エリア") problems.push("エリア席の同席種同券種UGは設定不可");
-          // 車椅子: 購入後の他席種への/からのUGは不可。車椅子内では「同年齢・指定席内の席変更」または「大人へのランクアップ」のみ可
+          // 車椅子: 購入後の他席種への/からのUGは不可。車椅子は同一席種内の年齢区分変更のみ可
+          // （V1→V2等、別の車椅子席へのUGは不可。2026-07-06確定。※駐車場の車いすは席種カテゴリが駐車券なので別途除外済み）
           const srcWc = isWheelchair(srcSeat), dstWc = isWheelchair(dstSeat);
           if (srcWc || dstWc) {
             if (srcWc !== dstWc) {
               problems.push("車椅子は他席種とのUG不可");
-            } else {
-              const sameAgeReserved = sameAgeCat && dstCat === "指定席";
-              const upgradeToAdult = !sameAgeCat && dr === 4 && dr > sr;
-              if (!sameAgeReserved && !upgradeToAdult) problems.push("車椅子は同年齢の席変更または大人へのUGのみ可");
+            } else if (srcSeat !== dstSeat) {
+              problems.push("車椅子は同一席種内の年齢区分変更のみ可（別の車椅子席へのUG不可）");
             }
           }
           // 年齢区分の昇格は「→大人」のみ（幼児→子供・子供→U23等の中間昇格は設定不可）。
