@@ -3845,7 +3845,14 @@
         els.container.onscroll = () => requestAnimationFrame(renderBody);
 
         // Alt+ホイールでズーム（CSS zoom を使用 — sticky/scrollと互換性あり）
+        // Shift+ホイールで横スクロール（列数の多いチケットTSVの横移動を楽にする。
+        // 縦ホイールの回転量をそのまま横スクロールに割り当てる。ズーム(Alt)とは併用しない）
         els.container.addEventListener("wheel", (e) => {
+          if (e.shiftKey && !e.altKey && e.deltaY !== 0) {
+            e.preventDefault();
+            els.container.scrollLeft += e.deltaY;
+            return;
+          }
           if (!e.altKey) return;
           e.preventDefault();
           const delta = e.deltaY > 0 ? -10 : 10;
