@@ -6022,19 +6022,39 @@
             if (scrolled) updatePreview();
           }, 16);
         };
-        const move = (em) => { fx = em.clientX; fy = em.clientY; updatePreview(); if (!timer) startTimer(); };
-        const up = () => {
+        const teardown = () => {
           document.removeEventListener("mousemove", move);
           document.removeEventListener("mouseup", up);
+          document.removeEventListener("keydown", onKey, true);
           if (timer) { clearInterval(timer); timer = null; }
           document.body.classList.remove("fill-dragging");
+        };
+        const move = (em) => { fx = em.clientX; fy = em.clientY; updatePreview(); if (!timer) startTimer(); };
+        const up = () => {
+          teardown();
           const fd = state._fillDrag;
           state._fillDrag = null;
           // 実際に延びたときだけ確定。単純クリック（延び無し）は再描画もしない＝ハンドル保持
           if (fd && (fd.r2 !== fd.src.r2 || fd.c2 !== fd.src.c2)) applyFill(fd.src, fd.r2, fd.c2);
         };
+        // Escでキャンセル: フィルを適用せず選択を元に戻す（列リサイズと同様の操作感）
+        const onKey = (ek) => {
+          if (ek.key !== "Escape") return;
+          ek.preventDefault();
+          ek.stopImmediatePropagation();
+          teardown();
+          state._fillDrag = null;
+          const single = src.r1 === src.r2 && src.c1 === src.c2;
+          state.range = single ? null : { ...src };
+          state.selected = { row: src.r1, col: src.c1 };
+          state.anchor = { row: src.r1, col: src.c1 };
+          state.forceRender = true;
+          renderBody();
+          setStatus("フィルをキャンセルしました");
+        };
         document.addEventListener("mousemove", move);
         document.addEventListener("mouseup", up);
+        document.addEventListener("keydown", onKey, true); // capture: グローバルkeydownより先に処理
       }
       // 隣接列（左優先、無ければ右）の連続データ末尾行を返す（ダブルクリック自動フィルの下端）
       function fillHandleExtent(src) {
