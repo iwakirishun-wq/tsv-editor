@@ -667,6 +667,8 @@
         z-index: 6;
       }
       body.fill-dragging, body.fill-dragging * { cursor: crosshair !important; }
+      /* フィルドラッグ中は対象範囲を緑がかった色で区別（通常の選択と見分ける） */
+      body.fill-dragging td.in-range { background: rgba(33, 115, 70, 0.14) !important; }
 
 
 
@@ -6000,6 +6002,9 @@
           state.range = range; // プレビュー: in-range ハイライトで見せる
           state.forceRender = true;
           renderBody();
+          // ドラッグ中は対象セル数をステータスに表示（片軸のみ延びるので一方は0）
+          const n = (range.r2 - s.r2) * (s.c2 - s.c1 + 1) + (range.c2 - s.c2) * (s.r2 - s.r1 + 1);
+          setStatus(n > 0 ? `フィル: ${n}セルにコピー` : "フィル: 元の位置");
         };
         const startTimer = () => {
           const EDGE = 60, MAX = 20;
