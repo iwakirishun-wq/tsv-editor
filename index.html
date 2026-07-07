@@ -6052,7 +6052,30 @@
         if (r2 <= src.r2) { setStatus("自動フィル: 隣の列にデータが無いため対象がありません"); return; }
         applyFill(src, r2, src.c2);
       }
-      // 元範囲 src を、拡張後の右下(r2,c2)までタイル状にコピー入力する
+      // 数値の等差系列を判定。vals が2件以上の正準な数値（"001"等ゼロ埋めは除外）で
+      // 一定差の等差数列なら { last, step, decimals } を返す。そうでなければ null（=タイルコピー）。
+      function fillSeriesInfo(vals) {
+        if (vals.length < 2) return null;
+        const nums = [];
+        let decimals = 0;
+        for (const raw of vals) {
+          const s = String(raw ?? "").trim();
+          if (s === "") return null;
+          const n = Number(s);
+          if (!isFinite(n) || String(n) !== s) return null; // 正準な数値のみ（"001","1,000","1e3"等は除外）
+          nums.push(n);
+          const dot = s.indexOf(".");
+          if (dot >= 0) decimals = Math.max(decimals, s.length - dot - 1);
+        }
+        const step = nums[1] - nums[0];
+        for (let i = 2; i < nums.length; i++) {
+          if (Math.abs((nums[i] - nums[i - 1]) - step) > 1e-9) return null;
+        }
+        return { last: nums[nums.length - 1], step, decimals };
+      }
+      const fillSeriesVal = (ser, k) => (ser.last + ser.step * k).toFixed(ser.decimals);
+      // 元範囲 src を、拡張後の右下(r2,c2)までコピー入力する。
+      // 単一列/単一行で数値の等差系列なら系列を継続、それ以外はタイルコピー。
       function applyFill(src, r2, c2) {
         const downExt = r2 - src.r2, rightExt = c2 - src.c2;
         if (downExt <= 0 && rightExt <= 0) { // 実質広がっていない → 何もしない
@@ -6062,21 +6085,25 @@
         const srcRows = src.r2 - src.r1 + 1, srcCols = src.c2 - src.c1 + 1;
         let changed = false;
         if (downExt >= rightExt) {
-          // 下方向フィル: 列は元のまま、行をタイル
-          for (let r = src.r2 + 1; r <= r2; r++) {
-            const sr = src.r1 + ((r - src.r1) % srcRows);
-            for (let c = src.c1; c <= src.c2; c++) {
-              const v = safeGet(sr, c);
+          // 下方向フィル: 列ごとに系列判定（無ければ行タイル）
+          for (let c = src.c1; c <= src.c2; c++) {
+            const colVals = [];
+            for (let r = src.r1; r <= src.r2; r++) colVals.push(safeGet(r, c));
+            const ser = fillSeriesInfo(colVals);
+            for (let r = src.r2 + 1; r <= r2; r++) {
+              const v = ser ? fillSeriesVal(ser, r - src.r2) : safeGet(src.r1 + ((r - src.r1) % srcRows), c);
               if (safeGet(r, c) !== v) { safeSet(r, c, v); changed = true; }
             }
           }
           state.range = { r1: src.r1, c1: src.c1, r2, c2: src.c2 };
         } else {
-          // 右方向フィル: 行は元のまま、列をタイル
-          for (let c = src.c2 + 1; c <= c2; c++) {
-            const sc = src.c1 + ((c - src.c1) % srcCols);
-            for (let r = src.r1; r <= src.r2; r++) {
-              const v = safeGet(r, sc);
+          // 右方向フィル: 行ごとに系列判定（無ければ列タイル）
+          for (let r = src.r1; r <= src.r2; r++) {
+            const rowVals = [];
+            for (let c = src.c1; c <= src.c2; c++) rowVals.push(safeGet(r, c));
+            const ser = fillSeriesInfo(rowVals);
+            for (let c = src.c2 + 1; c <= c2; c++) {
+              const v = ser ? fillSeriesVal(ser, c - src.c2) : safeGet(r, src.c1 + ((c - src.c1) % srcCols));
               if (safeGet(r, c) !== v) { safeSet(r, c, v); changed = true; }
             }
           }
