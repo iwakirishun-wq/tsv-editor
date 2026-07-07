@@ -1830,14 +1830,14 @@
               </div>
             </div>
             <div class="rb-btn-wrap">
-              <button class="rb-btn" id="btn-sej-check" title="SEJデータのチェックをまとめて切り替えます&#10;カナ検査・備考HTML変換&#10;前提条件を満たさない項目は自動でスキップされます" aria-label="SEJチェックの切り替え" aria-pressed="false">
+              <button class="rb-btn" id="btn-sej-check" title="SEJデータのチェックをまとめて切り替えます&#10;カナ検査・Word文字数チェック(word1〜7が50字超でエラー)&#10;前提条件を満たさない項目は自動でスキップされます" aria-label="SEJチェックの切り替え" aria-pressed="false">
                 <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 6h8M8 6v12"></path><path d="M14 18l3.5-10L21 18"></path><path d="M15.5 14h4"></path></svg></span>
                 <span>SEJチェック</span>
               </button>
               <button class="rb-caret" id="caret-sej-check" type="button" title="個別に機能を選んでON/OFF" aria-label="SEJチェックの詳細設定を開く" aria-expanded="false">▾</button>
               <div class="rb-dropdown" id="dd-sej-check">
                 <label><input type="checkbox" data-flag="kanaCheck"> カナ検査</label>
-                <label><input type="checkbox" data-flag="sejBikoCheck"> 備考HTML変換(SEJ)</label>
+                <label><input type="checkbox" data-flag="sejWordLenCheck"> Word文字数チェック(50字超)</label>
               </div>
             </div>
             <button class="rb-btn" id="btn-ikkatsu-check" title="席種一括設定TSV(23列)の設定整合チェックを表にインライン表示（切り替え）&#10;NG（赤）: マスタ未登録・席種名不一致・指定席整合・上限9+リセール可・リセール下限1321・購入限定あり+単体不可・P+他種混在&#10;注意（橙）: 上限9+SEJ可&#10;席種エリアマスタを連携すると席種名/指定席チェックも有効になります" aria-label="席種一括設定チェックの切り替え" aria-pressed="false">
@@ -2336,7 +2336,7 @@
         boxCheck: false,     // 区画席（（〇名）席種）の設定検査
         ikkatsuCheck: false, // 席種一括設定チェック（23列）のインライン検品
         bikoHtmlCheck: false, // 備考(nte)列のHTMLを表上で実際のHTML表示として再現（席種エリアマスタのみ）
-        sejBikoCheck: false, // SEJのwordNセルをマスタ備考のHTML表示に切替（SEJデータ＋マスタ連携時のみ。備考差分表示と競合しないよう bikoHtmlCheck から分離）
+        sejWordLenCheck: false, // SEJのword1〜7が50字超のときエラー表記（SEJデータ時。マスタ不要）
         spaceCheck: false,   // セル値の前後空白検査（マスタ非依存・全列対象）
         verticalHeader: true, // ヘッダー縦書き表示（既定でON・列幅節約）
         vHeaderHeight: 230, // 縦書きヘッダーの行高さ(px・手動調整可能)
@@ -2414,11 +2414,11 @@
       const INSPECT_FLAG_LABELS = {
         colorView: "カラー表示", gateView: "ゲート表示", parkingCheck: "駐車券検査",
         boxCheck: "区画席検査", kanaCheck: "カナ検査", bikoHtmlCheck: "備考HTML変換",
-        sejBikoCheck: "備考HTML変換(SEJ)",
+        sejWordLenCheck: "Word文字数チェック(50字超)",
       };
       const INSPECT_GROUPS = {
         "btn-seatmaster-check": ["colorView", "gateView", "parkingCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck"],
-        "btn-sej-check": ["kanaCheck", "sejBikoCheck"],
+        "btn-sej-check": ["kanaCheck", "sejWordLenCheck"],
       };
       // カナ検査の対象列（半角カナ必須の略称/備考系のみ。席種名・試合名等のフルネーム列は全角カナが正しいため対象外）。
       // 前提条件チェックと描画ロジックで共用する。
@@ -2456,19 +2456,19 @@
           }
         }
         if (key === "bikoHtmlCheck") {
-          // 席種エリアマスタ等の自データnte列をHTML表示する機能。SEJのwordNセルは sejBikoCheck が担当
+          // 席種エリアマスタ等の自データnte列をHTML表示する機能。SEJのword列は sejWordLenCheck（文字数）が担当
           if (!_hasHeader("nte")) return "備考列(nte)がありません";
         }
-        if (key === "sejBikoCheck") {
+        if (key === "sejWordLenCheck") {
           if (!isSejData()) return "SEJデータではありません";
-          if (!state.sejMaster) return "SEJマスタが未連携です";
+          if (!state.headers.some((h) => /^word[1-9]$/.test(String(h).trim()))) return "word列(word1〜7)がありません";
         }
         return null;
       }
       // 複数の検品トグルをまとめて1ボタンで切り替える（席種エリアマスタチェック/SEJチェック用）。
       // 現在すべてONなら一括OFF、そうでなければ一括ON（前提条件を満たさない項目は自動スキップ）。
       // kanaCheckのみ2つのグループボタンから共有される（同一機能のため）。備考HTMLは
-      // マスタ用(bikoHtmlCheck)とSEJ用(sejBikoCheck)で別フラグ（SEJ備考差分表示との競合防止）
+      // マスタ用(bikoHtmlCheck)は備考HTML変換。SEJのword検査は sejWordLenCheck（50字超）で別フラグ
       function toggleInspectGroup(keys, btnId, label) {
         const allOn = keys.every((k) => state[k]);
         const turnOn = !allOn;
@@ -2479,10 +2479,10 @@
           const reason = _inspectFlagPrecondition(k);
           if (reason) { skipped.push(`${INSPECT_FLAG_LABELS[k] || k}（${reason}）`); continue; }
           state[k] = true;
-          if (k !== "colorView" && k !== "bikoHtmlCheck" && k !== "sejBikoCheck") needAutoFit = true;
+          if (k !== "colorView" && k !== "bikoHtmlCheck" && k !== "sejWordLenCheck") needAutoFit = true;
         }
         // 備考HTML変換ON時は読みやすさのため折り返し表示も自動で有効化する（既存仕様を維持）
-        if ((state.bikoHtmlCheck || state.sejBikoCheck) && !state.wrapCells) {
+        if (state.bikoHtmlCheck && !state.wrapCells) {
           state.wrapCells = true;
           state.wrapRows.clear();
           document.body.classList.add("wrap-cells");
@@ -2511,8 +2511,8 @@
           }
         }
         state[key] = on;
-        if (on && key !== "colorView" && key !== "bikoHtmlCheck" && key !== "sejBikoCheck") { autoFitAllColumnsQuiet(); renderHeader(); }
-        if (on && (key === "bikoHtmlCheck" || key === "sejBikoCheck") && !state.wrapCells) {
+        if (on && key !== "colorView" && key !== "bikoHtmlCheck" && key !== "sejWordLenCheck") { autoFitAllColumnsQuiet(); renderHeader(); }
+        if (on && key === "bikoHtmlCheck" && !state.wrapCells) {
           state.wrapCells = true;
           state.wrapRows.clear();
           document.body.classList.add("wrap-cells");
@@ -2707,6 +2707,46 @@
         if (/大人|ADULT|高校/i.test(a)) return 4;
         return 0; // 共通・不明はランク判定しない
       }
+      // 年齢区分を「範囲」[min,max]ランクで返す（範囲券種対応・2026-07-07追加）。
+      //  common=true: 「3歳以上共通」等の全年齢券種（年齢制限なし）／ min=0: 判定不能。
+      //  単一ラベルは min===max。範囲例:「幼児〜中学生」「3歳〜中学生」=[1,2]／「高校生以上」「高校生〜大人」=[3,4]。
+      function ugAgeSpan(a) {
+        a = String(a).normalize("NFKC");
+        if (/共通|全年齢/.test(a)) return { min: 1, max: 4, common: true };
+        const ranks = [];
+        if (/幼児|未就学|INFANT/i.test(a)) ranks.push(1);
+        // 「3歳〜」等、先頭付近の小さい歳(3〜6)は幼児からの範囲とみなす（「24歳」等の大人表記は数字直後なので除外）
+        if (/(^|[^0-9])[3-6]\s*歳/.test(a)) ranks.push(1);
+        if (/子供|こども|子ども|小中|小・中|小学|中学|CHILD/i.test(a)) ranks.push(2);
+        // 高校生はU23帯（ナレッジKEN203「U23(高校生〜23歳)」）。以前は大人扱いだったのを2026-07-07修正
+        if (/U23|アンダー|高校/i.test(a)) ranks.push(3);
+        if (/大人|ADULT/i.test(a)) ranks.push(4);
+        if (!ranks.length) return { min: 0, max: 0, common: false };
+        let min = Math.min(...ranks), max = Math.max(...ranks);
+        if (/以上/.test(a)) max = 4; // 「〜以上」は大人まで
+        if (/以下/.test(a)) min = 1; // 「〜以下」は幼児まで
+        return { min, max, common: false };
+      }
+      // UGの年齢区分可否。戻り: null=可 / 文字列=不可理由コード（down|up_out|mid_up）。
+      //  ・共通/判定不能はスキップ（可）
+      //  ・元または先が範囲券種: 相手の年齢が範囲内に収まるか（範囲外の上=up_out／下=down）
+      //  ・単一どうし: 従来ルール（同ランク可 / 昇格は大人へのみ可=mid_up / 降格不可=down）
+      function ugAgeSpanReason(srcAge, dstAge) {
+        const s = ugAgeSpan(srcAge), d = ugAgeSpan(dstAge);
+        if (s.common || d.common) return null;
+        if (s.min === 0 || d.min === 0) return null;
+        const srcRange = s.max > s.min, dstRange = d.max > d.min;
+        if (srcRange) return (d.min >= s.min && d.max <= s.max) ? null : (d.max > s.max ? "up_out" : "down");
+        if (dstRange) return (s.min >= d.min && s.max <= d.max) ? null : (s.max > d.max ? "down" : "up_out");
+        if (d.min === s.min) return null;
+        if (d.min > s.min) return d.min === 4 ? null : "mid_up";
+        return "down";
+      }
+      function ugAgeReasonMsg(reason, srcAge, dstAge) {
+        if (reason === "mid_up") return "年齢区分の昇格は大人へのみ可(" + srcAge + "→" + dstAge + ")";
+        if (reason === "up_out") return "範囲券種の範囲外(上)へのUG不可(" + srcAge + "→" + dstAge + ")";
+        return "年齢降格(" + srcAge + "→" + dstAge + ")";
+      }
       // 売止め等のダミー価格（検算対象外）か
       function ugIsDummyPrice(n) {
         return n != null && (n >= PRICE_RULES.DUMMY_PRICE_MIN || /^9+$/.test(String(n)));
@@ -2798,8 +2838,8 @@
         // そもそも対象外（車椅子/エリア/年齢降格/大人ダウングレード）なのかを区別するために使う。
         function canUpgrade(srcSeat, srcCode, srcAge, dstSeat, dstCode, dstAge) {
           const sr = ageRank(srcAge), dr = ageRank(dstAge);
-          if (sr && dr && dr < sr) return false; // 年齢降格
-          if (sr && dr && dr > sr && dr !== 4) return false; // 中間昇格（幼児→U23等）は別席種でも不可
+          // 年齢降格/範囲外/中間昇格をまとめて判定（範囲券種対応・両方向。2026-07-07）
+          if (ugAgeSpanReason(srcAge, dstAge)) return false;
           // UG対象は基本「指定席」または「エリア席」。その他(パドックパス等)・駐車券・BOX席(区画席)は
           // 登録漏れ候補に含めない（これらの席種間のUGは想定しないため）。
           const srcCat = seatCat(srcCode, srcSeat), dstCat = seatCat(dstCode, dstSeat);
@@ -2847,8 +2887,12 @@
 
           // --- 可否チェック ---
           if (!/会員/.test(kbn) && !/会員/.test(rank)) problems.push("一般販売にUG不可");
-          // 年齢降格（先のランク < 元のランク）のみ不可。子供→大人など昇格・同ランクはOK
-          if (sr && dr && dr < sr) problems.push("年齢降格(" + srcAge + "→" + dstAge + ")");
+          // 年齢区分の可否（降格/範囲外/中間昇格）を範囲券種対応でまとめて判定（両方向・2026-07-07）。
+          // 例: 幼児〜中学生→大人=範囲外で不可 / 幼児〜中学生→幼児=範囲内で可 / 高校生以上→U23=範囲内で可
+          {
+            const ageReason = ugAgeSpanReason(srcAge, dstAge);
+            if (ageReason) problems.push(ugAgeReasonMsg(ageReason, srcAge, dstAge));
+          }
           // エリア席のみ「同席種・同券種UG不可」。その他(O・車椅子・パス等)/指定席は対象外
           const dstCat = seatCat(dstCode, dstSeat);
           if (sameSeat && dstCat === "エリア") problems.push("エリア席の同席種同券種UGは設定不可");
@@ -2861,12 +2905,6 @@
             } else if (srcSeat !== dstSeat) {
               problems.push("車椅子は同一席種内の年齢区分変更のみ可（別の車椅子席へのUG不可）");
             }
-          }
-          // 年齢区分の昇格は「→大人」のみ（幼児→子供・子供→U23等の中間昇格は設定不可）。
-          // 2026-07-04確定: 別席種間でも中間昇格は不可（従来は同席種のみ制限で、
-          // 3歳～中学生→U23等の別席種UGが素通しになっていた）。降格は上の年齢降格チェックで判定済み
-          if (sr && dr && dr > sr && dr !== 4) {
-            problems.push("年齢区分の昇格は大人へのみ可(" + srcAge + "→" + dstAge + ")");
           }
           // 大人料金が先<元（実質ダウングレード）のUGは不可。
           // 大人以外の年齢区分は、その年齢自身の差額が500円以内（先が安い側）なら例外的に許可（fee=0）
@@ -3577,7 +3615,7 @@
           toggleInspectGroup(["colorView", "gateView", "parkingCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck"], "btn-seatmaster-check", "席種エリアマスタチェック");
         };
         $("btn-sej-check").onclick = () => {
-          toggleInspectGroup(["kanaCheck", "sejBikoCheck"], "btn-sej-check", "SEJチェック");
+          toggleInspectGroup(["kanaCheck", "sejWordLenCheck"], "btn-sej-check", "SEJチェック");
         };
         // 統合ボタンの▾: 個別ON/OFFドロップダウンを開閉する（フロント側のメインボタンの見た目・動作は変えない）
         document.querySelectorAll(".rb-caret").forEach((caret) => {
@@ -5103,6 +5141,14 @@
           if (!Object.keys(nteWordCols).length) nteWordCols = null;
         }
 
+        // SEJ Word文字数チェック: word1〜7が50字超のときエラー表記（システム上限50字）。マスタ不要。
+        let wordLenCols = null;
+        if (state.sejWordLenCheck && isSejFile) {
+          wordLenCols = new Set();
+          state.headers.forEach((h, hi) => { if (/^word[1-9]$/.test(String(h).trim())) wordLenCols.add(hi); });
+          if (!wordLenCols.size) wordLenCols = null;
+        }
+
         for (let vi = start; vi < end; vi++) {
           const i = rows._direct ? vi : rows._indices[vi];
           const row = state.data[i];
@@ -5368,20 +5414,20 @@
                 const parts = sejSplitNte(m.nte || "");
                 const masterVal = parts[nteWordCols[j] - 1] || "";
                 const cur = cellVal.trim();
-                if (state.sejBikoCheck) {
-                  // 備考HTML変換(SEJ): 表示のみマスタ備考のN番目項目をHTML表記に切り替える（元データは書き換えない）
-                  const htmlParts = sejSplitNteHtml(m.nte || "");
-                  const masterHtml = htmlParts[nteWordCols[j] - 1] || "";
-                  displayVal = masterHtml
-                    ? renderHtmlValue(masterHtml, { isHtml: true })
-                    : `<span style="color:#aaa">—</span>`;
-                  if (cur !== masterVal.trim()) cls.push("cell-diff");
-                } else if (cur === masterVal.trim()) {
+                if (cur === masterVal.trim()) {
                   if (cur) displayVal += `<br><span style="color:#16a34a;font-size:10px">✓</span>`;
                 } else {
                   cls.push("cell-diff");
                   displayVal += `<br><span style="color:#888;font-size:10px">マスタ:</span> <span style="font-size:11px">${diffEmphasis(cur, masterVal)}</span>`;
                 }
+              }
+            }
+            // SEJ Word文字数チェック: word1〜7が50字超ならエラー表記（赤背景＋文字数注記）
+            if (wordLenCols && wordLenCols.has(j)) {
+              const len = [...String(cellVal)].length;
+              if (len > 50) {
+                cls.push("cell-ng");
+                displayVal += `<br><span style="color:#dc2626;font-size:10px">⚠${len}字（50字超）</span>`;
               }
             }
             const style =
@@ -7736,7 +7782,7 @@
         if (_bm) { _bm.classList.remove("active-state"); _bm.setAttribute("aria-pressed","false"); }
         document.body.classList.remove("marker-mode");
         // 検品表示トグルは現在のデータの列構成に紐づくため、別ファイル/タブへ持ち越さずリセットする
-        ["colorView", "gateView", "parkingCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck", "sejBikoCheck", "ikkatsuCheck"].forEach((k) => { state[k] = false; });
+        ["colorView", "gateView", "parkingCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck", "sejWordLenCheck", "ikkatsuCheck"].forEach((k) => { state[k] = false; });
         const _bik = $("btn-ikkatsu-check");
         if (_bik) { _bik.classList.remove("active-state"); _bik.setAttribute("aria-pressed", "false"); }
         syncInspectUI();
@@ -9336,36 +9382,50 @@
         if (!rowIndices.length) { setStatus("⚠ 表示する行がありません"); return; }
         const isFiltered = rowIndices.length < state.data.length;
 
-        // イベント最終日の推定: 販売終了日時の「日付」部分で最も件数が多い日（同数なら遅い方）を候補にする。
-        // 当日/前売の境界はイベントごとに違う（時刻も様々）ため、ここでは候補日を出すだけにして、
-        // 実際の境界日時は出力ダイアログでユーザーに選択・確認してもらう（指定ミス防止のため曜日も表示）。
+        // 当日/前売の境界日時の推定（ユーザー確定ルール・2026-07-07）:
+        //  価格経路スケジュール内の「販売終了が 23:59（その日の最後の1分）の行」の日付で最も件数が多い日を
+        //  “前売の最終日”とみなし、その 23:59 の1分後＝翌日00:00 を当日開始の候補にする。
+        //  ここでは候補を出すだけで、実際の境界は出力ダイアログでユーザーが確認・変更できる（曜日も表示）。
         const endIdx = H.indexOf("販売終了日時");
-        let candidateDate = "", candidateTime = "11:00";
+        let candidateDate = "", candidateTime = "00:00";
         if (endIdx !== -1) {
-          const counts = new Map();
+          const parseEnd = (raw) => String(raw || "").match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);
+          const nextDay = (dateKey) => {
+            const d = new Date(dateKey + "T00:00:00");
+            d.setDate(d.getDate() + 1);
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+          };
+          const pickMost = (map) => {
+            let best = null;
+            // 同数なら遅い日付を採用（イベント最終日側に倒す）
+            for (const [k, v] of map) if (!best || v.n > best.v.n || (v.n === best.v.n && k > best.k)) best = { k, v };
+            return best;
+          };
+          const count2359 = new Map(); // 23:59終了行の日付ごとの件数
+          const countAll = new Map();  // フォールバック用: 全終了日時の日付ごと（代表時刻も保持）
           for (const i of rowIndices) {
-            const raw = String(state.data[i]?.[endIdx] || "");
-            const m = raw.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);
+            const m = parseEnd(state.data[i]?.[endIdx]);
             if (!m) continue;
             const dateKey = `${m[1]}-${String(m[2]).padStart(2, "0")}-${String(m[3]).padStart(2, "0")}`;
-            const rec = counts.get(dateKey) || { n: 0, time: `${String(m[4] || 11).padStart(2, "0")}:${String(m[5] || 0).padStart(2, "0")}` };
-            rec.n++;
-            counts.set(dateKey, rec);
+            const hh = String(m[4] ?? "").padStart(2, "0"), mm = String(m[5] ?? "").padStart(2, "0");
+            if (hh === "23" && mm === "59") {
+              const r = count2359.get(dateKey) || { n: 0 }; r.n++; count2359.set(dateKey, r);
+            }
+            const rec = countAll.get(dateKey) || { n: 0, time: `${String(m[4] || 11).padStart(2, "0")}:${String(m[5] || 0).padStart(2, "0")}` };
+            rec.n++; countAll.set(dateKey, rec);
           }
-          let best = null;
-          for (const [k, rec] of counts) {
-            if (!best || rec.n > best.rec.n || (rec.n === best.rec.n && k > best.k)) best = { k, rec };
-          }
-          if (best) {
-            candidateDate = best.k;
-            candidateTime = best.rec.time;
-            // 切り替えのタイミングは00:00のため、販売終了が23:59(その日の最後の1分)の場合は
-            // 「翌日00:00」を境界候補にする（木曜23:59で終わる前売は、実質的に金曜0時から当日扱いになる）
-            if (candidateTime === "23:59") {
-              const d = new Date(candidateDate + "T00:00:00");
-              d.setDate(d.getDate() + 1);
-              candidateDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-              candidateTime = "00:00";
+          const best2359 = pickMost(count2359);
+          if (best2359) {
+            // 最多の「23:59終了日」＋1分＝翌日00:00 を当日開始候補に
+            candidateDate = nextDay(best2359.k);
+            candidateTime = "00:00";
+          } else {
+            // 23:59終了の行が無い場合のみ、従来どおり最多の販売終了日時を候補にする
+            const best = pickMost(countAll);
+            if (best) {
+              candidateDate = best.k;
+              candidateTime = best.v.time;
+              if (candidateTime === "23:59") { candidateDate = nextDay(candidateDate); candidateTime = "00:00"; }
             }
           }
         }
@@ -9392,7 +9452,7 @@
             </div>
             <div style="border:1px solid #e2e8ee;border-radius:6px;padding:10px 12px;margin-bottom:16px;background:#f8fafc">
               <div style="font-weight:600;margin-bottom:4px">当日／前売の境界日時（999999ダミー判定に使用）</div>
-              <div style="color:#737373;font-size:11.5px;margin-bottom:8px">この日時より後を「当日」、前を「前売り」として999999(ダミー価格)の検算に使います。候補はチェック対象データの販売終了日時から自動推定したものです。日付は必ずカレンダーで確認し、曜日が想定と合っているか確認してください。</div>
+              <div style="color:#737373;font-size:11.5px;margin-bottom:8px">この日時より後を「当日」、前を「前売り」として999999(ダミー価格)の検算に使います。候補は<b>販売終了が23:59の行が最も多い日の翌日0:00</b>（＝前売最終日の1分後）を自動推定したものです。日付は必ずカレンダーで確認し、曜日が想定と合っているか確認してください。</div>
               <div style="display:flex;align-items:center;gap:6px">
                 <input type="date" id="px-cutoff-date" value="${candidateDate}" style="font-size:13px;padding:4px 6px">
                 <input type="time" id="px-cutoff-time" value="${candidateTime}" style="font-size:13px;padding:4px 6px">
