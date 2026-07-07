@@ -5975,41 +5975,53 @@
         h.title = "ドラッグして下/右へコピー入力";
         td.appendChild(h);
       }
-      // フィルハンドルのドラッグ開始
+      // フィルハンドルのドラッグ開始（端では自動スクロールして長い範囲もフィル可能）
       function startFillDrag() {
         const src = selNormRange();
         if (!src) return;
         state._fillDrag = { src, r2: src.r2, c2: src.c2 };
         document.body.classList.add("fill-dragging");
-        const move = (em) => {
-          const { r, c } = hitCellFromPoint(em.clientX, em.clientY);
+        let fx = 0, fy = 0, timer = null;
+        // 現在のマウス位置からフィルプレビュー範囲を再計算（下/右のみ、はみ出しの大きい軸を延ばす）
+        const updatePreview = () => {
+          const { r, c } = hitCellFromPoint(fx, fy);
           const s = state._fillDrag.src;
-          // 下方向と右方向のうち、はみ出し量が大きい方の軸だけ延ばす（下/右のみ）
-          const downExt = Math.max(0, r - s.r2);
-          const rightExt = Math.max(0, c - s.c2);
+          const downExt = Math.max(0, r - s.r2), rightExt = Math.max(0, c - s.c2);
           let range;
-          if (downExt === 0 && rightExt === 0) {
-            range = { ...s };
-          } else if (downExt >= rightExt) {
-            range = { r1: s.r1, c1: s.c1, r2: r, c2: s.c2 };
-          } else {
-            range = { r1: s.r1, c1: s.c1, r2: s.r2, c2: c };
-          }
+          if (downExt === 0 && rightExt === 0) range = { ...s };
+          else if (downExt >= rightExt) range = { r1: s.r1, c1: s.c1, r2: r, c2: s.c2 };
+          else range = { r1: s.r1, c1: s.c1, r2: s.r2, c2: c };
           state._fillDrag.r2 = range.r2;
           state._fillDrag.c2 = range.c2;
-          // プレビュー: 選択範囲を広げて in-range ハイライトで見せる
-          state.range = range;
+          state.range = range; // プレビュー: in-range ハイライトで見せる
           state.forceRender = true;
           renderBody();
         };
+        const startTimer = () => {
+          const EDGE = 60, MAX = 20;
+          const sp = (o) => Math.ceil(Math.min(o / EDGE, 1) * MAX);
+          timer = setInterval(() => {
+            if (!state._fillDrag) { clearInterval(timer); timer = null; return; }
+            const rect = els.container.getBoundingClientRect();
+            let scrolled = false;
+            const ob = fy - (rect.bottom - EDGE), ot = (rect.top + EDGE) - fy;
+            const orr = fx - (rect.right - EDGE), ol = (rect.left + EDGE) - fx;
+            if (ob > 0) { els.container.scrollTop += sp(ob); scrolled = true; }
+            if (ot > 0) { els.container.scrollTop -= sp(ot); scrolled = true; }
+            if (orr > 0) { els.container.scrollLeft += sp(orr); scrolled = true; }
+            if (ol > 0) { els.container.scrollLeft -= sp(ol); scrolled = true; }
+            if (scrolled) updatePreview();
+          }, 16);
+        };
+        const move = (em) => { fx = em.clientX; fy = em.clientY; updatePreview(); if (!timer) startTimer(); };
         const up = () => {
           document.removeEventListener("mousemove", move);
           document.removeEventListener("mouseup", up);
+          if (timer) { clearInterval(timer); timer = null; }
           document.body.classList.remove("fill-dragging");
           const fd = state._fillDrag;
           state._fillDrag = null;
-          if (!fd) return;
-          applyFill(fd.src, fd.r2, fd.c2);
+          if (fd) applyFill(fd.src, fd.r2, fd.c2);
         };
         document.addEventListener("mousemove", move);
         document.addEventListener("mouseup", up);
