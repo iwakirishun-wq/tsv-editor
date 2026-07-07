@@ -5981,12 +5981,16 @@
         if (!src) return;
         state._fillDrag = { src, r2: src.r2, c2: src.c2 };
         document.body.classList.add("fill-dragging");
-        let fx = 0, fy = 0, timer = null;
-        // 現在のマウス位置からフィルプレビュー範囲を再計算（下/右のみ、はみ出しの大きい軸を延ばす）
+        let fx = 0, fy = 0, timer = null, everMoved = false;
+        // 現在のマウス位置からフィルプレビュー範囲を再計算（下/右のみ、はみ出しの大きい軸を延ばす）。
+        // 一度も延びていない間は再描画しない（単純クリック時にハンドルを作り直さず、ダブルクリック
+        // 自動フィルの対象が消えないようにするため）。
         const updatePreview = () => {
           const { r, c } = hitCellFromPoint(fx, fy);
           const s = state._fillDrag.src;
           const downExt = Math.max(0, r - s.r2), rightExt = Math.max(0, c - s.c2);
+          if (downExt === 0 && rightExt === 0 && !everMoved) return;
+          everMoved = everMoved || downExt > 0 || rightExt > 0;
           let range;
           if (downExt === 0 && rightExt === 0) range = { ...s };
           else if (downExt >= rightExt) range = { r1: s.r1, c1: s.c1, r2: r, c2: s.c2 };
@@ -6021,10 +6025,32 @@
           document.body.classList.remove("fill-dragging");
           const fd = state._fillDrag;
           state._fillDrag = null;
-          if (fd) applyFill(fd.src, fd.r2, fd.c2);
+          // 実際に延びたときだけ確定。単純クリック（延び無し）は再描画もしない＝ハンドル保持
+          if (fd && (fd.r2 !== fd.src.r2 || fd.c2 !== fd.src.c2)) applyFill(fd.src, fd.r2, fd.c2);
         };
         document.addEventListener("mousemove", move);
         document.addEventListener("mouseup", up);
+      }
+      // 隣接列（左優先、無ければ右）の連続データ末尾行を返す（ダブルクリック自動フィルの下端）
+      function fillHandleExtent(src) {
+        const left = src.c1 - 1, right = src.c2 + 1;
+        const neighbor = left >= 0 ? left : (right <= state.headers.length - 1 ? right : -1);
+        if (neighbor === -1) return src.r2;
+        let last = src.r2;
+        for (let r = src.r2 + 1; r < state.data.length; r++) {
+          if (String(safeGet(r, neighbor) ?? "").trim() === "") break;
+          last = r;
+        }
+        return last;
+      }
+      // フィルハンドルのダブルクリック: 隣接列の末尾まで下方向へ自動フィル
+      function autoFillDown() {
+        if (!fillHandleAllowed()) return;
+        const src = selNormRange();
+        if (!src) return;
+        const r2 = fillHandleExtent(src);
+        if (r2 <= src.r2) { setStatus("自動フィル: 隣の列にデータが無いため対象がありません"); return; }
+        applyFill(src, r2, src.c2);
       }
       // 元範囲 src を、拡張後の右下(r2,c2)までタイル状にコピー入力する
       function applyFill(src, r2, c2) {
@@ -6066,6 +6092,13 @@
 
       // ===== 編集 =====
       function onDblClick(e) {
+        // フィルハンドルのダブルクリック → 隣接列の末尾まで自動フィル（編集開始より優先）
+        if (e.target.classList && e.target.classList.contains("fill-handle")) {
+          e.preventDefault();
+          e.stopPropagation();
+          autoFillDown();
+          return;
+        }
         const td = e.target.closest("td[data-col]");
         if (!td) return;
         const row = parseInt(td.parentNode.dataset.row);
