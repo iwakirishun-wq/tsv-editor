@@ -652,6 +652,25 @@
       .col-resize-handle:hover {
         background: var(--accent);
       }
+      /* フィルハンドル（選択範囲の右下をドラッグして下/右方向へコピー入力） */
+      td.has-fill-handle { position: relative; }
+      .fill-handle {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        width: 8px;
+        height: 8px;
+        background: #217346;
+        border: 1px solid #fff;
+        box-sizing: border-box;
+        cursor: crosshair;
+        z-index: 6;
+        display: none; /* 通常は隠す。選択セルにマウスを乗せた時だけ表示し、キーボード操作や他セルのクリックを邪魔しない */
+      }
+      td.has-fill-handle:hover .fill-handle { display: block; }
+      body.fill-dragging, body.fill-dragging * { cursor: crosshair !important; }
+      /* フィルドラッグ中は対象範囲を緑がかった色で区別（通常の選択と見分ける） */
+      body.fill-dragging td.in-range { background: rgba(33, 115, 70, 0.14) !important; }
 
 
 
@@ -3845,7 +3864,14 @@
         els.container.onscroll = () => requestAnimationFrame(renderBody);
 
         // Alt+ホイールでズーム（CSS zoom を使用 — sticky/scrollと互換性あり）
+        // Shift+ホイールで横スクロール（列数の多いチケットTSVの横移動を楽にする。
+        // 縦ホイールの回転量をそのまま横スクロールに割り当てる。ズーム(Alt)とは併用しない）
         els.container.addEventListener("wheel", (e) => {
+          if (e.shiftKey && !e.altKey && e.deltaY !== 0) {
+            e.preventDefault();
+            els.container.scrollLeft += e.deltaY;
+            return;
+          }
           if (!e.altKey) return;
           e.preventDefault();
           const delta = e.deltaY > 0 ? -10 : 10;
@@ -5463,6 +5489,7 @@
           }
         }
         els.tbody.innerHTML = html;
+        placeFillHandle();
         _prevHighlight = {
           selected: state.selected ? { ...state.selected } : null,
           range: state.range ? { ...state.range } : null,
@@ -5580,6 +5607,7 @@
           range: cur.range ? { ...cur.range } : null,
           selectedCol: cur.selectedCol,
         };
+        placeFillHandle();
         updateStatusPos();
       }
 
@@ -5661,6 +5689,13 @@
         if (e.target.closest("td.editing")) return;
         // 右クリックは onContextMenu で処理（選択範囲を維持するため）
         if (e.button === 2) return;
+        // フィルハンドル: 通常の選択ドラッグより先に処理（下/右へコピー入力）
+        if (e.target.classList && e.target.classList.contains("fill-handle")) {
+          e.preventDefault();
+          e.stopPropagation();
+          startFillDrag();
+          return;
+        }
         // 編集中に他セルをクリックした場合: 以下の e.preventDefault() がフォーカス移動(blur)を
         // 抑制してしまい編集が確定されないため、先に明示的blurで確定させてから選択処理に進む
         if (state.isEditing) {
@@ -5910,8 +5945,214 @@
         }
       }
 
+      // ===== フィルハンドル（Excel風: 選択範囲の右下をドラッグして下/右へコピー入力）=====
+      // 安全のため、フィルター/非表示行があるとき（可視行とデータ行がずれる）は無効化する。
+      function fillHandleAllowed() {
+        return !state.isEditing && !state.filteredIndices && state.hiddenRows.size === 0;
+      }
+      // 現在の選択範囲の正規化 {r1,c1,r2,c2}（昇順）。選択が無ければ null。
+      function selNormRange() {
+        if (state.range) {
+          const { r1, c1, r2, c2 } = state.range;
+          return { r1: Math.min(r1, r2), c1: Math.min(c1, c2), r2: Math.max(r1, r2), c2: Math.max(c1, c2) };
+        }
+        if (state.selected) {
+          const { row, col } = state.selected;
+          return { r1: row, c1: col, r2: row, c2: col };
+        }
+        return null;
+      }
+      // 選択範囲右下のセルにフィルハンドルを配置（renderBody/updateHighlight から呼ぶ）
+      function placeFillHandle() {
+        const old = els.tbody.querySelector(".fill-handle");
+        if (old) old.remove();
+        const prevTd = els.tbody.querySelector("td.has-fill-handle");
+        if (prevTd) prevTd.classList.remove("has-fill-handle");
+        if (!fillHandleAllowed() || state._fillDrag) return;
+        const sr = selNormRange();
+        if (!sr) return;
+        const td = els.tbody.querySelector(`tr[data-row="${sr.r2}"] td[data-col="${sr.c2}"]`);
+        if (!td) return; // 右下セルが仮想スクロールで未描画なら出さない
+        td.classList.add("has-fill-handle");
+        const h = document.createElement("div");
+        h.className = "fill-handle";
+        h.title = "ドラッグして下/右へコピー入力";
+        td.appendChild(h);
+      }
+      // フィルハンドルのドラッグ開始（端では自動スクロールして長い範囲もフィル可能）
+      function startFillDrag() {
+        const src = selNormRange();
+        if (!src) return;
+        state._fillDrag = { src, r2: src.r2, c2: src.c2 };
+        document.body.classList.add("fill-dragging");
+        let fx = 0, fy = 0, timer = null, everMoved = false;
+        // 現在のマウス位置からフィルプレビュー範囲を再計算（下/右のみ、はみ出しの大きい軸を延ばす）。
+        // 一度も延びていない間は再描画しない（単純クリック時にハンドルを作り直さず、ダブルクリック
+        // 自動フィルの対象が消えないようにするため）。
+        const updatePreview = () => {
+          const { r, c } = hitCellFromPoint(fx, fy);
+          const s = state._fillDrag.src;
+          const downExt = Math.max(0, r - s.r2), rightExt = Math.max(0, c - s.c2);
+          if (downExt === 0 && rightExt === 0 && !everMoved) return;
+          everMoved = everMoved || downExt > 0 || rightExt > 0;
+          let range;
+          if (downExt === 0 && rightExt === 0) range = { ...s };
+          else if (downExt >= rightExt) range = { r1: s.r1, c1: s.c1, r2: r, c2: s.c2 };
+          else range = { r1: s.r1, c1: s.c1, r2: s.r2, c2: c };
+          state._fillDrag.r2 = range.r2;
+          state._fillDrag.c2 = range.c2;
+          state.range = range; // プレビュー: in-range ハイライトで見せる
+          state.forceRender = true;
+          renderBody();
+          // ドラッグ中は対象セル数をステータスに表示（片軸のみ延びるので一方は0）
+          const n = (range.r2 - s.r2) * (s.c2 - s.c1 + 1) + (range.c2 - s.c2) * (s.r2 - s.r1 + 1);
+          setStatus(n > 0 ? `フィル: ${n}セルにコピー` : "フィル: 元の位置");
+        };
+        const startTimer = () => {
+          const EDGE = 60, MAX = 20;
+          const sp = (o) => Math.ceil(Math.min(o / EDGE, 1) * MAX);
+          timer = setInterval(() => {
+            if (!state._fillDrag) { clearInterval(timer); timer = null; return; }
+            const rect = els.container.getBoundingClientRect();
+            let scrolled = false;
+            const ob = fy - (rect.bottom - EDGE), ot = (rect.top + EDGE) - fy;
+            const orr = fx - (rect.right - EDGE), ol = (rect.left + EDGE) - fx;
+            if (ob > 0) { els.container.scrollTop += sp(ob); scrolled = true; }
+            if (ot > 0) { els.container.scrollTop -= sp(ot); scrolled = true; }
+            if (orr > 0) { els.container.scrollLeft += sp(orr); scrolled = true; }
+            if (ol > 0) { els.container.scrollLeft -= sp(ol); scrolled = true; }
+            if (scrolled) updatePreview();
+          }, 16);
+        };
+        const teardown = () => {
+          document.removeEventListener("mousemove", move);
+          document.removeEventListener("mouseup", up);
+          document.removeEventListener("keydown", onKey, true);
+          if (timer) { clearInterval(timer); timer = null; }
+          document.body.classList.remove("fill-dragging");
+        };
+        const move = (em) => { fx = em.clientX; fy = em.clientY; updatePreview(); if (!timer) startTimer(); };
+        const up = () => {
+          teardown();
+          const fd = state._fillDrag;
+          state._fillDrag = null;
+          // 実際に延びたときだけ確定。単純クリック（延び無し）は再描画もしない＝ハンドル保持
+          if (fd && (fd.r2 !== fd.src.r2 || fd.c2 !== fd.src.c2)) applyFill(fd.src, fd.r2, fd.c2);
+        };
+        // Escでキャンセル: フィルを適用せず選択を元に戻す（列リサイズと同様の操作感）
+        const onKey = (ek) => {
+          if (ek.key !== "Escape") return;
+          ek.preventDefault();
+          ek.stopImmediatePropagation();
+          teardown();
+          state._fillDrag = null;
+          const single = src.r1 === src.r2 && src.c1 === src.c2;
+          state.range = single ? null : { ...src };
+          state.selected = { row: src.r1, col: src.c1 };
+          state.anchor = { row: src.r1, col: src.c1 };
+          state.forceRender = true;
+          renderBody();
+          setStatus("フィルをキャンセルしました");
+        };
+        document.addEventListener("mousemove", move);
+        document.addEventListener("mouseup", up);
+        document.addEventListener("keydown", onKey, true); // capture: グローバルkeydownより先に処理
+      }
+      // 隣接列（左優先、無ければ右）の連続データ末尾行を返す（ダブルクリック自動フィルの下端）
+      function fillHandleExtent(src) {
+        const left = src.c1 - 1, right = src.c2 + 1;
+        const neighbor = left >= 0 ? left : (right <= state.headers.length - 1 ? right : -1);
+        if (neighbor === -1) return src.r2;
+        let last = src.r2;
+        for (let r = src.r2 + 1; r < state.data.length; r++) {
+          if (String(safeGet(r, neighbor) ?? "").trim() === "") break;
+          last = r;
+        }
+        return last;
+      }
+      // フィルハンドルのダブルクリック: 隣接列の末尾まで下方向へ自動フィル
+      function autoFillDown() {
+        if (!fillHandleAllowed()) return;
+        const src = selNormRange();
+        if (!src) return;
+        const r2 = fillHandleExtent(src);
+        if (r2 <= src.r2) { setStatus("自動フィル: 隣の列にデータが無いため対象がありません"); return; }
+        applyFill(src, r2, src.c2);
+      }
+      // 数値の等差系列を判定。vals が2件以上の正準な数値（"001"等ゼロ埋めは除外）で
+      // 一定差の等差数列なら { last, step, decimals } を返す。そうでなければ null（=タイルコピー）。
+      function fillSeriesInfo(vals) {
+        if (vals.length < 2) return null;
+        const nums = [];
+        let decimals = 0;
+        for (const raw of vals) {
+          const s = String(raw ?? "").trim();
+          if (s === "") return null;
+          const n = Number(s);
+          if (!isFinite(n) || String(n) !== s) return null; // 正準な数値のみ（"001","1,000","1e3"等は除外）
+          nums.push(n);
+          const dot = s.indexOf(".");
+          if (dot >= 0) decimals = Math.max(decimals, s.length - dot - 1);
+        }
+        const step = nums[1] - nums[0];
+        for (let i = 2; i < nums.length; i++) {
+          if (Math.abs((nums[i] - nums[i - 1]) - step) > 1e-9) return null;
+        }
+        return { last: nums[nums.length - 1], step, decimals };
+      }
+      const fillSeriesVal = (ser, k) => (ser.last + ser.step * k).toFixed(ser.decimals);
+      // 元範囲 src を、拡張後の右下(r2,c2)までコピー入力する。
+      // 単一列/単一行で数値の等差系列なら系列を継続、それ以外はタイルコピー。
+      function applyFill(src, r2, c2) {
+        const downExt = r2 - src.r2, rightExt = c2 - src.c2;
+        if (downExt <= 0 && rightExt <= 0) { // 実質広がっていない → 何もしない
+          state.range = { ...src }; state.forceRender = true; renderBody(); return;
+        }
+        saveUndo();
+        const srcRows = src.r2 - src.r1 + 1, srcCols = src.c2 - src.c1 + 1;
+        let changed = false;
+        if (downExt >= rightExt) {
+          // 下方向フィル: 列ごとに系列判定（無ければ行タイル）
+          for (let c = src.c1; c <= src.c2; c++) {
+            const colVals = [];
+            for (let r = src.r1; r <= src.r2; r++) colVals.push(safeGet(r, c));
+            const ser = fillSeriesInfo(colVals);
+            for (let r = src.r2 + 1; r <= r2; r++) {
+              const v = ser ? fillSeriesVal(ser, r - src.r2) : safeGet(src.r1 + ((r - src.r1) % srcRows), c);
+              if (safeGet(r, c) !== v) { safeSet(r, c, v); changed = true; }
+            }
+          }
+          state.range = { r1: src.r1, c1: src.c1, r2, c2: src.c2 };
+        } else {
+          // 右方向フィル: 行ごとに系列判定（無ければ列タイル）
+          for (let r = src.r1; r <= src.r2; r++) {
+            const rowVals = [];
+            for (let c = src.c1; c <= src.c2; c++) rowVals.push(safeGet(r, c));
+            const ser = fillSeriesInfo(rowVals);
+            for (let c = src.c2 + 1; c <= c2; c++) {
+              const v = ser ? fillSeriesVal(ser, c - src.c2) : safeGet(r, src.c1 + ((c - src.c1) % srcCols));
+              if (safeGet(r, c) !== v) { safeSet(r, c, v); changed = true; }
+            }
+          }
+          state.range = { r1: src.r1, c1: src.c1, r2: src.r2, c2 };
+        }
+        if (changed) { markDirty(); setStatus("フィル: コピー入力しました"); }
+        state.selected = { row: state.range.r2, col: state.range.c2 };
+        state.anchor = { row: src.r1, col: src.c1 };
+        state.forceRender = true;
+        renderBody();
+        updateStatusPos();
+      }
+
       // ===== 編集 =====
       function onDblClick(e) {
+        // フィルハンドルのダブルクリック → 隣接列の末尾まで自動フィル（編集開始より優先）
+        if (e.target.classList && e.target.classList.contains("fill-handle")) {
+          e.preventDefault();
+          e.stopPropagation();
+          autoFillDown();
+          return;
+        }
         const td = e.target.closest("td[data-col]");
         if (!td) return;
         const row = parseInt(td.parentNode.dataset.row);
