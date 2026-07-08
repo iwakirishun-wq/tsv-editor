@@ -9054,6 +9054,7 @@
           }
           
           const maxPrices = {};
+          // リセール上限はチケットアカウントの「前売価格」の上限と一致すべき（当日価格は対象外）。
           // 桁区切りカンマを除いて数値化。0/空欄や売止めダミー(999999等)は「最高額」の対象外にする
           // （これらを混ぜるとリセール上限検算が常に誤NGになるため）。
           const _parsePM = (s) => { const n = parseInt(String(s ?? "").replace(/[^0-9]/g, ""), 10); return isNaN(n) ? 0 : n; };
@@ -9064,11 +9065,11 @@
              const rank = String(rankIdx >= 0 ? row[rankIdx] : "");
              const route = String(routeIdx >= 0 ? row[routeIdx] : "");
              if (rank.includes("チケットアカウント") || route.includes("チケットアカウント")) {
-                const cand = [_parsePM(row[dayIdx]), _parsePM(row[advIdx])].filter((n) => n > 0 && !ugIsDummyPrice(n));
-                if (!cand.length) continue;
-                const mx = Math.max(...cand);
-                if (!maxPrices[code] || mx > maxPrices[code]) {
-                   maxPrices[code] = mx;
+                // 前売価格のみを対象にする（当日価格は含めない）
+                const adv = advIdx >= 0 ? _parsePM(row[advIdx]) : 0;
+                if (!(adv > 0 && !ugIsDummyPrice(adv))) continue;
+                if (!maxPrices[code] || adv > maxPrices[code]) {
+                   maxPrices[code] = adv;
                 }
              }
           }
