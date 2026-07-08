@@ -183,9 +183,12 @@ const SCENARIOS = [
   },
   // --- 範囲券種（年齢レンジ）2026-07-07 ---
   {
-    name: "範囲: 「幼児〜中学生」→大人 → invalid（範囲外の上へのUG不可）",
+    // 範囲券種でも→大人は可（同席種の大人化/別席種の昇格）。2026-07-08: 範囲外扱いで誤invalidにしていたのを修正
+    name: "範囲: 「幼児〜中学生」→大人(別席種) → OK（→大人は範囲券種でも可・実差額3000）",
+    // 元(RC席・幼児〜中学生)=5000/5300、先(S席・大人)=8000/8500 → 異区分diff>500→実差額3000/3200
     row: ugRow(SEAT_RC.name, SEAT_RC.cd, "幼児〜中学生", SEAT_S.name, SEAT_S.cd, "大人", 3000, 3200),
-    expectStatus: "invalid",
+    expectStatus: "ok",
+    expectExpected: 3000,
   },
   {
     name: "範囲: 「幼児〜中学生」→小学生(別席種・範囲内) → OK（可否が開くことの確認）",
@@ -263,7 +266,7 @@ eqSpan("3歳以上共通", 1, 4, true, "3歳以上共通=全年齢common");
 
 // --- canUpgrade: 範囲券種の両方向レンジ判定（2026-07-07）---
 eqCU(validate.canUpgrade("RC席", "RESV43", "幼児〜中学生", "子供席", "RESV60", "幼児"), true, "範囲元→範囲内(幼児)は可");
-eqCU(validate.canUpgrade("RC席", "RESV43", "幼児〜中学生", "大人席", "RESV61", "大人"), false, "範囲元→範囲外(大人)は不可");
+eqCU(validate.canUpgrade("RC席", "RESV43", "幼児〜中学生", "大人席", "RESV61", "大人"), true, "範囲元→大人は可（範囲券種でも大人化は許可）");
 eqCU(validate.canUpgrade("H席", "RESV41", "高校生以上", "U23席", "RESV62", "U23"), true, "高校生以上→U23(範囲内)は可");
 eqCU(validate.canUpgrade("H席", "RESV41", "高校生以上", "大人席", "RESV63", "大人"), true, "高校生以上→大人(範囲内)は可");
 eqCU(validate.canUpgrade("H席", "RESV41", "高校生以上", "小中席", "RESV64", "子供"), false, "高校生以上→小中(降格)は不可");
