@@ -656,8 +656,8 @@
       td.has-fill-handle { position: relative; }
       .fill-handle {
         position: absolute;
-        right: -1px;
-        bottom: -1px;
+        right: 0;
+        bottom: 0;
         width: 8px;
         height: 8px;
         background: #217346;
@@ -665,7 +665,9 @@
         box-sizing: border-box;
         cursor: crosshair;
         z-index: 6;
+        display: none; /* 通常は隠す。選択セルにマウスを乗せた時だけ表示し、キーボード操作や他セルのクリックを邪魔しない */
       }
+      td.has-fill-handle:hover .fill-handle { display: block; }
       body.fill-dragging, body.fill-dragging * { cursor: crosshair !important; }
       /* フィルドラッグ中は対象範囲を緑がかった色で区別（通常の選択と見分ける） */
       body.fill-dragging td.in-range { background: rgba(33, 115, 70, 0.14) !important; }
