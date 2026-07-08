@@ -2755,7 +2755,11 @@
         if (s.common || d.common) return null;
         if (s.min === 0 || d.min === 0) return null;
         const srcRange = s.max > s.min, dstRange = d.max > d.min;
-        if (srcRange) return (d.min >= s.min && d.max <= s.max) ? null : (d.max > s.max ? "up_out" : "down");
+        if (srcRange) {
+          if (d.min >= s.min && d.max <= s.max) return null; // 範囲内（再発行・範囲内の年齢区分変更）
+          if (d.min === 4) return null;                       // →大人は範囲券種でも可（同席種の大人化／別席種の昇格）
+          return d.max > s.max ? "up_out" : "down";
+        }
         if (dstRange) return (s.min >= d.min && s.max <= d.max) ? null : (s.max > d.max ? "down" : "up_out");
         if (d.min === s.min) return null;
         if (d.min > s.min) return d.min === 4 ? null : "mid_up";
