@@ -5774,6 +5774,20 @@
       let _mouseMoveRAF = false;
       function hitCellFromPoint(mx, my) {
         const rect = els.container.getBoundingClientRect();
+        // ① 実DOMヒットテスト優先: カーソル直下の実セルから data-row/data-col を読む。
+        //    行高が不均一（折り返し・個別wrap-row・行高変更・ズーム）でも onMouseDown と
+        //    同じ精度でドラッグ選択でき、"意図しない範囲まで選択される" 過剰選択を防ぐ。
+        //    端の自動スクロール中にカーソルがコンテナ外へ出てもコンテナ内へクランプして拾う。
+        const cx = Math.max(rect.left + 1, Math.min(mx, rect.right - 1));
+        const cy = Math.max(rect.top + 1, Math.min(my, rect.bottom - 1));
+        const elHit = document.elementFromPoint(cx, cy);
+        const tdHit = elHit && elHit.closest ? elHit.closest("td[data-col]") : null;
+        if (tdHit && tdHit.parentNode && tdHit.parentNode.dataset) {
+          const rr = parseInt(tdHit.parentNode.dataset.row);
+          const cc = parseInt(tdHit.dataset.col);
+          if (!isNaN(rr) && !isNaN(cc)) return { r: rr, c: cc };
+        }
+        // ② フォールバック: セル外（最終行より下・ヘッダー上）では従来の算術推定で範囲を延ばす。
         const relX = mx - rect.left + els.container.scrollLeft;
         const relY = my - rect.top + els.container.scrollTop;
         const rh = state.wrapCells ? 56 : ROW_H;
