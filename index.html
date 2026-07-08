@@ -5702,6 +5702,18 @@
           const editingInput = els.tbody.querySelector("td.editing input");
           if (editingInput) editingInput.blur();
         }
+        // 検索ボックス/行移動/数式バー等の入力欄にフォーカスが残っていると、この後の e.preventDefault() で
+        // フォーカスが外れず、クリック後の Shift+矢印などキーボード選択が入力欄に取られて効かなくなる。
+        // セル/行/列を選択するクリックのときは、入力欄のフォーカスを外してグリッド操作へ戻す。
+        {
+          const ae = document.activeElement;
+          if (ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA") && !ae.closest("td.editing")) {
+            const isSelTarget = e.target.closest("td[data-col]") || e.target.closest(".row-num[data-rownum]")
+              || (e.target.closest("th[data-col]") && !e.target.closest(".filter-btn")
+                  && !e.target.closest(".sort-arrow") && !e.target.closest(".col-resize-handle"));
+            if (isSelTarget) ae.blur();
+          }
+        }
         const rowNum = e.target.closest(".row-num[data-rownum]");
         if (rowNum) {
           e.preventDefault();
