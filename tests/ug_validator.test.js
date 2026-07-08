@@ -18,8 +18,8 @@ if (!m) {
   process.exit(1);
 }
 const core = m[1];
-const factory = new Function(core + "\nreturn { buildUgValidator, ugAgeRank, ugIsDummyPrice, ugExpectedCharge, PRICE_RULES };");
-const { buildUgValidator, ugAgeRank } = factory();
+const factory = new Function(core + "\nreturn { buildUgValidator, ugAgeRank, ugAgeSpan, ugIsDummyPrice, ugExpectedCharge, PRICE_RULES };");
+const { buildUgValidator, ugAgeRank, ugAgeSpan } = factory();
 
 // --- 列構成（実アプリの c.xxx に対応する仮想カラムID） ---
 const c = {
@@ -85,6 +85,16 @@ NORMALS.push({ ...priceRow(SEAT_PERIOD_DST.name, SEAT_PERIOD_DST.cd, "大人", 1
 // 「3歳〜中学生」ラベル（上限が中学生＝子供ランク扱い）の降格/横移動判定テスト用データ
 const SEAT_M = { name: "M席", cd: "RESV18" };
 NORMALS.push(priceRow(SEAT_M.name, SEAT_M.cd, "3歳〜中学生", 5300, 5600));
+
+// 範囲券種（年齢レンジ）のUG判定テスト用データ（2026-07-07）
+const SEAT_HS = { name: "H指定席", cd: "RESV41" };   // 「高校生以上」= U23〜大人帯
+const SEAT_U = { name: "U指定席", cd: "RESV42" };    // U23（高校生以上の範囲内・先）
+const SEAT_RC = { name: "RC指定席", cd: "RESV43" };  // 「幼児〜中学生」= 幼児〜子供帯
+const SEAT_EL = { name: "EL指定席", cd: "RESV45" };  // 小学生（幼児〜中学生の範囲内・先）
+NORMALS.push(priceRow(SEAT_HS.name, SEAT_HS.cd, "高校生以上", 6000, 6300));
+NORMALS.push(priceRow(SEAT_U.name, SEAT_U.cd, "U23", 7000, 7000));
+NORMALS.push(priceRow(SEAT_RC.name, SEAT_RC.cd, "幼児〜中学生", 5000, 5300));
+NORMALS.push(priceRow(SEAT_EL.name, SEAT_EL.cd, "小学生", 5300, 5600));
 
 const SCENARIOS = [
   {
@@ -171,6 +181,32 @@ const SCENARIOS = [
     expectStatus: "ok",
     expectExpected: 300,
   },
+  // --- 範囲券種（年齢レンジ）2026-07-07 ---
+  {
+    name: "範囲: 「幼児〜中学生」→大人 → invalid（範囲外の上へのUG不可）",
+    row: ugRow(SEAT_RC.name, SEAT_RC.cd, "幼児〜中学生", SEAT_S.name, SEAT_S.cd, "大人", 3000, 3200),
+    expectStatus: "invalid",
+  },
+  {
+    name: "範囲: 「幼児〜中学生」→小学生(別席種・範囲内) → OK（可否が開くことの確認）",
+    // 元(RC席・幼児〜中学生)=5000/5300、先(EL席・小学生)=5300/5600 → 範囲内でUG可（従来はinvalid）。
+    // 差額は既存の価格ロジック（ugAgeRankは「幼児」が先にヒットし異区分扱い→1〜500は500に切上げ）で500。
+    row: ugRow(SEAT_RC.name, SEAT_RC.cd, "幼児〜中学生", SEAT_EL.name, SEAT_EL.cd, "小学生", 500, 500),
+    expectStatus: "ok",
+    expectExpected: 500,
+  },
+  {
+    name: "範囲: 「高校生以上」→小中 → invalid（年齢降格）",
+    row: ugRow(SEAT_HS.name, SEAT_HS.cd, "高校生以上", SEAT_S.name, SEAT_S.cd, "子供", 300, 300),
+    expectStatus: "invalid",
+  },
+  {
+    name: "範囲: 「高校生以上」→U23(別席種・範囲内) → OK（実差額 前売1000/当日700）",
+    // 元(H席・高校生以上)=6000/6300、先(U席・U23)=7000/7000 → 範囲内。異区分diff>500→実差額
+    row: ugRow(SEAT_HS.name, SEAT_HS.cd, "高校生以上", SEAT_U.name, SEAT_U.cd, "U23", 1000, 700),
+    expectStatus: "ok",
+    expectExpected: 1000,
+  },
 ];
 
 let pass = 0, fail = 0;
@@ -206,6 +242,33 @@ eqCU(ugAgeRank("3歳〜中学生"), 2, "「3歳〜中学生」は子供ランク
 eqCU(ugAgeRank("中学生以下"), 2, "「中学生以下」は子供ランク");
 eqCU(ugAgeRank("3歳以上共通"), 0, "「3歳以上共通」はランク判定しない(全年齢OK)");
 eqCU(ugAgeRank("高校生〜大人"), 4, "「高校生〜大人」は大人ランク");
+
+// --- ugAgeSpan（範囲券種を[min,max]レンジで解釈・2026-07-07）---
+function eqSpan(label, min, max, common, desc) {
+  const s = ugAgeSpan(label);
+  const ok = s.min === min && s.max === max && !!s.common === !!common;
+  if (ok) pass++;
+  else { fail++; console.error(`NG ugAgeSpan[${desc}]: 期待 {min:${min},max:${max},common:${!!common}} / 実際 ${JSON.stringify(s)}`); }
+}
+eqSpan("幼児", 1, 1, false, "幼児=単一[1,1]");
+eqSpan("小学生", 2, 2, false, "小学生=単一[2,2]");
+eqSpan("U23", 3, 3, false, "U23=単一[3,3]");
+eqSpan("大人", 4, 4, false, "大人=単一[4,4]");
+eqSpan("幼児〜中学生", 1, 2, false, "幼児〜中学生=[1,2]");
+eqSpan("3歳〜中学生", 1, 2, false, "3歳〜中学生=[1,2]（3歳で幼児から）");
+eqSpan("中学生以下", 1, 2, false, "中学生以下=[1,2]");
+eqSpan("高校生以上", 3, 4, false, "高校生以上=[3,4]（高校生=U23帯）");
+eqSpan("高校生〜大人", 3, 4, false, "高校生〜大人=[3,4]");
+eqSpan("3歳以上共通", 1, 4, true, "3歳以上共通=全年齢common");
+
+// --- canUpgrade: 範囲券種の両方向レンジ判定（2026-07-07）---
+eqCU(validate.canUpgrade("RC席", "RESV43", "幼児〜中学生", "子供席", "RESV60", "幼児"), true, "範囲元→範囲内(幼児)は可");
+eqCU(validate.canUpgrade("RC席", "RESV43", "幼児〜中学生", "大人席", "RESV61", "大人"), false, "範囲元→範囲外(大人)は不可");
+eqCU(validate.canUpgrade("H席", "RESV41", "高校生以上", "U23席", "RESV62", "U23"), true, "高校生以上→U23(範囲内)は可");
+eqCU(validate.canUpgrade("H席", "RESV41", "高校生以上", "大人席", "RESV63", "大人"), true, "高校生以上→大人(範囲内)は可");
+eqCU(validate.canUpgrade("H席", "RESV41", "高校生以上", "小中席", "RESV64", "子供"), false, "高校生以上→小中(降格)は不可");
+eqCU(validate.canUpgrade("幼児席", "RESV65", "幼児", "範囲先席", "RESV66", "3歳〜中学生"), true, "単一(幼児)→範囲先(3歳〜中学生)は範囲内で可");
+eqCU(validate.canUpgrade("U23席", "RESV67", "U23", "範囲先席", "RESV68", "3歳〜中学生"), false, "単一(U23)→範囲先(3歳〜中学生)は降格で不可");
 
 // 大人料金ダウングレード判定が、条件(会員ランク/販売経路)の異なる無関係な価格を拾って
 // 誤判定しないことの回帰テスト（X席の大人料金は「店頭」経路にしかなく、UG行は既定条件で登録）
