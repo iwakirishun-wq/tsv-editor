@@ -2203,7 +2203,7 @@
           ・<span style="color:#16a34a">✓</span> = マスタと完全一致<br>
           ・ピンク色のセル = 不一致。セル内に「マスタ: …」と正しい値が併記され、<b style="color:#dc2626;background:#fde3e3">違う部分が赤く強調</b>されます（濁点抜け・全角半角違いもわかります）<br>
           ・セルを編集しても変わるのは現データ（SEJ側）だけで、マスタには影響しません<br>
-          ・<b>マスタ未使用（ゴースト行）</b>: 現データで使われている席種と<b>同じグループ名</b>のマスタ登録のうち、現データに無いものだけを最終行にグレー表示します（例: もてぎMTGPのSEJを開いていれば、もてぎMTGPグループの未使用席種だけ）。別イベントの席種は表示しません。ゴースト行は保存されません
+          ・<b>マスタ未使用（ゴースト行）</b>: 表示中のデータで使われている席種と<b>同じグループ名</b>のマスタ登録のうち、表示中に無いものだけを最終行にグレー表示します（例: もてぎMTGPのSEJを開いていれば、もてぎMTGPグループの未使用席種だけ）。<b>グループ名でフィルターすると、そのグループの未使用席種だけに絞り込まれます</b>（どれが抜けているか確認しやすくなります）。別イベントの席種は表示しません。ゴースト行は保存されません
         </p>
 
         <h2>キーボードショートカット</h2>
@@ -2641,34 +2641,43 @@
       }
 
       // SEJゴースト行リスト（キャッシュ付き）
-      // 現データで使われている席種のグループ名を集め、同じグループのマスタ未使用コードだけを返す
-      let _ghostCache = { key: null, list: [] };
-      function getSejGhostList(sejCodeColIdx) {
+      // 「表示中の行」で使われている席種のグループ名を集め、同じグループのマスタ未使用コードだけを返す。
+      // グループ名でフィルターすると、そのグループの未使用席種だけがゴースト表示される（どれが抜けているか確認するため）。
+      let _ghostCache = { rows: null, sejCol: -1, ver: -1, list: [] };
+      function getSejGhostList(sejCodeColIdx, rows) {
         if (!state.sejMaster) return [];
-        const key = state.sejMaster.fileName + "|" + state.data.length + "|" + _dataVersion + "|" + sejCodeColIdx;
-        if (_ghostCache.key === key) return _ghostCache.list;
+        // rows = getVisibleRows() の結果。フィルター/非表示が変わると別オブジェクトになるので識別子に使う
+        // （applyFilters が _visibleRowsCache=null にするため、フィルター変更のたびに新しいオブジェクトになる）。
+        if (_ghostCache.rows === rows && _ghostCache.sejCol === sejCodeColIdx && _ghostCache.ver === _dataVersion)
+          return _ghostCache.list;
         const byCode = state.sejMaster.byCode;
         const byGroup = state.sejMaster.byGroup;
         const grpKey = state.sejMaster.grpKey;
         // グループ名列が無い／インデックス未構築のマスタではゴーストを出さない
         // （別グループ・別イベントの席種を誤って大量表示しないための安全側）
-        if (!grpKey || !byGroup) { _ghostCache = { key, list: [] }; return []; }
+        if (!grpKey || !byGroup) { _ghostCache = { rows, sejCol: sejCodeColIdx, ver: _dataVersion, list: [] }; return []; }
         const grpOf = (m) => ((m && m[grpKey]) || "").toString().trim();
-        // 現データで使われているコードと、その所属グループ（=ソートに使うグループ名）を集める
+        // 表示中の行で使われているコードと、その所属グループ（=ソートに使うグループ名）を集める。
+        // フィルター中は表示行だけを見るので、絞ったグループのゴーストだけが出る。
         const usedCodes = new Set();
         const usedGroups = new Set();
-        for (const r of state.data) {
+        const scanRow = (r) => {
           const cd = (r[sejCodeColIdx] ?? "").trim();
-          if (!cd) continue;
+          if (!cd) return;
           usedCodes.add(cd);
           const m = byCode[cd];
           if (m) {
             const g = grpOf(m);
             if (g) usedGroups.add(g);
           }
+        };
+        if (rows && rows._indices) {
+          for (const idx of rows._indices) scanRow(state.data[idx]);
+        } else {
+          for (const r of state.data) scanRow(r);
         }
-        // 現データに含まれるグループだけを走査（マスタ全件は見ない）。
-        // 同じグループのマスタ登録のうち、現データに無いコードだけをゴーストとして返す。
+        // 表示中データに含まれるグループだけを走査（マスタ全件は見ない）。
+        // 同じグループのマスタ登録のうち、表示中データに無いコードだけをゴーストとして返す。
         const list = [];
         for (const g of usedGroups) {
           const codes = byGroup[g];
@@ -2683,7 +2692,7 @@
             });
           }
         }
-        _ghostCache = { key, list };
+        _ghostCache = { rows, sejCol: sejCodeColIdx, ver: _dataVersion, list };
         return list;
       }
 
@@ -5564,12 +5573,12 @@
         if (end < rows.length)
           html += `<tr style="height:${(rows.length - end) * rowH}px"><td colspan="${colSpan}"></td></tr>`;
 
-        // SEJゴースト行: 現データと同じグループのマスタ登録のうち、現データに無い席種だけを最終行に表示
-        // （セブン発券対象の漏れ確認用。別イベント・別グループの席種は対象外なので表示しない）
+        // SEJゴースト行: 表示中データと同じグループのマスタ登録のうち、表示中データに無い席種だけを最終行に表示
+        // （セブン発券対象の漏れ確認用。別イベント・別グループの席種は対象外。グループ絞り込み時は絞ったグループのみ）
         if (state.sejMaster && sejCodeColIdx !== -1) {
-          const missing = getSejGhostList(sejCodeColIdx);
+          const missing = getSejGhostList(sejCodeColIdx, rows);
           if (missing.length) {
-            html += `<tr class="ghost-sep"><td colspan="${colSpan}">▼ 同グループのマスタ未使用 ${missing.length}件（現データに無い＝セブン発券していない席種。漏れがないか確認）</td></tr>`;
+            html += `<tr class="ghost-sep"><td colspan="${colSpan}">▼ 同グループのマスタ未使用 ${missing.length}件（表示中データに無い＝セブン発券していない席種。漏れがないか確認）</td></tr>`;
             for (const g of missing) {
               html += `<tr class="ghost-row" title="${escHtml(g.cd)}"><td class="row-num">−</td>`;
               for (const j of visCols) {
