@@ -1681,6 +1681,10 @@
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline><path d="M9 12h6M9 16h6"></path></svg></span>
               <span>開く</span>
             </button>
+            <button class="rb-btn" id="btn-open-clipboard" title="クリップボードのTSV/CSVを新しいタブとして開きます&#10;ファイル選択ダイアログが反応しないときの代替手段&#10;（Excelやメモ帳でデータ全体をコピーしてから押す）" aria-label="クリップボードから開く">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="8" y="2" width="8" height="4" rx="1"></rect><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><path d="M9 12h6M9 16h6"></path></svg></span>
+              <span>貼付から開く</span>
+            </button>
             <button class="rb-btn" id="btn-save" title="現在のデータをファイルとして保存&#10;ショートカット: Ctrl+S" aria-label="ファイルを保存">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg></span>
               <span>保存 <span id="dirty-indicator" role="status" aria-label="未保存の変更があります"></span></span>
@@ -2151,6 +2155,7 @@
         <h2>📁 ファイルタブ</h2>
         <div class="man-btn-section">
           <div class="man-btn-row"><span class="man-btn-label">開く</span><span class="man-btn-desc">TSV・CSV・TXTを開く。画面へのドラッグ&amp;ドロップでも可。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">貼付から開く</span><span class="man-btn-desc">クリップボードのTSV/CSVを新しいタブとして開く。ファイル選択ダイアログが反応しないときの代替（Excelやメモ帳でデータをコピーしてから押す）。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">保存</span><span class="man-btn-desc">上書き保存（Ctrl+S）。タブの赤い●は未保存の印。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">名前を付けて保存</span><span class="man-btn-desc">ファイル名を指定して別名で保存（Ctrl+Shift+S）。以降の保存は新しい名前になります。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">絞込保存</span><span class="man-btn-desc">フィルターで絞り込んだ行だけを別ファイルに保存。</span></div>
@@ -3566,6 +3571,7 @@
           else doOpen();
         };
         $("btn-drop-open").onclick = () => openDataFilePicker();
+        if ($("btn-open-clipboard")) $("btn-open-clipboard").onclick = openFromClipboard;
         $("btn-save").onclick = saveFile;
         $("btn-save-as").onclick = doSaveFileAs;
         $("btn-undo").onclick = undo;
@@ -3937,6 +3943,15 @@
 
       function loadFile(file) {
         if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => loadTextAsFile(e.target.result, file.name);
+        reader.onerror = () => setStatus("ファイルの読み込みに失敗しました");
+        reader.readAsText(file);
+      }
+
+      // テキストとファイル名から新規タブとして読み込む（ファイル選択・ドロップ・クリップボード共通）
+      function loadTextAsFile(text, fileName) {
+        if (text == null) return;
         // 先に現在のタブを保存してからパース（parseDataがstateを書き換えるため）
         saveCurrentTab();
         // 非アクティブになった前タブのdataを解放してメモリを節約
@@ -3947,81 +3962,101 @@
             prev.headers = null;
           }
         }
-        state.fileName = file.name;
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const text = e.target.result;
-          state.delimiter = detectDelimiter(text, file.name);
-          parseData(text);
-          state.originalRowCount = state.data.length; // 開いた直後の行数（保存時の予期せぬ増減チェック用）
-          clearAutoDropColumns();
-          applyHeaderMapping();
-          // マスタ連携済みなら、開いたファイルにもグループ名仮想列を追加する
-          applySejGroupVirtualCol();
-          // 前タブの表示状態が新ファイルに引き継がれないようリセット
-          state.cellColors = {};
-          state.hiddenRows = new Set();
-          state.hiddenCols = new Set();
-          state.wrapRows.clear();
-          state.wrapCells = false;
-          state.columnFilters = {};
-          state.filteredIndices = null;
-          state.freezeCols = 0;
-          state.sortCol = -1;
-          state.sortAsc = true;
-          state.sortKeys = [];
-          state.undoStack = [];
-          state.redoStack = [];
-          state.selected = null;
-          state.range = null;
-          state.anchor = null;
-          _visibleRowsCache = null;
-          // UI 同期（前タブのボタン状態を引き継がない）
-          document.body.classList.remove('wrap-cells');
-          const _bwLF = $('btn-wrap');
-          if (_bwLF) { _bwLF.classList.remove('active-state'); _bwLF.setAttribute('aria-pressed', 'false'); }
-          els.filterClear.style.display = 'none';
-          els.filterExport.style.display = 'none';
-          const tab = {
-            fileName: state.fileName,
-            headers: state.headers,
-            data: state.data,
-            delimiter: state.delimiter,
-            colWidths: {},
-            sortCol: -1,
-            sortAsc: true,
-            sortKeys: [],
-            headerMode: state.headerMode,
-            encoding: state.encoding,
-            dirty: false,
-            _rawText: text, // 遅延復元用にrawTextを保持
-            originalRowCount: state.originalRowCount,
-          };
-          // 現在のタブが空白シート（+ボタンで作成・未編集）なら上書き、それ以外は新タブ
-          const cur = state.tabs[state.activeTab];
-          const isBlankSheet = cur?._isBlankSheet === true && !cur.dirty;
-          if (isBlankSheet) {
-            state.tabs[state.activeTab] = tab;
-          } else {
-            state.tabs.push(tab);
-            state.activeTab = state.tabs.length - 1;
-          }
-          updateHeaderModeBtn();
-          renderTabBar();
-          autoFitAllColumnsQuiet();
-          state.tabs[state.activeTab].colWidths = { ...state.colWidths };
-          renderHeader();
-          state.forceRender = true;
-          renderBody();
-          showTable();
-          markClean();
-          setStatus(
-            `ロード完了: ${state.data.length}行 × ${state.headers.length}列`,
-          );
-          updateEncodingStatus();
+        state.fileName = fileName;
+        state.delimiter = detectDelimiter(text, fileName);
+        parseData(text);
+        state.originalRowCount = state.data.length; // 開いた直後の行数（保存時の予期せぬ増減チェック用）
+        clearAutoDropColumns();
+        applyHeaderMapping();
+        // マスタ連携済みなら、開いたファイルにもグループ名仮想列を追加する
+        applySejGroupVirtualCol();
+        // 前タブの表示状態が新ファイルに引き継がれないようリセット
+        state.cellColors = {};
+        state.hiddenRows = new Set();
+        state.hiddenCols = new Set();
+        state.wrapRows.clear();
+        state.wrapCells = false;
+        state.columnFilters = {};
+        state.filteredIndices = null;
+        state.freezeCols = 0;
+        state.sortCol = -1;
+        state.sortAsc = true;
+        state.sortKeys = [];
+        state.undoStack = [];
+        state.redoStack = [];
+        state.selected = null;
+        state.range = null;
+        state.anchor = null;
+        _visibleRowsCache = null;
+        // UI 同期（前タブのボタン状態を引き継がない）
+        document.body.classList.remove('wrap-cells');
+        const _bwLF = $('btn-wrap');
+        if (_bwLF) { _bwLF.classList.remove('active-state'); _bwLF.setAttribute('aria-pressed', 'false'); }
+        els.filterClear.style.display = 'none';
+        els.filterExport.style.display = 'none';
+        const tab = {
+          fileName: state.fileName,
+          headers: state.headers,
+          data: state.data,
+          delimiter: state.delimiter,
+          colWidths: {},
+          sortCol: -1,
+          sortAsc: true,
+          sortKeys: [],
+          headerMode: state.headerMode,
+          encoding: state.encoding,
+          dirty: false,
+          _rawText: text, // 遅延復元用にrawTextを保持
+          originalRowCount: state.originalRowCount,
         };
-        reader.onerror = () => setStatus("ファイルの読み込みに失敗しました");
-        reader.readAsText(file);
+        // 現在のタブが空白シート（+ボタンで作成・未編集）なら上書き、それ以外は新タブ
+        const cur = state.tabs[state.activeTab];
+        const isBlankSheet = cur?._isBlankSheet === true && !cur.dirty;
+        if (isBlankSheet) {
+          state.tabs[state.activeTab] = tab;
+        } else {
+          state.tabs.push(tab);
+          state.activeTab = state.tabs.length - 1;
+        }
+        updateHeaderModeBtn();
+        renderTabBar();
+        autoFitAllColumnsQuiet();
+        state.tabs[state.activeTab].colWidths = { ...state.colWidths };
+        renderHeader();
+        state.forceRender = true;
+        renderBody();
+        showTable();
+        markClean();
+        setStatus(
+          `ロード完了: ${state.data.length}行 × ${state.headers.length}列`,
+        );
+        updateEncodingStatus();
+      }
+
+      // クリップボードのTSV/CSVテキストを新規ファイルとして開く（OSのファイル選択ダイアログを経由しない）
+      // ファイル選択ダイアログがWindows環境で応答しなくなる場合の確実な代替手段。
+      async function openFromClipboard() {
+        let txt = "";
+        try {
+          txt = await navigator.clipboard.readText();
+        } catch {
+          setStatus("クリップボードを読み取れませんでした（ブラウザの権限を確認してください）");
+          return;
+        }
+        if (!txt || !txt.trim()) {
+          setStatus("クリップボードが空です。表計算ソフトやテキストエディタでデータをコピーしてからお試しください");
+          return;
+        }
+        const open = () => {
+          const stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "").slice(0, 14);
+          // 内容から区切り文字を判定し、拡張子を合わせる（Excel由来はタブ、CSVはカンマ）。
+          // ファイル名の拡張子で誤ってタブ固定にならないようにするため。
+          const ext = txt.includes("\t") ? "tsv" : txt.includes(",") ? "csv" : "tsv";
+          loadTextAsFile(txt, `貼り付け_${stamp}.${ext}`);
+          setStatus(`クリップボードから開きました（${state.data.length}行 × ${state.headers.length}列）`);
+        };
+        if (state.dirty) showReloadDialog(open);
+        else open();
       }
 
       // 非アクティブタブを復元（遅延ロード）
