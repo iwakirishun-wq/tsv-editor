@@ -1840,14 +1840,14 @@
               </div>
             </div>
             <div class="rb-btn-wrap">
-              <button class="rb-btn" id="btn-sej-check" title="SEJデータのチェックをまとめて切り替えます&#10;カナ検査・Word文字数チェック(word1〜7が50字超でエラー)&#10;前提条件を満たさない項目は自動でスキップされます" aria-label="SEJチェックの切り替え" aria-pressed="false">
+              <button class="rb-btn" id="btn-sej-check" title="SEJデータのチェックをまとめて切り替えます&#10;カナ検査・Word文字数チェック(word1〜7が半角換算50字超でエラー。全角=2字)&#10;前提条件を満たさない項目は自動でスキップされます" aria-label="SEJチェックの切り替え" aria-pressed="false">
                 <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 6h8M8 6v12"></path><path d="M14 18l3.5-10L21 18"></path><path d="M15.5 14h4"></path></svg></span>
                 <span>SEJチェック</span>
               </button>
               <button class="rb-caret" id="caret-sej-check" type="button" title="個別に機能を選んでON/OFF" aria-label="SEJチェックの詳細設定を開く" aria-expanded="false">▾</button>
               <div class="rb-dropdown" id="dd-sej-check">
                 <label><input type="checkbox" data-flag="kanaCheck"> カナ検査</label>
-                <label><input type="checkbox" data-flag="sejWordLenCheck"> Word文字数チェック(50字超)</label>
+                <label><input type="checkbox" data-flag="sejWordLenCheck"> Word文字数チェック(半角換算50字超)</label>
               </div>
             </div>
             <button class="rb-btn" id="btn-ikkatsu-check" title="席種一括設定TSV(23列)の設定整合チェックを表にインライン表示（切り替え）&#10;NG（赤）: マスタ未登録・席種名不一致・指定席整合・上限9+リセール可・リセール下限1321・購入限定あり+単体不可・P+他種混在&#10;注意（橙）: 上限9+SEJ可&#10;席種エリアマスタを連携すると席種名/指定席チェックも有効になります" aria-label="席種一括設定チェックの切り替え" aria-pressed="false">
@@ -2348,7 +2348,7 @@
         boxCheck: false,     // 区画席（（〇名）席種）の設定検査
         ikkatsuCheck: false, // 席種一括設定チェック（23列）のインライン検品
         bikoHtmlCheck: false, // 備考(nte)列のHTMLを表上で実際のHTML表示として再現（席種エリアマスタのみ）
-        sejWordLenCheck: false, // SEJのword1〜7が50字超のときエラー表記（SEJデータ時。マスタ不要）
+        sejWordLenCheck: false, // SEJのword1〜7が半角換算50字超(全角=2字)のときエラー表記（SEJデータ時。マスタ不要）
         spaceCheck: false,   // セル値の前後空白検査（マスタ非依存・全列対象）
         verticalHeader: true, // ヘッダー縦書き表示（既定でON・列幅節約）
         vHeaderHeight: 230, // 縦書きヘッダーの行高さ(px・手動調整可能)
@@ -2426,7 +2426,7 @@
       const INSPECT_FLAG_LABELS = {
         colorView: "カラー表示", gateView: "ゲート表示", parkingCheck: "駐車券検査",
         boxCheck: "区画席検査", kanaCheck: "カナ検査", bikoHtmlCheck: "備考HTML変換",
-        sejWordLenCheck: "Word文字数チェック(50字超)",
+        sejWordLenCheck: "Word文字数チェック(半角換算50字超)",
       };
       const INSPECT_GROUPS = {
         "btn-seatmaster-check": ["colorView", "gateView", "parkingCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck"],
@@ -3561,11 +3561,11 @@
       function init() {
         setupCustomTooltips();
         $("btn-open").onclick = () => {
-          const doOpen = () => els.fileInput.click();
+          const doOpen = () => openDataFilePicker();
           if (state.dirty) showReloadDialog(doOpen);
           else doOpen();
         };
-        $("btn-drop-open").onclick = () => els.fileInput.click();
+        $("btn-drop-open").onclick = () => openDataFilePicker();
         $("btn-save").onclick = saveFile;
         $("btn-save-as").onclick = doSaveFileAs;
         $("btn-undo").onclick = undo;
@@ -3905,6 +3905,36 @@
       }
 
       // ===== ファイル =====
+      // ファイル選択ダイアログを開く共通関数。
+      // Windows環境で input[type=file] のネイティブダイアログが「開く」を押しても
+      // 応答しなくなる事象があるため、対応ブラウザでは File System Access API
+      // (showOpenFilePicker) を優先する（別実装のダイアログなので同事象を回避できる）。
+      // 非対応・エラー時は従来の input にフォールバックする。
+      async function pickFileWithFallback(extensions, onFile, fallback) {
+        if (window.showOpenFilePicker) {
+          try {
+            const [handle] = await window.showOpenFilePicker({
+              multiple: false,
+              types: [{ description: "TSV/CSV/テキスト", accept: { "text/plain": extensions } }],
+            });
+            onFile(await handle.getFile());
+            return;
+          } catch (err) {
+            if (err && err.name === "AbortError") return; // ユーザーがキャンセル
+            // SecurityError等（file://実行・権限なし）→ 従来方式へフォールバック
+          }
+        }
+        fallback();
+      }
+
+      function openDataFilePicker() {
+        pickFileWithFallback(
+          [".tsv", ".csv", ".txt"],
+          (file) => loadFile(file),
+          () => els.fileInput.click(),
+        );
+      }
+
       function loadFile(file) {
         if (!file) return;
         // 先に現在のタブを保存してからパース（parseDataがstateを書き換えるため）
@@ -5195,7 +5225,7 @@
           if (!Object.keys(nteWordCols).length) nteWordCols = null;
         }
 
-        // SEJ Word文字数チェック: word1〜7が50字超のときエラー表記（システム上限50字）。マスタ不要。
+        // SEJ Word文字数チェック: word1〜7が半角換算50字超のときエラー表記。マスタ不要。
         let wordLenCols = null;
         if (state.sejWordLenCheck && isSejFile) {
           wordLenCols = new Set();
@@ -5476,12 +5506,13 @@
                 }
               }
             }
-            // SEJ Word文字数チェック: word1〜7が50字超ならエラー表記（赤背景＋文字数注記）
+            // SEJ Word文字数チェック: word1〜7が半角換算50字超ならエラー表記（赤背景＋文字数注記）
+            // システム上限は半角50字。全角は1文字=半角2字ぶんとして数える
             if (wordLenCols && wordLenCols.has(j)) {
-              const len = [...String(cellVal)].length;
+              const len = sejHalfWidthLen(cellVal);
               if (len > 50) {
                 cls.push("cell-ng");
-                displayVal += `<br><span style="color:#dc2626;font-size:10px">⚠${len}字（50字超）</span>`;
+                displayVal += `<br><span style="color:#dc2626;font-size:10px">⚠半角換算${len}字（50字超・全角=2字）</span>`;
               }
             }
             const style =
@@ -9113,17 +9144,23 @@
       }
       
       function _openPriceMasterPicker(onDone) {
-        const input = document.createElement("input");
-        input.type = "file";
-        input.accept = ".tsv,.csv,.txt,text/tab-separated-values,text/csv,text/plain";
-        input.style.display = "none";
-        document.body.appendChild(input);
-        input.onchange = () => {
-          if (input.files && input.files[0]) loadPriceMasterFile(input.files[0], null, onDone);
-          input.remove();
-        };
-        input.oncancel = () => input.remove();
-        input.click();
+        pickFileWithFallback(
+          [".tsv", ".csv", ".txt"],
+          (file) => loadPriceMasterFile(file, null, onDone),
+          () => {
+            const input = document.createElement("input");
+            input.type = "file";
+            input.accept = ".tsv,.csv,.txt,text/tab-separated-values,text/csv,text/plain";
+            input.style.display = "none";
+            document.body.appendChild(input);
+            input.onchange = () => {
+              if (input.files && input.files[0]) loadPriceMasterFile(input.files[0], null, onDone);
+              input.remove();
+            };
+            input.oncancel = () => input.remove();
+            input.click();
+          },
+        );
       }
 
       // 仮想列「グループ名」を現在のタブへ追加（保存時除外・フィルター/ソート可能）。
@@ -9322,19 +9359,25 @@
       // 席種エリアマスタTSVのファイル選択ダイアログを開く（onDone: 連携成功後に実行）
       function _openSejMasterPicker(onDone) {
         setStatus("席種エリアマスタTSVを選択してください...");
-        const input = document.createElement("input");
-        input.type = "file";
-        input.accept = ".tsv,.txt,text/tab-separated-values,text/plain";
-        input.style.display = "none";
-        document.body.appendChild(input);
-        input.onchange = () => {
-          if (input.files && input.files[0]) loadSejMasterFile(input.files[0], null, onDone);
-          else setStatus("ファイルが選択されませんでした");
-          input.remove();
-        };
-        // 対応ブラウザではキャンセルを検知してフィードバック
-        input.oncancel = () => { setStatus("マスタファイルの選択をキャンセルしました"); input.remove(); };
-        input.click();
+        pickFileWithFallback(
+          [".tsv", ".txt"],
+          (file) => loadSejMasterFile(file, null, onDone),
+          () => {
+            const input = document.createElement("input");
+            input.type = "file";
+            input.accept = ".tsv,.txt,text/tab-separated-values,text/plain";
+            input.style.display = "none";
+            document.body.appendChild(input);
+            input.onchange = () => {
+              if (input.files && input.files[0]) loadSejMasterFile(input.files[0], null, onDone);
+              else setStatus("ファイルが選択されませんでした");
+              input.remove();
+            };
+            // 対応ブラウザではキャンセルを検知してフィードバック
+            input.oncancel = () => { setStatus("マスタファイルの選択をキャンセルしました"); input.remove(); };
+            input.click();
+          },
+        );
       }
 
       // 現在の行データから席種エリアコードを取り、マスタの表示名を返す
@@ -9345,6 +9388,17 @@
         const code = (row[codeIdx] ?? "").trim();
         if (!code) return null;
         return state.sejMaster.byCode[code] || null;
+      }
+
+      // SEJのword文字数を半角換算で数える（半角=1字・全角=2字。システムの半角50字上限に合わせる）
+      // 半角扱い: ASCII(U+0000〜U+007E)と半角カナ(U+FF61〜U+FF9F)。それ以外は全角=2字
+      function sejHalfWidthLen(s) {
+        let len = 0;
+        for (const ch of String(s ?? "")) {
+          const cp = ch.codePointAt(0);
+          len += cp <= 0x7e || (cp >= 0xff61 && cp <= 0xff9f) ? 1 : 2;
+        }
+        return len;
       }
 
       // SEJデータかどうか判定（word1〜word7 と sej_template_cd が存在）
