@@ -2948,8 +2948,9 @@
               problems.push("車椅子は同一席種内の年齢区分変更のみ可（別の車椅子席へのUG不可）");
             }
           }
-          // 大人料金が先<元（実質ダウングレード）のUGは不可。
-          // 大人以外の年齢区分は、その年齢自身の差額が500円以内（先が安い側）なら例外的に許可（fee=0）
+          // 大人料金が先<元（実質ダウングレード）のUGは、元が大人のときだけ不可。
+          // 元が大人以外の年齢区分なら不可にしない（アップグレード可）。その場合の期待差額は
+          // 自年齢の差額の通常ルールで計算する（0未満→0円／0円以上→その差額。ugExpectedChargeが算出）。
           if (!sameSeat && !srcWc && !dstWc) {
             const ck0 = condKey(row);
             const as = lookupAdult(ck0, srcSeat), ad = lookupAdult(ck0, dstSeat);
@@ -2960,18 +2961,7 @@
               if (asp == null || adp == null || isDummyPrice(asp) || isDummyPrice(adp)) return false;
               return asp > adp;
             });
-            if (adultDowngrade && sr !== 4) {
-              const s0 = lookup(ck0, srcSeat, srcAge), d0 = lookup(ck0, dstSeat, dstAge);
-              const exempt = ["adv", "day"].every((which) => {
-                const sp = s0 ? s0[which] : null, dp = d0 ? d0[which] : null;
-                if (sp == null || dp == null || isDummyPrice(sp) || isDummyPrice(dp)) return false;
-                const diff = dp - sp;
-                return diff < 0 && diff >= -500;
-              });
-              if (!exempt) problems.push("大人料金が先<元のためUG不可");
-            } else if (adultDowngrade) {
-              problems.push("大人料金が先<元のためUG不可");
-            }
+            if (adultDowngrade && sr === 4) problems.push("大人料金が先<元のためUG不可");
           }
           // マスタ連携時: マスタ未登録の席種を注記
           if (seatMeta) {
@@ -2996,10 +2986,10 @@
             }
           }
 
-          // 前売窓に「かぶっている」か＝行の販売開始日時がdayCutoff未満（=当日より前から売っている）。
-          // dayCutoff未指定なら常にnull=判定不能。
-          // ※当日窓かぶり(販売終了>=dayCutoff)はかつてNG判定に使っていたが、当日ダミー＝売止めは正常と
-          //   確定したため廃止（当日価格のダミーはエラーにしない。前売ダミーのみ設定漏れ検出に使う）。
+          // 当日/前売それぞれの窓に「かぶっている」か（dayCutoff＝当日料金の切り替わり日時。未指定なら常にnull=判定不能）。
+          //  ・当日窓かぶり: 行の販売終了日時が dayCutoff 以降まで続く（＝当日料金の期間まで売っている）。
+          //  ・前売窓かぶり: 行の販売開始日時が dayCutoff 未満（＝当日より前＝前売の期間から売っている）。
+          const overlapsDay = (rec) => (dayCutoff == null || !rec || rec.end == null) ? null : rec.end >= dayCutoff;
           const overlapsAdv = (rec) => (dayCutoff == null || !rec || rec.start == null) ? null : rec.start < dayCutoff;
 
           // --- 期待差額（前売・当日） ---
@@ -3011,18 +3001,18 @@
             const sp = s ? s[which] : null, dp = d ? d[which] : null;
             if (sp == null || dp == null) return { exp: null, note: "価格不明", dummy: false };
             if (isDummyPrice(sp) || isDummyPrice(dp)) {
-              // 当日価格のダミー（999999等）は「当日は販売しない＝売止め」という正常な設定なのでエラーにしない。
-              //   （販売期間は前売～当日を1本で持つため当日窓にかぶるが、当日を売らない券種では当日価格をダミーにするのが正しい）
-              // 前売価格のダミーだけ、元・先とも前売窓にかぶっている（＝前売で売っている）のにダミー値のまま→設定漏れとしてエラー。
-              //   前売窓にかぶっていない（当日のみ販売＝前売で売らない）ならダミーで正常なのでエラーではない。
-              const bothOverlapAdv = overlapsAdv(s) === true && overlapsAdv(d) === true;
-              const dummyError = which === "adv" && bothOverlapAdv;
-              const note = dummyError
-                ? "販売期間が前売にかぶっているのに価格がダミー値（売止め等）のまま設定不可"
-                : (which === "day"
-                    ? "当日はダミー値（売止め等）＝当日販売なしとして正常（検算対象外）"
-                    : "ダミー金額に変換が後程必要（境界日時を指定していない、または対象期間が重なっていないため現時点ではエラーではありません）");
-              return { exp: null, note, dummy: true, dummyError, srcPrice: sp, dstPrice: dp };
+              // ダミー価格（999999等の売止め）の正誤は、その窓の販売期間かぶりで決まる（dayCutoff基準・2026-07-10確定）。
+              //  ・当日ダミー: 販売終了が dayCutoff より前（当日窓にかぶらない＝当日は売らない）なら正常。
+              //               販売終了が dayCutoff 以降（当日まで売る）のにダミー→当日価格の設定漏れ＝NG。
+              //  ・前売ダミー: 販売開始が dayCutoff 以降（前売窓にかぶらない＝当日だけ売る）なら正常。
+              //               販売開始が dayCutoff 未満（前売から売る）のにダミー→前売価格の設定漏れ＝NG。
+              //  元・先どちらも対象の窓にかぶっているときだけNG（片方でもかぶらなければ対象外＝まだ未確定なだけ）。
+              const overlapFn = which === "day" ? overlapsDay : overlapsAdv;
+              const bothOverlap = overlapFn(s) === true && overlapFn(d) === true;
+              const note = bothOverlap
+                ? `販売期間が${which === "day" ? "当日" : "前売"}にかぶっているのに価格がダミー値（売止め等）のまま設定不可`
+                : "ダミー金額に変換が後程必要（境界日時を指定していない、または対象期間が重なっていないため現時点ではエラーではありません）";
+              return { exp: null, note, dummy: true, dummyError: bothOverlap, srcPrice: sp, dstPrice: dp };
             }
             const diff = dp - sp;
             // 期待差額の写像は純粋関数 ugExpectedCharge に集約（同年齢: 差額0は全区分500・大人は1〜500→500/超→実差額・

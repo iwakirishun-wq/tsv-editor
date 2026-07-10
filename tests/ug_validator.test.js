@@ -55,6 +55,10 @@ const SEAT_A = { name: "Aエリア席", cd: "RESV02" }; // ラベル表記をSEA
 const SEAT_FREE = { name: "自由エリア", cd: "FREE03" }; // エリア(自由席)扱い
 const SEAT_FREE2 = { name: "自由席(3日通し前売)", cd: "RESV12" }; // 大人の当日価格がダミー（当日販売なし）
 const SEAT_VC = { name: "VC-2", cd: "RESV13" }; // 大人の前売/当日とも実価格（SEAT_FREE2より高い＝アップグレード）
+// 大人料金ダウングレード（先<元）だが、元が大人以外なら不可にしない検証用（2026-07-10）。
+const SEAT_HI = { name: "上位席", cd: "RESV51" };  // 大人10000・子供6000（元席）
+const SEAT_LO = { name: "下位席A", cd: "RESV52" }; // 大人8000（元より安い＝大人ダウングレード）・子供5500（子供差額−500）
+const SEAT_LO2 = { name: "下位席B", cd: "RESV53" }; // 大人8000（大人ダウングレード）・子供6300（子供差額+300）
 
 const NORMALS = [
   priceRow(SEAT_S.name, SEAT_S.cd, "大人", 8000, 8500),
@@ -66,6 +70,12 @@ const NORMALS = [
   priceRow(SEAT_S.name, SEAT_S.cd, "3歳以上共通", 104200, 999999), // ランク判定不能(rank=0)な年齢ラベル
   priceRow(SEAT_FREE2.name, SEAT_FREE2.cd, "大人", 13000, 999999),
   priceRow(SEAT_VC.name, SEAT_VC.cd, "大人", 19000, 23000),
+  priceRow(SEAT_HI.name, SEAT_HI.cd, "大人", 10000, 10000),
+  priceRow(SEAT_HI.name, SEAT_HI.cd, "子供", 6000, 6000),
+  priceRow(SEAT_LO.name, SEAT_LO.cd, "大人", 8000, 8000),
+  priceRow(SEAT_LO.name, SEAT_LO.cd, "子供", 5500, 5500),
+  priceRow(SEAT_LO2.name, SEAT_LO2.cd, "大人", 8000, 8000),
+  priceRow(SEAT_LO2.name, SEAT_LO2.cd, "子供", 6300, 6300),
 ];
 
 // 条件(会員ランク/販売経路)をまたいだ大人料金の取り違えを防ぐ回帰テスト用データ。
@@ -110,6 +120,26 @@ const SCENARIOS = [
     row: ugRow(SEAT_S.name, SEAT_S.cd, "大人", SEAT_A.name, SEAT_A.cd, "大人", 0, 0),
     expectStatus: "ng",
     expectExpected: 2000,
+  },
+  {
+    // 元が大人のダウングレード（大人料金 先8000<元10000）は不可（2026-07-10 仕様維持）
+    name: "大人ダウングレード（元が大人・先の大人料金が安い） → invalid",
+    row: ugRow(SEAT_HI.name, SEAT_HI.cd, "大人", SEAT_LO.name, SEAT_LO.cd, "大人", 0, 0),
+    expectStatus: "invalid",
+  },
+  {
+    // 元が子供なら大人料金が先<元でも不可にしない。子供差額 5500−6000=−500 <0 → 期待0円（返金なし）
+    name: "元が子供・大人料金は先<元でも不可にしない（子供差額−500→期待0円） → OK",
+    row: ugRow(SEAT_HI.name, SEAT_HI.cd, "子供", SEAT_LO.name, SEAT_LO.cd, "子供", 0, 0),
+    expectStatus: "ok",
+    expectExpected: 0,
+  },
+  {
+    // 元が子供・大人料金は先<元だが、子供差額 6300−6000=+300 → 期待300円（同区分子供は実差額のまま）
+    name: "元が子供・大人料金は先<元でも不可にしない（子供差額+300→期待300円） → OK",
+    row: ugRow(SEAT_HI.name, SEAT_HI.cd, "子供", SEAT_LO2.name, SEAT_LO2.cd, "子供", 300, 300),
+    expectStatus: "ok",
+    expectExpected: 300,
   },
   {
     name: "元価格が売止めダミー(999999) → 検算対象外。登録差額もダミー値なら OK（0円表示バグの再発防止）",
@@ -209,6 +239,21 @@ const SCENARIOS = [
     row: ugRow(SEAT_HS.name, SEAT_HS.cd, "高校生以上", SEAT_U.name, SEAT_U.cd, "U23", 1000, 700),
     expectStatus: "ok",
     expectExpected: 1000,
+  },
+  // --- 範囲券種の双方向確認（元⇄先どちらの向きでもOK・2026-07-10 ユーザー確認）---
+  {
+    // 高校生以上⇄U23 の逆方向（U23→高校生以上）も可。先<元でも元が大人以外なので不可にしない、差額マイナス→0
+    name: "範囲(双方向): U23→「高校生以上」 → OK（範囲内・逆方向。差額マイナスで期待0円）",
+    row: ugRow(SEAT_U.name, SEAT_U.cd, "U23", SEAT_HS.name, SEAT_HS.cd, "高校生以上", 0, 0),
+    expectStatus: "ok",
+    expectExpected: 0,
+  },
+  {
+    // 幼児〜中学生⇄小学生 の逆方向（小学生→幼児〜中学生）も可（範囲内）。差額マイナス→0
+    name: "範囲(双方向): 小学生→「幼児〜中学生」 → OK（範囲内・逆方向。差額マイナスで期待0円）",
+    row: ugRow(SEAT_EL.name, SEAT_EL.cd, "小学生", SEAT_RC.name, SEAT_RC.cd, "幼児〜中学生", 0, 0),
+    expectStatus: "ok",
+    expectExpected: 0,
   },
 ];
 
@@ -342,20 +387,20 @@ const NORMALS_CUTOFF = [
 const validateCutoff = buildUgValidator(NORMALS_CUTOFF, c, v, seatMeta, DAY_CUTOFF);
 const CUTOFF_SCENARIOS = [
   {
-    // 当日価格のダミー（999999）は「当日は販売しない＝売止め」で正常。当日窓に両方かぶっていてもエラーにしない（2026-07-10確定）
-    name: "[dayCutoff] 元(R)は当日まで売る実価格、先(P)の当日はダミー（売止め）→ 当日はエラーではない（OK）",
+    // 元(R)・先(P)とも当日(07/05 19:00)まで売る＝当日窓にかぶるのに先(P)の当日がダミー→当日価格の設定漏れ＝NG（2026-07-10確定）
+    name: "[dayCutoff] 元(R)・先(P)とも当日まで売るのに先(P)の当日がダミー → 当日はエラー（NG）",
     row: ugRow(SEAT_R.name, SEAT_R.cd, "大人", SEAT_P.name, SEAT_P.cd, "大人", 500, 12345),
-    expectStatus: "ok",
+    expectStatus: "ng",
   },
   {
-    // 前売差額は R(9000)→Q(9200)=diff200→期待値500を正しく登録。当日だけダミー値でも当日は売止めとして正常
-    name: "[dayCutoff] 元(R)は当日まで売る実価格、先(Q)は07/02で売り切る当日ダミー → OK（当日は売止めで正常）",
+    // 先(Q)は07/02で売り切る＝当日窓にかぶらない（当日は売らない）ので当日ダミーは正常。前売差額500は正しく登録 → OK
+    name: "[dayCutoff] 先(Q)は07/02で売り切る（当日窓にかぶらない）当日ダミー → OK（当日は売らないので正常）",
     row: ugRow(SEAT_R.name, SEAT_R.cd, "大人", SEAT_Q.name, SEAT_Q.cd, "大人", 500, 12345),
     expectStatus: "ok",
   },
   {
-    // 前売価格がダミー（999999）で元・先とも前売窓にかぶる（前売で売っている）→ 設定漏れとしてNG（2026-07-10 前売のみ維持）
-    name: "[dayCutoff] 先(T)の前売がダミーだが前売から販売中（前売窓かぶり）→ 前売はエラー（NG）",
+    // 元(R)・先(T)とも前売から売る＝前売窓にかぶるのに先(T)の前売がダミー→前売価格の設定漏れ＝NG
+    name: "[dayCutoff] 元(R)・先(T)とも前売から売るのに先(T)の前売がダミー → 前売はエラー（NG）",
     row: ugRow(SEAT_R.name, SEAT_R.cd, "大人", SEAT_T.name, SEAT_T.cd, "大人", 500, 500),
     expectStatus: "ng",
   },
