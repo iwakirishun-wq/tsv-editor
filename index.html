@@ -220,6 +220,15 @@
         border-color: var(--rb-accent);
       }
       .rb-btn.active-state .rb-icon svg { color: #fff; }
+      /* マスタ連携ボタンへファイルをドラッグ中の強調（ドロップで連携できることを示す） */
+      .rb-btn.drag-over {
+        background: var(--rb-accent);
+        color: #fff;
+        border-color: var(--rb-accent);
+        outline: 2px dashed #fff;
+        outline-offset: -3px;
+      }
+      .rb-btn.drag-over .rb-icon svg { color: #fff; }
       /* 統合ボタン(席種エリアマスタチェック/SEJチェック)の個別ON/OFFドロップダウン。
          フロント側の見た目は今まで通りのボタンのままにし、▾で個別制御の階層を開く */
       .rb-btn-wrap { position: relative; display: flex; flex-direction: column; align-items: center; }
@@ -1814,11 +1823,11 @@
         <!-- Group: マスタ連携 -->
         <div class="rb-group">
           <div class="rb-buttons">
-            <button class="rb-btn" id="btn-sej-link" title="席種エリアマスタを連携&#10;SEJ設定・価格経路スケジュールのチェック/HTML出力に必須&#10;クリック: マスタファイル(TSV)を選択／もう一度押すと解除" aria-label="席種エリアマスタ連携">
+            <button class="rb-btn" id="btn-sej-link" title="席種エリアマスタを連携&#10;SEJ設定・価格経路スケジュールのチェック/HTML出力に必須&#10;クリック: マスタファイル(TSV)を選択／もう一度押すと解除&#10;このボタンにファイルをドラッグ&ドロップしても連携できます" aria-label="席種エリアマスタ連携">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></span>
               <span>席種エリアマスタ連携</span>
             </button>
-            <button class="rb-btn" id="btn-price-link" title="価格経路スケジュールを連携&#10;席種一括設定のリセール上限検算に必要&#10;クリック: 価格マスタファイル(TSV/CSV)を選択／もう一度押すと解除" aria-label="価格マスタ連携">
+            <button class="rb-btn" id="btn-price-link" title="価格経路スケジュールを連携&#10;席種一括設定のリセール上限検算に必要&#10;クリック: 価格マスタファイル(TSV/CSV)を選択／もう一度押すと解除&#10;このボタンにファイルをドラッグ&ドロップしても連携できます" aria-label="価格マスタ連携">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="2"></rect><line x1="8" y1="2" x2="8" y2="6"></line><line x1="16" y1="2" x2="16" y2="6"></line><path d="M12 10a2 2 0 1 0 0 4h1a2 2 0 1 1 0 4H9"></path><line x1="12" y1="9" x2="12" y2="19"></line></svg></span>
               <span>価格マスタ連携</span>
             </button>
@@ -2437,6 +2446,9 @@
         "btn-seatmaster-check": ["colorView", "gateView", "parkingCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck"],
         "btn-sej-check": ["kanaCheck", "sejWordLenCheck"],
       };
+      // タブごとに保存・復元する検品トグル（タブ切り替えで勝手にOFFにならないようにする）。
+      // spaceCheckはマスタ非依存・全列対象でデータ構造に紐づかないため全タブ共通のまま（ここには含めない）。
+      const INSPECT_TAB_FLAGS = ["colorView", "gateView", "parkingCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck", "sejWordLenCheck", "ikkatsuCheck"];
       // カナ検査の対象列（半角カナ必須の略称/備考系のみ。席種名・試合名等のフルネーム列は全角カナが正しいため対象外）。
       // 前提条件チェックと描画ロジックで共用する。
       const KANA_TEXT_COLS = new Set([
@@ -3277,6 +3289,9 @@
         t.newlineMixed = state.newlineMixed;
         t.markedCells = new Set(state.markedCells);
         t.originalRowCount = state.originalRowCount;
+        // 検品トグルをタブごとに保存（タブ切り替えで外れないようにする）
+        t.inspectFlags = {};
+        for (const k of INSPECT_TAB_FLAGS) t.inspectFlags[k] = !!state[k];
       }
 
       function switchTab(idx) {
@@ -3378,6 +3393,14 @@
         applyHeaderMapping();
         // マスタ連携済みなら、仮想列が無いタブにもグループ名を追加する
         applySejGroupVirtualCol();
+        // 検品トグルをタブごとに復元（resetStateで一旦falseにされているので、保存済みなら戻す）。
+        // これでタブを切り替えてもチェックボタンが勝手にOFFにならない。
+        if (t.inspectFlags) {
+          for (const k of INSPECT_TAB_FLAGS) state[k] = !!t.inspectFlags[k];
+          syncInspectUI();
+          const _bik = $("btn-ikkatsu-check");
+          if (_bik) { _bik.classList.toggle("active-state", state.ikkatsuCheck); _bik.setAttribute("aria-pressed", String(state.ikkatsuCheck)); }
+        }
         if (state.dirty) {
           els.dirty.classList.add("show");
           document.title = "● TSV/CSV Editor";
@@ -3646,6 +3669,23 @@
             loadSejMasterFile(e.dataTransfer.files[0]);
           }
         });
+        // ドラッグ&ドロップで価格経路スケジュール（価格マスタ）を読込
+        // stopPropagation必須: window側のドロップ処理へ伝播すると価格マスタ連携と同時に
+        // 新規タブとしても二重に開かれてしまう。
+        const priceBtn = $("btn-price-link");
+        if (priceBtn) {
+          priceBtn.addEventListener("dragenter", (e) => { e.preventDefault(); e.stopPropagation(); priceBtn.classList.add("drag-over"); });
+          priceBtn.addEventListener("dragover", (e) => { e.preventDefault(); e.stopPropagation(); priceBtn.classList.add("drag-over"); });
+          priceBtn.addEventListener("dragleave", (e) => { e.stopPropagation(); priceBtn.classList.remove("drag-over"); });
+          priceBtn.addEventListener("drop", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            priceBtn.classList.remove("drag-over");
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+              loadPriceMasterFile(e.dataTransfer.files[0], null);
+            }
+          });
+        }
         // 検品表示トグル（チケットタブ）: 関連項目をまとめたグループボタン
         $("btn-seatmaster-check").onclick = () => {
           toggleInspectGroup(["colorView", "gateView", "parkingCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck"], "btn-seatmaster-check", "席種エリアマスタチェック");
