@@ -138,19 +138,6 @@
         font-family: var(--font-ui);
       }
       .rb-tab:hover { background: var(--rb-bg-hover); }
-      /* Excelの「ファイル」タブに相当。バックステージ領域への入口として単色の塗りで視覚的に分離する */
-      .rb-tab[data-tab="file"] {
-        background: var(--rb-accent);
-        color: #fff;
-        font-weight: 600;
-      }
-      .rb-tab[data-tab="file"]:hover {
-        background: var(--rb-accent-hover);
-      }
-      .rb-tab[data-tab="file"].rb-tab-active {
-        background: var(--rb-accent-hover);
-        border-bottom-color: #fff;
-      }
       .rb-tab.rb-tab-active {
         border-bottom-color: var(--rb-accent);
         background: var(--rb-bg-hover);
@@ -1698,6 +1685,10 @@
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg></span>
               <span>保存 <span id="dirty-indicator" role="status" aria-label="未保存の変更があります"></span></span>
             </button>
+            <button class="rb-btn" id="btn-save-as" title="ファイル名を指定して別名で保存します&#10;ショートカット: Ctrl+Shift+S" aria-label="名前を付けて保存">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><path d="M13.5 3.5l3 3L9 14l-3.3.6L6.3 11l7.2-7.5z"></path></svg></span>
+              <span>名前を付けて保存</span>
+            </button>
             <button class="rb-btn" id="btn-export-filtered" style="display:none" title="フィルターで絞り込んだ行だけを&#10;新しいファイルとして保存します" aria-label="フィルター結果のみを保存">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="13" x2="12" y2="19"></line><polyline points="9 16 12 13 15 16"></polyline></svg></span>
               <span>絞込保存</span>
@@ -2161,6 +2152,7 @@
         <div class="man-btn-section">
           <div class="man-btn-row"><span class="man-btn-label">開く</span><span class="man-btn-desc">TSV・CSV・TXTを開く。画面へのドラッグ&amp;ドロップでも可。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">保存</span><span class="man-btn-desc">上書き保存（Ctrl+S）。タブの赤い●は未保存の印。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">名前を付けて保存</span><span class="man-btn-desc">ファイル名を指定して別名で保存（Ctrl+Shift+S）。以降の保存は新しい名前になります。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">絞込保存</span><span class="man-btn-desc">フィルターで絞り込んだ行だけを別ファイルに保存。</span></div>
         </div>
 
@@ -2214,6 +2206,7 @@
           <div>
             <h3 style="margin:10px 0 6px;font-size:11px;color:var(--text-dim)">ファイル・基本</h3>
             <div class="man-row"><span>保存</span><span class="man-key">Ctrl+S</span></div>
+            <div class="man-row"><span>名前を付けて保存</span><span class="man-key">Ctrl+Shift+S</span></div>
             <div class="man-row"><span>元に戻す</span><span class="man-key">Ctrl+Z</span></div>
             <div class="man-row"><span>やり直し</span><span class="man-key">Ctrl+Y / Ctrl+Shift+Z</span></div>
             <div class="man-row"><span>全選択</span><span class="man-key">Ctrl+A</span></div>
@@ -3574,6 +3567,7 @@
         };
         $("btn-drop-open").onclick = () => els.fileInput.click();
         $("btn-save").onclick = saveFile;
+        $("btn-save-as").onclick = doSaveFileAs;
         $("btn-undo").onclick = undo;
         $("btn-redo").onclick = redo;
         els.filterClear.onclick = clearAllFilters;
@@ -4439,6 +4433,36 @@
           return;
         }
         await doSaveFile();
+      }
+
+      // ===== 名前を付けて保存 =====
+      async function doSaveFileAs() {
+        const current = state.fileName || "data.tsv";
+        const dot = current.lastIndexOf(".");
+        const ext = dot >= 0 ? current.slice(dot) : ".tsv";
+        let newName = prompt("名前を付けて保存\n保存するファイル名を入力してください:", current);
+        if (newName === null) return; // キャンセル
+        newName = newName.trim();
+        if (!newName) {
+          setStatus("保存をキャンセルしました");
+          return;
+        }
+        if (!newName.includes(".")) newName += ext;
+        const applyRename = async () => {
+          state.fileName = newName;
+          if (state.activeTab >= 0 && state.tabs[state.activeTab]) {
+            state.tabs[state.activeTab].fileName = newName;
+          }
+          const cap = $("main-table").querySelector("caption");
+          if (cap) cap.textContent = `${state.fileName} データ編集グリッド`;
+          await doSaveFile();
+        };
+        const lintIssues = runLint();
+        if (lintIssues.length > 0) {
+          showLintDialog(lintIssues, applyRename);
+          return;
+        }
+        await applyRename();
       }
       // ===== ソート =====
       function sortByColumn(col, shiftKey = false) {
@@ -6497,6 +6521,11 @@
 
         const { key, ctrlKey, metaKey, shiftKey } = e;
 
+        if (cmd && shiftKey && (key === "s" || key === "S")) {
+          e.preventDefault();
+          doSaveFileAs();
+          return;
+        }
         if (cmd && key === "s") {
           e.preventDefault();
           saveFile();
@@ -9087,9 +9116,13 @@
         const input = document.createElement("input");
         input.type = "file";
         input.accept = ".tsv,.csv,.txt,text/tab-separated-values,text/csv,text/plain";
+        input.style.display = "none";
+        document.body.appendChild(input);
         input.onchange = () => {
           if (input.files && input.files[0]) loadPriceMasterFile(input.files[0], null, onDone);
+          input.remove();
         };
+        input.oncancel = () => input.remove();
         input.click();
       }
 
@@ -9292,12 +9325,15 @@
         const input = document.createElement("input");
         input.type = "file";
         input.accept = ".tsv,.txt,text/tab-separated-values,text/plain";
+        input.style.display = "none";
+        document.body.appendChild(input);
         input.onchange = () => {
           if (input.files && input.files[0]) loadSejMasterFile(input.files[0], null, onDone);
           else setStatus("ファイルが選択されませんでした");
+          input.remove();
         };
         // 対応ブラウザではキャンセルを検知してフィードバック
-        input.oncancel = () => setStatus("マスタファイルの選択をキャンセルしました");
+        input.oncancel = () => { setStatus("マスタファイルの選択をキャンセルしました"); input.remove(); };
         input.click();
       }
 
