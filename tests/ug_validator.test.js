@@ -331,25 +331,33 @@ function priceRowP(seat, seatCd, age, adv, day, start, end) {
 const SEAT_P = { name: "P指定席", cd: "RESV09" }; // 当日(07/05 19:00)まで売る・当日価格はダミー
 const SEAT_Q = { name: "Q指定席", cd: "RESV10" }; // 07/02で売り切る（当日にはかぶらない）・当日価格はダミー
 const SEAT_R = { name: "R指定席", cd: "RESV11" }; // 当日まで売る・前売/当日とも実価格（UG元として使う）
+const SEAT_T = { name: "T指定席", cd: "RESV12" }; // 前売から売る・前売価格がダミー（前売で売るのに価格未設定＝設定漏れ）
 const NORMALS_CUTOFF = [
   // 大人料金ダウングレード判定に引っかからないよう、P/Qの前売価格はRの前売価格以上にしておく
   priceRowP(SEAT_P.name, SEAT_P.cd, "大人", 9500, 999999, "2026/06/01 11:00", "2026/07/05 19:00"),
   priceRowP(SEAT_Q.name, SEAT_Q.cd, "大人", 9200, 999999, "2026/06/01 11:00", "2026/07/02 23:59"),
   priceRowP(SEAT_R.name, SEAT_R.cd, "大人", 9000, 9500, "2026/06/01 11:00", "2026/07/05 19:00"),
+  priceRowP(SEAT_T.name, SEAT_T.cd, "大人", 999999, 9500, "2026/06/01 11:00", "2026/07/05 19:00"),
 ];
 const validateCutoff = buildUgValidator(NORMALS_CUTOFF, c, v, seatMeta, DAY_CUTOFF);
 const CUTOFF_SCENARIOS = [
   {
-    // 前売差額は R(9000)→P(9500)=diff500→期待値500を正しく登録。当日だけダミー値のまま登録した状態をテストする
-    name: "[dayCutoff] 元(R)は当日まで売る実価格、先(P)も当日まで売るがダミー → 当日窓に両方かぶっているのでエラー",
+    // 当日価格のダミー（999999）は「当日は販売しない＝売止め」で正常。当日窓に両方かぶっていてもエラーにしない（2026-07-10確定）
+    name: "[dayCutoff] 元(R)は当日まで売る実価格、先(P)の当日はダミー（売止め）→ 当日はエラーではない（OK）",
     row: ugRow(SEAT_R.name, SEAT_R.cd, "大人", SEAT_P.name, SEAT_P.cd, "大人", 500, 12345),
-    expectStatus: "ng",
+    expectStatus: "ok",
   },
   {
-    // 前売差額は R(9000)→Q(9200)=diff200→期待値500を正しく登録。当日だけダミー値のまま登録した状態をテストする
-    name: "[dayCutoff] 元(R)は当日まで売る実価格、先(Q)は07/02で売り切る(当日窓にかぶらない)ダミー → エラーではない",
+    // 前売差額は R(9000)→Q(9200)=diff200→期待値500を正しく登録。当日だけダミー値でも当日は売止めとして正常
+    name: "[dayCutoff] 元(R)は当日まで売る実価格、先(Q)は07/02で売り切る当日ダミー → OK（当日は売止めで正常）",
     row: ugRow(SEAT_R.name, SEAT_R.cd, "大人", SEAT_Q.name, SEAT_Q.cd, "大人", 500, 12345),
     expectStatus: "ok",
+  },
+  {
+    // 前売価格がダミー（999999）で元・先とも前売窓にかぶる（前売で売っている）→ 設定漏れとしてNG（2026-07-10 前売のみ維持）
+    name: "[dayCutoff] 先(T)の前売がダミーだが前売から販売中（前売窓かぶり）→ 前売はエラー（NG）",
+    row: ugRow(SEAT_R.name, SEAT_R.cd, "大人", SEAT_T.name, SEAT_T.cd, "大人", 500, 500),
+    expectStatus: "ng",
   },
 ];
 for (const s of CUTOFF_SCENARIOS) {

@@ -220,6 +220,15 @@
         border-color: var(--rb-accent);
       }
       .rb-btn.active-state .rb-icon svg { color: #fff; }
+      /* マスタ連携ボタンへファイルをドラッグ中の強調（ドロップで連携できることを示す） */
+      .rb-btn.drag-over {
+        background: var(--rb-accent);
+        color: #fff;
+        border-color: var(--rb-accent);
+        outline: 2px dashed #fff;
+        outline-offset: -3px;
+      }
+      .rb-btn.drag-over .rb-icon svg { color: #fff; }
       /* 統合ボタン(席種エリアマスタチェック/SEJチェック)の個別ON/OFFドロップダウン。
          フロント側の見た目は今まで通りのボタンのままにし、▾で個別制御の階層を開く */
       .rb-btn-wrap { position: relative; display: flex; flex-direction: column; align-items: center; }
@@ -1814,11 +1823,11 @@
         <!-- Group: マスタ連携 -->
         <div class="rb-group">
           <div class="rb-buttons">
-            <button class="rb-btn" id="btn-sej-link" title="席種エリアマスタを連携&#10;SEJ設定・価格経路スケジュールのチェック/HTML出力に必須&#10;クリック: マスタファイル(TSV)を選択／もう一度押すと解除" aria-label="席種エリアマスタ連携">
+            <button class="rb-btn" id="btn-sej-link" title="席種エリアマスタを連携&#10;SEJ設定・価格経路スケジュールのチェック/HTML出力に必須&#10;クリック: マスタファイル(TSV)を選択／もう一度押すと解除&#10;このボタンにファイルをドラッグ&ドロップしても連携できます" aria-label="席種エリアマスタ連携">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></span>
               <span>席種エリアマスタ連携</span>
             </button>
-            <button class="rb-btn" id="btn-price-link" title="価格経路スケジュールを連携&#10;席種一括設定のリセール上限検算に必要&#10;クリック: 価格マスタファイル(TSV/CSV)を選択／もう一度押すと解除" aria-label="価格マスタ連携">
+            <button class="rb-btn" id="btn-price-link" title="価格経路スケジュールを連携&#10;席種一括設定のリセール上限検算に必要&#10;クリック: 価格マスタファイル(TSV/CSV)を選択／もう一度押すと解除&#10;このボタンにファイルをドラッグ&ドロップしても連携できます" aria-label="価格マスタ連携">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="2"></rect><line x1="8" y1="2" x2="8" y2="6"></line><line x1="16" y1="2" x2="16" y2="6"></line><path d="M12 10a2 2 0 1 0 0 4h1a2 2 0 1 1 0 4H9"></path><line x1="12" y1="9" x2="12" y2="19"></line></svg></span>
               <span>価格マスタ連携</span>
             </button>
@@ -1844,14 +1853,14 @@
               </div>
             </div>
             <div class="rb-btn-wrap">
-              <button class="rb-btn" id="btn-sej-check" title="SEJデータのチェックをまとめて切り替えます&#10;カナ検査・Word文字数チェック(word1〜7が半角換算50字超でエラー。全角=2字)&#10;前提条件を満たさない項目は自動でスキップされます" aria-label="SEJチェックの切り替え" aria-pressed="false">
+              <button class="rb-btn" id="btn-sej-check" title="SEJデータのチェックをまとめて切り替えます&#10;カナ検査・Word文字数チェック(word1〜7が50字超でエラー。全角・半角とも1字)&#10;前提条件を満たさない項目は自動でスキップされます" aria-label="SEJチェックの切り替え" aria-pressed="false">
                 <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 6h8M8 6v12"></path><path d="M14 18l3.5-10L21 18"></path><path d="M15.5 14h4"></path></svg></span>
                 <span>SEJチェック</span>
               </button>
               <button class="rb-caret" id="caret-sej-check" type="button" title="個別に機能を選んでON/OFF" aria-label="SEJチェックの詳細設定を開く" aria-expanded="false">▾</button>
               <div class="rb-dropdown" id="dd-sej-check">
                 <label><input type="checkbox" data-flag="kanaCheck"> カナ検査</label>
-                <label><input type="checkbox" data-flag="sejWordLenCheck"> Word文字数チェック(半角換算50字超)</label>
+                <label><input type="checkbox" data-flag="sejWordLenCheck"> Word文字数チェック(50字超)</label>
               </div>
             </div>
             <button class="rb-btn" id="btn-ikkatsu-check" title="席種一括設定TSV(23列)の設定整合チェックを表にインライン表示（切り替え）&#10;NG（赤）: マスタ未登録・席種名不一致・指定席整合・上限9+リセール可・リセール下限1321・購入限定あり+単体不可・P+他種混在&#10;注意（橙）: 上限9+SEJ可&#10;席種エリアマスタを連携すると席種名/指定席チェックも有効になります" aria-label="席種一括設定チェックの切り替え" aria-pressed="false">
@@ -2203,7 +2212,7 @@
           ・<span style="color:#16a34a">✓</span> = マスタと完全一致<br>
           ・ピンク色のセル = 不一致。セル内に「マスタ: …」と正しい値が併記され、<b style="color:#dc2626;background:#fde3e3">違う部分が赤く強調</b>されます（濁点抜け・全角半角違いもわかります）<br>
           ・セルを編集しても変わるのは現データ（SEJ側）だけで、マスタには影響しません<br>
-          ・<b>マスタ未使用（ゴースト行）</b>: 現データで使われている席種と<b>同じグループ名</b>のマスタ登録のうち、現データに無いものだけを最終行にグレー表示します（例: もてぎMTGPのSEJを開いていれば、もてぎMTGPグループの未使用席種だけ）。別イベントの席種は表示しません。ゴースト行は保存されません
+          ・<b>マスタ未使用（ゴースト行）</b>: 表示中のデータで使われている席種と<b>同じグループ名</b>のマスタ登録のうち、表示中に無いものだけを最終行にグレー表示します（例: もてぎMTGPのSEJを開いていれば、もてぎMTGPグループの未使用席種だけ）。<b>グループ名でフィルターすると、そのグループの未使用席種だけに絞り込まれます</b>（どれが抜けているか確認しやすくなります）。別イベントの席種は表示しません。ゴースト行は保存されません
         </p>
 
         <h2>キーボードショートカット</h2>
@@ -2353,7 +2362,7 @@
         boxCheck: false,     // 区画席（（〇名）席種）の設定検査
         ikkatsuCheck: false, // 席種一括設定チェック（23列）のインライン検品
         bikoHtmlCheck: false, // 備考(nte)列のHTMLを表上で実際のHTML表示として再現（席種エリアマスタのみ）
-        sejWordLenCheck: false, // SEJのword1〜7が半角換算50字超(全角=2字)のときエラー表記（SEJデータ時。マスタ不要）
+        sejWordLenCheck: false, // SEJのword1〜7が50字超(全角・半角とも1字)のときエラー表記（SEJデータ時。マスタ不要）
         spaceCheck: false,   // セル値の前後空白検査（マスタ非依存・全列対象）
         verticalHeader: true, // ヘッダー縦書き表示（既定でON・列幅節約）
         vHeaderHeight: 230, // 縦書きヘッダーの行高さ(px・手動調整可能)
@@ -2431,12 +2440,15 @@
       const INSPECT_FLAG_LABELS = {
         colorView: "カラー表示", gateView: "ゲート表示", parkingCheck: "駐車券検査",
         boxCheck: "区画席検査", kanaCheck: "カナ検査", bikoHtmlCheck: "備考HTML変換",
-        sejWordLenCheck: "Word文字数チェック(半角換算50字超)",
+        sejWordLenCheck: "Word文字数チェック(50字超)",
       };
       const INSPECT_GROUPS = {
         "btn-seatmaster-check": ["colorView", "gateView", "parkingCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck"],
         "btn-sej-check": ["kanaCheck", "sejWordLenCheck"],
       };
+      // タブごとに保存・復元する検品トグル（タブ切り替えで勝手にOFFにならないようにする）。
+      // spaceCheckはマスタ非依存・全列対象でデータ構造に紐づかないため全タブ共通のまま（ここには含めない）。
+      const INSPECT_TAB_FLAGS = ["colorView", "gateView", "parkingCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck", "sejWordLenCheck", "ikkatsuCheck"];
       // カナ検査の対象列（半角カナ必須の略称/備考系のみ。席種名・試合名等のフルネーム列は全角カナが正しいため対象外）。
       // 前提条件チェックと描画ロジックで共用する。
       const KANA_TEXT_COLS = new Set([
@@ -2641,34 +2653,43 @@
       }
 
       // SEJゴースト行リスト（キャッシュ付き）
-      // 現データで使われている席種のグループ名を集め、同じグループのマスタ未使用コードだけを返す
-      let _ghostCache = { key: null, list: [] };
-      function getSejGhostList(sejCodeColIdx) {
+      // 「表示中の行」で使われている席種のグループ名を集め、同じグループのマスタ未使用コードだけを返す。
+      // グループ名でフィルターすると、そのグループの未使用席種だけがゴースト表示される（どれが抜けているか確認するため）。
+      let _ghostCache = { rows: null, sejCol: -1, ver: -1, list: [] };
+      function getSejGhostList(sejCodeColIdx, rows) {
         if (!state.sejMaster) return [];
-        const key = state.sejMaster.fileName + "|" + state.data.length + "|" + _dataVersion + "|" + sejCodeColIdx;
-        if (_ghostCache.key === key) return _ghostCache.list;
+        // rows = getVisibleRows() の結果。フィルター/非表示が変わると別オブジェクトになるので識別子に使う
+        // （applyFilters が _visibleRowsCache=null にするため、フィルター変更のたびに新しいオブジェクトになる）。
+        if (_ghostCache.rows === rows && _ghostCache.sejCol === sejCodeColIdx && _ghostCache.ver === _dataVersion)
+          return _ghostCache.list;
         const byCode = state.sejMaster.byCode;
         const byGroup = state.sejMaster.byGroup;
         const grpKey = state.sejMaster.grpKey;
         // グループ名列が無い／インデックス未構築のマスタではゴーストを出さない
         // （別グループ・別イベントの席種を誤って大量表示しないための安全側）
-        if (!grpKey || !byGroup) { _ghostCache = { key, list: [] }; return []; }
+        if (!grpKey || !byGroup) { _ghostCache = { rows, sejCol: sejCodeColIdx, ver: _dataVersion, list: [] }; return []; }
         const grpOf = (m) => ((m && m[grpKey]) || "").toString().trim();
-        // 現データで使われているコードと、その所属グループ（=ソートに使うグループ名）を集める
+        // 表示中の行で使われているコードと、その所属グループ（=ソートに使うグループ名）を集める。
+        // フィルター中は表示行だけを見るので、絞ったグループのゴーストだけが出る。
         const usedCodes = new Set();
         const usedGroups = new Set();
-        for (const r of state.data) {
+        const scanRow = (r) => {
           const cd = (r[sejCodeColIdx] ?? "").trim();
-          if (!cd) continue;
+          if (!cd) return;
           usedCodes.add(cd);
           const m = byCode[cd];
           if (m) {
             const g = grpOf(m);
             if (g) usedGroups.add(g);
           }
+        };
+        if (rows && rows._indices) {
+          for (const idx of rows._indices) scanRow(state.data[idx]);
+        } else {
+          for (const r of state.data) scanRow(r);
         }
-        // 現データに含まれるグループだけを走査（マスタ全件は見ない）。
-        // 同じグループのマスタ登録のうち、現データに無いコードだけをゴーストとして返す。
+        // 表示中データに含まれるグループだけを走査（マスタ全件は見ない）。
+        // 同じグループのマスタ登録のうち、表示中データに無いコードだけをゴーストとして返す。
         const list = [];
         for (const g of usedGroups) {
           const codes = byGroup[g];
@@ -2683,7 +2704,7 @@
             });
           }
         }
-        _ghostCache = { key, list };
+        _ghostCache = { rows, sejCol: sejCodeColIdx, ver: _dataVersion, list };
         return list;
       }
 
@@ -2975,10 +2996,10 @@
             }
           }
 
-          // 当日/前売それぞれの窓に「かぶっている」か（dayCutoff未指定なら常にnull=判定不能）。
-          //  ・当日窓: 行の販売終了日時がdayCutoff以降まで続く（=当日まで売っている）
-          //  ・前売窓: 行の販売開始日時がdayCutoff未満（=当日より前から売っている）
-          const overlapsDay = (rec) => (dayCutoff == null || !rec || rec.end == null) ? null : rec.end >= dayCutoff;
+          // 前売窓に「かぶっている」か＝行の販売開始日時がdayCutoff未満（=当日より前から売っている）。
+          // dayCutoff未指定なら常にnull=判定不能。
+          // ※当日窓かぶり(販売終了>=dayCutoff)はかつてNG判定に使っていたが、当日ダミー＝売止めは正常と
+          //   確定したため廃止（当日価格のダミーはエラーにしない。前売ダミーのみ設定漏れ検出に使う）。
           const overlapsAdv = (rec) => (dayCutoff == null || !rec || rec.start == null) ? null : rec.start < dayCutoff;
 
           // --- 期待差額（前売・当日） ---
@@ -2990,14 +3011,18 @@
             const sp = s ? s[which] : null, dp = d ? d[which] : null;
             if (sp == null || dp == null) return { exp: null, note: "価格不明", dummy: false };
             if (isDummyPrice(sp) || isDummyPrice(dp)) {
-              // 元・先どちらも対象の窓（当日/前売）に かぶっているのにダミー値のまま→エラー。
-              // どちらか一方でも窓にかぶっていなければ（その期間はそもそも対象外）、まだ未確定なだけでエラーではない。
-              const overlapFn = which === "day" ? overlapsDay : overlapsAdv;
-              const bothOverlap = overlapFn(s) === true && overlapFn(d) === true;
-              const note = bothOverlap
-                ? `販売期間が${which === "day" ? "当日" : "前売"}にかぶっているのに価格がダミー値（売止め等）のまま設定不可`
-                : "ダミー金額に変換が後程必要（境界日時を指定していない、または対象期間が重なっていないため現時点ではエラーではありません）";
-              return { exp: null, note, dummy: true, dummyError: bothOverlap, srcPrice: sp, dstPrice: dp };
+              // 当日価格のダミー（999999等）は「当日は販売しない＝売止め」という正常な設定なのでエラーにしない。
+              //   （販売期間は前売～当日を1本で持つため当日窓にかぶるが、当日を売らない券種では当日価格をダミーにするのが正しい）
+              // 前売価格のダミーだけ、元・先とも前売窓にかぶっている（＝前売で売っている）のにダミー値のまま→設定漏れとしてエラー。
+              //   前売窓にかぶっていない（当日のみ販売＝前売で売らない）ならダミーで正常なのでエラーではない。
+              const bothOverlapAdv = overlapsAdv(s) === true && overlapsAdv(d) === true;
+              const dummyError = which === "adv" && bothOverlapAdv;
+              const note = dummyError
+                ? "販売期間が前売にかぶっているのに価格がダミー値（売止め等）のまま設定不可"
+                : (which === "day"
+                    ? "当日はダミー値（売止め等）＝当日販売なしとして正常（検算対象外）"
+                    : "ダミー金額に変換が後程必要（境界日時を指定していない、または対象期間が重なっていないため現時点ではエラーではありません）");
+              return { exp: null, note, dummy: true, dummyError, srcPrice: sp, dstPrice: dp };
             }
             const diff = dp - sp;
             // 期待差額の写像は純粋関数 ugExpectedCharge に集約（同年齢: 差額0は全区分500・大人は1〜500→500/超→実差額・
@@ -3264,6 +3289,9 @@
         t.newlineMixed = state.newlineMixed;
         t.markedCells = new Set(state.markedCells);
         t.originalRowCount = state.originalRowCount;
+        // 検品トグルをタブごとに保存（タブ切り替えで外れないようにする）
+        t.inspectFlags = {};
+        for (const k of INSPECT_TAB_FLAGS) t.inspectFlags[k] = !!state[k];
       }
 
       function switchTab(idx) {
@@ -3365,6 +3393,14 @@
         applyHeaderMapping();
         // マスタ連携済みなら、仮想列が無いタブにもグループ名を追加する
         applySejGroupVirtualCol();
+        // 検品トグルをタブごとに復元（resetStateで一旦falseにされているので、保存済みなら戻す）。
+        // これでタブを切り替えてもチェックボタンが勝手にOFFにならない。
+        if (t.inspectFlags) {
+          for (const k of INSPECT_TAB_FLAGS) state[k] = !!t.inspectFlags[k];
+          syncInspectUI();
+          const _bik = $("btn-ikkatsu-check");
+          if (_bik) { _bik.classList.toggle("active-state", state.ikkatsuCheck); _bik.setAttribute("aria-pressed", String(state.ikkatsuCheck)); }
+        }
         if (state.dirty) {
           els.dirty.classList.add("show");
           document.title = "● TSV/CSV Editor";
@@ -3633,6 +3669,23 @@
             loadSejMasterFile(e.dataTransfer.files[0]);
           }
         });
+        // ドラッグ&ドロップで価格経路スケジュール（価格マスタ）を読込
+        // stopPropagation必須: window側のドロップ処理へ伝播すると価格マスタ連携と同時に
+        // 新規タブとしても二重に開かれてしまう。
+        const priceBtn = $("btn-price-link");
+        if (priceBtn) {
+          priceBtn.addEventListener("dragenter", (e) => { e.preventDefault(); e.stopPropagation(); priceBtn.classList.add("drag-over"); });
+          priceBtn.addEventListener("dragover", (e) => { e.preventDefault(); e.stopPropagation(); priceBtn.classList.add("drag-over"); });
+          priceBtn.addEventListener("dragleave", (e) => { e.stopPropagation(); priceBtn.classList.remove("drag-over"); });
+          priceBtn.addEventListener("drop", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            priceBtn.classList.remove("drag-over");
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+              loadPriceMasterFile(e.dataTransfer.files[0], null);
+            }
+          });
+        }
         // 検品表示トグル（チケットタブ）: 関連項目をまとめたグループボタン
         $("btn-seatmaster-check").onclick = () => {
           toggleInspectGroup(["colorView", "gateView", "parkingCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck"], "btn-seatmaster-check", "席種エリアマスタチェック");
@@ -5260,7 +5313,7 @@
           if (!Object.keys(nteWordCols).length) nteWordCols = null;
         }
 
-        // SEJ Word文字数チェック: word1〜7が半角換算50字超のときエラー表記。マスタ不要。
+        // SEJ Word文字数チェック: word1〜7が50字超のときエラー表記（全角・半角とも1字）。マスタ不要。
         let wordLenCols = null;
         if (state.sejWordLenCheck && isSejFile) {
           wordLenCols = new Set();
@@ -5541,13 +5594,13 @@
                 }
               }
             }
-            // SEJ Word文字数チェック: word1〜7が半角換算50字超ならエラー表記（赤背景＋文字数注記）
-            // システム上限は半角50字。全角は1文字=半角2字ぶんとして数える
+            // SEJ Word文字数チェック: word1〜7が50字超ならエラー表記（赤背景＋文字数注記）
+            // 文字数は全角・半角とも1文字として数える（システム上限50文字に合わせる）
             if (wordLenCols && wordLenCols.has(j)) {
-              const len = sejHalfWidthLen(cellVal);
+              const len = [...String(cellVal)].length;
               if (len > 50) {
                 cls.push("cell-ng");
-                displayVal += `<br><span style="color:#dc2626;font-size:10px">⚠半角換算${len}字（50字超・全角=2字）</span>`;
+                displayVal += `<br><span style="color:#dc2626;font-size:10px">⚠${len}字（50字超）</span>`;
               }
             }
             const style =
@@ -5560,12 +5613,12 @@
         if (end < rows.length)
           html += `<tr style="height:${(rows.length - end) * rowH}px"><td colspan="${colSpan}"></td></tr>`;
 
-        // SEJゴースト行: 現データと同じグループのマスタ登録のうち、現データに無い席種だけを最終行に表示
-        // （セブン発券対象の漏れ確認用。別イベント・別グループの席種は対象外なので表示しない）
+        // SEJゴースト行: 表示中データと同じグループのマスタ登録のうち、表示中データに無い席種だけを最終行に表示
+        // （セブン発券対象の漏れ確認用。別イベント・別グループの席種は対象外。グループ絞り込み時は絞ったグループのみ）
         if (state.sejMaster && sejCodeColIdx !== -1) {
-          const missing = getSejGhostList(sejCodeColIdx);
+          const missing = getSejGhostList(sejCodeColIdx, rows);
           if (missing.length) {
-            html += `<tr class="ghost-sep"><td colspan="${colSpan}">▼ 同グループのマスタ未使用 ${missing.length}件（現データに無い＝セブン発券していない席種。漏れがないか確認）</td></tr>`;
+            html += `<tr class="ghost-sep"><td colspan="${colSpan}">▼ 同グループのマスタ未使用 ${missing.length}件（表示中データに無い＝セブン発券していない席種。漏れがないか確認）</td></tr>`;
             for (const g of missing) {
               html += `<tr class="ghost-row" title="${escHtml(g.cd)}"><td class="row-num">−</td>`;
               for (const j of visCols) {
@@ -9423,17 +9476,6 @@
         const code = (row[codeIdx] ?? "").trim();
         if (!code) return null;
         return state.sejMaster.byCode[code] || null;
-      }
-
-      // SEJのword文字数を半角換算で数える（半角=1字・全角=2字。システムの半角50字上限に合わせる）
-      // 半角扱い: ASCII(U+0000〜U+007E)と半角カナ(U+FF61〜U+FF9F)。それ以外は全角=2字
-      function sejHalfWidthLen(s) {
-        let len = 0;
-        for (const ch of String(s ?? "")) {
-          const cp = ch.codePointAt(0);
-          len += cp <= 0x7e || (cp >= 0xff61 && cp <= 0xff9f) ? 1 : 2;
-        }
-        return len;
       }
 
       // SEJデータかどうか判定（word1〜word7 と sej_template_cd が存在）
