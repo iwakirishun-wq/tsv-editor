@@ -1665,6 +1665,15 @@
       #btn-marker.active-state { background: #fff0f6; border-color: #f472b6; color: #be185d; }
       body.marker-mode td[data-col] { cursor: crosshair; }
 
+      /* アニメーション過敏設定の尊重（OSで「視差効果を減らす」時は動きを抑える） 2026-07-21 */
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          animation-duration: .001ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: .001ms !important;
+          scroll-behavior: auto !important;
+        }
+      }
     </style>
   </head>
   <body>
@@ -1694,11 +1703,11 @@
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="8" y="2" width="8" height="4" rx="1"></rect><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><path d="M9 12h6M9 16h6"></path></svg></span>
               <span>貼付から開く</span>
             </button>
-            <button class="rb-btn" id="btn-save" title="現在のデータをファイルとして保存&#10;ショートカット: Ctrl+S" aria-label="ファイルを保存">
+            <button class="rb-btn" id="btn-save" title="現在のデータを保存（前回の保存先へ上書き。初回は保存先を選びます）&#10;ショートカット: Ctrl+S" aria-label="ファイルを保存">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg></span>
               <span>保存 <span id="dirty-indicator" role="status" aria-label="未保存の変更があります"></span></span>
             </button>
-            <button class="rb-btn" id="btn-save-as" title="ファイル名を指定して別名で保存します&#10;ショートカット: Ctrl+Shift+S" aria-label="名前を付けて保存">
+            <button class="rb-btn" id="btn-save-as" title="保存先フォルダとファイル名を選んで保存します&#10;ショートカット: Ctrl+Shift+S" aria-label="名前を付けて保存">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><path d="M13.5 3.5l3 3L9 14l-3.3.6L6.3 11l7.2-7.5z"></path></svg></span>
               <span>名前を付けて保存</span>
             </button>
@@ -2730,7 +2739,6 @@
       const PRICE_RULES = {
         SEAT_CHANGE_FEE: 500,    // 同席種同区分／差額0円のUG手数料、および大人の1〜500円UGの下限
         RESALE_MIN: 1321,        // リセール用販売価格下限（手数料割れ防止）
-        DUMMY_PRICE_MIN: 800000, // この額以上、または全桁9（99999等）は売止めダミー扱い
       };
       // 年齢区分ランク（1=幼児 2=子供 3=U23 4=大人 0=共通/不明）
       function ugAgeRank(a) {
@@ -2773,10 +2781,15 @@
         const s = ugAgeSpan(srcAge), d = ugAgeSpan(dstAge);
         if (s.common || d.common) return null;
         if (s.min === 0 || d.min === 0) return null;
+        // 先が大人チケットなら元がどの区分でも可（同席種の大人化／別席種の昇格。正本§2.1）。
+        // 「大人（高校生以上）」等の複合ラベルは span=[3,4] になり d.min===4 では大人と
+        // 認識されないため、ugAgeRank=4（大人系ラベル）かつ span上限=大人 で判定する
+        // （2026-07-18: パドックパス 子ども(3歳〜中学生)→大人（高校生以上）の誤invalidを修正）。
+        // 大人より上の区分は存在しないため、この早期許可で降格を誤許可することはない。
+        if (d.max === 4 && ugAgeRank(dstAge) === 4) return null;
         const srcRange = s.max > s.min, dstRange = d.max > d.min;
         if (srcRange) {
           if (d.min >= s.min && d.max <= s.max) return null; // 範囲内（再発行・範囲内の年齢区分変更）
-          if (d.min === 4) return null;                       // →大人は範囲券種でも可（同席種の大人化／別席種の昇格）
           return d.max > s.max ? "up_out" : "down";
         }
         if (dstRange) return (s.min >= d.min && s.max <= d.max) ? null : (s.max > d.max ? "down" : "up_out");
@@ -2789,9 +2802,12 @@
         if (reason === "up_out") return "範囲券種の範囲外(上)へのUG不可(" + srcAge + "→" + dstAge + ")";
         return "年齢降格(" + srcAge + "→" + dstAge + ")";
       }
-      // 売止め等のダミー価格（検算対象外）か
+      // 売止め等のダミー価格（検算対象外）か。売止めの記号は全桁9（999999等）のみ。
+      // 2026-08-24: 旧「80万円以上はダミー」条件を撤廃（VBA側は2026-08-19に撤廃済みで未追随だった）。
+      // 27F1はPaddock Club 1,200,000 / S-BOX 1,250,000 / GRAN VIEW 1,500,000 / R-BOX 1,600,000 /
+      // VIPスイート 850,000 がいずれも実価格のため、閾値方式では実価格を売止めと誤認する。
       function ugIsDummyPrice(n) {
-        return n != null && (n >= PRICE_RULES.DUMMY_PRICE_MIN || /^9+$/.test(String(n)));
+        return n != null && /^9+$/.test(String(n));
       }
       // 異席種UGの期待差額（diff = 先価格 − 元価格）。同席種同区分(sameSeat)は呼び出し側で別扱い。
       //  ・差額0円は年齢区分の組合せに関わらず手数料(500)（2026-07-03確定: 異区分間も500円）
@@ -2810,7 +2826,6 @@
         return diff < 0 ? 0 : (diff <= fee ? fee : diff);
       }
       // ===PRICE_RULES_CORE_END===
-      const UG_DUMMY_MIN = PRICE_RULES.DUMMY_PRICE_MIN; // 既存参照の互換エイリアス
       // ===UG_VALIDATOR_CORE_START=== UI/stateに依存しない純粋ロジック（tests/ug_validator.test.js が抽出して検証する）
       // seatMeta(code, name) -> { isFree, isReserved, found } | null（席種エリアマスタ連携時のみ）
       // dayCutoff: 当日/前売の境界タイムスタンプ（出力ダイアログでユーザーが選択。未指定ならnull=判定なし）。
@@ -2825,21 +2840,42 @@
           const t = new Date(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0)).getTime();
           return isNaN(t) ? null : t;
         };
+        // 空欄の価格は「0円」ではなく「未設定」。num() は Number("")===0 のため空欄を0円と誤読する。
+        // VBA側は空欄をダミー価格に読み替えて検算対象外にしているので、同じ扱いに揃える（2026-08-25）。
+        const priceOrNull = (s) => { const t = String(s).trim(); if (t === "") return null; const n = Number(t.replace(/,/g, "")); return isNaN(n) ? null : n; };
         const byCond = new Map(), any = new Map();
-        const adultByCond = new Map(), adultAny = new Map(); // 席ごとの大人料金（ランク4）を引くための索引
+        // 席種ごとの最高額（前売/当日それぞれ・ダミー価格と未設定は除外）。ダウングレード判定の基準。
+        // 条件キー別(maxByCond)は validate() 用、席種のみ(maxAny)は条件を持たない canUpgrade() 用。
+        const maxByCond = new Map(), maxAny = new Map();
+        const bumpMax = (map, key, rec) => {
+          let m = map.get(key);
+          if (!m) { m = { adv: null, day: null }; map.set(key, m); }
+          for (const w of ["adv", "day"]) {
+            const p = rec[w];
+            if (p == null || ugIsDummyPrice(p)) continue;
+            if (m[w] == null || p > m[w]) m[w] = p;
+          }
+        };
         for (const row of rows) {
           const flag = v(row, c.ugFlag);
           if (flag === "該当" || flag === "1") continue;
           const seat = v(row, c.seat), age = v(row, c.age);
           if (!seat) continue;
-          const rec = { adv: num(v(row, c.adv)), day: num(v(row, c.day)), start: parseDt(v(row, c.start)), end: parseDt(v(row, c.end)) };
+          const rec = { adv: priceOrNull(v(row, c.adv)), day: priceOrNull(v(row, c.day)), start: parseDt(v(row, c.start)), end: parseDt(v(row, c.end)) };
           byCond.set(condKey(row) + "|" + seat + "|" + age, rec);
           if (!any.has(seat + "|" + age)) any.set(seat + "|" + age, rec);
-          if (ageRank(age) === 4) {
-            adultByCond.set(condKey(row) + "|" + seat, rec);
-            if (!adultAny.has(seat)) adultAny.set(seat, rec);
-          }
+          bumpMax(maxByCond, condKey(row) + "|" + seat, rec);
+          bumpMax(maxAny, seat, rec);
         }
+        // 元席種の最高額が先席種を上回る組合せは実質ダウングレード（前売・当日を別々に比較し、
+        // どちらかで上回れば不可）。どちらかの席種で最高額が取れない場合は比較しない＝許可側。
+        const isSeatDowngrade = (map, srcKey, dstKey) => {
+          const s = map.get(srcKey), d = map.get(dstKey);
+          if (!s || !d) return false;
+          return ["adv", "day"].some((w) => s[w] != null && d[w] != null && s[w] > d[w]);
+        };
+        // 0円商品はUGの元にも先にもできない（前売・当日いずれかが0円ならブロック）。VBA CheckUpgrade 準拠
+        const hasZeroPrice = (rec) => !!rec && (rec.adv === 0 || rec.day === 0);
         // 席種カテゴリ: 指定席 / エリア / その他 / 駐車券
         //  判定はマスタ・コードを正とする（席種名での決め打ちはしない）:
         //   コード6桁目 O=その他（パドック/パス等・UG例外的に可）/ P=駐車券
@@ -2851,61 +2887,104 @@
           const ch6 = (code && String(code).length >= 6) ? String(code)[5].toUpperCase() : "";
           if (ch6 === "O") return "その他";
           if (ch6 === "P") return "駐車券";
-          if (seatMeta) { const m = seatMeta(code, seat); if (m && m.found) { if (m.stockTyp === "1" || m.isReserved) return "指定席"; if (m.stockTyp === "2" || m.isFree) return "エリア"; } }
+          if (seatMeta) {
+            const m = seatMeta(code, seat);
+            if (m && m.found) {
+              // 呼び出し元がカテゴリを直接持っている場合はそれを正とする（2026-08-25追加）。
+              // 席種エリアマスタを持たない料金表マクロが、大分類（「駐車場」「その他」）から
+              // 席種カテゴリを渡すための口。コード6桁目が未採番の駐車券が指定席と誤判定され、
+              // 実データで231件の乖離が出ていた。
+              if (m.cat) return m.cat;
+              if (m.stockTyp === "1" || m.isReserved) return "指定席";
+              if (m.stockTyp === "2" || m.isFree) return "エリア";
+            }
+          }
           // NFKCで半角カナ（「ｴﾘｱ」等）を全角化してから判定（2026-07-04発見: マスタ未連携時の
           // フォールバック判定が半角カナ表記の席名でエリア扱い漏れになる不具合の再発防止）
           const sn = String(seat || "").normalize("NFKC");
           if (/駐車/.test(sn)) return "駐車券";
-          return /自由席|エリア/.test(sn) ? "エリア" : "指定席";
+          return (/自由席|エリア/.test(sn) || isAreaSeatByName(sn)) ? "エリア" : "指定席";
         };
-        const isWheelchair = (seat) => /車椅子|車いす/.test(seat || "");
-        // 車椅子の同伴席は「自分の席の年齢区分変更」のみ可（他の車椅子席へのUGは不可）
-        const isCompanion = (seat) => /同伴/.test(seat || "");
-        // BOX席（区画席）判定。マスタのbox_seat_flg優先、無ければ席種名の「（〇名）」で判定。
+        const isWheelchair = (seat) => /車椅子|車いす|車イス/.test(String(seat || "").normalize("NFKC"));
+        // 車椅子の同伴席は「自分の席の年齢区分変更」のみ可（席移動不可・他席種UG不可）
+        const isCompanion = (seat) => /同伴/.test(String(seat || "").normalize("NFKC"));
+        // UG(席種変更)対象外席種。出典: 鈴鹿サーキット公式 26F1「チケット・観戦に関するご注意」
+        // https://www.suzukacircuit.jp/f1/ticket/readme.html
+        // S-BOX/R-BOX/GRAN VIEWはBOX判定、車椅子はisWheelchairで既にブロックされるため、
+        // 既存判定を素通りしていた席種だけを列挙する。ローカルホスピは27F1席種エリアマスタ未登録
+        // かつ販売経路=法人のため対象外（IGTCのホスピタリティ観戦券は対象に残すので厳密一致させる）。
+        const isUgExcludedSeat = (seat) =>
+          /ファミリーシート|カメラマン|市民応援席|ローカルホスピ/.test(String(seat || "").normalize("NFKC"));
+        // 元席種内の年齢区分変更だけを認める席種（SHUN指示 2026-08-19）。
+        // 木曜日券・木・金曜日券は上位席へのUG不可。マスタ上エリア席（数在庫）なので
+        // 同席種・同券種の再発行UGも不可＝実質「同一席種内の年齢区分変更のみ」。
+        const isSameSeatOnlyUg = (seat) => /木曜日券|金曜日券/.test(String(seat || "").normalize("NFKC"));
+        // パス系（ピットウォーク・パドックパス等）は完全同一席種の年齢区分変更のみ可。
+        // 大分類「その他」やコード6桁目Oで弾かれる前に判定する必要がある（2026-07-18確定）。
+        // 半角カナ表記（ﾊﾟﾄﾞｯｸﾊﾟｽ）の実データがあるため NFKC 正規化してから判定する。
+        const isSpecialPass = (seat) => /ピットウォーク|パドックパス|パス/.test(String(seat || "").normalize("NFKC"));
+        // 席種名に「エリア」表記が無いがマスタ上は数在庫（エリア席）の席種。
+        // seatMeta連携時はマスタの在庫種別が正なので不要だが、未連携時のフォールバック判定で
+        // これらが指定席扱いになると「エリア席の同席種同券種UG不可」を取りこぼす。
+        const isAreaSeatByName = (seat) =>
+          /木曜日券|金曜日券|Paddock Club|同伴/i.test(String(seat || "").normalize("NFKC"));
+        // BOX席（区画席）判定。マスタのbox_seat_flg優先、無ければ席種名で判定。
+        // 名前での判定は「BOX/ボックス表記」または「（〇名）」の人数単位のみ。
+        // VIP/スイート/ラウンジ/テラス等の名称だけでは区画席にしない（指定/エリアとしてUG対象にする）。
+        // 2026-08-25: BOX/ボックス表記の判定を追加（VBA isBoxSeat と同一化）。マスタ未連携時に
+        // R-BOX・S-BOX が区画席と認識されず、料金表マクロ経由の判定で406件の乖離が出ていた。
         const isBoxSeat = (code, seat) => {
           if (seatMeta) { const m = seatMeta(code, seat); if (m && m.found) return !!m.box; }
-          return /[（(]\s*[0-9０-９]+\s*名\s*[）)]/.test(String(seat || "").normalize("NFKC"));
+          const sn = String(seat || "").normalize("NFKC");
+          return /BOX|ボックス/i.test(sn) || /[（(]\s*[0-9０-９]+\s*名\s*[）)]/.test(sn);
         };
-        const isAdultAge = (a) => ageRank(a) === 4; // 大人（同年齢区分どうしで差額0でも500円の席変更手数料が必要なのは大人のみ）
         const isDummyPrice = ugIsDummyPrice; // 売止め等のダミー価格判定（純粋ロジックを委譲）
         const lookup = (ck, seat, age) => byCond.get(ck + "|" + seat + "|" + age) || any.get(seat + "|" + age) || null;
-        // 条件（会員ランク/販売経路）が完全一致する大人料金のみを使う。"any"フォールバックで他条件の
-        // 価格に化けると、表示上の価格と矛盾するダウングレード誤判定（先<元なのに先のほうが高く見える等）
-        // を引き起こすため、ここでは厳密一致のみとし、見つからなければ判定不能（null）にする
-        const lookupAdult = (ck, seat) => adultByCond.get(ck + "|" + seat) || null;
 
         // UG行が実在しなくても「この席種×券種の組み合わせは構造的にUG可能か」を判定する。
-        // 実在する行のkbn/rank/条件には依存しない（条件キーがないので大人料金は"any"索引のみ参照）。
+        // 実在する行のkbn/rank/条件には依存しない（条件キーがないので最高額は"any"索引のみ参照）。
         // マトリクスの「—」セル（登録なし）が、本来UGが成立しうるのに登録漏れなのか、
         // そもそも対象外（車椅子/エリア/年齢降格/大人ダウングレード）なのかを区別するために使う。
         function canUpgrade(srcSeat, srcCode, srcAge, dstSeat, dstCode, dstAge) {
           const sr = ageRank(srcAge), dr = ageRank(dstAge);
           // 年齢降格/範囲外/中間昇格をまとめて判定（範囲券種対応・両方向。2026-07-07）
           if (ugAgeSpanReason(srcAge, dstAge)) return false;
+          // 公式HPでUG対象外と明示された席種（2026-08-18ルール。VBA側から2026-08-24に移植）
+          if (isUgExcludedSeat(srcSeat) || isUgExcludedSeat(dstSeat)) return false;
+          const sameAgeCatPre = (sr !== 0 && sr === dr) || srcAge === dstAge;
+          // 木曜日券・木・金曜日券は同一席種内の年齢区分変更のみ（2026-08-19ルール。VBA側から移植）
+          if (isSameSeatOnlyUg(srcSeat) || isSameSeatOnlyUg(dstSeat)) {
+            return srcSeat === dstSeat && !sameAgeCatPre;
+          }
+          // パス系も完全同一席種の年齢区分変更のみ可（2026-07-18ルール。2026-08-25にVBAから移植）。
+          // 大分類「その他」で弾かれる前に判定する。IGTC26のパドックパス 子ども→大人(5,000円)
+          // のような正当なUGを取りこぼさないため。同年齢区分の自己UG（再発行）は対象外。
+          if (isSpecialPass(srcSeat) || isSpecialPass(dstSeat)) {
+            return srcSeat === dstSeat && srcSeat !== "" && !sameAgeCatPre;
+          }
           // UG対象は基本「指定席」または「エリア席」。その他(パドックパス等)・駐車券・BOX席(区画席)は
           // 登録漏れ候補に含めない（これらの席種間のUGは想定しないため）。
           const srcCat = seatCat(srcCode, srcSeat), dstCat = seatCat(dstCode, dstSeat);
           if ((srcCat !== "指定席" && srcCat !== "エリア") || (dstCat !== "指定席" && dstCat !== "エリア")) return false;
           if (isBoxSeat(srcCode, srcSeat) || isBoxSeat(dstCode, dstSeat)) return false;
-          const sameAgeCat = (sr !== 0 && sr === dr) || srcAge === dstAge;
+          const sameAgeCat = sameAgeCatPre;
           const sameSeat = srcSeat === dstSeat && srcSeat !== "" && sameAgeCat;
-          // 同伴席は自分の席の年齢区分変更のみ可（別の車椅子席へのUGは不可）
-          if (isCompanion(srcSeat) && srcSeat !== dstSeat) return false;
-          if (sameSeat && dstCat === "エリア") return false;
+          // 車椅子・同伴: 席移動不可（他席種への変更・同席種同券種の再発行は不可。同一席種内の年齢区分変更のみ可）
           const srcWc = isWheelchair(srcSeat), dstWc = isWheelchair(dstSeat);
-          if (srcWc || dstWc) {
-            if (srcWc !== dstWc) return false;         // 片方だけ車椅子→不可
-            if (srcSeat !== dstSeat) return false;     // 車椅子は同一席種内の年齢区分変更のみ（V1→V2等の別車椅子席UG不可・2026-07-06確定）
+          const srcComp = isCompanion(srcSeat), dstComp = isCompanion(dstSeat);
+          if (srcWc || dstWc || srcComp || dstComp) {
+            if (srcWc !== dstWc) return false;
+            if (srcComp !== dstComp) return false;
+            if (srcSeat !== dstSeat) return false;
+            if (sameAgeCat) return false;
+            if (dr !== 4) return false;
+            return true;
           }
-          if (!sameSeat && !srcWc && !dstWc) {
-            const as = adultAny.get(srcSeat), ad = adultAny.get(dstSeat);
-            const adultDowngrade = ["adv", "day"].some((which) => {
-              const asp = as ? as[which] : null, adp = ad ? ad[which] : null;
-              if (asp == null || adp == null || isDummyPrice(asp) || isDummyPrice(adp)) return false;
-              return asp > adp;
-            });
-            if (adultDowngrade) return false;
-          }
+          if (sameSeat && dstCat === "エリア") return false;
+          // 0円商品はUGの元にも先にもできない（VBAから2026-08-25移植）
+          if (hasZeroPrice(any.get(srcSeat + "|" + srcAge)) || hasZeroPrice(any.get(dstSeat + "|" + dstAge))) return false;
+          // 席種の最高額どうしの比較によるダウングレード防止（2026-07-12 VBA確定ルール・2026-08-25 JS移植）
+          if (!sameSeat && !srcWc && !dstWc && isSeatDowngrade(maxAny, srcSeat, dstSeat)) return false;
           return true;
         }
 
@@ -2935,33 +3014,45 @@
             const ageReason = ugAgeSpanReason(srcAge, dstAge);
             if (ageReason) problems.push(ugAgeReasonMsg(ageReason, srcAge, dstAge));
           }
+          // 公式HPでUG対象外と明示された席種（2026-08-18ルール。VBA側から2026-08-24に移植）
+          if (isUgExcludedSeat(srcSeat) || isUgExcludedSeat(dstSeat)) problems.push("公式HPでUG対象外の席種");
+          // 木曜日券・木・金曜日券は同一席種内の年齢区分変更のみ（2026-08-19ルール。VBA側から移植）
+          if (isSameSeatOnlyUg(srcSeat) || isSameSeatOnlyUg(dstSeat)) {
+            if (srcSeat !== dstSeat) problems.push("木曜日券・木金曜日券は他席種とのUG不可");
+            else if (sameAgeCat) problems.push("木曜日券・木金曜日券の同席種同券種UGは設定不可");
+          }
           // エリア席のみ「同席種・同券種UG不可」。その他(O・車椅子・パス等)/指定席は対象外
           const dstCat = seatCat(dstCode, dstSeat);
           if (sameSeat && dstCat === "エリア") problems.push("エリア席の同席種同券種UGは設定不可");
-          // 車椅子: 購入後の他席種への/からのUGは不可。車椅子は同一席種内の年齢区分変更のみ可
-          // （V1→V2等、別の車椅子席へのUGは不可。2026-07-06確定。※駐車場の車いすは席種カテゴリが駐車券なので別途除外済み）
+          // 車椅子・同伴: 席移動不可（他席種への変更・同席種同券種の再発行は不可。同一席種内の年齢区分変更のみ可）
           const srcWc = isWheelchair(srcSeat), dstWc = isWheelchair(dstSeat);
-          if (srcWc || dstWc) {
+          const srcComp = isCompanion(srcSeat), dstComp = isCompanion(dstSeat);
+          if (srcWc || dstWc || srcComp || dstComp) {
             if (srcWc !== dstWc) {
               problems.push("車椅子は他席種とのUG不可");
+            } else if (srcComp !== dstComp) {
+              problems.push("車椅子と同伴席の相互UGは不可");
             } else if (srcSeat !== dstSeat) {
-              problems.push("車椅子は同一席種内の年齢区分変更のみ可（別の車椅子席へのUG不可）");
+              problems.push("車椅子席は同伴含め席移動不可（他席種への変更不可）");
+            } else if (sameAgeCat) {
+              problems.push("車椅子席は席移動不可のため同券種UGは設定不可");
+            } else if (dr !== 4) {
+              problems.push("車椅子席の年齢変更は大人へのみ可");
             }
           }
-          // 大人料金が先<元（実質ダウングレード）のUGは、元が大人のときだけ不可。
-          // 元が大人以外の年齢区分なら不可にしない（アップグレード可）。その場合の期待差額は
-          // 自年齢の差額の通常ルールで計算する（0未満→0円／0円以上→その差額。ugExpectedChargeが算出）。
-          if (!sameSeat && !srcWc && !dstWc) {
+          // 0円商品はUGの元にも先にもできない（VBAから2026-08-25移植）
+          {
             const ck0 = condKey(row);
-            const as = lookupAdult(ck0, srcSeat), ad = lookupAdult(ck0, dstSeat);
-            // ダミー価格(999999等)は売止め/当日販売なしの記号にすぎず実際の金額ではないため、
-            // どちらかがダミーの組み合わせはダウングレード判定の対象外にする（実数どうしでのみ比較する）
-            const adultDowngrade = ["adv", "day"].some((which) => {
-              const asp = as ? as[which] : null, adp = ad ? ad[which] : null;
-              if (asp == null || adp == null || isDummyPrice(asp) || isDummyPrice(adp)) return false;
-              return asp > adp;
-            });
-            if (adultDowngrade && sr === 4) problems.push("大人料金が先<元のためUG不可");
+            if (hasZeroPrice(lookup(ck0, srcSeat, srcAge)) || hasZeroPrice(lookup(ck0, dstSeat, dstAge))) {
+              problems.push("0円商品はUG不可");
+            }
+          }
+          // 席種ごとの最高額（前売/当日それぞれ・ダミー除外）を比較した実質ダウングレードは不可。
+          // 2026-08-25: 旧「大人料金が先<元、かつ元が大人のときだけ不可」から基準を変更（正本§2-7改訂）。
+          // 大人券種を持たない席種（「3歳以上共通」のみの席・スイート系等）が大人料金基準を素通りし、
+          // 高額席から安い席への0円UGが生成される穴を塞ぐため（VBAが2026-07-12に先行導入した基準）。
+          if (!sameSeat && !srcWc && !dstWc && !srcComp && !dstComp && isSeatDowngrade(maxByCond, condKey(row) + "|" + srcSeat, condKey(row) + "|" + dstSeat)) {
+            problems.push("席種の最高額が先<元のためUG不可");
           }
           // マスタ連携時: マスタ未登録の席種を注記
           if (seatMeta) {
@@ -3242,6 +3333,7 @@
         t.data = state.data.map(r => [...r]);
         t.headers = [...state.headers];
         t.fileName = state.fileName;
+        t.fileHandle = state.fileHandle || null; // 保存先ハンドルもタブごとに保持（タブ切替で取り違えないように）
         t.delimiter = state.delimiter;
         t.colWidths = { ...state.colWidths };
         t.sortCol = state.sortCol;
@@ -3307,6 +3399,7 @@
         state.data = t.data ? t.data.map((r) => [...r]) : [[""]];
         state.headers = t.headers ? [...t.headers] : ["列1"];
         state.fileName = t.fileName;
+        state.fileHandle = t.fileHandle || null; // 保存先ハンドルもタブごとに復元
         state.delimiter = t.delimiter;
         state.colWidths = { ...(t.colWidths || {}) };
         state.sortCol = t.sortCol;
@@ -3966,7 +4059,8 @@
               multiple: false,
               types: [{ description: "TSV/CSV/テキスト", accept: { "text/plain": extensions } }],
             });
-            onFile(await handle.getFile());
+            // ハンドルも渡す（保存先として記憶し、次回の「保存」で同じ場所へ上書きできるようにする）
+            onFile(await handle.getFile(), handle);
             return;
           } catch (err) {
             if (err && err.name === "AbortError") return; // ユーザーがキャンセル
@@ -3979,21 +4073,23 @@
       function openDataFilePicker() {
         pickFileWithFallback(
           [".tsv", ".csv", ".txt"],
-          (file) => loadFile(file),
+          (file, handle) => loadFile(file, handle),
           () => els.fileInput.click(),
         );
       }
 
-      function loadFile(file) {
+      // handle: File System Access API の書き込み可能ハンドル（あれば保存先として記憶する）。
+      // ドラッグ&ドロップ・input選択・クリップボード等でハンドルが無い場合はundefined→保存時に保存先を尋ねる。
+      function loadFile(file, handle) {
         if (!file) return;
         const reader = new FileReader();
-        reader.onload = (e) => loadTextAsFile(e.target.result, file.name);
+        reader.onload = (e) => loadTextAsFile(e.target.result, file.name, handle);
         reader.onerror = () => setStatus("ファイルの読み込みに失敗しました");
         reader.readAsText(file);
       }
 
       // テキストとファイル名から新規タブとして読み込む（ファイル選択・ドロップ・クリップボード共通）
-      function loadTextAsFile(text, fileName) {
+      function loadTextAsFile(text, fileName, handle) {
         if (text == null) return;
         // 先に現在のタブを保存してからパース（parseDataがstateを書き換えるため）
         saveCurrentTab();
@@ -4006,6 +4102,8 @@
           }
         }
         state.fileName = fileName;
+        // 保存先ハンドル（あれば「保存」で同じ場所へ上書き。無ければ次回保存時に保存先を尋ねる）
+        state.fileHandle = handle || null;
         state.delimiter = detectDelimiter(text, fileName);
         parseData(text);
         state.originalRowCount = state.data.length; // 開いた直後の行数（保存時の予期せぬ増減チェック用）
@@ -4494,7 +4592,55 @@
         _reloadCallback = null;
       }
 
-      async function doSaveFile() {
+      // ===== 保存先の選択（File System Access API） =====
+      // 保存ダイアログ（保存先フォルダ＋ファイル名を選べる）が使えるか
+      const _canPickSave = () => typeof window.showSaveFilePicker === "function";
+      // 拡張子に応じた保存ダイアログのファイル種別（既定の拡張子・フィルタ）
+      function _saveAsTypes(name) {
+        const lower = String(name || "").toLowerCase();
+        if (lower.endsWith(".csv")) return [{ description: "CSV (カンマ区切り)", accept: { "text/csv": [".csv"] } }];
+        if (lower.endsWith(".txt")) return [{ description: "テキスト", accept: { "text/plain": [".txt"] } }];
+        return [{ description: "TSV (タブ区切り)", accept: { "text/tab-separated-values": [".tsv"] } }];
+      }
+      // ハンドルへの書き込み権限を確保（無ければ要求）。granted なら true
+      async function _ensureWritePermission(handle) {
+        try {
+          if (!handle || !handle.queryPermission) return true; // 古い実装はそのまま試す
+          const opts = { mode: "readwrite" };
+          if ((await handle.queryPermission(opts)) === "granted") return true;
+          if ((await handle.requestPermission(opts)) === "granted") return true;
+          return false;
+        } catch (_) { return true; }
+      }
+      // 確定した保存先ハンドルへ実際に書き込む（真の上書き保存）
+      async function _writeToHandle(handle, txt) {
+        const w = await handle.createWritable();
+        await w.write(txt);
+        await w.close();
+      }
+      // フォールバック: ブラウザの既定ダウンロードフォルダへ保存（従来動作）
+      function _downloadBlob(txt, name) {
+        const blob = new Blob([txt], { type: "text/plain" });
+        const a = document.createElement("a");
+        const objUrl = URL.createObjectURL(blob);
+        a.href = objUrl;
+        a.download = name;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(objUrl), 1000);
+      }
+      // 保存後のファイル名を state・タブ・キャプションに反映
+      function _applySavedName(name) {
+        if (!name) return;
+        state.fileName = name;
+        if (state.activeTab >= 0 && state.tabs[state.activeTab]) {
+          state.tabs[state.activeTab].fileName = name;
+        }
+        const cap = $("main-table").querySelector("caption");
+        if (cap) cap.textContent = `${state.fileName} データ編集グリッド`;
+      }
+
+      // askLocation=true で「名前を付けて保存」（保存先フォルダとファイル名を毎回選ぶ）
+      async function doSaveFile({ askLocation = false } = {}) {
         // フィルター中は表示行のみ保存する確認
         if (state.filteredIndices) {
           const shown = state.filteredIndices.length;
@@ -4521,17 +4667,63 @@
         const virtualNote = state.sejVirtualCols ? "（仮想列は除外）" : "";
         const bom = state.encoding === "utf8bom" ? "﻿" : "";
         const txt = bom + buildFileContent();
-        const blob = new Blob([txt], { type: "text/plain" });
-        const a = document.createElement("a");
-        const objUrl = URL.createObjectURL(blob);
-        a.href = objUrl;
-        a.download = state.fileName;
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(objUrl), 1000);
+
+        // 保存先の決定（デスクトップのエディタと同じ挙動）:
+        //  1) 保存先ハンドルがある（開いた/名前を付けて保存で確定済み）→ その場所へ静かに上書き
+        //  2) File System Access API が使える → 保存ダイアログで保存先フォルダ＋名前を選ぶ（以後はそこへ上書き）
+        //  3) いずれも不可（file://実行・非対応ブラウザ）→ 既定ダウンロードフォルダへ（従来動作。名前を付けて保存なら名前だけ指定可）
+        const canOverwrite = !askLocation && state.fileHandle && typeof state.fileHandle.createWritable === "function";
+        let savedTo = "";
+        if (canOverwrite) {
+          if (!(await _ensureWritePermission(state.fileHandle))) {
+            setStatus("保存先への書き込みが許可されませんでした（名前を付けて保存で場所を選び直せます）");
+            return;
+          }
+          try {
+            await _writeToHandle(state.fileHandle, txt);
+            savedTo = state.fileHandle.name || state.fileName;
+          } catch (e) {
+            if (e && e.name === "AbortError") { setStatus("保存をキャンセルしました"); return; }
+            console.warn("上書き保存に失敗、ダウンロードにフォールバック:", e);
+            _downloadBlob(txt, state.fileName);
+          }
+        } else if (_canPickSave()) {
+          try {
+            const handle = await window.showSaveFilePicker({
+              suggestedName: state.fileName || "data.tsv",
+              types: _saveAsTypes(state.fileName),
+            });
+            state.fileHandle = handle;
+            _applySavedName(handle.name);
+            await _writeToHandle(handle, txt);
+            savedTo = handle.name;
+          } catch (e) {
+            if (e && e.name === "AbortError") { setStatus("保存をキャンセルしました"); return; }
+            console.warn("保存ダイアログに失敗、ダウンロードにフォールバック:", e);
+            _downloadBlob(txt, state.fileName);
+          }
+        } else {
+          // File System Access API 非対応。保存先フォルダは選べないため既定のダウンロード先へ。
+          if (askLocation) {
+            // せめてファイル名は指定できるようにする（従来の「名前を付けて保存」）
+            const cur = state.fileName || "data.tsv";
+            const dot = cur.lastIndexOf(".");
+            const ext = dot >= 0 ? cur.slice(dot) : ".tsv";
+            let nn = prompt("名前を付けて保存\n（このブラウザでは保存先フォルダは選べません。ダウンロードフォルダに保存されます）\nファイル名:", cur);
+            if (nn === null) { setStatus("保存をキャンセルしました"); return; }
+            nn = nn.trim();
+            if (!nn) { setStatus("保存をキャンセルしました"); return; }
+            if (!nn.includes(".")) nn += ext;
+            _applySavedName(nn);
+          }
+          _downloadBlob(txt, state.fileName);
+        }
+
         markClean();
         const rowNote = isFullSave && savedRows !== state.originalRowCount ? `（元 ${state.originalRowCount}行→保存 ${savedRows}行）` : "";
         if (isFullSave) state.originalRowCount = savedRows; // 全行保存時のみ次回の基準を更新（フィルター保存では基準を保つ）
-        setStatus(`保存しました（${savedRows}行${virtualNote}）${rowNote}`);
+        const locNote = savedTo ? ` → ${savedTo}` : "";
+        setStatus(`保存しました（${savedRows}行${virtualNote}）${locNote}${rowNote}`);
       }
 
       async function saveFile() {
@@ -4543,34 +4735,14 @@
         await doSaveFile();
       }
 
-      // ===== 名前を付けて保存 =====
+      // ===== 名前を付けて保存（保存先フォルダとファイル名を毎回選ぶ） =====
       async function doSaveFileAs() {
-        const current = state.fileName || "data.tsv";
-        const dot = current.lastIndexOf(".");
-        const ext = dot >= 0 ? current.slice(dot) : ".tsv";
-        let newName = prompt("名前を付けて保存\n保存するファイル名を入力してください:", current);
-        if (newName === null) return; // キャンセル
-        newName = newName.trim();
-        if (!newName) {
-          setStatus("保存をキャンセルしました");
-          return;
-        }
-        if (!newName.includes(".")) newName += ext;
-        const applyRename = async () => {
-          state.fileName = newName;
-          if (state.activeTab >= 0 && state.tabs[state.activeTab]) {
-            state.tabs[state.activeTab].fileName = newName;
-          }
-          const cap = $("main-table").querySelector("caption");
-          if (cap) cap.textContent = `${state.fileName} データ編集グリッド`;
-          await doSaveFile();
-        };
         const lintIssues = runLint();
         if (lintIssues.length > 0) {
-          showLintDialog(lintIssues, applyRename);
+          showLintDialog(lintIssues, () => doSaveFile({ askLocation: true }));
           return;
         }
-        await applyRename();
+        await doSaveFile({ askLocation: true });
       }
       // ===== ソート =====
       function sortByColumn(col, shiftKey = false) {
@@ -6575,6 +6747,10 @@
       // ===== キーボード =====
       function onKeyDown(e) {
         if (e.target.tagName === "INPUT" && e.target.closest("td.editing"))
+          return;
+        // ヘッダーコメント編集欄（単体編集・一括辞書編集）ではEnterで改行できるよう、
+        // グリッドのキー操作（Enterで次行へ移動 等）を素通りさせる
+        if (e.target.tagName === "TEXTAREA" && e.target.closest("._comment-edit-ov, #dict-editor-overlay"))
           return;
         // F4: 直前の操作を繰り返す（Excel同様）
         if (e.key === "F4" && !e.ctrlKey && !e.altKey && !e.shiftKey) {
@@ -10008,7 +10184,7 @@
         for (const row of normals) {
           const sc = v(row, c.seat); const n = numOf(v(row, c.adv));
           if (sc && !(sc in _seatCodeMap)) _seatCodeMap[sc] = v(row, c.seatCd);
-          if (sc && n != null && n < UG_DUMMY_MIN) {
+          if (sc && n != null && !ugIsDummyPrice(n)) {
             if (!(sc in _seatAdvAny) || n < _seatAdvAny[sc]) _seatAdvAny[sc] = n;
             if (isAdultAgeLabel(v(row, c.age)) && (!(sc in _seatAdv) || n < _seatAdv[sc])) _seatAdv[sc] = n;
           }
@@ -11368,10 +11544,11 @@ ${findings.length
           for (const fileHandle of launchParams.files) {
             try {
               const file = await fileHandle.getFile();
+              // fileHandle は書き込み可能。保存先として記憶し「保存」で同じファイルへ上書きできるようにする
               if (state.dirty) {
-                showReloadDialog(() => loadFile(file));
+                showReloadDialog(() => loadFile(file, fileHandle));
               } else {
-                loadFile(file);
+                loadFile(file, fileHandle);
               }
             } catch (e) {
               console.error("ファイルを開けませんでした:", e);
