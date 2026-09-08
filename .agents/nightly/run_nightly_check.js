@@ -14,6 +14,7 @@ const fs = require("fs");
 const path = require("path");
 const { chromium } = require("playwright");
 const dummy = require("./dummy_data");
+const { runLargeGridScenario } = require("./large_grid_scenario");
 
 const REPO_ROOT = path.join(__dirname, "..", "..");
 const INDEX_HTML = path.join(REPO_ROOT, "index.html");
@@ -342,6 +343,7 @@ async function main() {
     scenarios.push(await runSejScenario(browser, today));
     scenarios.push(await runIkkatsuScenario(browser, today));
     scenarios.push(await runSeatMasterMainGridScenario(browser, today));
+    scenarios.push(await runLargeGridScenario(browser, withPage, INDEX_HTML, LOG_DIR, today));
     const real = await runRealDataScenarioIfAvailable(browser, today);
     if (real) scenarios.push(real);
   } catch (e) {
@@ -385,6 +387,8 @@ async function main() {
     if (sc.okCellCount != null) lines.push(`- OKセル数: ${sc.okCellCount}`);
     if (sc.warnCellCount != null) lines.push(`- 警告セル数: ${sc.warnCellCount}`);
     if (sc.htmlSaveSizeBytes != null) lines.push(`- HTML保存サイズ: ${sc.htmlSaveSizeBytes} bytes`);
+    if (sc.gridSize) lines.push(`- データ規模: ${sc.gridSize}`);
+    if (sc.perf) lines.push(`- 操作レイテンシ(ms): ` + Object.entries(sc.perf).map(([k, v]) => `${k}=${v}`).join(" / "));
     if (sc.dataSource) lines.push(`- データ源: ${sc.dataSource.boPath} / ${sc.dataSource.seatMetaPath}（参考チェック・全体結果には影響しません）`);
     if (sc.dayCutoffUsed) lines.push(`- 境界日時（自動候補）: ${sc.dayCutoffUsed} ※${sc.dayCutoffNote}`);
   }

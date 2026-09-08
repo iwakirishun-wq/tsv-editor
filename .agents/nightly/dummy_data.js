@@ -162,6 +162,24 @@ function buildDummyIkkatsuData() {
   return [headers.join("\t"), ...rows.map((r) => r.join("\t"))].join("\n");
 }
 
+// --- 大量行データ（描画性能・仮想スクロールの回帰チェック用） ---
+// 実データの最大級（会場レイアウト 約68000行×60列）を模した合成データ。
+// 中身の正しさではなく「描画が破綻しないか」「操作が遅くならないか」を見るためのもの。
+function buildDummyLargeGrid(rows, cols) {
+  const headers = [];
+  for (let c = 0; c < cols; c++) headers.push("col" + (c + 1));
+  const lines = [headers.join("\t")];
+  for (let r = 0; r < rows; r++) {
+    const cells = [];
+    for (let c = 0; c < cols; c++) {
+      // 数値列と文字列列を混ぜる（範囲統計の集計対象を作るため）
+      cells.push(c % 3 === 0 ? String((r * 7 + c) % 100000) : "値" + r + "_" + c);
+    }
+    lines.push(cells.join("\t"));
+  }
+  return lines.join("\n");
+}
+
 module.exports = {
   DAY_CUTOFF_DATE,
   DAY_CUTOFF_TIME,
@@ -170,4 +188,5 @@ module.exports = {
   buildDummySeatMasterMainGrid,
   buildDummySejData,
   buildDummyIkkatsuData,
+  buildDummyLargeGrid,
 };
