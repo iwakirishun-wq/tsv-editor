@@ -1671,7 +1671,7 @@
       <div class="rb-content" id="rb-pane-file" role="group" aria-label="ファイル・データ操作">
         <div class="rb-group">
           <div class="rb-buttons">
-            <button class="rb-btn" id="btn-open" title="TSV/CSVファイルを開く&#10;ドラッグ&amp;ドロップでも読み込めます" aria-label="ファイルを開く">
+            <button class="rb-btn" id="btn-open" title="TSV/CSV/Excelファイルを開く&#10;ドラッグ&amp;ドロップでも読み込めます&#10;Excel(.xlsx/.xlsm/.xls)は表示どおりの文字列のままTSVへ変換して開きます" aria-label="ファイルを開く">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline><path d="M9 12h6M9 16h6"></path></svg></span>
               <span>開く</span>
             </button>
@@ -1930,7 +1930,7 @@
     <div id="main">
       <div id="drop-zone">
         <div style="font-size: 40px; opacity: 0.3" aria-hidden="true">📄</div>
-        <div class="drop-msg">TSV / CSV ファイルをここにドロップ</div>
+        <div class="drop-msg">TSV / CSV / Excel ファイルをここにドロップ</div>
         <div style="font-size: 12px; color: var(--text-dim); margin-top: 4px">
           または下のボタンから選択
         </div>
@@ -2099,7 +2099,7 @@
     <input
       type="file"
       id="file-input"
-      accept=".tsv,.csv,.txt,text/tab-separated-values,text/csv,text/plain"
+      accept=".tsv,.csv,.txt,.xlsx,.xlsm,.xls,text/tab-separated-values,text/csv,text/plain"
       aria-label="TSV/CSVファイルを開く"
       style="display: none"
     />
@@ -2155,7 +2155,7 @@
 
         <h2>📁 ファイルタブ</h2>
         <div class="man-btn-section">
-          <div class="man-btn-row"><span class="man-btn-label">開く</span><span class="man-btn-desc">TSV・CSV・TXTを開く。画面へのドラッグ&amp;ドロップでも可。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">開く</span><span class="man-btn-desc">TSV・CSV・TXT・Excel(.xlsx/.xlsm/.xls)を開く。画面へのドラッグ&amp;ドロップでも可。Excelはシートごとに別タブでTSVへ変換して開き、値は文字列のまま（日付は表示どおり、数値は桁区切りなしの生の値、先頭0も保持）。元のExcelを上書きしないよう保存先は未設定になります。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">保存</span><span class="man-btn-desc">上書き保存（Ctrl+S）。タブの赤い●は未保存の印。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">名前を付けて保存</span><span class="man-btn-desc">ファイル名を指定して別名で保存（Ctrl+Shift+S）。以降の保存は新しい名前になります。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">絞込保存</span><span class="man-btn-desc">フィルターで絞り込んだ行だけを別ファイルに保存。</span></div>
@@ -4030,7 +4030,7 @@
           try {
             const [handle] = await window.showOpenFilePicker({
               multiple: false,
-              types: [{ description: "TSV/CSV/テキスト", accept: { "text/plain": extensions } }],
+              types: [{ description: "TSV/CSV/テキスト/Excel", accept: { "text/plain": extensions } }],
             });
             // ハンドルも渡す（保存先として記憶し、次回の「保存」で同じ場所へ上書きできるようにする）
             onFile(await handle.getFile(), handle);
@@ -4074,9 +4074,125 @@
 
       function openDataFilePicker() {
         pickFileWithFallback(
-          [".tsv", ".csv", ".txt"],
+          [".tsv", ".csv", ".txt", ".xlsx", ".xlsm", ".xls"],
           (file, handle) => loadFile(file, handle),
           () => els.fileInput.click(),
+        );
+      }
+
+      // ===== Excel(.xlsx/.xlsm/.xls) 取り込み =====
+      // 方針: セルの値は「Excelの表示どおりの文字列」をそのまま使う。
+      //   日付/金額/数値をこちら側で解釈・再フォーマットしない（勝手に変換しない）。
+      //   例: 表示が 2026/9/9 なら "2026/9/9"、32,000 なら "32,000" のまま取り込む。
+      const XLSX_EXT = /\.(xlsx|xlsm|xlsb|xls)$/i;
+      function isExcelFile(name) {
+        return XLSX_EXT.test(String(name || ""));
+      }
+      let _xlsxLibPromise = null;
+      function loadXlsxLib() {
+        if (window.XLSX) return Promise.resolve(window.XLSX);
+        if (_xlsxLibPromise) return _xlsxLibPromise;
+        _xlsxLibPromise = new Promise((resolve, reject) => {
+          const sc = document.createElement("script");
+          sc.src = "./vendor/xlsx.full.min.js";
+          sc.onload = () => (window.XLSX ? resolve(window.XLSX) : reject(new Error("XLSX未定義")));
+          sc.onerror = () => reject(new Error("Excel読み込みライブラリを読み込めませんでした"));
+          document.head.appendChild(sc);
+        }).catch((e) => { _xlsxLibPromise = null; throw e; });
+        return _xlsxLibPromise;
+      }
+      // シート1枚をTSVテキストへ。
+      // 値の決め方（勝手な変換をしない、が方針）:
+      //   ・文字列セル      → そのまま（先頭0の "0012" や長い数字コードも維持）
+      //   ・日付/時刻セル   → Excelの表示どおりの文字列（"2026/9/9"。シリアル値には戻さない）
+      //   ・数値セル        → セルが持つ生の値（"32000"。表示書式の桁区切り "," は付けない）
+      //   ・数式セル        → 計算結果の値（式そのものは持ち込まない）
+      //   ・真偽値/エラー   → 表示文字列
+      function _cellToText(XLSX, cell) {
+        if (!cell) return "";
+        const t = cell.t;
+        if (t === "n") {
+          const isDate = (() => {
+            try { return !!(cell.z && XLSX.SSF && XLSX.SSF.is_date(cell.z)); } catch (_) { return false; }
+          })();
+          // 日付・時刻は表示文字列を採用（シリアル値では意味が失われるため）
+          if (isDate) return cell.w != null ? String(cell.w) : String(cell.v ?? "");
+          // 通常の数値は生の値。#,##0 等の桁区切りは付けない
+          return cell.v == null ? "" : String(cell.v);
+        }
+        if (t === "d") return cell.w != null ? String(cell.w) : String(cell.v ?? "");
+        if (t === "b") return cell.v ? "TRUE" : "FALSE";
+        if (t === "e") return cell.w != null ? String(cell.w) : "";
+        // 文字列セル: 表示文字列ではなく生の値を優先（書式で加工されないように）
+        return cell.v != null ? String(cell.v) : (cell.w != null ? String(cell.w) : "");
+      }
+      function _sheetToTsv(XLSX, ws) {
+        const ref = ws["!ref"];
+        if (!ref) return "";
+        const range = XLSX.utils.decode_range(ref);
+        const esc = (v) =>
+          v.includes("\t") || v.includes('"') || v.includes("\n") || v.includes("\r")
+            ? '"' + v.replace(/"/g, '""') + '"'
+            : v;
+        const lines = [];
+        for (let r = range.s.r; r <= range.e.r; r++) {
+          const cells = [];
+          for (let c = range.s.c; c <= range.e.c; c++) {
+            cells.push(esc(_cellToText(XLSX, ws[XLSX.utils.encode_cell({ r, c })])));
+          }
+          // 完全な空行は落とす（末尾の余白行対策）
+          if (cells.every((v) => v === "")) continue;
+          lines.push(cells.join("\t"));
+        }
+        return lines.join("\n");
+      }
+      async function loadExcelFile(file) {
+        setStatus(`Excelを読み込み中... (${file.name})`);
+        let XLSX;
+        try {
+          XLSX = await loadXlsxLib();
+        } catch (e) {
+          setStatus(e.message || "Excel読み込みライブラリを読み込めませんでした");
+          return;
+        }
+        let wb;
+        try {
+          const buf = await file.arrayBuffer();
+          wb = XLSX.read(buf, {
+            type: "array",
+            cellDates: false, // 日付をDateへ変換しない
+            cellText: true,   // 表示文字列(w)を保持
+            cellNF: true,
+            raw: false,
+          });
+        } catch (e) {
+          console.warn("Excel解析に失敗:", e);
+          setStatus(`Excelを読み込めませんでした（${file.name}）`);
+          return;
+        }
+        const names = wb.SheetNames || [];
+        if (!names.length) {
+          setStatus("シートが見つかりませんでした");
+          return;
+        }
+        const base = file.name.replace(XLSX_EXT, "");
+        let opened = 0;
+        for (const nm of names) {
+          const ws = wb.Sheets[nm];
+          if (!ws) continue;
+          const tsv = _sheetToTsv(XLSX, ws);
+          if (!tsv.trim()) continue; // 空シートは開かない
+          // 保存先ハンドルは渡さない: TSVでExcelを上書きしないため（保存時に保存先を尋ねる）
+          loadTextAsFile(tsv, names.length > 1 ? `${base}_${nm}.tsv` : `${base}.tsv`);
+          opened++;
+        }
+        if (!opened) {
+          setStatus(`空のブックでした（${file.name}）`);
+          return;
+        }
+        setStatus(
+          `Excelを取り込みました: ${file.name} → ${opened}シートをTSVとして開きました` +
+            "（値はExcelの表示どおりの文字列。保存先は未設定）"
         );
       }
 
@@ -4084,6 +4200,11 @@
       // ドラッグ&ドロップ・input選択・クリップボード等でハンドルが無い場合はundefined→保存時に保存先を尋ねる。
       function loadFile(file, handle) {
         if (!file) return;
+        if (isExcelFile(file.name)) {
+          // Excelは別経路でTSVへ変換して開く（保存先ハンドルは引き継がない）
+          loadExcelFile(file);
+          return;
+        }
         const reader = new FileReader();
         reader.onload = (e) => loadTextAsFile(e.target.result, file.name, handle);
         reader.onerror = () => setStatus("ファイルの読み込みに失敗しました");

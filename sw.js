@@ -3,6 +3,7 @@
 // → 「更新したのに古い画面が出る」問題を起こさずオフライン動作を実現する
 const CACHE = "tsv-editor-v1";
 const CORE = ["./", "./index.html", "./manifest.json", "./icon.svg"];
+// Excel取り込み用ライブラリは初回利用時に読み込む（fetchハンドラで自動キャッシュされる）
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(CORE)).catch(() => {}));
