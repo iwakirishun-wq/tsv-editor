@@ -33,6 +33,9 @@
         --header-border: #bfbfbf;
         --cell-border: #d0d0d0;
         --col-active-bg: #e8f0e8;
+        /* 選択範囲の見え方（Excel準拠）: 外周は緑の太線、内側は薄いグレー */
+        --range-line: #217346;
+        --range-fill: rgba(0, 0, 0, 0.08);
         --danger-bg: #fef2f2;
         --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
         --shadow-md: 0 2px 4px rgba(0,0,0,0.06);
@@ -679,8 +682,14 @@
         height: var(--row-h, 22px);
         background: #fff;
       }
-      /* ゼブラストライプ: Excelの交互行色に相当。ハイライト系はすべて!importantで上書きされる */
-      tbody tr:nth-child(even) { background: #f6f6f6; }
+      /* ゼブラストライプ: Excelの交互行色に相当。ハイライト系はすべて!importantで上書きされる。
+         nth-child は仮想スクロールのスペーサ行でパリティがずれる（スクロールすると縞が入れ替わる）ため、
+         描画時に可視行インデックスから .r-alt を付けて縞を固定する */
+      tbody tr.r-alt { background: #f6f6f6; }
+      /* 仮想スクロールの上下スペーサ行。高さはインラインstyleで指定するので、
+         セル側の既定高さ・余白・罫線は打ち消しておく（0pxのときに1行ぶん膨らむのを防ぐ） */
+      tbody tr.vspacer { background: transparent; }
+      tbody tr.vspacer > td { height: 0; padding: 0; border: 0; line-height: 0; }
       tbody td {
         border-right: 1px solid var(--cell-border);
         border-bottom: 1px solid var(--cell-border);
@@ -731,17 +740,38 @@
         border-right-color: #217346;
       }
 
-      /* ===ハイライト（Excel互換・グリーン系）=== */
-      /* background を !important で塗ると、カラー表示(disp_color_cd)やマーカー等のインライン背景色が
-         選択時に完全に消えてしまうため、box-shadowの内側塗りで「重ねる」形にして元の色を透過させる */
+      /* ===ハイライト（Excel互換）=== */
+      /* Excelと同じく「選択範囲の外周だけを緑の太線で囲み、内側は薄いグレーで塗る」。
+         どこからどこまでを選んでいるのかが一目で分かる。
+         background を !important で塗ると、カラー表示(disp_color_cd)やマーカー等のインライン背景色が
+         選択時に完全に消えてしまうため、塗りも枠線も box-shadow の内側描画で「重ねる」形にする。
+         box-shadow はレイアウトに影響しないので、選択のたびにセル幅がずれることもない。
+         4辺の枠線は個別のCSS変数に持たせ、範囲の端に付く .rng-t/b/l/r だけが上書きする */
+      td.in-range,
       td.selected {
-        box-shadow: inset 0 0 0 1000px rgba(33, 115, 70, 0.16);
-        outline: 2px solid #217346;
-        outline-offset: -1px;
-        z-index: 2;
+        --e-t: 0 0 0 0 transparent;
+        --e-b: 0 0 0 0 transparent;
+        --e-l: 0 0 0 0 transparent;
+        --e-r: 0 0 0 0 transparent;
+        --cell-fill: transparent;
+        box-shadow:
+          inset var(--e-t), inset var(--e-b), inset var(--e-l), inset var(--e-r),
+          inset 0 0 0 1000px var(--cell-fill);
       }
-      td.in-range {
-        box-shadow: inset 0 0 0 1000px rgba(33, 115, 70, 0.16);
+      td.in-range { --cell-fill: var(--range-fill); }
+      td.rng-t { --e-t: 0 2px 0 0 var(--range-line); }
+      td.rng-b { --e-b: 0 -2px 0 0 var(--range-line); }
+      td.rng-l { --e-l: 2px 0 0 0 var(--range-line); }
+      td.rng-r { --e-r: -2px 0 0 0 var(--range-line); }
+      /* アクティブセルは四辺を緑の太線で囲み、中は塗らない（Excelと同じく、
+         範囲選択中でも「いまどのセルにカーソルがあるか」が分かるようにする） */
+      td.selected {
+        --e-t: 0 2px 0 0 var(--range-line);
+        --e-b: 0 -2px 0 0 var(--range-line);
+        --e-l: 2px 0 0 0 var(--range-line);
+        --e-r: -2px 0 0 0 var(--range-line);
+        --cell-fill: transparent;
+        z-index: 2;
       }
       td.col-highlight {
         background: rgba(33, 115, 70, 0.03);
@@ -754,19 +784,16 @@
         color: #000;
         font-weight: bold;
       }
-      /* 選択セルと検索ヒットが重なる場合: 背景は検索色のまま、緑枠線を明示 */
+      /* 選択セルと検索ヒットが重なる場合: 背景は検索色のまま。緑の枠線は td.selected の
+         box-shadow がそのまま乗るので、ここでは背景と重ね順だけ指定する */
       td.selected.search-hit {
         position: relative;
         background: var(--hit) !important;
-        outline: 2px solid #217346;
-        outline-offset: -1px;
         z-index: 3;
       }
       td.selected.search-hit.current {
         position: relative;
         background: var(--hit-current) !important;
-        outline: 2px solid #217346;
-        outline-offset: -1px;
         z-index: 3;
       }
 
@@ -3193,19 +3220,36 @@
       }
 
       // === RIBBON JS: タブ切替 ===
+      function activateRibbonTab(tab) {
+        if (!tab) return;
+        document.querySelectorAll(".rb-tab[data-tab]").forEach((t) => {
+          if (t.id === "btn-manual") return;
+          const active = t === tab;
+          t.classList.toggle("rb-tab-active", active);
+          t.setAttribute("aria-selected", String(active));
+        });
+        document.querySelectorAll(".rb-content").forEach((pane) => {
+          pane.classList.toggle("rb-content-active", pane.id === "rb-pane-" + tab.dataset.tab);
+        });
+      }
+      // リボンの別タブに隠れている入力欄へキーボードショートカットで飛べるようにする。
+      // 非表示（display:none）の要素は focus() しても何も起きないため、
+      // 先にその入力欄があるタブを開いてからフォーカスする。
+      // 例: 既定のタブは「チケット」だが検索欄は「ホーム」タブにあり、
+      //     これが無いと Ctrl+F を押しても無反応になる。
+      function focusRibbonInput(el) {
+        if (!el) return;
+        const pane = el.closest(".rb-content");
+        if (pane && !pane.classList.contains("rb-content-active")) {
+          const id = pane.id.replace(/^rb-pane-/, "");
+          activateRibbonTab(document.querySelector('.rb-tab[data-tab="' + id + '"]'));
+        }
+        el.focus();
+        if (el.select) el.select();
+      }
       document.querySelectorAll(".rb-tab[data-tab]").forEach((tab) => {
         if (tab.id === "btn-manual") return; // ヘルプはダイアログを開く既存ハンドラに任せる
-        tab.addEventListener("click", () => {
-          document.querySelectorAll(".rb-tab[data-tab]").forEach((t) => {
-            if (t.id === "btn-manual") return;
-            const active = t === tab;
-            t.classList.toggle("rb-tab-active", active);
-            t.setAttribute("aria-selected", String(active));
-          });
-          document.querySelectorAll(".rb-content").forEach((pane) => {
-            pane.classList.toggle("rb-content-active", pane.id === "rb-pane-" + tab.dataset.tab);
-          });
-        });
+        tab.addEventListener("click", () => activateRibbonTab(tab));
       });
       // === RIBBON JS END ===
       function debounce(fn, ms) {
@@ -5453,6 +5497,9 @@
       }
 
       let lastRenderKey = null;
+      // 現在tbodyに描画されている行ウィンドウ（スクロール差分描画用）。
+      // { start, end, sig, topEl, botEl } / 全置換のたびに作り直す
+      let _domWindow = null;
 
       let _visibleRowsCache = null;
       let _visibleRowsCacheKey = "";
@@ -5526,15 +5573,21 @@
           Math.ceil((scrollTop + viewH) / rowH) + BUFFER,
         );
         const key = `${start}-${end}-${rows.length}`;
-        if (!state.forceRender && lastRenderKey === key) return;
+        const forced = state.forceRender;
+        if (!forced && lastRenderKey === key) return;
         lastRenderKey = key;
         state.forceRender = false;
 
         const visCols = getVisibleCols();
         const colSpan = visCols.length + 1;
+        const rangeEdge = rangeEdgeInfo();
+        // 差分描画の可否判定に使うシグネチャ。行HTMLの「形」に効く要素だけを見る。
+        // 中身（選択・検索ヒット・データ）の変化は呼び出し側が state.forceRender=true にする規約なので、
+        // forced でなくシグネチャも同じなら「スクロールで表示ウィンドウが動いただけ」と判断できる。
+        const renderSig =
+          visCols.join(",") + "|" + rowH + "|" + state.freezeCols + "|" +
+          visCols.map((c) => state.colWidths[c] || 80).join(",") + "|" + rows.length;
         let html = "";
-        if (start > 0)
-          html += `<tr style="height:${start * rowH}px"><td colspan="${colSpan}"></td></tr>`;
 
         // フリーズ列のoffsetLeftをthから取得してキャッシュ
         let freezeLeftCache = {};
@@ -5634,7 +5687,9 @@
           if (!wordLenCols.size) wordLenCols = null;
         }
 
-        for (let vi = start; vi < end; vi++) {
+        // 1行ぶんのHTMLを生成する。全置換でもスクロール差分でも同じ関数を使う。
+        const buildRow = (vi) => {
+          let html = "";
           const i = rows._direct ? vi : rows._indices[vi];
           const row = state.data[i];
           const rowInRange = isRowInRange(i);
@@ -5670,13 +5725,23 @@
               isLimTarget: !!(_ikLimSeatCodes && _ikLimSeatCodes.has(_ikCode)),
             };
           }
-          html += `<tr role="row" data-row="${i}" aria-rowindex="${i + 2}" class="${wrapCls}">`;
+          // ゼブラ縞は可視行インデックス基準。スペーサ行やスクロール位置に影響されない
+          const zebraCls = vi % 2 === 1 ? " r-alt" : "";
+          html += `<tr role="row" data-row="${i}" aria-rowindex="${i + 2}" class="${wrapCls}${zebraCls}">`;
           html += `<td role="rowheader" class="row-num${rowInRange || state.selected?.row === i ? " row-selected" : ""}" data-rownum="${i}">${i + 1}</td>`;
           for (const j of visCols) {
             let cls = [];
             if (state.selected?.row === i && state.selected?.col === j)
               cls.push("selected");
-            if (isInRange(i, j)) cls.push("in-range");
+            if (isInRange(i, j)) {
+              cls.push("in-range");
+              if (rangeEdge) {
+                if (i === rangeEdge.firstRow) cls.push("rng-t");
+                if (i === rangeEdge.lastRow) cls.push("rng-b");
+                if (j === rangeEdge.firstCol) cls.push("rng-l");
+                if (j === rangeEdge.lastCol) cls.push("rng-r");
+              }
+            }
             if (
               state.selectedCol === j &&
               !isInRange(i, j) &&
@@ -5916,9 +5981,55 @@
             html += `<td role="gridcell" data-col="${j}" aria-colindex="${j + 2}" ${style ? `style="${style}"` : ""} class="${cls.join(" ")}" aria-selected="${isSelected}">${displayVal}</td>`;
           }
           html += `</tr>`;
+          return html;
+        };
+
+        // ===== スクロール差分描画 =====
+        // 表示ウィンドウがずれただけなら、外へ出た行を消して入ってきた行だけ足す。
+        // tbody 全置換はテーブル全体のレイアウト再計算を招き、描画セル数に比例して重い
+        // （60列・約70行で40ms超）。差分なら数行ぶんで済むので大きなTSVでもスクロールが滑らかになる。
+        const domw = _domWindow;
+        if (
+          !forced && domw && domw.sig === renderSig &&
+          start < domw.end && end > domw.start &&
+          domw.topEl && domw.topEl.parentNode === els.tbody &&
+          domw.botEl && domw.botEl.parentNode === els.tbody
+        ) {
+          const tb = els.tbody, topEl = domw.topEl, botEl = domw.botEl;
+          if (start > domw.start) {
+            for (let k = domw.start; k < start; k++) {
+              const el = topEl.nextElementSibling;
+              if (!el || el === botEl) break;
+              tb.removeChild(el);
+            }
+          } else if (start < domw.start) {
+            let frag = "";
+            for (let vi = start; vi < domw.start; vi++) frag += buildRow(vi);
+            topEl.insertAdjacentHTML("afterend", frag);
+          }
+          if (end < domw.end) {
+            for (let k = end; k < domw.end; k++) {
+              const el = botEl.previousElementSibling;
+              if (!el || el === topEl) break;
+              tb.removeChild(el);
+            }
+          } else if (end > domw.end) {
+            let frag = "";
+            for (let vi = domw.end; vi < end; vi++) frag += buildRow(vi);
+            botEl.insertAdjacentHTML("beforebegin", frag);
+          }
+          topEl.style.height = start * rowH + "px";
+          botEl.style.height = (rows.length - end) * rowH + "px";
+          domw.start = start;
+          domw.end = end;
+          placeFillHandle();
+          return;
         }
-        if (end < rows.length)
-          html += `<tr style="height:${(rows.length - end) * rowH}px"><td colspan="${colSpan}"></td></tr>`;
+
+        // ===== 全置換 =====
+        html += `<tr class="vspacer vspacer-top" aria-hidden="true" style="height:${start * rowH}px"><td colspan="${colSpan}"></td></tr>`;
+        for (let vi = start; vi < end; vi++) html += buildRow(vi);
+        html += `<tr class="vspacer vspacer-bottom" aria-hidden="true" style="height:${(rows.length - end) * rowH}px"><td colspan="${colSpan}"></td></tr>`;
 
         // SEJゴースト行: 表示中データと同じグループのマスタ登録のうち、表示中データに無い席種だけを最終行に表示
         // （セブン発券対象の漏れ確認用。別イベント・別グループの席種は対象外。グループ絞り込み時は絞ったグループのみ）
@@ -5943,6 +6054,11 @@
           }
         }
         els.tbody.innerHTML = html;
+        _domWindow = {
+          start, end, sig: renderSig,
+          topEl: els.tbody.querySelector("tr.vspacer-top"),
+          botEl: els.tbody.querySelector("tr.vspacer-bottom"),
+        };
         placeFillHandle();
         _prevHighlight = {
           selected: state.selected ? { ...state.selected } : null,
@@ -5971,6 +6087,37 @@
           c <= Math.max(c1, c2)
         );
       }
+      // 選択範囲の外周に緑の太線を引くため、「範囲の端になる行/列」を求める。
+      // 非表示行・フィルター・非表示列があっても、実際に見えている範囲の端に線が来るように
+      // データ上の r1/c1 ではなく可視行・可視列の中での最初/最後を返す。
+      function rangeEdgeInfo() {
+        const rg = state.range;
+        if (!rg) return null;
+        const r1 = Math.min(rg.r1, rg.r2), r2 = Math.max(rg.r1, rg.r2);
+        const c1 = Math.min(rg.c1, rg.c2), c2 = Math.max(rg.c1, rg.c2);
+        let firstCol = -1, lastCol = -1;
+        for (const c of getVisibleCols()) {
+          if (c >= c1 && c <= c2) {
+            if (firstCol === -1) firstCol = c;
+            lastCol = c;
+          }
+        }
+        let firstRow = -1, lastRow = -1;
+        const vr = getVisibleRows();
+        if (vr._direct) {
+          firstRow = Math.max(0, r1);
+          lastRow = Math.min(vr.length - 1, r2);
+        } else {
+          for (const i of vr._indices) {
+            if (i >= r1 && i <= r2) {
+              if (firstRow === -1) firstRow = i;
+              lastRow = i;
+            }
+          }
+        }
+        return { firstRow, lastRow, firstCol, lastCol };
+      }
+
       let _hitSet = new Set();
       function rebuildHitSet() {
         _hitSet.clear();
@@ -5978,6 +6125,70 @@
       }
       function isHit(r, c) {
         return _hitSet.has(r + "," + c);
+      }
+
+      function sameRange(a, b) {
+        if (a === b) return true;
+        if (!a || !b) return false;
+        return a.r1 === b.r1 && a.c1 === b.c1 && a.r2 === b.r2 && a.c2 === b.c2;
+      }
+
+      // 選択状態に対応するクラスを、いま描画されているセルにだけ反映する。
+      // renderBody の全置換と違ってレイアウト再計算が起きないので、ドラッグ選択や
+      // Shift+矢印のように毎フレーム範囲が変わる操作でも軽い。
+      function applySelectionClasses() {
+        const sel = state.selected;
+        const selCol = state.selectedCol;
+        const rg = state.range;
+        let r1 = 0, r2 = -1, c1 = 0, c2 = -1, fullRow = false;
+        if (rg) {
+          r1 = Math.min(rg.r1, rg.r2); r2 = Math.max(rg.r1, rg.r2);
+          c1 = Math.min(rg.c1, rg.c2); c2 = Math.max(rg.c1, rg.c2);
+          fullRow = c1 === 0 && c2 === state.headers.length - 1;
+        }
+        const edge = rangeEdgeInfo();
+        const trs = els.tbody.children;
+        for (let ti = 0; ti < trs.length; ti++) {
+          const tr = trs[ti];
+          const rowAttr = tr.getAttribute("data-row");
+          if (rowAttr === null) continue; // スペーサ行・ゴースト行は対象外
+          const i = +rowAttr;
+          const rowIn = !!rg && i >= r1 && i <= r2;
+          const tds = tr.children;
+          for (let k = 0; k < tds.length; k++) {
+            const td = tds[k];
+            const colAttr = td.getAttribute("data-col");
+            if (colAttr === null) {
+              // 行番号セル
+              td.classList.toggle(
+                "row-selected",
+                !!((fullRow && rowIn) || (sel && sel.row === i)),
+              );
+              continue;
+            }
+            const j = +colAttr;
+            const isSel = !!sel && sel.row === i && sel.col === j;
+            const isIn = rowIn && j >= c1 && j <= c2;
+            td.classList.toggle("selected", isSel);
+            td.classList.toggle("in-range", isIn);
+            td.classList.toggle("rng-t", isIn && !!edge && i === edge.firstRow);
+            td.classList.toggle("rng-b", isIn && !!edge && i === edge.lastRow);
+            td.classList.toggle("rng-l", isIn && !!edge && j === edge.firstCol);
+            td.classList.toggle("rng-r", isIn && !!edge && j === edge.lastCol);
+            td.classList.toggle("col-highlight", selCol === j && !isIn && !isSel);
+            const as = isSel || isIn ? "true" : "false";
+            if (td.getAttribute("aria-selected") !== as)
+              td.setAttribute("aria-selected", as);
+          }
+        }
+        // 列ヘッダーのアクティブ強調（列全体選択・選択セルの列の両方を反映）
+        const activeCol = selCol != null ? selCol : sel ? sel.col : null;
+        const ths = els.thead.querySelectorAll("th[data-col]");
+        for (let k = 0; k < ths.length; k++)
+          ths[k].classList.toggle(
+            "col-active",
+            +ths[k].getAttribute("data-col") === activeCol,
+          );
       }
 
       let _prevHighlight = { selected: null, range: null, selectedCol: null };
@@ -5989,11 +6200,9 @@
           selectedCol: state.selectedCol,
         };
 
-        // 範囲が変わった場合 or 列選択が変わった場合はDOM全体を再描画（forceRender経由）
-        const rangeChanged =
-          JSON.stringify(prev.range) !== JSON.stringify(cur.range);
+        // 範囲・列選択の変化。JSON.stringifyはドラッグ中に毎フレーム走るので使わない
+        const rangeChanged = !sameRange(prev.range, cur.range);
         const colChanged = prev.selectedCol !== cur.selectedCol;
-        // 範囲選択・列選択の変化のみフル再描画。
         if (rangeChanged || colChanged) {
           // selectedはクローンして保持（state.selectedを直接参照すると、
           // 後でin-place変更された際に前回値の追跡がずれる）
@@ -6002,8 +6211,12 @@
             range: cur.range ? { ...cur.range } : null,
             selectedCol: cur.selectedCol,
           };
-          state.forceRender = true;
-          renderBody();
+          // 描画済みセルのクラスだけ差し替える。以前はここで tbody を全置換していたが、
+          // テーブル全体のレイアウト再計算を伴うため、60列の大きなTSVではドラッグ選択の
+          // 1フレームに40ms超かかっていた。in-range/selected/col-highlight はいずれも
+          // 背景と枠線だけの変化でレイアウトに影響しないため、クラス操作で十分。
+          applySelectionClasses();
+          placeFillHandle();
           updateStatusPos();
           return;
         }
@@ -6071,14 +6284,30 @@
           els.fbarVal.value = v;
         }
         els.statusPos.textContent = `${colIndexToLetter(col)}${row + 1}  行${row + 1} 列${col + 1} : ${v.slice(0, 40)}${v.length > 0 ? ` [${v.length}文字/${bytes}B]` : ""}`;
-        if (state.range) {
-          const { r1, c1, r2, c2 } = state.range;
-          const stats = calcRangeStats(
-            Math.min(r1, r2),
-            Math.min(c1, c2),
-            Math.max(r1, r2),
-            Math.max(c1, c2),
-          );
+        updateRangeStats();
+      }
+
+      // 範囲統計（合計/平均/個数）は選択セル数に比例して重い。
+      // 小さい範囲は従来どおり即時計算し、広い範囲だけドラッグが落ち着いてから
+      // 1回だけ計算する（毎フレーム走らせると選択操作そのものが引っかかるため）。
+      const STATS_SYNC_CELLS = 20000;   // これ以下は即時計算
+      const STATS_MAX_CELLS = 2000000;  // これを超える範囲は集計を省略
+      let _statsTimer = null;
+      function updateRangeStats() {
+        if (_statsTimer) {
+          clearTimeout(_statsTimer);
+          _statsTimer = null;
+        }
+        if (!state.range) {
+          els.statusStats.textContent = "";
+          return;
+        }
+        const { r1, c1, r2, c2 } = state.range;
+        const a1 = Math.min(r1, r2), a2 = Math.max(r1, r2);
+        const b1 = Math.min(c1, c2), b2 = Math.max(c1, c2);
+        const nRows = a2 - a1 + 1, nCols = b2 - b1 + 1;
+        const show = () => {
+          const stats = calcRangeStats(a1, b1, a2, b2);
           const parts = [];
           if (stats.numCount > 0) {
             parts.push("合計:" + fmt(stats.sum));
@@ -6086,9 +6315,21 @@
           }
           parts.push("個数:" + stats.count);
           els.statusStats.textContent = parts.join("  ");
-        } else {
-          els.statusStats.textContent = "";
+        };
+        const cells = nRows * nCols;
+        if (cells > STATS_MAX_CELLS) {
+          els.statusStats.textContent = `選択:${nRows}行×${nCols}列（範囲が大きいため集計は省略）`;
+          return;
         }
+        if (cells <= STATS_SYNC_CELLS) {
+          show();
+          return;
+        }
+        els.statusStats.textContent = `選択:${nRows}行×${nCols}列  集計中…`;
+        _statsTimer = setTimeout(() => {
+          _statsTimer = null;
+          if (state.range) show();
+        }, 80);
       }
 
       function calcRangeStats(r1, c1, r2, c2) {
@@ -6351,7 +6592,8 @@
             _mouseMoveRAF = true;
             requestAnimationFrame(() => {
               _mouseMoveRAF = false;
-              renderHeader();
+              // 列ヘッダーの強調は applySelectionClasses が更新するので、
+              // ドラッグ中に thead を毎フレーム作り直す必要はない
               updateHighlight();
             });
           }
@@ -6955,7 +7197,7 @@
         }
         if (cmd && key === "f") {
           e.preventDefault();
-          els.search.focus();
+          focusRibbonInput(els.search);
           return;
         }
         if (cmd && key === "h") {
@@ -6965,8 +7207,8 @@
         }
         if (cmd && key === "g") {
           e.preventDefault();
-          $("goto-input").focus();
-          $("goto-input").select();
+          // 行移動欄も「ホーム」タブの中にあるため、検索と同様にタブを開いてから移動する
+          focusRibbonInput($("goto-input"));
           return;
         }
         if (cmd && key === "c") {
@@ -7415,9 +7657,8 @@
           r2: state.data.length - 1,
           c2: state.headers.length - 1,
         };
-        state.forceRender = true;
-        renderHeader();
-        renderBody();
+        applySelectionClasses();
+        placeFillHandle();
         updateStatusPos();
       }
 
@@ -8960,9 +9201,17 @@
         const iter = vr._direct
           ? Array.from({ length: state.data.length }, (_, k) => k)
           : vr._indices;
-        for (const r of iter)
-          for (let c = 0; c < state.headers.length; c++)
-            if (matcher(safeGet(r, c))) state.searchHits.push({ row: r, col: c });
+        const nCols = state.headers.length;
+        refresh: for (const r of iter) {
+          const row = state.data[r];
+          if (!row) continue;
+          for (let c = 0; c < nCols; c++) {
+            if (matcher(row[c] ?? "")) {
+              if (state.searchHits.length >= MAX_SEARCH_HITS) break refresh;
+              state.searchHits.push({ row: r, col: c });
+            }
+          }
+        }
         rebuildHitSet();
         // 現在の選択セルが依然ヒットに含まれていれば searchIdx を維持
         if (state.selected) {
@@ -8985,11 +9234,20 @@
             return null;
           }
         } else {
-          const lq = q.toLowerCase();
-          return (v) => String(v).toLowerCase().includes(lq);
+          // 大文字小文字を無視した部分一致。toLowerCase().includes() はセルごとに
+          // 小文字化した文字列を新たに作るため、6万行×60列だと400万回の文字列生成になり重い。
+          // クエリをエスケープした正規表現の i フラグ判定なら文字列を作らず約4倍速い。
+          try {
+            const re = new RegExp(escRe(q), "i");
+            return (v) => re.test(v == null ? "" : v);
+          } catch {
+            const lq = q.toLowerCase();
+            return (v) => String(v).toLowerCase().includes(lq);
+          }
         }
       }
 
+      const MAX_SEARCH_HITS = 100000;
       function execSearch() {
         const q = els.search.value;
         if (typeof _lastSearched !== 'undefined') _lastSearched = q;
@@ -9022,15 +9280,27 @@
           ? null
           : vr._indices.filter(r => r >= minR && r <= maxR);
         const iter = rowsToSearch ?? Array.from({ length: maxR - minR + 1 }, (_, k) => minR + k);
-        for (const r of iter) {
+        // ヒット上限。「値」のようなありふれた語で全セルが該当すると数百万件の配列と
+        // 巨大なSetを作ることになり、検索そのものが数秒固まってしまうため打ち切る。
+        const hits = state.searchHits;
+        const data = state.data;
+        let truncated = false;
+        outer: for (const r of iter) {
+          const row = data[r];
+          if (!row) continue;
           for (let c = minC; c <= maxC; c++) {
-            const v = safeGet(r, c);
-            if (matcher(v)) state.searchHits.push({ row: r, col: c });
+            // safeGet と同じ正規化（未定義セルは空文字扱い）を保ったまま関数呼び出しを省く
+            const v = row[c] ?? "";
+            if (matcher(v)) {
+              if (hits.length >= MAX_SEARCH_HITS) { truncated = true; break outer; }
+              hits.push({ row: r, col: c });
+            }
           }
         }
         rebuildHitSet();
         const scopeNote = scope ? ` (${getScopeLabel(scope)})` : "";
-        els.count.textContent = `${state.searchHits.length}件${scopeNote}`;
+        const truncNote = truncated ? "以上（上限）" : "件";
+        els.count.textContent = `${state.searchHits.length}${truncNote}${scopeNote}`;
         if (state.searchHits.length > 0) moveSearch(1);
         else {
           state.forceRender = true;
