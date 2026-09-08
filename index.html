@@ -1987,6 +1987,25 @@
         >
           ファイルを選択
         </button>
+        <button
+          type="button"
+          class="btn"
+          id="btn-drop-sample"
+          style="
+            margin-top: 2px;
+            height: 30px;
+            padding: 0 14px;
+            font-size: 12px;
+            background: transparent;
+            color: var(--text-dim);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+          "
+          title="動作確認用のサンプルTSV（20行）をその場で開きます"
+          aria-label="テスト用のサンプルTSVを読み込む"
+        >
+          テスト用TSVを読み込む
+        </button>
       </div>
       <div id="table-container">
         <table
@@ -2354,6 +2373,8 @@
         // 非表示
         hiddenRows: new Set(),
         hiddenCols: new Set(),
+        // フィルター中に追加した行（条件に合わなくても表示し続ける）
+        forceVisibleRows: new Set(),
 
         // ヘッダー自動変換辞書 & コメント
         headerDict: {},    // { "English": "日本語", ... }
@@ -3278,8 +3299,10 @@
       function safeSet(r, c, v) {
         if (r < 0 || c < 0) return;
         // 行が足りなければ自動追加
-        while (r >= state.data.length)
+        while (r >= state.data.length) {
           state.data.push(new Array(state.headers.length).fill(""));
+          markForceVisible(state.data.length - 1, 1);
+        }
         // 列が足りなければ自動追加
         while (c >= state.headers.length) {
           state.headers.push("列" + (state.headers.length + 1));
@@ -3357,6 +3380,7 @@
         }
         t.columnFilters = savedCF;
         t.hiddenRows = new Set(state.hiddenRows);
+        t.forceVisibleRows = new Set(state.forceVisibleRows);
         t.hiddenCols = new Set(state.hiddenCols);
         t.freezeCols = state.freezeCols;
         t.wrapCells = state.wrapCells;
@@ -3424,6 +3448,7 @@
           }
           state.columnFilters = restoredCF;
           state.hiddenRows = t.hiddenRows ? new Set(t.hiddenRows) : new Set();
+          state.forceVisibleRows = t.forceVisibleRows ? new Set(t.forceVisibleRows) : new Set();
           state.hiddenCols = t.hiddenCols ? new Set(t.hiddenCols) : new Set();
           state.freezeCols = t.freezeCols || 0;
           state.wrapCells = t.wrapCells || false;
@@ -3690,6 +3715,7 @@
           else doOpen();
         };
         $("btn-drop-open").onclick = () => openDataFilePicker();
+        $("btn-drop-sample").onclick = () => loadSampleTsv();
         if ($("btn-open-clipboard")) $("btn-open-clipboard").onclick = openFromClipboard;
         $("btn-save").onclick = saveFile;
         $("btn-save-as").onclick = doSaveFileAs;
@@ -4070,6 +4096,35 @@
         fallback();
       }
 
+      // 動作確認用のサンプルTSV（外部ファイル不要。file://直開きでも読める）
+      const SAMPLE_TSV = [
+        "レース	券種	席種	区分	単価	枚数	備考",
+        "F1日本GP	前売	V1席	大人	32000	2	",
+        "F1日本GP	前売	V1席	UG	28000	1	UG会員限定",
+        "F1日本GP	前売	B1席	大人	24000	4	",
+        "F1日本GP	前売	B1席	中高生	12000	1	",
+        "F1日本GP	当日	B1席	大人	26000	1	",
+        "F1日本GP	前売	自由席	大人	9000	3	",
+        "F1日本GP	前売	自由席	U23	0	2	ZEROパス",
+        "F1日本GP	前売	駐車券	-	5000	1	P7",
+        "8耐	前売	グランド	大人	8000	2	",
+        "8耐	前売	グランド	UG	6500	1	UG会員限定",
+        "8耐	前売	自由席	大人	5000	5	",
+        "8耐	当日	自由席	大人	6000		当日券",
+        "8耐	前売	車いす	大人	5000	1	",
+        "8耐	前売	駐車券	-	3000	2	",
+        "JRR もてぎ	前売	スタンド	大人	4500	2	",
+        "JRR もてぎ	前売	スタンド	中高生	2000	1	",
+        "JRR もてぎ	前売	自由席	大人	3500	4	",
+        "JRR もてぎ	前売	自由席	U23	0	1	ZEROパス",
+        "JRR もてぎ	当日	スタンド	大人	5000	1	",
+        "JRR もてぎ	前売	駐車券	-	1500	3	",
+      ].join("\n");
+      function loadSampleTsv() {
+        loadTextAsFile(SAMPLE_TSV, "サンプル.tsv");
+        setStatus("テスト用サンプルTSVを読み込みました（保存先未設定）");
+      }
+
       function openDataFilePicker() {
         pickFileWithFallback(
           [".tsv", ".csv", ".txt"],
@@ -4115,6 +4170,7 @@
         state.cellColors = {};
         state.hiddenRows = new Set();
         state.hiddenCols = new Set();
+        state.forceVisibleRows = new Set();
         state.wrapRows.clear();
         state.wrapCells = false;
         state.columnFilters = {};
@@ -4821,6 +4877,7 @@
         const filterKeys = Object.keys(state.columnFilters);
         if (!filterKeys.length) {
           state.filteredIndices = null;
+          state.forceVisibleRows.clear();
           els.filterClear.style.display = "none";
           els.filterExport.style.display = "none";
           updateHiddenStatus();
@@ -4864,6 +4921,16 @@
           }
           if (match) state.filteredIndices.push(idx);
         });
+        // フィルター中に追加された行は条件に関係なく表示し続ける
+        if (state.forceVisibleRows.size) {
+          const shown = new Set(state.filteredIndices);
+          let added = false;
+          for (const r of [...state.forceVisibleRows]) {
+            if (r < 0 || r >= state.data.length) { state.forceVisibleRows.delete(r); continue; }
+            if (!shown.has(r)) { state.filteredIndices.push(r); added = true; }
+          }
+          if (added) state.filteredIndices.sort((a, b) => a - b);
+        }
         els.filterClear.style.display = "";
         els.filterExport.style.display = "";
         updateHiddenStatus();
@@ -4874,6 +4941,7 @@
       function clearAllFilters() {
         state.columnFilters = {};
         state.filteredIndices = null;
+        state.forceVisibleRows.clear();
         els.filterClear.style.display = "none";
         els.filterExport.style.display = "none";
         updateHiddenStatus();
@@ -6513,7 +6581,7 @@
           if (dir === "down") {
             // 最終行でEnter → 新しい行を追加してから移動
             if (r >= state.data.length - 1) {
-              state.data.push(new Array(state.headers.length).fill(""));
+              state.data.push(new Array(state.headers.length).fill("")); markForceVisible(state.data.length - 1, 1);
               markDirty();
               applyFilters();
             }
@@ -6525,7 +6593,7 @@
               // 最終列でTab → 次の行の先頭へ（最終行なら新規追加）
               const nextRow = r + 1;
               if (nextRow >= state.data.length) {
-                state.data.push(new Array(state.headers.length).fill(""));
+                state.data.push(new Array(state.headers.length).fill("")); markForceVisible(state.data.length - 1, 1);
                 markDirty();
                 applyFilters();
               }
@@ -6919,6 +6987,7 @@
           _shiftHiddenRows(state.selected.row, 1);
           state._dupSet = null;
           state.data.splice(state.selected.row, 0, new Array(state.headers.length).fill(""));
+          markForceVisible(state.selected.row, 1);
           markDirty();
           applyFilters();
           state.forceRender = true;
@@ -7015,7 +7084,7 @@
           if (!shiftKey && row >= lastVisibleRow()) {
             // 最終可視行でEnter → 新しい行を追加
             saveUndo();
-            state.data.push(new Array(state.headers.length).fill(""));
+            state.data.push(new Array(state.headers.length).fill("")); markForceVisible(state.data.length - 1, 1);
             markDirty();
             applyFilters();
             state.forceRender = true;
@@ -7045,7 +7114,7 @@
             // 最終列でTab → 次の可視行の先頭へ（最終可視行なら新規追加）
             if (row >= lastVisibleRow()) {
               saveUndo();
-              state.data.push(new Array(state.headers.length).fill(""));
+              state.data.push(new Array(state.headers.length).fill("")); markForceVisible(state.data.length - 1, 1);
               markDirty();
               applyFilters();
               state.forceRender = true;
@@ -7588,7 +7657,7 @@
             } else {
               // 可視行を超えた場合: データ末尾に新行を追加
               tr = state.data.length;
-              state.data.push(new Array(state.headers.length).fill(""));
+              state.data.push(new Array(state.headers.length).fill("")); markForceVisible(state.data.length - 1, 1);
             }
             for (let ci = 0; ci < cb.cols; ci++) {
               const tc = startC + ci;
@@ -7985,6 +8054,7 @@
                     0,
                     new Array(state.headers.length).fill(""),
                   );
+                  markForceVisible(row, 1);
                   markDirty();
                   applyFilters();
                   state.forceRender = true;
@@ -8004,6 +8074,7 @@
                     0,
                     new Array(state.headers.length).fill(""),
                   );
+                  markForceVisible(row + 1, 1);
                   markDirty();
                   applyFilters();
                   state.forceRender = true;
@@ -8338,6 +8409,7 @@
         state.clipboard = null;
         state.hiddenRows = new Set();
         state.hiddenCols = new Set();
+        state.forceVisibleRows = new Set();
         state.freezeCols = 0;
         state.headerMode = "firstRow";
         state.wrapCells = false;
@@ -8422,6 +8494,7 @@
         state._dupSet = null;
         shiftMarkers(at, 1);
         state.data.splice(at, 0, Array(state.headers.length).fill(""));
+        markForceVisible(at, 1);
         markDirty();
         applyFilters();
         state.forceRender = true;
@@ -8613,6 +8686,7 @@
         };
         state.hiddenRows = remapRowSet(state.hiddenRows);
         state.wrapRows   = remapRowSet(state.wrapRows);
+        state.forceVisibleRows = remapRowSet(state.forceVisibleRows);
       }
 
       function _shiftRowColors(insertAt, count) {
@@ -8652,6 +8726,12 @@
       function _shiftHiddenRows(insertAt, count) {
         state.hiddenRows = _shiftRowIndexedSet(state.hiddenRows, insertAt, count);
         state.wrapRows   = _shiftRowIndexedSet(state.wrapRows,   insertAt, count);
+        state.forceVisibleRows = _shiftRowIndexedSet(state.forceVisibleRows, insertAt, count);
+      }
+      // フィルター中に追加した行を「表示し続ける行」として登録する
+      function markForceVisible(at, count) {
+        if (!state.filteredIndices) return;
+        for (let i = 0; i < (count || 1); i++) state.forceVisibleRows.add(at + i);
       }
       function _swapRowIndexedSet(s, r1, r2) {
         const h1 = s.has(r1), h2 = s.has(r2);
@@ -8662,6 +8742,7 @@
       function _swapHiddenRows(r1, r2) {
         _swapRowIndexedSet(state.hiddenRows, r1, r2);
         _swapRowIndexedSet(state.wrapRows,   r1, r2);
+        _swapRowIndexedSet(state.forceVisibleRows, r1, r2);
       }
       function _deleteRangeRowIndexedSet(s, r1, r2) {
         if (!s.size) return s;
@@ -8676,6 +8757,7 @@
       function _deleteRangeHiddenRows(r1, r2) {
         state.hiddenRows = _deleteRangeRowIndexedSet(state.hiddenRows, r1, r2);
         state.wrapRows   = _deleteRangeRowIndexedSet(state.wrapRows,   r1, r2);
+        state.forceVisibleRows = _deleteRangeRowIndexedSet(state.forceVisibleRows, r1, r2);
       }
 
       function cloneColumnFilters(cf) {
@@ -8734,6 +8816,7 @@
           columnFilters: cloneColumnFilters(state.columnFilters),
           hiddenRows: new Set(state.hiddenRows),
           hiddenCols: new Set(state.hiddenCols),
+          forceVisibleRows: new Set(state.forceVisibleRows),
           wrapRows: new Set(state.wrapRows),
           headerMode: state.headerMode,
           cellColors: { ...state.cellColors },
@@ -8755,6 +8838,7 @@
         state.columnFilters = s.columnFilters || {};
         state.hiddenRows = s.hiddenRows || new Set();
         state.hiddenCols = s.hiddenCols || new Set();
+        state.forceVisibleRows = s.forceVisibleRows ? new Set(s.forceVisibleRows) : new Set();
         state.wrapRows = s.wrapRows ? new Set(s.wrapRows) : new Set();
         state.headerMode = s.headerMode || "firstRow";
         state.cellColors = s.cellColors ? { ...s.cellColors } : {};
