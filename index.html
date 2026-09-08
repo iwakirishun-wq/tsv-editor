@@ -4084,6 +4084,7 @@
       // 方針: セルの値は「Excelの表示どおりの文字列」をそのまま使う。
       //   日付/金額/数値をこちら側で解釈・再フォーマットしない（勝手に変換しない）。
       //   例: 表示が 2026/9/9 なら "2026/9/9"、32,000 なら "32,000" のまま取り込む。
+      // ===EXCEL_IMPORT_CORE_START=== UI/stateに依存しない純粋ロジック（tests/excel_import.test.js が抽出して検証する）
       const XLSX_EXT = /\.(xlsx|xlsm|xlsb|xls)$/i;
       function isExcelFile(name) {
         return XLSX_EXT.test(String(name || ""));
@@ -4146,6 +4147,7 @@
         }
         return lines.join("\n");
       }
+      // ===EXCEL_IMPORT_CORE_END===
       async function loadExcelFile(file) {
         setStatus(`Excelを読み込み中... (${file.name})`);
         let XLSX;
