@@ -1682,26 +1682,20 @@
     <div class="rb-ribbon" role="toolbar" aria-label="リボンメニュー">
       <!-- Tab Bar -->
       <div class="rb-tabbar">
+        <button class="rb-tab rb-tab-active" data-tab="ticket" aria-selected="true">チケット</button>
+        <button class="rb-tab" data-tab="home" aria-selected="false">ホーム</button>
         <button class="rb-tab" data-tab="file" aria-selected="false">ファイル</button>
-        <button class="rb-tab rb-tab-active" data-tab="home" aria-selected="true">ホーム</button>
-        <button class="rb-tab" data-tab="data" aria-selected="false">データ</button>
-        <button class="rb-tab" data-tab="ticket" aria-selected="false">チケット</button>
-        <button class="rb-tab" data-tab="view" aria-selected="false">表示</button>
         <div class="rb-tab-spacer"></div>
         <button class="rb-tab" id="btn-manual" data-tab="help" title="操作ヘルプを表示（?キーでも開けます）" aria-label="ヘルプを開く">ヘルプ</button>
       </div>
 
-      <!-- Content Pane: ファイル -->
-      <div class="rb-content" id="rb-pane-file" role="group" aria-label="ファイル操作">
+      <!-- Content Pane: ファイル（ファイル＋データ） -->
+      <div class="rb-content" id="rb-pane-file" role="group" aria-label="ファイル・データ操作">
         <div class="rb-group">
           <div class="rb-buttons">
             <button class="rb-btn" id="btn-open" title="TSV/CSVファイルを開く&#10;ドラッグ&amp;ドロップでも読み込めます" aria-label="ファイルを開く">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline><path d="M9 12h6M9 16h6"></path></svg></span>
               <span>開く</span>
-            </button>
-            <button class="rb-btn" id="btn-open-clipboard" title="クリップボードのTSV/CSVを新しいタブとして開きます&#10;ファイル選択ダイアログが反応しないときの代替手段&#10;（Excelやメモ帳でデータ全体をコピーしてから押す）" aria-label="クリップボードから開く">
-              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="8" y="2" width="8" height="4" rx="1"></rect><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><path d="M9 12h6M9 16h6"></path></svg></span>
-              <span>貼付から開く</span>
             </button>
             <button class="rb-btn" id="btn-save" title="現在のデータを保存（前回の保存先へ上書き。初回は保存先を選びます）&#10;ショートカット: Ctrl+S" aria-label="ファイルを保存">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg></span>
@@ -1722,10 +1716,56 @@
           </div>
           <span class="rb-group-label">ファイル</span>
         </div>
+        <!-- Group: 絞り込み -->
+        <div class="rb-group">
+          <div class="rb-buttons">
+            <button class="rb-btn" id="btn-filter-clear" style="display:none" title="現在設定されているフィルターをすべて解除&#10;非表示の行も再表示されます" aria-label="フィルターをクリア">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 6L6 18M6 6l12 12"></path></svg></span>
+              <span>解除</span>
+            </button>
+            <button class="rb-btn" id="btn-reset-view" title="表示状態をすべてリセット&#10;フィルター・ソート・非表示列/行・選択範囲をすべて解除します" aria-label="表示をすべてリセット">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg></span>
+              <span>リセット</span>
+            </button>
+          </div>
+          <span class="rb-group-label">絞り込み</span>
+        </div>
+        <!-- Group: 検品 -->
+        <div class="rb-group">
+          <div class="rb-buttons">
+            <button class="rb-btn" id="btn-marker" title="マーカー（検品チェック用）&#10;範囲選択中に押す: 選択範囲へ一括付与/解除（Ctrl+Qでも可）&#10;範囲なしで押す: マーカーモード切替（ON中はダブルクリックで付け外し）&#10;Ctrl+Zで取り消せます" aria-label="マーカーの適用・モード切り替え" aria-pressed="false">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg></span>
+              <span>マーカー</span>
+            </button>
+            <button class="rb-btn" id="btn-marker-clear" title="マーカーをすべてクリア" aria-label="マーカーをすべてクリア">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 5H9l-7 7 7 7h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2z"></path><line x1="18" y1="9" x2="12" y2="15"></line><line x1="12" y1="9" x2="18" y2="15"></line></svg></span>
+              <span>消去</span>
+            </button>
+            <label class="rb-btn" id="marker-color-wrap" title="マーカーの色を変更&#10;以降に付けるマーカーと既存マーカーすべてに適用されます" style="cursor:pointer">
+              <span class="rb-icon"><input type="color" id="marker-color" value="#facc15" aria-label="マーカーの色" style="width:24px;height:24px;border:none;padding:0;background:none;cursor:pointer"></span>
+              <span>マーカー色</span>
+            </label>
+          </div>
+          <span class="rb-group-label">検品</span>
+        </div>
+        <!-- Group: データ整理 -->
+        <div class="rb-group">
+          <div class="rb-buttons">
+            <button class="rb-btn" id="btn-delete-empty-rows" title="全列が空欄になっている行をまとめて削除します&#10;Ctrl+Zで元に戻せます" aria-label="空行を一括削除">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="1"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line><line x1="7" y1="11.5" x2="11" y2="11.5"></line></svg></span>
+              <span>空行削除</span>
+            </button>
+            <button class="rb-btn" id="btn-trim-cells" title="すべてのセルとヘッダーの前後にある余分な空白文字を取り除きます&#10;Ctrl+Zで元に戻せます" aria-label="前後空白をトリム">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 4v16M17 4v16"></path><path d="M10 9h4M10 15h4"></path></svg></span>
+              <span>空白トリム</span>
+            </button>
+          </div>
+          <span class="rb-group-label">データ整理</span>
+        </div>
       </div>
 
-      <!-- Content Pane: ホーム (default active) -->
-      <div class="rb-content rb-content-active" id="rb-pane-home" role="group" aria-label="ホーム">
+      <!-- Content Pane: ホーム（ホーム＋表示） -->
+      <div class="rb-content" id="rb-pane-home" role="group" aria-label="ホーム・表示">
         <!-- Group: 元に戻す -->
         <div class="rb-group">
           <div class="rb-buttons">
@@ -1775,60 +1815,54 @@
           </div>
           <span class="rb-group-label">検索</span>
         </div>
-      </div>
-
-      <!-- Content Pane: データ -->
-      <div class="rb-content" id="rb-pane-data" role="group" aria-label="データ操作">
-        <!-- Group: 絞り込み -->
         <div class="rb-group">
           <div class="rb-buttons">
-            <button class="rb-btn" id="btn-filter-clear" style="display:none" title="現在設定されているフィルターをすべて解除&#10;非表示の行も再表示されます" aria-label="フィルターをクリア">
-              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 6L6 18M6 6l12 12"></path></svg></span>
-              <span>解除</span>
+            <button class="rb-btn" id="btn-row-height" title="行の高さを順番に切り替え&#10;（22px → 30px → 40px → 22px）" aria-label="行の高さを変更">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="5" y1="6" x2="19" y2="6"></line><line x1="5" y1="12" x2="19" y2="12"></line><line x1="5" y1="18" x2="19" y2="18"></line><polyline points="2 3 2 21"></polyline><polyline points="22 3 22 21"></polyline></svg></span>
+              <span>行高さ</span>
             </button>
-            <button class="rb-btn" id="btn-reset-view" title="表示状態をすべてリセット&#10;フィルター・ソート・非表示列/行・選択範囲をすべて解除します" aria-label="表示をすべてリセット">
-              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg></span>
-              <span>リセット</span>
+            <button class="rb-btn" id="btn-wrap" title="セル内の長いテキストを折り返して表示&#10;選択範囲がある場合はその行だけ切り替え" aria-label="セル折り返し表示の切り替え" aria-pressed="false">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6h18M3 12h18M3 18h12"></path><polyline points="18 14 20 12 18 10"></polyline></svg></span>
+              <span>折り返し</span>
             </button>
-          </div>
-          <span class="rb-group-label">絞り込み</span>
-        </div>
-        <!-- Group: 検品 -->
-        <div class="rb-group">
-          <div class="rb-buttons">
-            <button class="rb-btn" id="btn-marker" title="マーカー（検品チェック用）&#10;範囲選択中に押す: 選択範囲へ一括付与/解除（Ctrl+Qでも可）&#10;範囲なしで押す: マーカーモード切替（ON中はダブルクリックで付け外し）&#10;Ctrl+Zで取り消せます" aria-label="マーカーの適用・モード切り替え" aria-pressed="false">
-              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg></span>
-              <span>マーカー</span>
+            <button class="rb-btn" id="btn-autofit-all" title="全列の幅をデータの内容に合わせて自動調整&#10;列ヘッダーのダブルクリックで個別調整も可能" aria-label="全列幅を自動調整">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line></svg></span>
+              <span>列自動</span>
             </button>
-            <button class="rb-btn" id="btn-marker-clear" title="マーカーをすべてクリア" aria-label="マーカーをすべてクリア">
-              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 5H9l-7 7 7 7h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2z"></path><line x1="18" y1="9" x2="12" y2="15"></line><line x1="12" y1="9" x2="18" y2="15"></line></svg></span>
-              <span>消去</span>
+            <button class="rb-btn" id="btn-vertical-header" title="ヘッダーを縦書きにして列幅を節約します（切り替え）&#10;コード系の細い列が多いマスタTSVで便利です" aria-label="縦書きヘッダーの切り替え" aria-pressed="false">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="1"></rect><line x1="3" y1="13" x2="21" y2="13"></line><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line><path d="M6 5v6M12 5v6M18 5v6" stroke-width="2"></path></svg></span>
+              <span>縦ヘッダー</span>
             </button>
-            <label class="rb-btn" id="marker-color-wrap" title="マーカーの色を変更&#10;以降に付けるマーカーと既存マーカーすべてに適用されます" style="cursor:pointer">
-              <span class="rb-icon"><input type="color" id="marker-color" value="#facc15" aria-label="マーカーの色" style="width:24px;height:24px;border:none;padding:0;background:none;cursor:pointer"></span>
-              <span>マーカー色</span>
+            <label class="rb-btn" id="vheader-height-wrap" title="縦書きヘッダーの行高さをpxで調整&#10;ヘッダー文字が見切れる場合はここで広げてください" style="cursor:pointer">
+              <input type="number" id="vheader-height" min="60" max="300" step="10" value="120" aria-label="縦書きヘッダーの高さ(px)" style="width:48px;border:1px solid var(--border,#ccc);border-radius:4px;padding:1px 2px;font-size:11px;text-align:center;background:var(--bg-elev,#fff);color:inherit;">
+              <span>行高(px)</span>
             </label>
+            <button class="rb-btn" id="btn-header-mode" title="ヘッダーモードを切り替え&#10;「1行目」: ファイルの1行目をヘッダーとして使用&#10;「連番」: 1, 2, 3...の連番ヘッダー" aria-label="ヘッダーモード切り替え" aria-pressed="true">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18"></rect><rect x="3" y="3" width="18" height="6" fill="currentColor" opacity="0.15"></rect><line x1="3" y1="9" x2="21" y2="9"></line></svg></span>
+              <span>ヘッダー</span>
+            </button>
           </div>
-          <span class="rb-group-label">検品</span>
+          <span class="rb-group-label">行・列・ヘッダー</span>
         </div>
-        <!-- Group: データ整理 -->
+        <!-- Group: 補助表示 -->
         <div class="rb-group">
           <div class="rb-buttons">
-            <button class="rb-btn" id="btn-delete-empty-rows" title="全列が空欄になっている行をまとめて削除します&#10;Ctrl+Zで元に戻せます" aria-label="空行を一括削除">
-              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="1"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line><line x1="7" y1="11.5" x2="11" y2="11.5"></line></svg></span>
-              <span>空行削除</span>
+            <button class="rb-btn" id="btn-cross-hi" title="選択中のセルの行と列を太い罫線＋淡い背景で強調します（十字ハイライト）&#10;列ぶれしない方式（罫線は box-shadow 描画でレイアウト非干渉）&#10;設定はブラウザに保存されます（エディタ画面のみ。価格チェック表のHTML出力には含まれません）" aria-label="十字ハイライトの切り替え" aria-pressed="true">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="1"></rect><rect x="3" y="9" width="18" height="6" fill="currentColor" opacity="0.15"></rect><rect x="9" y="3" width="6" height="18" fill="currentColor" opacity="0.15"></rect></svg></span>
+              <span>十字強調</span>
             </button>
-            <button class="rb-btn" id="btn-trim-cells" title="すべてのセルとヘッダーの前後にある余分な空白文字を取り除きます&#10;Ctrl+Zで元に戻せます" aria-label="前後空白をトリム">
-              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 4v16M17 4v16"></path><path d="M10 9h4M10 15h4"></path></svg></span>
-              <span>空白トリム</span>
+            <button class="rb-btn" id="btn-space-check" title="セル値の前後に余分な空白（半角/全角スペース、タブ）がある場合に警告表示します&#10;マスタ連携不要・全列が対象です（切り替え）" aria-label="前後空白検査の切り替え" aria-pressed="false">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 8v8M20 8v8M4 12h4M16 12h4" stroke-dasharray="2 2"></path><rect x="8" y="9" width="8" height="6" rx="1"></rect></svg></span>
+              <span>前後空白</span>
             </button>
           </div>
-          <span class="rb-group-label">データ整理</span>
+          <span class="rb-group-label">補助</span>
         </div>
       </div>
 
-      <!-- Content Pane: チケット -->
-      <div class="rb-content" id="rb-pane-ticket" role="group" aria-label="チケット操作">
+
+      <!-- Content Pane: チケット (default active) -->
+      <div class="rb-content rb-content-active" id="rb-pane-ticket" role="group" aria-label="チケット操作">
         <!-- Group: マスタ連携 -->
         <div class="rb-group">
           <div class="rb-buttons">
@@ -1901,52 +1935,6 @@
         </div>
       </div>
 
-      <!-- Content Pane: 表示 -->
-      <div class="rb-content" id="rb-pane-view" role="group" aria-label="表示設定">
-        <div class="rb-group">
-          <div class="rb-buttons">
-            <button class="rb-btn" id="btn-row-height" title="行の高さを順番に切り替え&#10;（22px → 30px → 40px → 22px）" aria-label="行の高さを変更">
-              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="5" y1="6" x2="19" y2="6"></line><line x1="5" y1="12" x2="19" y2="12"></line><line x1="5" y1="18" x2="19" y2="18"></line><polyline points="2 3 2 21"></polyline><polyline points="22 3 22 21"></polyline></svg></span>
-              <span>行高さ</span>
-            </button>
-            <button class="rb-btn" id="btn-wrap" title="セル内の長いテキストを折り返して表示&#10;選択範囲がある場合はその行だけ切り替え" aria-label="セル折り返し表示の切り替え" aria-pressed="false">
-              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6h18M3 12h18M3 18h12"></path><polyline points="18 14 20 12 18 10"></polyline></svg></span>
-              <span>折り返し</span>
-            </button>
-            <button class="rb-btn" id="btn-autofit-all" title="全列の幅をデータの内容に合わせて自動調整&#10;列ヘッダーのダブルクリックで個別調整も可能" aria-label="全列幅を自動調整">
-              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line></svg></span>
-              <span>列自動</span>
-            </button>
-            <button class="rb-btn" id="btn-vertical-header" title="ヘッダーを縦書きにして列幅を節約します（切り替え）&#10;コード系の細い列が多いマスタTSVで便利です" aria-label="縦書きヘッダーの切り替え" aria-pressed="false">
-              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="1"></rect><line x1="3" y1="13" x2="21" y2="13"></line><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line><path d="M6 5v6M12 5v6M18 5v6" stroke-width="2"></path></svg></span>
-              <span>縦ヘッダー</span>
-            </button>
-            <label class="rb-btn" id="vheader-height-wrap" title="縦書きヘッダーの行高さをpxで調整&#10;ヘッダー文字が見切れる場合はここで広げてください" style="cursor:pointer">
-              <input type="number" id="vheader-height" min="60" max="300" step="10" value="120" aria-label="縦書きヘッダーの高さ(px)" style="width:48px;border:1px solid var(--border,#ccc);border-radius:4px;padding:1px 2px;font-size:11px;text-align:center;background:var(--bg-elev,#fff);color:inherit;">
-              <span>行高(px)</span>
-            </label>
-            <button class="rb-btn" id="btn-header-mode" title="ヘッダーモードを切り替え&#10;「1行目」: ファイルの1行目をヘッダーとして使用&#10;「連番」: 1, 2, 3...の連番ヘッダー" aria-label="ヘッダーモード切り替え" aria-pressed="true">
-              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18"></rect><rect x="3" y="3" width="18" height="6" fill="currentColor" opacity="0.15"></rect><line x1="3" y1="9" x2="21" y2="9"></line></svg></span>
-              <span>ヘッダー</span>
-            </button>
-          </div>
-          <span class="rb-group-label">行・列・ヘッダー</span>
-        </div>
-        <!-- Group: 補助表示 -->
-        <div class="rb-group">
-          <div class="rb-buttons">
-            <button class="rb-btn" id="btn-cross-hi" title="選択中のセルの行と列を太い罫線＋淡い背景で強調します（十字ハイライト）&#10;列ぶれしない方式（罫線は box-shadow 描画でレイアウト非干渉）&#10;設定はブラウザに保存されます（エディタ画面のみ。価格チェック表のHTML出力には含まれません）" aria-label="十字ハイライトの切り替え" aria-pressed="true">
-              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="1"></rect><rect x="3" y="9" width="18" height="6" fill="currentColor" opacity="0.15"></rect><rect x="9" y="3" width="6" height="18" fill="currentColor" opacity="0.15"></rect></svg></span>
-              <span>十字強調</span>
-            </button>
-            <button class="rb-btn" id="btn-space-check" title="セル値の前後に余分な空白（半角/全角スペース、タブ）がある場合に警告表示します&#10;マスタ連携不要・全列が対象です（切り替え）" aria-label="前後空白検査の切り替え" aria-pressed="false">
-              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 8v8M20 8v8M4 12h4M16 12h4" stroke-dasharray="2 2"></path><rect x="8" y="9" width="8" height="6" rx="1"></rect></svg></span>
-              <span>前後空白</span>
-            </button>
-          </div>
-          <span class="rb-group-label">補助</span>
-        </div>
-      </div>
     </div>
     <!-- === RIBBON HTML END === -->
 
@@ -2192,7 +2180,6 @@
         <h2>📁 ファイルタブ</h2>
         <div class="man-btn-section">
           <div class="man-btn-row"><span class="man-btn-label">開く</span><span class="man-btn-desc">TSV・CSV・TXTを開く。画面へのドラッグ&amp;ドロップでも可。</span></div>
-          <div class="man-btn-row"><span class="man-btn-label">貼付から開く</span><span class="man-btn-desc">クリップボードのTSV/CSVを新しいタブとして開く。ファイル選択ダイアログが反応しないときの代替（Excelやメモ帳でデータをコピーしてから押す）。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">保存</span><span class="man-btn-desc">上書き保存（Ctrl+S）。タブの赤い●は未保存の印。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">名前を付けて保存</span><span class="man-btn-desc">ファイル名を指定して別名で保存（Ctrl+Shift+S）。以降の保存は新しい名前になります。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">絞込保存</span><span class="man-btn-desc">フィルターで絞り込んだ行だけを別ファイルに保存。</span></div>
@@ -3716,7 +3703,6 @@
         };
         $("btn-drop-open").onclick = () => openDataFilePicker();
         $("btn-drop-sample").onclick = () => loadSampleTsv();
-        if ($("btn-open-clipboard")) $("btn-open-clipboard").onclick = openFromClipboard;
         $("btn-save").onclick = saveFile;
         $("btn-save-as").onclick = doSaveFileAs;
         $("btn-undo").onclick = undo;
@@ -4232,30 +4218,6 @@
 
       // クリップボードのTSV/CSVテキストを新規ファイルとして開く（OSのファイル選択ダイアログを経由しない）
       // ファイル選択ダイアログがWindows環境で応答しなくなる場合の確実な代替手段。
-      async function openFromClipboard() {
-        let txt = "";
-        try {
-          txt = await navigator.clipboard.readText();
-        } catch {
-          setStatus("クリップボードを読み取れませんでした（ブラウザの権限を確認してください）");
-          return;
-        }
-        if (!txt || !txt.trim()) {
-          setStatus("クリップボードが空です。表計算ソフトやテキストエディタでデータをコピーしてからお試しください");
-          return;
-        }
-        const open = () => {
-          const stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "").slice(0, 14);
-          // 内容から区切り文字を判定し、拡張子を合わせる（Excel由来はタブ、CSVはカンマ）。
-          // ファイル名の拡張子で誤ってタブ固定にならないようにするため。
-          const ext = txt.includes("\t") ? "tsv" : txt.includes(",") ? "csv" : "tsv";
-          loadTextAsFile(txt, `貼り付け_${stamp}.${ext}`);
-          setStatus(`クリップボードから開きました（${state.data.length}行 × ${state.headers.length}列）`);
-        };
-        if (state.dirty) showReloadDialog(open);
-        else open();
-      }
-
       // 非アクティブタブを復元（遅延ロード）
       function ensureTabData(tab) {
         if (tab.data != null) return;
