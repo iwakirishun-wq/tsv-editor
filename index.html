@@ -4454,7 +4454,8 @@
         }
       }
 
-      function buildFileContent() {
+      // allRows=true でフィルターを無視して全行を出力する
+      function buildFileContent({ allRows = false } = {}) {
         const d = state.delimiter;
         const nl = state.newline === "crlf" ? "\r\n" : "\n";
         const esc = (v) => {
@@ -4469,8 +4470,8 @@
           : null;
         const filterCols = (arr) =>
           virtualSet ? arr.filter((_, i) => !virtualSet.has(i)) : arr;
-        // フィルター中は表示行のみ、未フィルター時は全行
-        const rows = state.filteredIndices
+        // フィルター中は表示行のみ（allRows指定時はフィルターを無視して全行）
+        const rows = state.filteredIndices && !allRows
           ? state.filteredIndices.map((i) => state.data[i])
           : state.data;
         if (state.headerMode === "numbered") {
@@ -4618,24 +4619,55 @@
         if (cap) cap.textContent = `${state.fileName} データ編集グリッド`;
       }
 
+      // フィルター中の保存範囲を選ぶ（"filtered" | "all" | null=キャンセル）
+      function askSaveScope(shown, total) {
+        return new Promise((resolve) => {
+          document.querySelector("._save-scope-ov")?.remove();
+          const ov = document.createElement("div");
+          ov.className = "modal-overlay _save-scope-ov";
+          ov.innerHTML = `<div class="modal-dialog">
+            <div class="modal-title">フィルター中です。どちらを保存しますか？</div>
+            <p style="font-size:13px;margin:8px 0 4px;line-height:1.6">
+              全 <strong>${total}</strong> 行のうち <strong>${shown}</strong> 行が表示中です（非表示: ${total - shown} 行）。<br>
+              「表示中のみ」を選ぶと非表示の行はファイルから失われます。
+            </p>
+            <div class="modal-btns" style="flex-wrap:wrap">
+              <button class="_ss-cancel btn-default">キャンセル</button>
+              <button class="_ss-filtered btn-default">表示中の ${shown} 行だけ保存</button>
+              <button class="_ss-all btn-primary">全 ${total} 行を保存</button>
+            </div>
+          </div>`;
+          document.body.appendChild(ov);
+          const done = (v) => { ov.remove(); resolve(v); };
+          ov.querySelector("._ss-cancel").onclick = () => done(null);
+          ov.querySelector("._ss-filtered").onclick = () => done("filtered");
+          ov.querySelector("._ss-all").onclick = () => done("all");
+          ov.onkeydown = (e) => { if (e.key === "Escape") done(null); };
+          ov.querySelector("._ss-all").focus();
+        });
+      }
+
       // askLocation=true で「名前を付けて保存」（保存先フォルダとファイル名を毎回選ぶ）
       async function doSaveFile({ askLocation = false } = {}) {
-        // フィルター中は表示行のみ保存する確認
+        // フィルター中は「表示中のみ」か「フィルターを無視して全行」かを選ばせる
+        let saveAllRows = false;
         if (state.filteredIndices) {
           const shown = state.filteredIndices.length;
           const total = state.data.length;
           if (shown < total) {
-            if (!confirm(`フィルター中のため、表示中の ${shown} 行のみを保存します。\n（全 ${total} 行のうち ${total - shown} 行は除外されます）\n\n続行しますか？`)) {
+            const scope = await askSaveScope(shown, total);
+            if (scope === null) {
               setStatus("保存をキャンセルしました");
               return;
             }
+            saveAllRows = scope === "all";
           }
         }
         // 開いた直後の行数と保存時の行数が異なる場合は事前に確認（予期せぬ行の増減チェック）
         // フィルターで一部行のみ保存する場合は上の確認で足りるため、全行保存時のみ判定する
         // （絞り込み中に「絞った行数≠開いた時の全行数」で誤警告を出さないため）
-        const isFullSave = !state.filteredIndices || state.filteredIndices.length === state.data.length;
-        const savedRows = state.filteredIndices ? state.filteredIndices.length : state.data.length;
+        const isFullSave = saveAllRows || !state.filteredIndices || state.filteredIndices.length === state.data.length;
+        const savedRows = isFullSave ? state.data.length : state.filteredIndices.length;
         if (isFullSave && state.originalRowCount > 0 && savedRows !== state.originalRowCount) {
           const diff = savedRows - state.originalRowCount;
           if (!confirm(`開いた時点では ${state.originalRowCount}行でしたが、保存時は ${savedRows}行になります（${diff > 0 ? "+" : ""}${diff}行）。\n\n意図した変更でなければキャンセルして確認してください。続行しますか？`)) {
@@ -4645,7 +4677,7 @@
         }
         const virtualNote = state.sejVirtualCols ? "（仮想列は除外）" : "";
         const bom = state.encoding === "utf8bom" ? "﻿" : "";
-        const txt = bom + buildFileContent();
+        const txt = bom + buildFileContent({ allRows: saveAllRows });
 
         // 保存先の決定（デスクトップのエディタと同じ挙動）:
         //  1) 保存先ハンドルがある（開いた/名前を付けて保存で確定済み）→ その場所へ静かに上書き
@@ -4702,7 +4734,8 @@
         const rowNote = isFullSave && savedRows !== state.originalRowCount ? `（元 ${state.originalRowCount}行→保存 ${savedRows}行）` : "";
         if (isFullSave) state.originalRowCount = savedRows; // 全行保存時のみ次回の基準を更新（フィルター保存では基準を保つ）
         const locNote = savedTo ? ` → ${savedTo}` : "";
-        setStatus(`保存しました（${savedRows}行${virtualNote}）${locNote}${rowNote}`);
+        const scopeNote = saveAllRows ? "・フィルター無視" : "";
+        setStatus(`保存しました（${savedRows}行${scopeNote}${virtualNote}）${locNote}${rowNote}`);
       }
 
       async function saveFile() {
@@ -4910,6 +4943,7 @@
           const q = textInput.value.trim();
           if (q) state.columnFilters[col] = { type: "text", query: q };
           else delete state.columnFilters[col];
+          resetForceVisible();
           closeFilterDropdown();
           applyFilters();
         };
@@ -4961,6 +4995,7 @@
           if (minV === null && maxV === null) delete state.columnFilters[col];
           else
             state.columnFilters[col] = { type: "range", min: minV, max: maxV };
+          resetForceVisible();
           closeFilterDropdown();
           applyFilters();
         };
@@ -5050,6 +5085,7 @@
           });
         clrFlt.onclick = () => {
           delete state.columnFilters[col];
+          resetForceVisible();
           closeFilterDropdown();
           applyFilters();
         };
@@ -5072,6 +5108,7 @@
           if (!sel.size || sel.size === uniqueVals.length)
             delete state.columnFilters[col];
           else state.columnFilters[col] = { type: "values", values: sel };
+          resetForceVisible();
           closeFilterDropdown();
           applyFilters();
         };
@@ -8621,6 +8658,11 @@
         state.hiddenRows = _shiftRowIndexedSet(state.hiddenRows, insertAt, count);
         state.wrapRows   = _shiftRowIndexedSet(state.wrapRows,   insertAt, count);
         state.forceVisibleRows = _shiftRowIndexedSet(state.forceVisibleRows, insertAt, count);
+      }
+      // フィルター条件を設定/変更/解除したときに呼ぶ。
+      // 追加行の「常時表示」を解除し、新しい条件で通常どおり判定させる。
+      function resetForceVisible() {
+        state.forceVisibleRows.clear();
       }
       // フィルター中に追加した行を「表示し続ける行」として登録する
       function markForceVisible(at, count) {
