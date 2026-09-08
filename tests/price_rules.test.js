@@ -33,7 +33,7 @@ function eq(actual, expected, desc) {
 // --- 定数 ---
 eq(PRICE_RULES.SEAT_CHANGE_FEE, 500, "定数 SEAT_CHANGE_FEE=500");
 eq(PRICE_RULES.RESALE_MIN, 1321, "定数 RESALE_MIN=1321");
-eq(PRICE_RULES.DUMMY_PRICE_MIN, 800000, "定数 DUMMY_PRICE_MIN=800000");
+eq(PRICE_RULES.DUMMY_PRICE_MIN, undefined, "定数 DUMMY_PRICE_MIN は撤廃済み（2026-08-24）");
 
 // --- 年齢ランク ---
 eq(ugAgeRank("大人"), 4, "ageRank 大人=4");
@@ -43,11 +43,15 @@ eq(ugAgeRank("幼児"), 1, "ageRank 幼児=1");
 eq(ugAgeRank("共通"), 0, "ageRank 共通=0");
 
 // --- ダミー価格 ---
-eq(ugIsDummyPrice(800000), true, "dummy 800000=true");
+eq(ugIsDummyPrice(999999), true, "dummy 999999(全桁9)=true");
 eq(ugIsDummyPrice(99999), true, "dummy 99999(全桁9)=true");
 eq(ugIsDummyPrice(9), true, "dummy 9(全桁9)=true");
 eq(ugIsDummyPrice(5000), false, "dummy 5000=false");
 eq(ugIsDummyPrice(null), false, "dummy null=false");
+// 27F1の高額席は実価格。旧「80万円以上はダミー」条件で誤ってダミー扱いされていた回帰防止
+eq(ugIsDummyPrice(850000), false, "dummy 850000(VIPスイート実価格)=false");
+eq(ugIsDummyPrice(1200000), false, "dummy 1200000(Paddock Club実価格)=false");
+eq(ugIsDummyPrice(1600000), false, "dummy 1600000(R-BOX実価格)=false");
 
 // --- 期待差額（同年齢区分どうし）---
 // 大人: 差額0→500 / 1〜500→500 / 500超→実差額 / マイナス→0

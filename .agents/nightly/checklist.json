@@ -3,49 +3,49 @@
     {
       "id": "price-schedule-dummy",
       "label": "価格スケジュール(ダミー): 通常価格表/UGマトリクス/UG一覧",
-      "lastChecked": "2026-06-26T12:40:27.338Z",
-      "lastResult": "ok"
+      "lastChecked": "2026-09-01T18:00:19.453Z",
+      "lastResult": "ng"
     },
     {
       "id": "sej-dummy",
       "label": "SEJデータ(ダミー): カナ検査・備考HTML変換・SEJチェック",
-      "lastChecked": "2026-06-26T12:40:27.338Z",
-      "lastResult": "ok"
+      "lastChecked": "2026-09-01T18:00:19.453Z",
+      "lastResult": "ng"
     },
     {
       "id": "ikkatsu-dummy",
       "label": "一括設定TSV(ダミー): 一括設定チェックのNG検出",
-      "lastChecked": "2026-06-26T12:40:57.672Z",
-      "lastResult": "ok"
+      "lastChecked": "2026-09-03T13:01:16.443Z",
+      "lastResult": "ng"
     },
     {
       "id": "html-save",
       "label": "HTML保存ボタンで非空ファイルが保存されるか",
-      "lastChecked": "2026-06-26T12:40:57.672Z",
-      "lastResult": "ok"
+      "lastChecked": "2026-09-03T13:01:16.443Z",
+      "lastResult": "ng"
     },
     {
       "id": "sort-filter",
       "label": "通常価格表の並べ替え/絞り込み（種別=前売/当日列含む）",
-      "lastChecked": "2026-06-26T10:31:08.596Z",
-      "lastResult": "ok"
+      "lastChecked": "2026-09-03T13:03:05.331Z",
+      "lastResult": "ng"
     },
     {
       "id": "master-unlinked",
       "label": "席種エリアマスタ未連携時の挙動・案内メッセージ",
-      "lastChecked": "2026-06-26T10:31:08.596Z",
-      "lastResult": "ok"
+      "lastChecked": "2026-09-03T13:03:05.331Z",
+      "lastResult": "ng"
     },
     {
       "id": "large-data-perf",
       "label": "大量行データでの表示・出力パフォーマンス",
-      "lastChecked": "2026-06-26T12:21:21.300Z",
+      "lastChecked": "2026-09-03T13:16:49.671Z",
       "lastResult": "ok"
     },
     {
       "id": "real-data-optional",
       "label": "MAIN内の実マスターが見つかった場合の参考チェック",
-      "lastChecked": "2026-06-26T12:21:21.300Z",
+      "lastChecked": "2026-09-03T13:16:49.671Z",
       "lastResult": "ok"
     }
   ],
@@ -96,6 +96,438 @@
       "focusAreas": [
         "ikkatsu-dummy",
         "html-save"
+      ]
+    },
+    {
+      "date": "2026-06-26",
+      "status": "ok",
+      "focusAreas": [
+        "sort-filter",
+        "master-unlinked"
+      ]
+    },
+    {
+      "date": "2026-06-27",
+      "status": "ok",
+      "focusAreas": [
+        "large-data-perf",
+        "real-data-optional"
+      ]
+    },
+    {
+      "date": "2026-06-28",
+      "status": "ok",
+      "focusAreas": [
+        "price-schedule-dummy",
+        "sej-dummy"
+      ]
+    },
+    {
+      "date": "2026-06-29",
+      "status": "ok",
+      "focusAreas": [
+        "ikkatsu-dummy",
+        "html-save"
+      ]
+    },
+    {
+      "date": "2026-06-30",
+      "status": "ok",
+      "focusAreas": [
+        "sort-filter",
+        "master-unlinked"
+      ]
+    },
+    {
+      "date": "2026-07-01",
+      "status": "ok",
+      "focusAreas": [
+        "large-data-perf",
+        "real-data-optional"
+      ]
+    },
+    {
+      "date": "2026-07-02",
+      "status": "ok",
+      "focusAreas": [
+        "price-schedule-dummy",
+        "sej-dummy"
+      ]
+    },
+    {
+      "date": "2026-07-03",
+      "status": "ok",
+      "focusAreas": [
+        "ikkatsu-dummy",
+        "html-save"
+      ]
+    },
+    {
+      "date": "2026-07-03",
+      "status": "ok",
+      "focusAreas": [
+        "sort-filter",
+        "master-unlinked"
+      ]
+    },
+    {
+      "date": "2026-07-03",
+      "status": "ok",
+      "focusAreas": [
+        "large-data-perf",
+        "real-data-optional"
+      ]
+    },
+    {
+      "date": "2026-07-03",
+      "status": "ok",
+      "focusAreas": [
+        "price-schedule-dummy",
+        "sej-dummy"
+      ]
+    },
+    {
+      "date": "2026-07-03",
+      "status": "ok",
+      "focusAreas": [
+        "ikkatsu-dummy",
+        "html-save"
+      ]
+    },
+    {
+      "date": "2026-07-03",
+      "status": "ok",
+      "focusAreas": [
+        "sort-filter",
+        "master-unlinked"
+      ]
+    },
+    {
+      "date": "2026-07-03",
+      "status": "ok",
+      "focusAreas": [
+        "large-data-perf",
+        "real-data-optional"
+      ]
+    },
+    {
+      "date": "2026-07-04",
+      "status": "ok",
+      "focusAreas": [
+        "price-schedule-dummy",
+        "sej-dummy"
+      ]
+    },
+    {
+      "date": "2026-07-05",
+      "status": "ok",
+      "focusAreas": [
+        "ikkatsu-dummy",
+        "html-save"
+      ]
+    },
+    {
+      "date": "2026-07-06",
+      "status": "ok",
+      "focusAreas": [
+        "sort-filter",
+        "master-unlinked"
+      ]
+    },
+    {
+      "date": "2026-08-01",
+      "status": "error",
+      "focusAreas": [
+        "large-data-perf",
+        "real-data-optional"
+      ]
+    },
+    {
+      "date": "2026-08-01",
+      "status": "error",
+      "focusAreas": [
+        "price-schedule-dummy",
+        "sej-dummy"
+      ]
+    },
+    {
+      "date": "2026-08-01",
+      "status": "ok",
+      "focusAreas": [
+        "ikkatsu-dummy",
+        "html-save"
+      ]
+    },
+    {
+      "date": "2026-08-01",
+      "status": "ok",
+      "focusAreas": [
+        "sort-filter",
+        "master-unlinked"
+      ]
+    },
+    {
+      "date": "2026-08-02",
+      "status": "ok",
+      "focusAreas": [
+        "large-data-perf",
+        "real-data-optional"
+      ]
+    },
+    {
+      "date": "2026-08-03",
+      "status": "ok",
+      "focusAreas": [
+        "price-schedule-dummy",
+        "sej-dummy"
+      ]
+    },
+    {
+      "date": "2026-08-04",
+      "status": "ok",
+      "focusAreas": [
+        "ikkatsu-dummy",
+        "html-save"
+      ]
+    },
+    {
+      "date": "2026-08-05",
+      "status": "ok",
+      "focusAreas": [
+        "sort-filter",
+        "master-unlinked"
+      ]
+    },
+    {
+      "date": "2026-08-06",
+      "status": "ok",
+      "focusAreas": [
+        "large-data-perf",
+        "real-data-optional"
+      ]
+    },
+    {
+      "date": "2026-08-07",
+      "status": "ok",
+      "focusAreas": [
+        "price-schedule-dummy",
+        "sej-dummy"
+      ]
+    },
+    {
+      "date": "2026-08-08",
+      "status": "ok",
+      "focusAreas": [
+        "ikkatsu-dummy",
+        "html-save"
+      ]
+    },
+    {
+      "date": "2026-08-09",
+      "status": "ok",
+      "focusAreas": [
+        "sort-filter",
+        "master-unlinked"
+      ]
+    },
+    {
+      "date": "2026-08-10",
+      "status": "ok",
+      "focusAreas": [
+        "large-data-perf",
+        "real-data-optional"
+      ]
+    },
+    {
+      "date": "2026-08-11",
+      "status": "ok",
+      "focusAreas": [
+        "price-schedule-dummy",
+        "sej-dummy"
+      ]
+    },
+    {
+      "date": "2026-08-14",
+      "status": "ok",
+      "focusAreas": [
+        "ikkatsu-dummy",
+        "html-save"
+      ]
+    },
+    {
+      "date": "2026-08-14",
+      "status": "ok",
+      "focusAreas": [
+        "sort-filter",
+        "master-unlinked"
+      ]
+    },
+    {
+      "date": "2026-08-15",
+      "status": "ok",
+      "focusAreas": [
+        "large-data-perf",
+        "real-data-optional"
+      ]
+    },
+    {
+      "date": "2026-08-16",
+      "status": "ok",
+      "focusAreas": [
+        "price-schedule-dummy",
+        "sej-dummy"
+      ]
+    },
+    {
+      "date": "2026-08-17",
+      "status": "ok",
+      "focusAreas": [
+        "ikkatsu-dummy",
+        "html-save"
+      ]
+    },
+    {
+      "date": "2026-08-18",
+      "status": "ok",
+      "focusAreas": [
+        "sort-filter",
+        "master-unlinked"
+      ]
+    },
+    {
+      "date": "2026-08-19",
+      "status": "ok",
+      "focusAreas": [
+        "large-data-perf",
+        "real-data-optional"
+      ]
+    },
+    {
+      "date": "2026-08-20",
+      "status": "ok",
+      "focusAreas": [
+        "price-schedule-dummy",
+        "sej-dummy"
+      ]
+    },
+    {
+      "date": "2026-08-21",
+      "status": "ok",
+      "focusAreas": [
+        "ikkatsu-dummy",
+        "html-save"
+      ]
+    },
+    {
+      "date": "2026-08-22",
+      "status": "ok",
+      "focusAreas": [
+        "sort-filter",
+        "master-unlinked"
+      ]
+    },
+    {
+      "date": "2026-08-23",
+      "status": "ok",
+      "focusAreas": [
+        "large-data-perf",
+        "real-data-optional"
+      ]
+    },
+    {
+      "date": "2026-08-24",
+      "status": "ok",
+      "focusAreas": [
+        "price-schedule-dummy",
+        "sej-dummy"
+      ]
+    },
+    {
+      "date": "2026-08-25",
+      "status": "ng",
+      "focusAreas": [
+        "ikkatsu-dummy",
+        "html-save"
+      ]
+    },
+    {
+      "date": "2026-08-26",
+      "status": "ng",
+      "focusAreas": [
+        "sort-filter",
+        "master-unlinked"
+      ]
+    },
+    {
+      "date": "2026-08-27",
+      "status": "ng",
+      "focusAreas": [
+        "large-data-perf",
+        "real-data-optional"
+      ]
+    },
+    {
+      "date": "2026-08-28",
+      "status": "ng",
+      "focusAreas": [
+        "price-schedule-dummy",
+        "sej-dummy"
+      ]
+    },
+    {
+      "date": "2026-08-29",
+      "status": "ng",
+      "focusAreas": [
+        "ikkatsu-dummy",
+        "html-save"
+      ]
+    },
+    {
+      "date": "2026-08-30",
+      "status": "ng",
+      "focusAreas": [
+        "sort-filter",
+        "master-unlinked"
+      ]
+    },
+    {
+      "date": "2026-08-31",
+      "status": "ng",
+      "focusAreas": [
+        "large-data-perf",
+        "real-data-optional"
+      ]
+    },
+    {
+      "date": "2026-09-01",
+      "status": "ng",
+      "focusAreas": [
+        "price-schedule-dummy",
+        "sej-dummy"
+      ]
+    },
+    {
+      "date": "2026-09-03",
+      "status": "ng",
+      "focusAreas": [
+        "ikkatsu-dummy",
+        "html-save"
+      ]
+    },
+    {
+      "date": "2026-09-03",
+      "status": "ng",
+      "focusAreas": [
+        "sort-filter",
+        "master-unlinked"
+      ]
+    },
+    {
+      "date": "2026-09-03",
+      "status": "ok",
+      "focusAreas": [
+        "large-data-perf",
+        "real-data-optional"
       ]
     }
   ]

@@ -76,6 +76,15 @@ function pickFocusAreas(checklist, n) {
 
 async function withPage(browser, fn) {
   const page = await browser.newPage();
+  // File System Access API を無効化してから読み込ませる。
+  // index.html の pickFileWithFallback() は window.showOpenFilePicker があればそちらを優先するが、
+  // このAPIが開くネイティブピッカーはPlaywrightの "filechooser" イベントを発火させないため
+  // （filechooserは <input type=file> のみ）、テストが待ち続けてタイムアウトする。
+  // 以前はfile://でこのAPIが使えずフォールバック側が動いていたが、Chromium 149では使えてしまう。
+  await page.addInitScript(() => {
+    delete window.showOpenFilePicker;
+    delete window.showSaveFilePicker;
+  });
   const consoleErrors = [], pageErrors = [];
   page.on("console", (msg) => { if (msg.type() === "error") consoleErrors.push(msg.text()); });
   page.on("pageerror", (err) => pageErrors.push(String(err)));

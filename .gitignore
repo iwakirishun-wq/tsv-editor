@@ -1,6 +1,31 @@
+node_modules/
 dist/
+
+# 作業用一時ファイル・バックアップ
+*.backup*.html
+index_ug_fix_*.html
+lines.txt
+temp.txt
+search_results.txt
+tools/diagnose_test.js
 
 # 夜間UIチェック: 実際の業務マスターデータ・スクショ・保存HTMLが含まれるため公開リポジトリにコミットしない
 .agents/nightly/node_modules/
 .agents/nightly/log/
 .agents/nightly/package-lock.json
+
+# エージェントセッション作業ディレクトリ・レビュー
+.agents/explorer_m1/
+.agents/orchestrator/
+.agents/reviewer_m3/
+.agents/victory_auditor/
+.agents/worker_m2/
+.agents/worker_m2_gen2/
+.agents/BRIEFING.md
+.agents/ORIGINAL_REQUEST.md
+.agents/handoff.md
+.agents/ug_logic_writeout.md
+.agents/test_nte_sanitize.js
+.agents/session_diff*
+.agents/fusion_review*
+
