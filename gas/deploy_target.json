@@ -1,0 +1,5 @@
+{
+  "label": "チケットTSV/CSVエディタ",
+  "deploymentId": "AKfycbywVazQ1H1utNthZaVBXTdDOrYpQBQya6jefzrqUXizlh-H1jFh33neUwPdweZU-r_DCQ",
+  "note": "カタログ記載の公開URLに対応する正式デプロイID。deploy.ps1 はこのIDを -i で再デプロイするため、URLは変わらない。"
+}
