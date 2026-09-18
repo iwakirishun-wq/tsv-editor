@@ -6923,7 +6923,10 @@
             }
             state.forceRender = true;
             renderBody();
-            moveTo(Math.min(state.data.length - 1, r + 1), c);
+            // データindexを単純に+1すると、フィルター・行非表示で画面に出ていない行が
+            // 選ばれてしまい「編集したセルとは別の場所へ飛ばされる」ので、
+            // 矢印キーと同じく可視行の並びで次の行へ移動する
+            moveTo(nextVisibleRow(r, 1), c);
           } else if (dir === "tab") {
             if (c >= state.headers.length - 1) {
               // 最終列でTab → 次の行の先頭へ（最終行なら新規追加）
@@ -6935,7 +6938,7 @@
               }
               state.forceRender = true;
               renderBody();
-              moveTo(Math.min(state.data.length - 1, nextRow), 0);
+              moveTo(nextVisibleRow(r, 1), 0);
             } else {
               state.forceRender = true;
               renderBody();
@@ -9557,12 +9560,28 @@
 
       function scrollToCell(r, c, gentle) {
         const rh = state.wrapCells ? 56 : ROW_H;
-        // フィルター/非表示あり: 可視行内でのインデックスに変換してスクロール位置を計算
+        // フィルター/非表示あり: 可視行内でのインデックスに変換してスクロール位置を計算。
+        // r 自体が非表示のときデータindexをそのまま使うと見当違いの位置へ飛ぶので
+        // （フィルター中はデータindexと可視位置が大きくずれる）、二分探索で
+        // 「r以下で最も近い可視行」の位置へ寄せる。
         const vr = getVisibleRows();
-        const vi = vr._direct ? r : (() => { const i = vr._indices.indexOf(r); return i === -1 ? r : i; })();
+        const vi = vr._direct ? r : (() => {
+          const idx = vr._indices;
+          if (!idx.length) return 0;
+          let lo = 0, hi = idx.length - 1, ans = 0;
+          while (lo <= hi) {
+            const m = (lo + hi) >> 1;
+            if (idx[m] <= r) { ans = m; lo = m + 1; } else hi = m - 1;
+          }
+          return ans;
+        })();
         const top = vi * rh;
         const st = els.container.scrollTop;
-        const viewH = els.container.clientHeight;
+        // clientHeight にはsticky固定のヘッダーの高さも含まれる。ヘッダーは常に行の上へ
+        // 被さるので、行が実際に見える高さは clientHeight - theadH。これを引かないと
+        // 「下に隠れている」の判定がヘッダー1つぶん（列見出しは230px≒10行）甘くなり、
+        // Enterで移動した先のセルが画面の下に切れたまま残る。
+        const viewH = Math.max(rh * 3, els.container.clientHeight - els.thead.offsetHeight);
         if (top < st) {
           // セルが上に隠れている → gentle なら最小限スクロール
           els.container.scrollTop = gentle ? top - rh : top - 100;
