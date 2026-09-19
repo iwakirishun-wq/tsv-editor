@@ -3464,6 +3464,7 @@
           if (t.encoding) state.encoding = t.encoding;
           // filteredIndicesをレンダリングなしで再計算
           _visibleRowsCache = null;
+          resetRowHeights(); // 行indexの指す中身が変わるので実測行高は無効
           const fkeys = Object.keys(state.columnFilters);
           if (!fkeys.length) {
             state.filteredIndices = null;
@@ -4310,6 +4311,7 @@
         state.range = null;
         state.anchor = null;
         _visibleRowsCache = null;
+        resetRowHeights();
         // UI 同期（前タブのボタン状態を引き継がない）
         document.body.classList.remove('wrap-cells');
         const _bwLF = $('btn-wrap');
@@ -5556,6 +5558,36 @@
         return cols;
       }
 
+      // ===== 選択範囲 → 実際に触ってよいセル =====
+      // state.range はデータ行/列のindex範囲なので、絞り込み中や行非表示中は
+      // 「画面に見えていない行」を挟んだまま r1〜r2 が連続する。
+      // 範囲を読む・書く操作は必ずこの2つを通すこと。片方でも素通りさせると、
+      // 画面で選んだ範囲の外（非表示行）が黙って書き換わる。
+      function visibleRowsInRange(ra, rb) {
+        const lo = Math.max(0, Math.min(ra, rb));
+        const hi = Math.min(state.data.length - 1, Math.max(ra, rb));
+        const filtered = state.filteredIndices ? new Set(state.filteredIndices) : null;
+        const out = [];
+        for (let r = lo; r <= hi; r++) {
+          if (state.hiddenRows.has(r)) continue;
+          if (filtered && !filtered.has(r)) continue;
+          out.push(r);
+        }
+        return out;
+      }
+      function visibleColsInRange(ca, cb) {
+        const lo = Math.max(0, Math.min(ca, cb));
+        const hi = Math.min(state.headers.length - 1, Math.max(ca, cb));
+        const out = [];
+        for (let c = lo; c <= hi; c++) if (!state.hiddenCols.has(c)) out.push(c);
+        return out;
+      }
+      // 「選んだつもりの範囲」と実際に触れた範囲の差をステータスへ出すための件数
+      function hiddenRowsInRange(ra, rb) {
+        const span = Math.abs(rb - ra) + 1;
+        return Math.max(0, span - visibleRowsInRange(ra, rb).length);
+      }
+
       // セル単位の検査結果を displayVal へバッジHTMLとして追記する共通ヘルパー。
       // severity: "ok"（緑✓）/ "ng"（赤✗、cls に cell-ng を付与）/ "warn"（橙⚠、cls に cell-warn を付与）/ "info"（グレー、フラグなし）
       // 新しいセル検査を追加する場合、条件分岐の中でこの関数を呼ぶだけでよい（cls.push とバッジHTMLを個別に書く必要がない）。
@@ -5573,25 +5605,119 @@
         return displayVal + `<br><span style="color:${s.color};font-size:10px">${icon}${message}</span>`;
       }
 
-      // 仮想スクロールの上下スペーサ高を合わせる。
-      // 行の実高は rowH 固定ではない（検品バッジで2行になる・個別wrap-row・折り返し）。
-      // 見積り（総行数×rowH）より描画中の行が高いと、スクロールできる高さが描画ウィンドウごとに
-      // 変わってしまい、下端では「scrollTopがクランプされる→再描画→高さが戻る」の往復になって
-      // 画面が揺れる。超過分をスペーサーから差し引いて、合計高を常に総行数×rowHへ揃える。
-      function syncSpacerHeights(topEl, botEl, start, end, total, rowH) {
-        const topNominal = start * rowH;
-        const botNominal = Math.max(0, total - end) * rowH;
-        topEl.style.height = topNominal + "px";
-        botEl.style.height = botNominal + "px";
-        const actual = botEl.offsetTop - (topEl.offsetTop + topEl.offsetHeight);
-        let excess = actual - (end - start) * rowH;
-        if (excess <= 0) return;
-        // まず下スペーサーで吸収し、足りなければ上スペーサーを詰めて行を上へ寄せる
-        const cutBot = Math.min(excess, botNominal);
-        if (cutBot > 0) botEl.style.height = botNominal - cutBot + "px";
-        excess -= cutBot;
-        if (excess > 0)
-          topEl.style.height = Math.max(0, topNominal - excess) + "px";
+      // ===== 仮想スクロールの行高（実測オフセット方式）=====
+      // 行の実高は rowH 固定ではない。検品バッジ（cellNote）は値の下に注記を1行足すので
+      // 22px の行が 35px になり、備考HTML表示や個別wrap-rowではさらに伸びる。
+      // 「全行 rowH」を前提に start/end とスペーサ高を出すと、描画ウィンドウごとに総高が
+      // 変わってブラウザが scrollTop をクランプし、スクロールが途中で止まる・逆走する。
+      //
+      // そこで、一度でも描画した行は実高をキャッシュし、未測定行は実測平均で見積もって
+      // 可視行の累積オフセットを持つ。start/end は二分探索、スペーサ高は累積オフセットの
+      // 差分そのものなので、総高と実レイアウトが常に一致する。
+      //
+      // 測定で見積りが変わると start 行の上端位置(offsets[start])が動く＝画面が飛ぶため、
+      // ずれた分だけ scrollTop を足して見えている行をその場に留める（アンカー補正）。
+      const _rowH = {
+        map: new Map(), // データ行index -> 実測高(px)
+        sum: 0,         // 実測値の合計（未測定行の見積り平均に使う）
+        sig: null,      // 未描画行の高さにも効く条件。変わったら実測値を全部捨てる
+        offsets: null,  // 可視行の累積オフセット Float64Array(可視行数+1)
+        offRows: null,  // offsets を作った時点の getVisibleRows() オブジェクト（同一性で判定）
+        dirty: true,    // 実測値が更新された → offsets 作り直し
+      };
+      // 未描画行の高さにも影響する条件だけを並べる。
+      // セル編集・選択・行の折り返し切替はその行が再描画→再測定されるので含めない。
+      function _rowHSignature(visCols, rowH) {
+        return (
+          visCols.join(",") + "|" + rowH + "|" +
+          visCols.map((c) => state.colWidths[c] || 80).join(",") + "|" +
+          [state.colorView, state.gateView, state.parkingCheck, state.boxCheck,
+           state.kanaCheck, state.bikoHtmlCheck, state.ikkatsuCheck,
+           state.sejWordLenCheck, !!state.sejMaster, state.wrapCells]
+            .map((b) => (b ? 1 : 0)).join("")
+        );
+      }
+      // データそのものが入れ替わったとき（ファイル読込・タブ切替・ソート）に呼ぶ。
+      // 行indexの指す中身が変わるので実測値は無効。
+      function resetRowHeights() {
+        _rowH.map.clear();
+        _rowH.sum = 0;
+        _rowH.sig = null;
+        _rowH.offsets = null;
+        _rowH.offRows = null;
+        _rowH.dirty = true;
+      }
+      function _rowHEstimate(fallback) {
+        return _rowH.map.size ? _rowH.sum / _rowH.map.size : fallback;
+      }
+      function _rowHRecord(dataIdx, h) {
+        const prev = _rowH.map.get(dataIdx);
+        if (prev !== undefined && Math.abs(prev - h) < 0.5) return false;
+        if (prev !== undefined) _rowH.sum -= prev;
+        _rowH.map.set(dataIdx, h);
+        _rowH.sum += h;
+        _rowH.dirty = true;
+        return true;
+      }
+      // 可視行の累積オフセット。offsets[i] = i番目の可視行の上端、offsets[n] = 総高。
+      function rowOffsets(rows, fallbackH) {
+        if (_rowH.offsets && !_rowH.dirty && _rowH.offRows === rows)
+          return _rowH.offsets;
+        const n = rows.length;
+        const est = _rowHEstimate(fallbackH);
+        const arr = new Float64Array(n + 1);
+        const map = _rowH.map, idx = rows._indices;
+        let acc = 0;
+        for (let i = 0; i < n; i++) {
+          arr[i] = acc;
+          const h = map.get(idx ? idx[i] : i);
+          acc += h === undefined ? est : h;
+        }
+        arr[n] = acc;
+        _rowH.offsets = arr;
+        _rowH.offRows = rows;
+        _rowH.dirty = false;
+        return arr;
+      }
+      // offsets[i] <= y を満たす最大の i（= 座標yにある可視行）
+      function rowAtOffset(off, y, n) {
+        if (n <= 0) return 0;
+        let lo = 0, hi = n - 1;
+        while (lo < hi) {
+          const mid = (lo + hi + 1) >> 1;
+          if (off[mid] <= y) lo = mid;
+          else hi = mid - 1;
+        }
+        return lo;
+      }
+      // 描画済みの行を実測してキャッシュへ反映する。高さが変わったら true。
+      // 高さ0はレイアウト前（グリッドがまだ非表示のうちに描画された等）なので採用しない。
+      // 0を見積りに混ぜると総高が潰れてスクロール位置が飛ぶ。
+      function measureRenderedRows(topEl, botEl, rows) {
+        let changed = false;
+        for (let el = topEl.nextElementSibling; el && el !== botEl; el = el.nextElementSibling) {
+          if (!el.dataset || el.dataset.row === undefined) continue;
+          const h = el.offsetHeight;
+          if (h <= 0) continue;
+          if (_rowHRecord(+el.dataset.row, h)) changed = true;
+        }
+        return changed;
+      }
+      // スペーサ高を累積オフセットへ合わせる。測定で見積りがずれたぶんは scrollTop で吸収する。
+      function syncSpacerHeights(topEl, botEl, start, end, rows, rowH) {
+        let off = rowOffsets(rows, rowH);
+        topEl.style.height = off[start] + "px";
+        botEl.style.height = Math.max(0, off[rows.length] - off[end]) + "px";
+        const before = off[start];
+        if (!measureRenderedRows(topEl, botEl, rows)) return;
+        off = rowOffsets(rows, rowH);
+        const delta = off[start] - before;
+        topEl.style.height = off[start] + "px";
+        botEl.style.height = Math.max(0, off[rows.length] - off[end]) + "px";
+        // start より上の行の見積りが変わった → 同じ量だけスクロールして見え方を固定する。
+        // scrollTop の変更は scroll イベントを起こすが、start/end が同じなら
+        // renderBody は lastRenderKey で早期returnするので往復にはならない。
+        if (Math.abs(delta) >= 1) els.container.scrollTop += delta;
       }
 
       function renderBody() {
@@ -5599,17 +5725,23 @@
         const scrollTop = els.container.scrollTop;
         const viewH = els.container.clientHeight;
         const rowH = state.wrapCells ? 56 : ROW_H;
-        // 実際の行高が rowH より高いとコンテンツが見積りより伸びるため、scrollTop が
-        // 総行数×rowH を超えることがある。そのまま start を出すと end <= start になり
-        // 行が1件も描画されず本体が真っ白になる（さらに空白化で高さが縮んでクランプ→
-        // 再描画の往復になり画面が揺れる）ので、start は必ず最終行より手前へクランプする。
-        const start = Math.min(
-          Math.max(0, rows.length - 1),
-          Math.max(0, Math.floor(scrollTop / rowH) - BUFFER),
+        const visCols = getVisibleCols();
+        // 列幅や検品トグルが変わると未描画行の高さも変わる → 実測値を捨てて測り直す
+        const hSig = _rowHSignature(visCols, rowH);
+        if (_rowH.sig !== hSig) { resetRowHeights(); _rowH.sig = hSig; }
+        // 描画ウィンドウは実測オフセットの二分探索で決める。行高が rowH 固定でなくても
+        // 「画面に映っている行」を正しく選べるので、白紙化も位置ずれも起きない。
+        const off = rowOffsets(rows, rowH);
+        const start = Math.max(
+          0,
+          Math.min(
+            Math.max(0, rows.length - 1),
+            rowAtOffset(off, scrollTop, rows.length) - BUFFER,
+          ),
         );
         const end = Math.min(
           rows.length,
-          Math.max(start + 1, Math.ceil((scrollTop + viewH) / rowH) + BUFFER),
+          Math.max(start + 1, rowAtOffset(off, scrollTop + viewH, rows.length) + 1 + BUFFER),
         );
         const key = `${start}-${end}-${rows.length}`;
         const forced = state.forceRender;
@@ -5617,7 +5749,6 @@
         lastRenderKey = key;
         state.forceRender = false;
 
-        const visCols = getVisibleCols();
         const colSpan = visCols.length + 1;
         const rangeEdge = rangeEdgeInfo();
         // 差分描画の可否判定に使うシグネチャ。行HTMLの「形」に効く要素だけを見る。
@@ -6057,7 +6188,7 @@
             for (let vi = domw.end; vi < end; vi++) frag += buildRow(vi);
             botEl.insertAdjacentHTML("beforebegin", frag);
           }
-          syncSpacerHeights(topEl, botEl, start, end, rows.length, rowH);
+          syncSpacerHeights(topEl, botEl, start, end, rows, rowH);
           domw.start = start;
           domw.end = end;
           placeFillHandle();
@@ -6065,9 +6196,9 @@
         }
 
         // ===== 全置換 =====
-        html += `<tr class="vspacer vspacer-top" aria-hidden="true" style="height:${start * rowH}px"><td colspan="${colSpan}"></td></tr>`;
+        html += `<tr class="vspacer vspacer-top" aria-hidden="true" style="height:${off[start]}px"><td colspan="${colSpan}"></td></tr>`;
         for (let vi = start; vi < end; vi++) html += buildRow(vi);
-        html += `<tr class="vspacer vspacer-bottom" aria-hidden="true" style="height:${(rows.length - end) * rowH}px"><td colspan="${colSpan}"></td></tr>`;
+        html += `<tr class="vspacer vspacer-bottom" aria-hidden="true" style="height:${Math.max(0, off[rows.length] - off[end])}px"><td colspan="${colSpan}"></td></tr>`;
 
         // SEJゴースト行: 表示中データと同じグループのマスタ登録のうち、表示中データに無い席種だけを最終行に表示
         // （セブン発券対象の漏れ確認用。別イベント・別グループの席種は対象外。グループ絞り込み時は絞ったグループのみ）
@@ -6098,7 +6229,7 @@
           botEl: els.tbody.querySelector("tr.vspacer-bottom"),
         };
         if (_domWindow.topEl && _domWindow.botEl)
-          syncSpacerHeights(_domWindow.topEl, _domWindow.botEl, start, end, rows.length, rowH);
+          syncSpacerHeights(_domWindow.topEl, _domWindow.botEl, start, end, rows, rowH);
         placeFillHandle();
         _prevHighlight = {
           selected: state.selected ? { ...state.selected } : null,
@@ -6597,9 +6728,10 @@
         const relY = my - rect.top + els.container.scrollTop;
         const rh = state.wrapCells ? 56 : ROW_H;
         const theadH = els.thead.offsetHeight;
-        const vi = Math.max(0, Math.floor((relY - theadH) / rh));
-        // 可視行インデックス(vi)をデータインデックスに変換
+        // 可視行インデックス(vi)をデータインデックスに変換。
+        // 行高は rh 固定ではない（検品バッジ等）ので実測オフセットから引く。
         const vr = getVisibleRows();
+        const vi = rowAtOffset(rowOffsets(vr, rh), Math.max(0, relY - theadH), vr.length);
         const r = vr._direct
           ? Math.min(state.data.length - 1, vi)
           : vr._indices[Math.min(vr._indices.length - 1, vi)] ?? 0;
@@ -6833,31 +6965,36 @@
         if (downExt <= 0 && rightExt <= 0) { // 実質広がっていない → 何もしない
           state.range = { ...src }; state.forceRender = true; renderBody(); return;
         }
+        // 元範囲・フィル先とも、画面に見えている行/列だけを対象にする。
+        // データindexで連続に埋めると、絞り込みで隠れている行まで書き換わる。
+        const srcRowIdx = visibleRowsInRange(src.r1, src.r2);
+        const srcColIdx = visibleColsInRange(src.c1, src.c2);
+        if (!srcRowIdx.length || !srcColIdx.length) {
+          setStatus("フィル元に表示中のセルがありません");
+          return;
+        }
         saveUndo();
-        const srcRows = src.r2 - src.r1 + 1, srcCols = src.c2 - src.c1 + 1;
         let changed = false;
         if (downExt >= rightExt) {
           // 下方向フィル: 列ごとに系列判定（無ければ行タイル）
-          for (let c = src.c1; c <= src.c2; c++) {
-            const colVals = [];
-            for (let r = src.r1; r <= src.r2; r++) colVals.push(safeGet(r, c));
-            const ser = fillSeriesInfo(colVals);
-            for (let r = src.r2 + 1; r <= r2; r++) {
-              const v = ser ? fillSeriesVal(ser, r - src.r2) : safeGet(src.r1 + ((r - src.r1) % srcRows), c);
+          const tgtRowIdx = visibleRowsInRange(src.r2 + 1, r2);
+          for (const c of srcColIdx) {
+            const ser = fillSeriesInfo(srcRowIdx.map((r) => safeGet(r, c)));
+            tgtRowIdx.forEach((r, k) => {
+              const v = ser ? fillSeriesVal(ser, k + 1) : safeGet(srcRowIdx[k % srcRowIdx.length], c);
               if (safeGet(r, c) !== v) { safeSet(r, c, v); changed = true; }
-            }
+            });
           }
           state.range = { r1: src.r1, c1: src.c1, r2, c2: src.c2 };
         } else {
           // 右方向フィル: 行ごとに系列判定（無ければ列タイル）
-          for (let r = src.r1; r <= src.r2; r++) {
-            const rowVals = [];
-            for (let c = src.c1; c <= src.c2; c++) rowVals.push(safeGet(r, c));
-            const ser = fillSeriesInfo(rowVals);
-            for (let c = src.c2 + 1; c <= c2; c++) {
-              const v = ser ? fillSeriesVal(ser, c - src.c2) : safeGet(r, src.c1 + ((c - src.c1) % srcCols));
+          const tgtColIdx = visibleColsInRange(src.c2 + 1, c2);
+          for (const r of srcRowIdx) {
+            const ser = fillSeriesInfo(srcColIdx.map((c) => safeGet(r, c)));
+            tgtColIdx.forEach((c, k) => {
+              const v = ser ? fillSeriesVal(ser, k + 1) : safeGet(r, srcColIdx[k % srcColIdx.length]);
               if (safeGet(r, c) !== v) { safeSet(r, c, v); changed = true; }
-            }
+            });
           }
           state.range = { r1: src.r1, c1: src.c1, r2: src.r2, c2 };
         }
@@ -7480,7 +7617,9 @@
           return;
         }
         {
-          const rh = state.wrapCells ? 56 : ROW_H;
+          // 1画面ぶんの行数は実測平均で数える（検品バッジONだと行高が rowH の1.5倍以上になり、
+          // 固定値のままでは PageDown が画面2枚ぶん飛ぶ）
+          const rh = _rowHEstimate(state.wrapCells ? 56 : ROW_H);
           if (key === "PageUp") {
             e.preventDefault();
             moveTo(
@@ -7565,15 +7704,9 @@
           saveUndo();
           if (state.range) {
             const { r1, c1, r2, c2 } = state.range;
-            const filteredSet = state.filteredIndices ? new Set(state.filteredIndices) : null;
-            for (let r = Math.min(r1, r2); r <= Math.max(r1, r2); r++) {
-              if (state.hiddenRows.has(r)) continue; // 非表示行スキップ
-              if (filteredSet && !filteredSet.has(r)) continue; // フィルター除外行スキップ
-              for (let c = Math.min(c1, c2); c <= Math.max(c1, c2); c++) {
-                if (state.hiddenCols.has(c)) continue; // 非表示列スキップ
-                safeSet(r, c, "");
-              }
-            }
+            const delCols = visibleColsInRange(c1, c2); // 非表示列は消さない
+            for (const r of visibleRowsInRange(r1, r2)) // 非表示行・フィルター除外行は消さない
+              for (const c of delCols) safeSet(r, c, "");
           } else safeSet(row, col, "");
           markDirty();
           state.forceRender = true;
@@ -7722,15 +7855,9 @@
         saveUndo();
         if (state.range) {
           const { r1, c1, r2, c2 } = state.range;
-          const filteredSetCut = state.filteredIndices ? new Set(state.filteredIndices) : null;
-          for (let r = Math.min(r1, r2); r <= Math.max(r1, r2); r++) {
-            if (state.hiddenRows.has(r)) continue; // 非表示行スキップ
-            if (filteredSetCut && !filteredSetCut.has(r)) continue; // フィルター除外行スキップ
-            for (let c = Math.min(c1, c2); c <= Math.max(c1, c2); c++) {
-              if (state.hiddenCols.has(c)) continue; // 非表示列スキップ（コピーされていない列は消さない）
-              safeSet(r, c, "");
-            }
-          }
+          const cutCols = visibleColsInRange(c1, c2); // コピーされていない列は消さない
+          for (const r of visibleRowsInRange(r1, r2))
+            for (const c of cutCols) safeSet(r, c, "");
         } else {
           safeSet(state.selected.row, state.selected.col, "");
         }
@@ -7756,9 +7883,6 @@
           maxC = Math.max(c1, c2);
         const data2d = [];
         let txt = "";
-        const filteredSet = state.filteredIndices
-          ? new Set(state.filteredIndices)
-          : null;
         // ファイルの区切り文字に合わせてコピー（CSV対応）
         const copyDelim = state.delimiter || "\t";
         const copyEsc = (v) => {
@@ -7768,13 +7892,11 @@
             : s;
         };
         const htmlRows = [];
-        for (let r = minR; r <= maxR; r++) {
-          if (state.hiddenRows.has(r)) continue;
-          if (filteredSet && !filteredSet.has(r)) continue;
+        const copyCols = visibleColsInRange(minC, maxC);
+        for (const r of visibleRowsInRange(minR, maxR)) {
           const row = [];
           const htmlCells = [];
-          for (let c = minC; c <= maxC; c++) {
-            if (state.hiddenCols.has(c)) continue;
+          for (const c of copyCols) {
             const val = safeGet(r, c);
             row.push(val);
             const bg = state.cellColors[r + "," + c];
@@ -7915,20 +8037,30 @@
       }
 
       function doPasteFill(cb, range) {
-        saveUndo();
-        const r1 = Math.min(range.r1, range.r2), r2 = Math.max(range.r1, range.r2);
-        const c1 = Math.min(range.c1, range.c2), c2 = Math.max(range.c1, range.c2);
-        for (let r = r1; r <= r2; r++) {
-          for (let c = c1; c <= c2; c++) {
-            const srcR = (r - r1) % cb.rows;
-            const srcC = (c - c1) % cb.cols;
-            safeSet(r, c, cb.data2d[srcR]?.[srcC] ?? "");
-          }
+        // 画面に見えている行/列だけへ書く。コピー・切り取り・Deleteと同じ規則。
+        // データindexで連続に書くと、絞り込みで隠れている行まで巻き込む。
+        const tgtRows = visibleRowsInRange(range.r1, range.r2);
+        const tgtCols = visibleColsInRange(range.c1, range.c2);
+        if (!tgtRows.length || !tgtCols.length) {
+          setStatus("選択範囲に表示中のセルがありません");
+          return;
         }
+        saveUndo();
+        // 繰り返しの起点は「見えている範囲の左上」。隠れた行を数えないので、
+        // 画面上ではペーストデータがきれいに繰り返される。
+        tgtRows.forEach((r, ri) => {
+          tgtCols.forEach((c, ci) => {
+            safeSet(r, c, cb.data2d[ri % cb.rows]?.[ci % cb.cols] ?? "");
+          });
+        });
         markDirty();
         state.forceRender = true;
         renderBody();
-        setStatus("選択範囲全体にペーストしました");
+        const skipped = hiddenRowsInRange(range.r1, range.r2);
+        setStatus(
+          `選択範囲 ${tgtRows.length}行にペーストしました` +
+            (skipped ? `（非表示の${skipped}行は変更していません）` : ""),
+        );
       }
 
       async function pasteFromClipboard() {
@@ -8774,6 +8906,7 @@
         _visibleRowsCache = null;
         _visibleRowsCacheKey = "";
         lastRenderKey = null;
+        resetRowHeights();
         // tabs と activeTab はリセットしない
         els.filterClear.style.display = "none";
         els.filterExport.style.display = "none";
@@ -8853,6 +8986,7 @@
         if (state.data.length <= delCount) return;
         saveUndo();
         state.data.splice(r1, delCount);
+        resetRowHeights();
         state._dupSet = null;
         for (let _dr = 0; _dr < delCount; _dr++) shiftMarkers(r1, -1);
         _deleteRangeHiddenRows(r1, r2);
@@ -8998,6 +9132,7 @@
         }
       }
       function _sortDataUpdateColors(sortedWithOrigIdx, sortHeaderExists) {
+        resetRowHeights(); // 行の並びが変わる＝実測行高の対応が崩れる
         const base = sortHeaderExists ? 1 : 0;
         const origToNew = new Map(sortedWithOrigIdx.map((x, ni) => [x.origIdx, base + ni]));
         if (Object.keys(state.cellColors).length) {
@@ -9028,6 +9163,7 @@
       }
 
       function _shiftRowColors(insertAt, count) {
+        resetRowHeights();
         // 行挿入: rows >= insertAt を +count シフト
         const newCC = {};
         for (const [k, v] of Object.entries(state.cellColors)) {
@@ -9040,6 +9176,7 @@
         state.cellColors = newCC;
       }
       function _swapRowColors(r1, r2) {
+        resetRowHeights();
         // moveRowUp/Down: 2行の色を交換
         const newCC = { ...state.cellColors };
         const cols = new Set(
@@ -9575,19 +9712,23 @@
           }
           return ans;
         })();
-        const top = vi * rh;
+        // 行の上端は実測オフセットから取る。検品バッジで行高が rh を超えるとき
+        // vi*rh では実際の位置とずれ、Enterで移動した先が画面外に残る。
+        const off = rowOffsets(vr, rh);
+        const top = off[vi];
+        const rowHeight = Math.max(1, off[vi + 1] - off[vi] || rh);
         const st = els.container.scrollTop;
         // clientHeight にはsticky固定のヘッダーの高さも含まれる。ヘッダーは常に行の上へ
         // 被さるので、行が実際に見える高さは clientHeight - theadH。これを引かないと
         // 「下に隠れている」の判定がヘッダー1つぶん（列見出しは230px≒10行）甘くなり、
         // Enterで移動した先のセルが画面の下に切れたまま残る。
-        const viewH = Math.max(rh * 3, els.container.clientHeight - els.thead.offsetHeight);
+        const viewH = Math.max(rowHeight * 3, els.container.clientHeight - els.thead.offsetHeight);
         if (top < st) {
           // セルが上に隠れている → gentle なら最小限スクロール
-          els.container.scrollTop = gentle ? top - rh : top - 100;
-        } else if (top > st + viewH - rh * 2) {
+          els.container.scrollTop = gentle ? top - rowHeight : top - 100;
+        } else if (top > st + viewH - rowHeight * 2) {
           // セルが下に隠れている
-          els.container.scrollTop = gentle ? top - viewH + rh * 2 : top - 100;
+          els.container.scrollTop = gentle ? top - viewH + rowHeight * 2 : top - 100;
         }
         // 横スクロール: 選択セルが見えるようにする
         if (c !== undefined) {
