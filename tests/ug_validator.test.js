@@ -470,25 +470,38 @@ eqCU(validate.canUpgrade("RC席", "RESV43", "幼児〜中学生", "U23席", "RES
   } else pass++;
 }
 
-// UG行自体の販売期間が元の通常販売期間(〜07/05)を超えて07/10まで設定されている → invalid
+// UG行の販売期間は「元と先の重なり」= 開始 max / 終了 min でなければならない（2026-09-20 SHUN確定）。
+// PERIOD元は06/01 11:00〜07/05 21:00、PERIOD先は06/01 11:00〜07/10 21:00。
+// よって正解は 06/01 11:00 〜 07/05 21:00（終了は早いほう＝元に合わせる）。
+const ugPeriod = (start, end) => validate(ugRow(
+  SEAT_PERIOD_SRC.name, SEAT_PERIOD_SRC.cd, "大人", SEAT_PERIOD_DST.name, SEAT_PERIOD_DST.cd, "大人",
+  2000, 2000, start, end,
+));
+// 重なりどおり → 期間のNGは出ない
 {
-  const chkOver = validate(ugRow(
-    SEAT_PERIOD_SRC.name, SEAT_PERIOD_SRC.cd, "大人", SEAT_PERIOD_DST.name, SEAT_PERIOD_DST.cd, "大人",
-    2000, 2000, "2026/06/01 11:00", "2026/07/10 21:00",
-  ));
-  if (chkOver.status === "invalid" && chkOver.problems.some((p) => p.includes("元の通常販売期間"))) pass++;
-  else { fail++; console.error(`NG [UG期間が元の通常販売期間を超える]: status=${chkOver.status} problems=${JSON.stringify(chkOver.problems)}`); }
-}
-// UG行自体の販売期間が元の通常販売期間(〜07/05)に収まっている → このチェックでは引っかからない
-{
-  const chkIn = validate(ugRow(
-    SEAT_PERIOD_SRC.name, SEAT_PERIOD_SRC.cd, "大人", SEAT_PERIOD_DST.name, SEAT_PERIOD_DST.cd, "大人",
-    2000, 2000, "2026/06/01 11:00", "2026/07/05 21:00",
-  ));
-  if (chkIn.problems.some((p) => p.includes("通常販売期間"))) {
+  const chk = ugPeriod("2026/06/01 11:00", "2026/07/05 21:00");
+  if (chk.problems.some((p) => p.includes("UGの販売"))) {
     fail++;
-    console.error(`NG [UG期間が元の通常販売期間内なのに誤検知]: problems=${JSON.stringify(chkIn.problems)}`);
+    console.error(`NG [UG期間が重なりどおりなのに誤検知]: problems=${JSON.stringify(chk.problems)}`);
   } else pass++;
+}
+// 終了が早いほう(07/05)を越えて07/10まで売っている → 売り止めた元商品からUGで入れる穴
+{
+  const chk = ugPeriod("2026/06/01 11:00", "2026/07/10 21:00");
+  if (chk.status === "invalid" && chk.problems.some((p) => p.includes("販売終了が元・先の早いほうより後"))) pass++;
+  else { fail++; console.error(`NG [UG終了が早いほうより後]: status=${chk.status} problems=${JSON.stringify(chk.problems)}`); }
+}
+// 終了が早いほう(07/05)より手前で切れている → 本来UGできる期間の取りこぼし
+{
+  const chk = ugPeriod("2026/06/01 11:00", "2026/07/01 21:00");
+  if (chk.status === "invalid" && chk.problems.some((p) => p.includes("販売終了が元・先の早いほうより前"))) pass++;
+  else { fail++; console.error(`NG [UG終了が早いほうより前]: status=${chk.status} problems=${JSON.stringify(chk.problems)}`); }
+}
+// 開始が遅いほう(06/01 11:00)より前に出ている → まだ売っていない期間にUGが立つ
+{
+  const chk = ugPeriod("2026/05/20 11:00", "2026/07/05 21:00");
+  if (chk.status === "invalid" && chk.problems.some((p) => p.includes("販売開始が元・先の遅いほうより前"))) pass++;
+  else { fail++; console.error(`NG [UG開始が遅いほうより前]: status=${chk.status} problems=${JSON.stringify(chk.problems)}`); }
 }
 
 for (const s of SCENARIOS) {
@@ -553,6 +566,41 @@ for (const s of CUTOFF_SCENARIOS) {
     fail++;
     console.error(`NG [${s.name}] status: 期待 ${s.expectStatus} / 実際 ${chk.status}`);
   } else pass++;
+}
+
+// =============================================================
+// 席種エリアマスタ連携時の「本当に指定席か」判定（2026-09-20）
+// 席種在庫管理種別(stockTyp)と指定席自由席区分(isReserved/isFree)の
+// どちらか一方でも「2」なら数在庫として扱う。数在庫席種に自己UG
+// （同席種・同券種の差額500円＝席替え）は設定できない。
+// 実データの SGT1_VIPｽｲｰﾄ 5F（stock=2 の数在庫だが rsve=1）が、従来のOR判定では
+// 指定席に化けて自己UGを素通りさせていた。
+// =============================================================
+{
+  const SEAT_VIP = { name: "VIPスイート5F", cd: "RESV90" }; // stock=2(数在庫) / rsve=1(指定席)
+  const SEAT_RSV = { name: "通常指定席90", cd: "RESV91" }; // stock=1 / rsve=1 の純粋な指定席
+  const META = {
+    RESV90: { found: true, stockTyp: "2", isReserved: true, isFree: false },
+    RESV91: { found: true, stockTyp: "1", isReserved: true, isFree: false },
+  };
+  const metaFn = (code) => META[code] || null;
+  const ROWS = [
+    priceRow(SEAT_VIP.name, SEAT_VIP.cd, "大人", 60000, 60000),
+    priceRow(SEAT_RSV.name, SEAT_RSV.cd, "大人", 20000, 20000),
+  ];
+  const valMeta = buildUgValidator(ROWS, c, v, metaFn);
+  const cases = [
+    ["数在庫(stock=2/rsve=1)の自己UGは不可", valMeta.canUpgrade(SEAT_VIP.name, SEAT_VIP.cd, "大人", SEAT_VIP.name, SEAT_VIP.cd, "大人"), false],
+    ["純粋な指定席(stock=1/rsve=1)の自己UGは可（席替え）", valMeta.canUpgrade(SEAT_RSV.name, SEAT_RSV.cd, "大人", SEAT_RSV.name, SEAT_RSV.cd, "大人"), true],
+  ];
+  for (const [name, got, want] of cases) {
+    if (got === want) pass++;
+    else { fail++; console.error(`NG [${name}]: 期待 ${want} / 実際 ${got}`); }
+  }
+  // validate() 側でも invalid（問題文言つき）になること
+  const chkSelf = valMeta(ugRow(SEAT_VIP.name, SEAT_VIP.cd, "大人", SEAT_VIP.name, SEAT_VIP.cd, "大人", 500, 500));
+  if (chkSelf.status === "invalid" && chkSelf.problems.some((p) => p.includes("同席種同券種UGは設定不可"))) pass++;
+  else { fail++; console.error(`NG [数在庫の自己UGがvalidateで検出されない]: status=${chkSelf.status} problems=${JSON.stringify(chkSelf.problems)}`); }
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

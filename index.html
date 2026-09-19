@@ -2916,8 +2916,16 @@
               // 席種カテゴリを渡すための口。コード6桁目が未採番の駐車券が指定席と誤判定され、
               // 実データで231件の乖離が出ていた。
               if (m.cat) return m.cat;
-              if (m.stockTyp === "1" || m.isReserved) return "指定席";
-              if (m.stockTyp === "2" || m.isFree) return "エリア";
+              // 「本当に指定席」なのは 席種在庫管理種別=1（座席在庫）と 指定席自由席区分=1（指定席）が
+              // そろっているときだけ。どちらか一方でも 2（数在庫／自由席）なら数在庫として扱う。
+              // 2026-09-20: 従来は「1 または 指定席区分」のOR判定で、片方が1なら指定席に倒れていた。
+              // 実データ4,743行のうち両者が食い違うのは5件だが、そこに
+              // 「SGT1_VIPｽｲｰﾄ 5F/4F（在庫種別=2の数在庫なのに指定席区分=1）」が含まれており、
+              // 数在庫席種に自己UG（同席種・同券種の差額500円＝席替え）が通ってしまう穴になっていた。
+              // 座席を選べない商品に席替えUGを付けると、500円払って何も変わらない操作ができる。
+              const rsve = m.isReserved ? "1" : m.isFree ? "2" : "";
+              if (m.stockTyp === "2" || rsve === "2") return "エリア";
+              if (m.stockTyp === "1" || rsve === "1") return "指定席";
             }
           }
           // NFKCで半角カナ（「ｴﾘｱ」等）を全角化してから判定（2026-07-04発見: マスタ未連携時の
@@ -3081,19 +3089,43 @@
             if (!md || !md.found) notes.push("先席種マスタ未登録");
             if (srcSeat && (!ms || !ms.found)) notes.push("元席種マスタ未登録");
           }
-          // UG行自体の販売期間が、元/先の通常価格の販売期間を超えて設定されていないか。
-          // 元(または先)がそもそも売っていない期間までUGの販売期間に含めるのは不整合（購入できないものを
-          // アップグレードできてしまうことになるため）
+          // UG行の販売期間は「元と先の通常販売期間の重なり」でなければならない。
+          //   販売開始 = max(元の販売開始, 先の販売開始) / 販売終了 = min(元の販売終了, 先の販売終了)
+          // 元(または先)が売っていない期間をUGの販売期間に含めると、購入できないものをアップグレード
+          // できる／売り止めた商品にUGで入れる穴になる。逆に重なりより短いと、本来UGできる期間に
+          // できなくなる取りこぼしになるため、超過・不足の両方を検出する。
+          // 2026-09-20: 従来は「元/先の販売期間を超えている」だけを見ており不足は素通りしていた。
+          // 実データ（27F1 24,534行 / もてぎJRR26 192行ほか計74,237行のUG行）では開始=max・終了=min が
+          // 100%成立しているため、一致判定にしても既存データで新たなNGは出ない。
           {
             const ugStart = parseDt(v(row, c.start)), ugEnd = parseDt(v(row, c.end));
             if (ugStart != null && ugEnd != null) {
               const ckP = condKey(row);
               const srcNormal = lookup(ckP, srcSeat, srcAge), dstNormal = lookup(ckP, dstSeat, dstAge);
-              if (srcNormal && srcNormal.start != null && srcNormal.end != null && (ugStart < srcNormal.start || ugEnd > srcNormal.end)) {
-                problems.push("UGの販売期間が元の通常販売期間を超えている");
-              }
-              if (dstNormal && dstNormal.start != null && dstNormal.end != null && (ugStart < dstNormal.start || ugEnd > dstNormal.end)) {
-                problems.push("UGの販売期間が先の通常販売期間を超えている");
+              const bothDates = srcNormal && dstNormal &&
+                srcNormal.start != null && srcNormal.end != null &&
+                dstNormal.start != null && dstNormal.end != null;
+              if (bothDates) {
+                const wantStart = Math.max(srcNormal.start, dstNormal.start);
+                const wantEnd = Math.min(srcNormal.end, dstNormal.end);
+                if (ugStart !== wantStart) {
+                  problems.push(ugStart < wantStart
+                    ? "UGの販売開始が元・先の遅いほうより前"
+                    : "UGの販売開始が元・先の遅いほうより後");
+                }
+                if (ugEnd !== wantEnd) {
+                  problems.push(ugEnd > wantEnd
+                    ? "UGの販売終了が元・先の早いほうより後"
+                    : "UGの販売終了が元・先の早いほうより前");
+                }
+              } else {
+                // 片側の通常行が無い／日付が読めない場合は、読めるほうだけで超過を見る（従来の挙動）
+                if (srcNormal && srcNormal.start != null && srcNormal.end != null && (ugStart < srcNormal.start || ugEnd > srcNormal.end)) {
+                  problems.push("UGの販売期間が元の通常販売期間を超えている");
+                }
+                if (dstNormal && dstNormal.start != null && dstNormal.end != null && (ugStart < dstNormal.start || ugEnd > dstNormal.end)) {
+                  problems.push("UGの販売期間が先の通常販売期間を超えている");
+                }
               }
             }
           }
@@ -10768,7 +10800,9 @@
           const ch6 = (code && String(code).length >= 6) ? String(code)[5].toUpperCase() : "";
           if (ch6 === "O") return "その他";
           if (ch6 === "P") return "駐車券";
-          if (seatMeta) { const m = seatMeta(code, seat); if (m && m.found) { if (m.stockTyp === "1" || m.isReserved) return "指定席"; if (m.stockTyp === "2" || m.isFree) return "数在庫"; } }
+          // 検算側(buildUgValidator の seatCat)と同じ判定条件にする。表示ラベルだけ「エリア」→「数在庫」。
+          // 在庫種別と指定席区分の片方でも 2 なら数在庫（2026-09-20 厳格化）。
+          if (seatMeta) { const m = seatMeta(code, seat); if (m && m.found) { const rsve = m.isReserved ? "1" : m.isFree ? "2" : ""; if (m.stockTyp === "2" || rsve === "2") return "数在庫"; if (m.stockTyp === "1" || rsve === "1") return "指定席"; } }
           // NFKCで半角カナ（「ｴﾘｱ」等）を全角化してから判定（buildUgValidator内のseatCatと同一化）
           const sn = String(seat || "").normalize("NFKC");
           if (/駐車/.test(sn)) return "駐車券";
