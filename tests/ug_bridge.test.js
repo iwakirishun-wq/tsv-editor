@@ -164,6 +164,30 @@ const ROWS = [
   eq(r[0], "1\t500\t", "空欄は未設定扱い（0円ガードは発動せず、前売は同額500円）");
 }
 
+// --- 大分類「エリア席」を数在庫の根拠として受け取る（2026-09-20 / 検品F-9） ---
+// VBA seatCat は大分類「エリア席」でエリア確定するようになった。ブリッジが同じ根拠を
+// コアへ渡さないと、席種名に 自由席/エリア/木曜日券/金曜日券/Paddock Club/同伴 の
+// いずれも含まない数在庫席種で VBA=エリア（自己UG不可）／JS=指定席（自己UG可）に割れる。
+// 正本§10.1 のとおり「Ferris Wheel Lounge を大分類=エリア席へ直した後」がまさにこの形。
+{
+  const AREA_ROWS = [
+    row("Ferris Wheel Lounge観戦券", "RESV95", "大人", 60000, 60000, "エリア席"),
+    row("Ferris Wheel Lounge観戦券", "RESV95", "子供", 30000, 30000, "エリア席"),
+    row("通常指定席95", "RESV96", "大人", 20000, 20000, "指定席"),
+  ];
+  const r = run(AREA_ROWS, [
+    // 数在庫（大分類=エリア席）の自己UG＝同席種・同券種は不可
+    ["Ferris Wheel Lounge観戦券", "RESV95", "大人", "Ferris Wheel Lounge観戦券", "RESV95", "大人"],
+    // 同席種内の年齢区分変更は可（エリアでも年齢変更は通る）
+    ["Ferris Wheel Lounge観戦券", "RESV95", "子供", "Ferris Wheel Lounge観戦券", "RESV95", "大人"],
+    // 大分類=指定席の席種は自己UG（席替え500円）が可のまま
+    ["通常指定席95", "RESV96", "大人", "通常指定席95", "RESV96", "大人"],
+  ]);
+  eq(r[0], "0\t\t", "大分類エリア席の自己UGは不可（VBAと同じ結論になる）");
+  eq(r[1], "1\t30000\t30000", "大分類エリア席でも同席種内の年齢区分変更は可");
+  eq(r[2], "1\t500\t500", "大分類指定席の自己UG（席替え500円）は従来どおり可");
+}
+
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

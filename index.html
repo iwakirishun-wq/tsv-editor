@@ -2877,14 +2877,33 @@
             if (m[w] == null || p > m[w]) m[w] = p;
           }
         };
+        // 正本§7-1: 同一（条件×席種×券種）は1行想定。期分け等で複数行あると byCond は後の行、
+        // any は先の行しか保持できず、期は考慮されない。
+        // そこで「そのキーが複数行だったか」と「全期の外枠（最早の開始〜最遅の終了）」も持つ。
+        // 1行だけなら期間を厳密に照合でき、複数行なら外枠に収まっているかだけを見る。
+        const multiNormal = new Set();
+        const spanByCond = new Map(), spanAny = new Map();
+        const bumpSpan = (map, key, rec) => {
+          if (rec.start == null || rec.end == null) return;
+          const m = map.get(key);
+          if (!m) { map.set(key, { start: rec.start, end: rec.end }); return; }
+          if (rec.start < m.start) m.start = rec.start;
+          if (rec.end > m.end) m.end = rec.end;
+        };
         for (const row of rows) {
           const flag = v(row, c.ugFlag);
           if (flag === "該当" || flag === "1") continue;
           const seat = v(row, c.seat), age = v(row, c.age);
           if (!seat) continue;
           const rec = { adv: priceOrNull(v(row, c.adv)), day: priceOrNull(v(row, c.day)), start: parseDt(v(row, c.start)), end: parseDt(v(row, c.end)) };
-          byCond.set(condKey(row) + "|" + seat + "|" + age, rec);
-          if (!any.has(seat + "|" + age)) any.set(seat + "|" + age, rec);
+          const ck = condKey(row) + "|" + seat + "|" + age;
+          if (byCond.has(ck)) multiNormal.add(ck);
+          byCond.set(ck, rec);
+          const ak = seat + "|" + age;
+          if (any.has(ak)) multiNormal.add("ANY|" + ak);
+          else any.set(ak, rec);
+          bumpSpan(spanByCond, ck, rec);
+          bumpSpan(spanAny, ak, rec);
           bumpMax(maxByCond, condKey(row) + "|" + seat, rec);
           bumpMax(maxAny, seat, rec);
         }
@@ -2969,6 +2988,17 @@
         };
         const isDummyPrice = ugIsDummyPrice; // 売止め等のダミー価格判定（純粋ロジックを委譲）
         const lookup = (ck, seat, age) => byCond.get(ck + "|" + seat + "|" + age) || any.get(seat + "|" + age) || null;
+        // lookup が返した通常行が「その席種×券種で唯一の行」だったか。
+        // 期分け（同一キーに複数行）だと lookup は1行しか返せず、その行の期間は
+        // UG行の期間と一致しないのが当たり前なので、厳密一致で判定してはいけない。
+        const isUniqueNormal = (ck, seat, age) => {
+          const k = ck + "|" + seat + "|" + age;
+          if (byCond.has(k)) return !multiNormal.has(k);
+          return any.has(seat + "|" + age) && !multiNormal.has("ANY|" + seat + "|" + age);
+        };
+        // 期分けがある場合に使う、その席種×券種の全期の外枠（最早の開始〜最遅の終了）。
+        const lookupSpan = (ck, seat, age) =>
+          spanByCond.get(ck + "|" + seat + "|" + age) || spanAny.get(seat + "|" + age) || null;
 
         // UG行が実在しなくても「この席種×券種の組み合わせは構造的にUG可能か」を判定する。
         // 実在する行のkbn/rank/条件には依存しない（条件キーがないので最高額は"any"索引のみ参照）。
@@ -3102,9 +3132,14 @@
             if (ugStart != null && ugEnd != null) {
               const ckP = condKey(row);
               const srcNormal = lookup(ckP, srcSeat, srcAge), dstNormal = lookup(ckP, dstSeat, dstAge);
+              // 厳密な一致判定は「元・先とも通常行が一意に引き当てられる」ときだけ。
+              // 期分けがあると lookup は複数ある期のうち1つしか返せないため、
+              // 一致判定にすると期分けのある席種のUG行が軒並み invalid になる（正本§7-1）。
+              // その場合は従来どおり「超過だけ」の粗いガードへ倒す。
               const bothDates = srcNormal && dstNormal &&
                 srcNormal.start != null && srcNormal.end != null &&
-                dstNormal.start != null && dstNormal.end != null;
+                dstNormal.start != null && dstNormal.end != null &&
+                isUniqueNormal(ckP, srcSeat, srcAge) && isUniqueNormal(ckP, dstSeat, dstAge);
               if (bothDates) {
                 const wantStart = Math.max(srcNormal.start, dstNormal.start);
                 const wantEnd = Math.min(srcNormal.end, dstNormal.end);
@@ -3119,11 +3154,15 @@
                     : "UGの販売終了が元・先の早いほうより前");
                 }
               } else {
-                // 片側の通常行が無い／日付が読めない場合は、読めるほうだけで超過を見る（従来の挙動）
-                if (srcNormal && srcNormal.start != null && srcNormal.end != null && (ugStart < srcNormal.start || ugEnd > srcNormal.end)) {
+                // 一意に引き当てられない場合は「全期の外枠」だけで超過を見る。
+                // 期分けのある席種で lookup が返した1行の期間と比べると、別の期のUG行が
+                // 必ず食い違って誤検出になるため、最早の開始〜最遅の終了に収まっているかで判定する。
+                // 外枠なので誤検出は出ず、明らかな はみ出し（売っていない期間まで売る）は拾える。
+                const srcSpan = lookupSpan(ckP, srcSeat, srcAge), dstSpan = lookupSpan(ckP, dstSeat, dstAge);
+                if (srcSpan && (ugStart < srcSpan.start || ugEnd > srcSpan.end)) {
                   problems.push("UGの販売期間が元の通常販売期間を超えている");
                 }
-                if (dstNormal && dstNormal.start != null && dstNormal.end != null && (ugStart < dstNormal.start || ugEnd > dstNormal.end)) {
+                if (dstSpan && (ugStart < dstSpan.start || ugEnd > dstSpan.end)) {
                   problems.push("UGの販売期間が先の通常販売期間を超えている");
                 }
               }
@@ -3234,20 +3273,35 @@
         const sel = state.selected;
         if (a.type === "editCell") {
           if (!sel) { setStatus("セルを選択してください"); return; }
-          saveUndo();
+          // 画面に見えている行/列だけへ書く。コピー・切り取り・Delete・ペーストと同じ規則。
+          // 2026-09-20まで state.data[r][c] へ直接代入していたため、絞り込み中にF4を押すと
+          // 選択した可視行の「間に挟まっている非表示行」まで一括で上書きされ、しかも
+          // 画面外なので目視では気づけないまま保存できてしまった。safeSet も通していなかった。
+          let wrote = 0, skipped = 0;
           if (state.range) {
             const { r1, r2, c1, c2 } = state.range;
-            for (let r = Math.min(r1, r2); r <= Math.max(r1, r2); r++)
-              for (let c = Math.min(c1, c2); c <= Math.max(c1, c2); c++)
-                state.data[r][c] = a.payload.value;
+            const cols = visibleColsInRange(c1, c2);
+            const rows = visibleRowsInRange(r1, r2);
+            if (!rows.length || !cols.length) {
+              setStatus("選択範囲に表示中のセルがありません");
+              return;
+            }
+            saveUndo();
+            for (const r of rows) for (const c of cols) { safeSet(r, c, a.payload.value); wrote++; }
+            skipped = hiddenRowsInRange(r1, r2);
           } else {
-            state.data[sel.row][sel.col] = a.payload.value;
+            saveUndo();
+            safeSet(sel.row, sel.col, a.payload.value);
+            wrote = 1;
           }
           markDirty();
           applyFilters();
           state.forceRender = true;
           renderBody();
-          setStatus(`F4: 「${a.payload.value}」を再入力しました`);
+          setStatus(
+            `F4: 「${a.payload.value}」を ${wrote}セルに再入力しました` +
+              (skipped ? `（非表示の${skipped}行は変更していません）` : ""),
+          );
         } else if (a.type === "marker") {
           // 範囲選択があれば範囲全体に、なければ選択セルにマーカー
           applyMarkerToSelection();
@@ -8132,14 +8186,21 @@
       }
 
       function doPasteOverwrite(startR, startC, cb) {
-        // 貼り付け範囲が右にはみ出すと列が自動追加される。黙って増やすと気づかないため確認する
+        // 書き込む列を先に確定する。startC から右の「表示されている列」を cb.cols 個ぶん取る。
+        // 2026-09-20まで startC+ci の連番で書いていたため、非表示列があると
+        // 画面では飛ばして見える列に値が入っていた（コピー側は非表示列を除いているので、
+        // 同じ内容を貼り戻すだけでも隠した列が書き換わる）。
+        // 「選択範囲すべてに適用」側は visibleColsInRange を通しており、
+        // 同じダイアログの2択で挙動が食い違っていた。
+        const tgtCols = getVisibleCols().filter((c) => c >= startC).slice(0, cb.cols);
+        // 右に表示列が足りない分は列を追加する。黙って増やすと気づかないため確認する
         // （行方向は元々データ末尾に追記される仕様のため確認なし）。
-        const neededCols = startC + cb.cols;
-        if (neededCols > state.headers.length) {
-          const addN = neededCols - state.headers.length;
+        const addN = cb.cols - tgtCols.length;
+        if (addN > 0) {
           if (!confirm(`貼り付け範囲が右にはみ出すため、列が ${addN}列 追加されます（「列${state.headers.length + 1}」など）。\n\n列を追加して貼り付けますか？`)) {
             return;
           }
+          for (let k = 0; k < addN; k++) tgtCols.push(state.headers.length + k);
         }
         saveUndo();
         const vr = getVisibleRows();
@@ -8162,8 +8223,7 @@
               state.data.push(new Array(state.headers.length).fill("")); markForceVisible(state.data.length - 1, 1);
             }
             for (let ci = 0; ci < cb.cols; ci++) {
-              const tc = startC + ci;
-              safeSet(tr, tc, cb.data2d[ri]?.[ci] ?? "");
+              safeSet(tr, tgtCols[ci], cb.data2d[ri]?.[ci] ?? "");
             }
           }
           applyFilters(); // フィルターを再適用して新行を正しく反映
@@ -8172,8 +8232,7 @@
           for (let ri = 0; ri < cb.rows; ri++) {
             const tr = startR + ri;
             for (let ci = 0; ci < cb.cols; ci++) {
-              const tc = startC + ci;
-              safeSet(tr, tc, cb.data2d[ri]?.[ci] ?? "");
+              safeSet(tr, tgtCols[ci], cb.data2d[ri]?.[ci] ?? "");
             }
           }
         }

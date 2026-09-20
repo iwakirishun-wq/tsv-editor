@@ -603,5 +603,41 @@ for (const s of CUTOFF_SCENARIOS) {
   else { fail++; console.error(`NG [数在庫の自己UGがvalidateで検出されない]: status=${chkSelf.status} problems=${JSON.stringify(chkSelf.problems)}`); }
 }
 
+// =============================================================
+// 期分け（同一条件キーに通常行が複数）があるときは、販売期間を厳密一致で
+// 判定してはいけない（正本§7-1）。lookup は複数ある期のうち1行しか返せないため、
+// 一致判定のままだと期分けのある席種のUG行が軒並み invalid に落ちる。
+// 2026-09-20: 検品(F-7)で発覚。一意に引き当てられるときだけ一致判定を使う。
+// =============================================================
+{
+  const SP = { name: "期分け元", cd: "RESV92" };
+  const SD = { name: "期分け先", cd: "RESV93" };
+  // 元は早割(06/01〜06/30)と通常(07/01〜07/31)の2行を同一条件キーで持つ＝期分け
+  const ROWS = [
+    { ...priceRow(SP.name, SP.cd, "大人", 8000, 8500), [c.start]: "2026/06/01 11:00", [c.end]: "2026/06/30 21:00" },
+    { ...priceRow(SP.name, SP.cd, "大人", 9000, 9500), [c.start]: "2026/07/01 00:00", [c.end]: "2026/07/31 21:00" },
+    { ...priceRow(SD.name, SD.cd, "大人", 12000, 12500), [c.start]: "2026/06/01 11:00", [c.end]: "2026/07/31 21:00" },
+  ];
+  const valSplit = buildUgValidator(ROWS, c, v, null);
+  // 早割の期に対応するUG行。lookup が返す元の行（後勝ちで通常期）とは期間が食い違うが、
+  // 期分けなので「不一致」を理由に invalid にしてはいけない。
+  const chk = valSplit(ugRow(
+    SP.name, SP.cd, "大人", SD.name, SD.cd, "大人",
+    4000, 4000, "2026/06/01 11:00", "2026/06/30 21:00",
+  ));
+  const periodNg = chk.problems.filter((p) => p.includes("UGの販売"));
+  if (!periodNg.length) pass++;
+  else { fail++; console.error(`NG [期分けで販売期間の誤検出]: ${JSON.stringify(periodNg)}`); }
+
+  // 期分けが無い側（先のみ一意）でも、元が期分けなら厳密判定を使わない＝超過だけ見る。
+  // 明らかな超過（先の終了07/31を超えて08/31まで売る）は期分けでも拾えること。
+  const over = valSplit(ugRow(
+    SP.name, SP.cd, "大人", SD.name, SD.cd, "大人",
+    4000, 4000, "2026/06/01 11:00", "2026/08/31 21:00",
+  ));
+  if (over.problems.some((p) => p.includes("通常販売期間を超えている"))) pass++;
+  else { fail++; console.error(`NG [期分けでも超過は拾うべき]: ${JSON.stringify(over.problems)}`); }
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
