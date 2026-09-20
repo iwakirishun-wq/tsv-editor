@@ -3,7 +3,7 @@
  *
  * 実行: node tests/run_all.js
  *
- * UG判定ルールを変えたら、正本・JS・VBA・テストの4点をセットで更新すること
+ * UG判定ルールを変えたら、正本・JS・VBA・ブリッジ・テストの5点をセットで更新すること
  * （正本: 50_OUTPUTS/01_開発成果物/tsv_editor/2026-07-03_UG検算ルール正本.md）。
  */
 const path = require("path");
