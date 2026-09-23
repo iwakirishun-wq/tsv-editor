@@ -42,6 +42,8 @@
         --shadow-lg: 0 8px 16px rgba(0,0,0,0.08);
         --radius: 4px;
         --font-mono: "Menlo", "Consolas", "Monaco", "Courier New", monospace;
+        /* セルの文字サイズ。列幅の実測(cellMeasureFont)もここを見るので、変えるならここだけ変える */
+        --cell-fs: 13px;
         --font-ui: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic UI", "Segoe UI", sans-serif;
       }
       /* キーボード操作時のみフォーカスリングを表示（マウス操作時は非表示） */
@@ -76,11 +78,14 @@
         font-family: var(--font-ui);
         background: var(--bg);
         color: var(--text);
-        height: 100vh;
+        /* 表示倍率(--ui-zoom)はアプリ全体にかける。zoom を使うと 100vh が「拡大前の高さ」に
+           なってしまい、1.25倍なら実質125vh＝画面からはみ出すので、倍率で割って打ち消す。 */
+        zoom: var(--ui-zoom, 1);
+        height: calc(100vh / var(--ui-zoom, 1));
         display: flex;
         flex-direction: column;
         overflow: hidden;
-        font-size: 12px;
+        font-size: 13px;
       }
 
       ::-webkit-scrollbar {
@@ -680,7 +685,7 @@
 
       /* ===ボディ=== */
       tbody tr {
-        height: var(--row-h, 22px);
+        height: var(--row-h, 26px);
         background: #fff;
       }
       /* ゼブラストライプ: Excelの交互行色に相当。ハイライト系はすべて!importantで上書きされる。
@@ -712,8 +717,8 @@
         text-overflow: ellipsis;
         cursor: cell;
         color: var(--text);
-        font-size: 12px;
-        height: var(--row-h, 22px);
+        font-size: var(--cell-fs, 13px);
+        height: var(--row-h, 26px);
       }
 
 
@@ -1070,7 +1075,7 @@
           padding-bottom: 8px;
         }
         .rb-group { flex-shrink: 0; }
-        .rb-btn { width: 56px; height: 64px; font-size: 10px; }
+        .rb-btn { width: 56px; height: 64px; font-size: 11px; }
       }
       .ctx-tag {
         font-size: 10px;
@@ -1836,7 +1841,11 @@
         </div>
         <div class="rb-group">
           <div class="rb-buttons">
-            <button class="rb-btn" id="btn-row-height" title="行の高さを順番に切り替え&#10;（22px → 30px → 40px → 22px）" aria-label="行の高さを変更">
+            <button class="rb-btn" id="btn-ui-zoom" title="アプリ全体の表示倍率を切り替え&#10;（90% → 100% → 110% → 125% → 150% → 90%）&#10;文字・ボタン・表のすべてが拡大されます&#10;次に開いたときも同じ倍率で表示します" aria-label="表示倍率を変更">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"></circle><line x1="16" y1="16" x2="21" y2="21"></line><line x1="8" y1="11" x2="14" y2="11"></line><line x1="11" y1="8" x2="11" y2="14"></line></svg></span>
+              <span>表示倍率</span>
+            </button>
+            <button class="rb-btn" id="btn-row-height" title="行の高さを順番に切り替え&#10;（26px → 32px → 40px → 22px → 26px）" aria-label="行の高さを変更">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="5" y1="6" x2="19" y2="6"></line><line x1="5" y1="12" x2="19" y2="12"></line><line x1="5" y1="18" x2="19" y2="18"></line><polyline points="2 3 2 21"></polyline><polyline points="22 3 22 21"></polyline></svg></span>
               <span>行高さ</span>
             </button>
@@ -2231,7 +2240,8 @@
 
         <h2>👁 表示タブ</h2>
         <div class="man-btn-section">
-          <div class="man-btn-row"><span class="man-btn-label">行高さ / 折り返し / 列自動</span><span class="man-btn-desc">行の高さ切替、セル内折り返し、全列幅の自動調整。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">表示倍率</span><span class="man-btn-desc">押すたびに <b>90% → 100% → 110% → 125% → 150%</b> と切り替わります。文字・ボタン・表の<b>すべて</b>が拡大され、次にこのツールを開いたときも同じ倍率で表示します。表だけを拡大したいときは、表の上で <b>Alt＋ホイール</b>（こちらは保存されません）。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">行高さ / 折り返し / 列自動</span><span class="man-btn-desc">行の高さ切替（26 → 32 → 40 → 22px）、セル内折り返し、全列幅の自動調整。<b>列幅の自動調整は全行を見て決めます</b>（途中の行から値が入り始める列も潰れません）。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">縦ヘッダー</span><span class="man-btn-desc">列名を縦書きにして列幅を節約。コード系の細い列が多いときに（切替）。隣の「行高(px)」でヘッダー行の高さを手動調整できます（文字が見切れる場合に広げてください）。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">ヘッダー</span><span class="man-btn-desc">「1行目」モード（通常）と「連番」モードの切替。連番中は日本語変換・HTML出力・検品が使えません。</span></div>
         </div>
@@ -2737,6 +2747,19 @@
         }
         _ghostCache = { rows, sejCol: sejCodeColIdx, ver: _dataVersion, list };
         return list;
+      }
+
+      // ゴースト行の実測高。renderBody が「画面に入るぶんだけ」描くために、
+      // 未描画ぶんの高さをスペーサ行で埋める必要があるので、1行ぶんと見出し1行ぶんを覚えておく。
+      // 初期値はCSSから見た概算。実際に描いた直後に測って上書きする（uniform な行なので1回測れば足りる）。
+      // row は 0 のあいだ現在の行高(rowH)を使う。行高を変えても測り直すまで狂わないようにするため。
+      const _ghostH = { row: 0, sep: 26 };
+      // renderBody 用の薄いラッパ。席種エリアコード列の解決までここで面倒を見る。
+      function ghostListFor(rows) {
+        if (!state.sejMaster) return [];
+        const idx = state.headers.findIndex((h) => String(h).trim() === "seat_type_area_cd");
+        if (idx === -1) return [];
+        return getSejGhostList(idx, rows);
       }
 
       // ===== UG差額の自動検算 =====
@@ -3379,7 +3402,7 @@
         statusEncoding: $("status-encoding"),
       };
 
-      let ROW_H = 22;
+      let ROW_H = 26;
       const BUFFER = 20;
 
       // ===== セーフアクセス =====
@@ -3852,6 +3875,7 @@
         });
 
         $("btn-row-height").onclick = cycleRowHeight;
+        $("btn-ui-zoom").onclick = cycleUiZoom;
         $("btn-autofit-all").onclick = autoFitAllColumns;
         $("btn-wrap").onclick = toggleWrapCells;
         $("btn-sej-link").onclick = toggleSejLink;
@@ -3934,6 +3958,8 @@
         // 行の高さ（初期値はROW_Hに合わせてCSS変数を設定）
         document.documentElement.style.setProperty("--row-h", ROW_H + "px");
         setRbLabel("btn-row-height", `行高:${ROW_H}`);
+        // 表示倍率（前回使った倍率をlocalStorageから復元してラベルに出す）
+        restoreUiZoom();
         // 価格スケジュールチェック表
         // HTML出力: 開いているファイルの種別で自動切替（マニュアル記載どおりに復元）
         //   SEJデータ → マスタ照合カード / 席種一括設定 → チェックレポート / 経路価格スケジュール → 価格チェック表
@@ -4704,6 +4730,39 @@
 
 
 
+      // 1列ぶんの「いちばん長い値」を全行から探す。
+      //
+      // 先頭300行だけを見ていたころは、途中から値が入り始める列が header 幅のまま潰れていた。
+      // 実データ（経路価格スケジュール 鈴鹿_27F1・25,319行）だと
+      // 「アップグレード元席種エリアコード/名/券種コード/券種名」は791行目から、
+      // 「法人ランク区分/名」は330行目から値が入るので、後ろの列が軒並み縮んで読めなかった。
+      //
+      // 全行を measureText すると 25,319行×30列 のCanvas計測になって重いので、
+      // まず幅の概算（全角2・半角1の重み付き文字数）で候補を絞り、
+      // 最終的に実測するのは列ごとに上位3件だけにする。重みは必ず raw length 以上・2倍以下なので、
+      // 「v.length*2 < これまでの最大」なら全角でも届かない＝計算せず捨ててよい。
+      const _wlen = (s) => {
+        let n = 0;
+        for (let i = 0; i < s.length; i++) n += s.charCodeAt(i) > 0xff ? 2 : 1;
+        return n;
+      };
+      function widestValuesInColumn(c, keep = 3) {
+        let bestW = 0;
+        let vals = [];
+        const data = state.data;
+        for (let i = 0; i < data.length; i++) {
+          const row = data[i];
+          if (!row) continue;
+          const v = row[c];
+          if (!v) continue;
+          if (v.length * 2 < bestW) continue; // 全角換算でも最大に届かない
+          const w = _wlen(v);
+          if (w > bestW) { bestW = w; vals = [v]; }
+          else if (w === bestW && vals.length < keep && !vals.includes(v)) vals.push(v);
+        }
+        return vals;
+      }
+
       // ステータス表示なしの自動幅調整（ロード時用）
       function autoFitAllColumnsQuiet() {
         // 検品表示の各注記（カラー/ゲート名/駐車券/区画席/カナ/一括設定/SEJ対訳）は、
@@ -4712,13 +4771,9 @@
           const displayH = getDisplayHeader(c);
           // 縦ヘッダー時はヘッダー文字幅を列幅に含めない（列幅節約）
           let maxW = state.verticalHeader ? 40 : measureText(displayH || "", "600 13px system-ui") + 60;
-          const sample = Math.min(state.data.length, 300);
-          for (let i = 0; i < sample; i++) {
-            const v = safeGet(i, c);
-            if (v) {
-              const w = measureText(v, "12px Menlo,Consolas,monospace") + 16;
-              if (w > maxW) maxW = w;
-            }
+          for (const v of widestValuesInColumn(c)) {
+            const w = measureText(v, cellMeasureFont()) + 16;
+            if (w > maxW) maxW = w;
           }
           state.colWidths[c] = Math.max(40, Math.min(maxW, 600));
         }
@@ -6114,7 +6169,22 @@
           rows.length,
           Math.max(start + 1, rowAtOffset(off, scrollTop + viewH, rows.length) + 1 + BUFFER),
         );
-        const key = `${start}-${end}-${rows.length}`;
+        // SEJゴースト行も仮想化する。マスタ全件(4,800件超)を連携すると未使用コードが2,000件近くになり、
+        // 全部DOMへ出すとセルが4万個を超えて、スクロールも全置換も一気に重くなる
+        // （実測: 3,597行のSEJ＋9/23マスタで 全置換 20ms → 484ms、DOM 76行 → 2,052行）。
+        // データ行と同じく「画面に入るぶんだけ」描いて、上下はスペーサ行で高さを稼ぐ。
+        const ghostList = ghostListFor(rows);
+        const gh = _ghostH.row || rowH;
+        // ゴースト領域はデータ行の下（総高 off[rows.length]）＋見出し1行のあとから始まる
+        const ghostTop = off[rows.length] + (ghostList.length ? _ghostH.sep : 0);
+        let gStart = 0, gEnd = 0;
+        if (ghostList.length) {
+          const rel = scrollTop - ghostTop;
+          gStart = Math.max(0, Math.min(ghostList.length, Math.floor(rel / gh) - BUFFER));
+          gEnd = Math.max(gStart, Math.min(ghostList.length, Math.ceil((rel + viewH) / gh) + BUFFER));
+        }
+
+        const key = `${start}-${end}-${rows.length}-${gStart}-${gEnd}-${ghostList.length}`;
         const forced = state.forceRender;
         if (!forced && lastRenderKey === key) return;
         lastRenderKey = key;
@@ -6532,6 +6602,9 @@
         const domw = _domWindow;
         if (
           !forced && domw && domw.sig === renderSig &&
+          // ゴーストの窓が動いたら差分では追えない（ゴーストは下スペーサより後ろにあるため）。
+          // その場合は下の全置換へ落とす。ゴーストも仮想化済みなので全置換でも軽い。
+          domw.gStart === gStart && domw.gEnd === gEnd &&
           start < domw.end && end > domw.start &&
           domw.topEl && domw.topEl.parentNode === els.tbody &&
           domw.botEl && domw.botEl.parentNode === els.tbody
@@ -6573,29 +6646,42 @@
 
         // SEJゴースト行: 表示中データと同じグループのマスタ登録のうち、表示中データに無い席種だけを最終行に表示
         // （セブン発券対象の漏れ確認用。別イベント・別グループの席種は対象外。グループ絞り込み時は絞ったグループのみ）
-        if (state.sejMaster && sejCodeColIdx !== -1) {
-          const missing = getSejGhostList(sejCodeColIdx, rows);
-          if (missing.length) {
-            html += `<tr class="ghost-sep"><td colspan="${colSpan}">▼ 同グループのマスタ未使用 ${missing.length}件（表示中データに無い＝セブン発券していない席種。漏れがないか確認）</td></tr>`;
-            for (const g of missing) {
-              html += `<tr class="ghost-row" title="${escHtml(g.cd)}"><td class="row-num">−</td>`;
-              for (const j of visCols) {
-                const tdCw = state.colWidths[j] || 80;
-                let v = "";
-                if (j === sejCodeColIdx) {
-                  v = escHtml(g.nm);
-                } else if (state.sejVirtualCols && state.sejVirtualCols.indices.includes(j)) {
-                  v = escHtml(g.grp);
-                }
-                html += `<td style="width:${tdCw}px;min-width:${tdCw}px;max-width:${tdCw}px">${v}</td>`;
+        // データ行と同じく gStart〜gEnd の窓だけ描き、残りはスペーサ行で高さを作る。
+        if (ghostList.length) {
+          const vcolSet = state.sejVirtualCols ? new Set(state.sejVirtualCols.indices) : null;
+          html += `<tr class="ghost-sep"><td colspan="${colSpan}">▼ 同グループのマスタ未使用 ${ghostList.length}件（表示中データに無い＝セブン発券していない席種。漏れがないか確認）</td></tr>`;
+          if (gStart > 0)
+            html += `<tr class="vspacer ghost-vspacer-top" aria-hidden="true" style="height:${gStart * gh}px"><td colspan="${colSpan}"></td></tr>`;
+          for (let k = gStart; k < gEnd; k++) {
+            const g = ghostList[k];
+            html += `<tr class="ghost-row" title="${escHtml(g.cd)}"><td class="row-num">−</td>`;
+            for (const j of visCols) {
+              const tdCw = state.colWidths[j] || 80;
+              let v = "";
+              if (j === sejCodeColIdx) {
+                v = escHtml(g.nm);
+              } else if (vcolSet && vcolSet.has(j)) {
+                v = escHtml(g.grp);
               }
-              html += `</tr>`;
+              html += `<td style="width:${tdCw}px;min-width:${tdCw}px;max-width:${tdCw}px">${v}</td>`;
             }
+            html += `</tr>`;
           }
+          const gRest = ghostList.length - gEnd;
+          if (gRest > 0)
+            html += `<tr class="vspacer ghost-vspacer-bot" aria-hidden="true" style="height:${gRest * gh}px"><td colspan="${colSpan}"></td></tr>`;
         }
         els.tbody.innerHTML = html;
+        // 実測した1行ぶん／見出しぶんの高さを覚える。次の描画からスペーサの高さがぴたりと合う
+        // （ゴースト行は均一なので1回測れば足りる。0px はレイアウト前なので採用しない）。
+        if (ghostList.length) {
+          const sepEl = els.tbody.querySelector("tr.ghost-sep");
+          const gEl = els.tbody.querySelector("tr.ghost-row");
+          if (sepEl && sepEl.offsetHeight > 0) _ghostH.sep = sepEl.offsetHeight;
+          if (gEl && gEl.offsetHeight > 0) _ghostH.row = gEl.offsetHeight;
+        }
         _domWindow = {
-          start, end, sig: renderSig,
+          start, end, gStart, gEnd, sig: renderSig,
           topEl: els.tbody.querySelector("tr.vspacer-top"),
           botEl: els.tbody.querySelector("tr.vspacer-bottom"),
         };
@@ -9974,6 +10060,15 @@
       }
 
       let _canvasCtx = null;
+      // 列幅の実測に使うフォント。セル(td)の実際の描画と一致させること。
+      // ここがズレると測った幅では足りず、末尾が「…」で切れる
+      // （2026-09-23: セルを12px→13pxにしたとき、実測が12px monospace のままで券種コード等が切れた）。
+      function cellMeasureFont() {
+        const cs = getComputedStyle(document.documentElement);
+        const fs = cs.getPropertyValue("--cell-fs").trim() || "13px";
+        const ff = cs.getPropertyValue("--font-ui").trim() || "sans-serif";
+        return fs + " " + ff;
+      }
       function measureText(text, font) {
         if (!_canvasCtx)
           _canvasCtx = document.createElement("canvas").getContext("2d");
@@ -9986,7 +10081,7 @@
         for (let i = 0; i < sample; i++) {
           const v = safeGet(i, col);
           if (v) {
-            const w = measureText(v, "12px Menlo,Consolas,monospace") + 16;
+            const w = measureText(v, cellMeasureFont()) + 16;
             if (w > maxW) maxW = w;
           }
         }
@@ -10279,13 +10374,10 @@
         let changed = false;
         for (let c = 0; c < state.headers.length; c++) {
           let maxW = state.verticalHeader ? 40 : measureText(getDisplayHeader(c) || "", "600 13px system-ui") + 60;
-          const sample = Math.min(state.data.length, 300);
-          for (let i = 0; i < sample; i++) {
-            const v = safeGet(i, c);
-            if (v) {
-              const w = measureText(v, "12px Menlo,Consolas,monospace") + 20;
-              if (w > maxW) maxW = w;
-            }
+          // 全行から探す（先頭300行だけだと、途中から値が入る列が潰れる）。詳細は widestValuesInColumn のコメント
+          for (const v of widestValuesInColumn(c)) {
+            const w = measureText(v, cellMeasureFont()) + 20;
+            if (w > maxW) maxW = w;
           }
           const newW = Math.max(40, Math.min(maxW, 500));
           if (newW !== state.colWidths[c]) changed = true;
@@ -10299,15 +10391,48 @@
       }
 
       // ===== 行の高さ変更 =====
-      const ROW_H_OPTIONS = [22, 30, 40];
+      // 既定は26px（2026-09-23に22pxから引き上げ。12px文字＋22pxは詰まって読みにくいという指摘）。
+      // 詰めて一覧したいときのために22pxも残してある。
+      const ROW_H_OPTIONS = [26, 32, 40, 22];
       function cycleRowHeight() {
         const idx = ROW_H_OPTIONS.indexOf(ROW_H);
         ROW_H = ROW_H_OPTIONS[(idx + 1) % ROW_H_OPTIONS.length];
         document.documentElement.style.setProperty("--row-h", ROW_H + "px");
         setRbLabel("btn-row-height", `行高:${ROW_H}`);
+        resetRowHeights();
         state.forceRender = true;
         renderBody();
         setStatus(`行の高さ: ${ROW_H}px`);
+      }
+
+      // ===== 表示倍率（アプリ全体） =====
+      // CSS の zoom を body にかけてアプリごと拡大する。表だけを拡大する Alt+ホイールのズーム
+      // （state.zoomLevel / els.container.style.zoom）とは別物で、こちらはリボンやパネルにも効く。
+      // 業務PCでは毎回同じ倍率で使うので localStorage に覚えさせる。
+      const UI_ZOOM_OPTIONS = [90, 100, 110, 125, 150];
+      const UI_ZOOM_KEY = "tsvEditor.uiZoom";
+      let uiZoom = 100;
+      function applyUiZoom(pct, { save = true, status = false } = {}) {
+        uiZoom = UI_ZOOM_OPTIONS.includes(pct) ? pct : 100;
+        document.documentElement.style.setProperty("--ui-zoom", String(uiZoom / 100));
+        setRbLabel("btn-ui-zoom", `倍率:${uiZoom}%`);
+        if (save) {
+          try { localStorage.setItem(UI_ZOOM_KEY, String(uiZoom)); } catch (e) {}
+        }
+        // 拡大すると1行の実寸も描画ウィンドウも変わるので、実測値を捨てて測り直す
+        resetRowHeights();
+        state.forceRender = true;
+        renderBody();
+        if (status) setStatus(`表示倍率: ${uiZoom}%`);
+      }
+      function cycleUiZoom() {
+        const idx = UI_ZOOM_OPTIONS.indexOf(uiZoom);
+        applyUiZoom(UI_ZOOM_OPTIONS[(idx + 1) % UI_ZOOM_OPTIONS.length], { status: true });
+      }
+      function restoreUiZoom() {
+        let saved = 100;
+        try { saved = parseInt(localStorage.getItem(UI_ZOOM_KEY) || "100", 10); } catch (e) {}
+        applyUiZoom(saved, { save: false });
       }
 
       // ===== SEJ連携: 席種エリアマスタ読込 =====
