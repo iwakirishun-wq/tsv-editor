@@ -82,6 +82,29 @@ if (-not $New -and [string]::IsNullOrWhiteSpace($deploymentId)) {
 # --- 2. コードをGASへプッシュ ----------------------------------------------
 
 Write-Host ""
+# --- 0. エディタ本体をルートから同期 ---
+# gas/index.html はルートの index.html のコピー。手でコピーする運用だと必ず忘れて、
+# 「直したはずの機能がGAS版に無い」が起きる（2026-09-24のレビューで実際に指摘された）。
+# 差分があればここで必ず上書きしてから push する。
+$rootIndex = Join-Path (Split-Path -Parent $CurrentDir) "index.html"
+$gasIndex = Join-Path $CurrentDir "index.html"
+if (Test-Path $rootIndex) {
+    $needCopy = $true
+    if (Test-Path $gasIndex) {
+        $a = (Get-FileHash $rootIndex -Algorithm SHA256).Hash
+        $b = (Get-FileHash $gasIndex -Algorithm SHA256).Hash
+        $needCopy = ($a -ne $b)
+    }
+    if ($needCopy) {
+        Copy-Item $rootIndex $gasIndex -Force
+        Write-Host "0. エディタ本体を同期しました (index.html <- ルート)" -ForegroundColor Yellow
+    } else {
+        Write-Host "0. エディタ本体は最新です" -ForegroundColor DarkGray
+    }
+} else {
+    Write-Warning "ルートの index.html が見つかりません。gas/index.html をそのまま使います。"
+}
+
 Write-Host "1. GAS へコードをプッシュ中 (clasp push -f)..." -ForegroundColor Yellow
 cmd.exe /c "clasp push -f"
 if ($LASTEXITCODE -ne 0) {

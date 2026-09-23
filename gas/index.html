@@ -3338,6 +3338,10 @@
       function hpBuildIndex(hp) {
         const byCode = new Map();
         const byName = new Map();
+        // 備考は券種ではなく席種に対して付く（「小学生以上有料」は大人券にも子ども券にも同じ）。
+        // 券種込みのキーだけだと、券種列を持たない席種エリアマスタ/SEJから一生引けない。
+        const noteByCode = new Map();
+        const noteByName = new Map();
         const items = (hp && hp.items) || [];
         for (const it of items) {
           const code = String(it.seat_code || "").trim();
@@ -3349,8 +3353,22 @@
           }
           if (!byName.has(key)) byName.set(key, []);
           byName.get(key).push(it);
+          const note = String(it.note || "").trim();
+          if (note) {
+            if (code && !noteByCode.has(code)) noteByCode.set(code, note);
+            const nk = hpNormName(it.seat_name);
+            if (nk && !noteByName.has(nk)) noteByName.set(nk, note);
+          }
         }
-        return { byCode, byName };
+        return { byCode, byName, noteByCode, noteByName };
+      }
+
+      // 席種だけで備考を引く。券種列が無いファイル（席種エリアマスタ・SEJ）でも効くようにする。
+      function hpNoteForSeat(idx, row) {
+        const code = String(row.席種エリアコード || "").trim();
+        if (code && idx.noteByCode.has(code)) return idx.noteByCode.get(code);
+        const nk = hpNormName(row.席種エリア名);
+        return nk && idx.noteByName.has(nk) ? idx.noteByName.get(nk) : "";
       }
 
       // 1行ぶんの対応付け。戻り値の via で「何で当てたか」が分かる。
@@ -3444,7 +3462,9 @@
             return k && name.indexOf(k) !== -1;
           })
         );
-        return hits.length ? hits : rules;
+        // どのscopeにも当たらない席種に全ルールを当てると、たまたま一致したルールで黙って合格にしたり、
+        // 逆に無関係なルールと比べて「要修正」にしてしまう。当たらないことを事実として返す。
+        return hits;
       }
 
       function hpCheckSalePeriod(rowsIn, hp) {
@@ -3460,6 +3480,10 @@
             out.push({ level: "error", kind: "販売開始が違う", row, detail: "TSV " + row.販売開始日時 + " / HP " + hp.sale.start });
           }
           const rules = hpRulesForRow(hp, row);
+          if (!rules.length) {
+            out.push({ level: "info", kind: "scope未特定", row, detail: "この席種がHPのどの販売期間ルールに当たるか決められませんでした。目視で確認してください" });
+            continue;
+          }
           const machine = rules.filter((r) => r.machine_checkable !== false && hpParseDateTime(r.end) !== null);
           const manual = rules.filter((r) => r.machine_checkable === false || hpParseDateTime(r.end) === null);
           const e = hpParseDateTime(row.販売終了日時);
@@ -3508,11 +3532,15 @@
         if (hp && hp.items) {
           const idx = hpBuildIndex(hp);
           for (const row of rows) {
-            const { items } = hpLookup(idx, row);
-            const hpNote = items.length ? String(items[0].note || "").trim() : "";
+            // 席種単位で引く。券種込みで引くと、券種列を持たないファイルでは常に空振りして
+            // 「指摘はありません」と緑で出てしまう（見逃しとしては一番危ない）
+            const hpNote = hpNoteForSeat(idx, row);
             const tsvNote = String(row[noteKey] || "").trim();
             if (hpNote && !tsvNote) {
               out.push({ level: "error", kind: "備考の抜け(HP)", row, detail: "HPには記載があります: " + hpNote });
+            } else if (hpNote && tsvNote && hpNormName(hpNote) !== hpNormName(tsvNote)) {
+              // 両方にあって文字列が違う。表記揺れか実質的な違いかは機械では決められないのでAIへ回す
+              out.push({ level: "warn", kind: "備考がHPと違う", row, detail: "TSV「" + tsvNote + "」/ HP「" + hpNote + "」", aiTarget: true });
             }
           }
         }

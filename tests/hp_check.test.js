@@ -18,7 +18,7 @@ if (!m) {
 const factory = new Function(
   m[1] +
     "\nreturn { hpIsDummyPrice, hpToNumber, hpNormName, hpParseDateTime, hpBuildIndex," +
-    " hpLookup, hpIsUgRow, hpCollapse, hpCheckPrices, hpCheckSalePeriod, hpCheckNotes, hpRunAllChecks };"
+    " hpLookup, hpNoteForSeat, hpRulesForRow, hpIsUgRow, hpCollapse, hpCheckPrices, hpCheckSalePeriod, hpCheckNotes, hpRunAllChecks };"
 );
 const H = factory();
 
@@ -155,6 +155,28 @@ eq(f.length, 0, "グループ全部に備考があれば判定しない");
 
 f = H.hpCheckNotes([{ 配席ブロック管理名: "X", 席種エリア名: "B2-3観戦券", 券種名: "大人(24歳以上)", 備考: "" }], HP);
 has(f, "備考の抜け(HP)", "HPに記載があるのにTSVが空なら抜けとして出す");
+
+// --- レビュー指摘の回帰（席種単位の備考 / scope未特定） ---
+// 席種エリアマスタ・SEJ には券種列が無い。券種込みで引くと一生当たらず「指摘なし」と緑で出ていた
+f = H.hpCheckNotes([{ 配席ブロック管理名: "X", 席種エリアコード: "", 席種エリア名: "B2-3観戦券", 券種名: "", 備考: "" }], HP);
+has(f, "備考の抜け(HP)", "券種名が空でも席種名でHPの備考を引ける");
+
+f = H.hpCheckNotes([{ 配席ブロック管理名: "X", 席種エリアコード: "SF1GPE27011", 席種エリア名: "", 券種名: "", 備考: "" }], HP);
+eq(f.length, 0, "HP側に備考が無い席種では指摘しない");
+
+// 備考が両方にあって文言が違う場合は、機械で白黒つけずAIへ回す印を付ける
+f = H.hpCheckNotes([{ 配席ブロック管理名: "X", 席種エリア名: "B2-3観戦券", 券種名: "", 備考: "小学生から有料です" }], HP);
+has(f, "備考がHPと違う", "文言違いは要確認として出す");
+eq(f.find((x) => x.kind === "備考がHPと違う").aiTarget, true, "AIへ回す印を付ける");
+
+f = H.hpCheckNotes([{ 配席ブロック管理名: "X", 席種エリア名: "B2-3観戦券", 券種名: "", 備考: "小学生以上有料" }], HP);
+eq(f.length, 0, "文言が同じなら指摘しない");
+
+// どのscopeにも当たらない席種に全ルールを当てると、黙って合格/無関係な不一致になる
+eq(H.hpRulesForRow(HP, { 席種エリア名: "まったく関係ない席" }).length, 0, "当たらないときは空を返す（全ルールを当てない）");
+f = H.hpCheckSalePeriod([row({ 席種エリア名: "まったく関係ない席" })], HP);
+has(f, "scope未特定", "scopeが決められない席種は別枠に出す");
+hasNot(f, "販売終了が違う", "scope未特定の行を不一致と断定しない");
 
 // --- まとめ ---
 let r = H.hpRunAllChecks({ kind: "price_schedule", rows: [row({ 席種エリアコード: "SF1GPE27011", 席種エリア名: "F1_A1-1観戦券[T0]", 前売価格: "42000" })], hp: HP });
