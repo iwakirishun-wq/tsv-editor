@@ -29,3 +29,5 @@ tools/diagnose_test.js
 .agents/session_diff*
 .agents/fusion_review*
 
+__pycache__/
+*.pyc
