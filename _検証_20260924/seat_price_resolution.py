@@ -14,7 +14,7 @@ if not PC.exists():
 sys.path.insert(0, str(PC))
 import crosscheck as X
 
-EVENT = "JRR26"
+EVENT = (sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("-") else "JRR26")
 cfg = json.loads((PC / "events" / (EVENT + ".json")).read_text(encoding="utf-8"))
 pages = X.load_hp_pages(cfg)
 pages_by_id = {p["source_id"]: p for p in pages}
