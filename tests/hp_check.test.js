@@ -18,7 +18,7 @@ if (!m) {
 const factory = new Function(
   m[1] +
     "\nreturn { hpIsDummyPrice, hpToNumber, hpNormName, hpParseDateTime, hpBuildIndex," +
-    " hpLookup, hpNoteForSeat, hpRulesForRow, hpIsUgRow, hpCollapse, hpCheckPrices, hpCheckSalePeriod, hpCheckNotes, hpRunAllChecks };"
+    " hpLookup, hpNoteForSeat, hpRulesForRow, hpIsUgRow, hpCollapse, hpCheckPrices, hpCheckSalePeriod, hpCheckNotes, hpAgeRank, hpVariantSuffix, hpBaseName, hpCheckStructure, hpCheckVariantMixup, hpRunAllChecks };"
 );
 const H = factory();
 
@@ -178,13 +178,73 @@ f = H.hpCheckSalePeriod([row({ 席種エリア名: "まったく関係ない席"
 has(f, "scope未特定", "scopeが決められない席種は別枠に出す");
 hasNot(f, "販売終了が違う", "scope未特定の行を不一致と断定しない");
 
+// --- HPを使わない構造チェック ---
+// きっかけ: もてぎJRR26 の S2指定駐車券 が 2,000/3,000（販促価格）になっていた実例。
+// HPとマスターはどちらも3,500円。価格起点のHP突合では2,000円がページに在るため○になっていた。
+eq(H.hpAgeRank("もてぎ_大人（24歳以上）") > H.hpAgeRank("もてぎ_U23（高校生～23歳）"), true, "大人はU23より上位");
+eq(H.hpAgeRank("もてぎ_U23（高校生～23歳）") > H.hpAgeRank("もてぎ_3歳～中学生"), true, "U23は子どもより上位");
+eq(H.hpAgeRank("なし"), 0, "判定できない券種は順序検査に使わない");
+eq(H.hpVariantSuffix("MJRR1_S2指定駐車券(販促)"), "販促", "別枠の接尾辞を取れる");
+eq(H.hpVariantSuffix("MJRR1_S2指定駐車券"), "", "通常コードは接尾辞なし");
+eq(H.hpBaseName("MJRR1_S2指定駐車券(販促)"), H.hpBaseName("MJRR1_S2指定駐車券"), "接尾辞を外すと同じ名前になる");
+
+const srow = (o) => Object.assign({ 席種エリアコード: "", 席種エリア名: "", 券種名: "", 前売価格: "", 当日価格: "" }, o);
+
+f = H.hpCheckStructure([srow({ 席種エリアコード: "A", 券種名: "大人", 前売価格: "5000", 当日価格: "4000" })]);
+has(f, "当日が前売より安い", "当日が前売を下回ったら出す");
+f = H.hpCheckStructure([srow({ 席種エリアコード: "A", 券種名: "大人", 前売価格: "5000", 当日価格: "6000" })]);
+eq(f.length, 0, "当日のほうが高いのは正常");
+f = H.hpCheckStructure([srow({ 席種エリアコード: "A", 券種名: "大人", 前売価格: "5000", 当日価格: "999999" })]);
+eq(f.length, 0, "売止めダミーは比較しない");
+
+f = H.hpCheckStructure([
+  srow({ 席種エリアコード: "B", 券種名: "もてぎ_大人（24歳以上）", 前売価格: "3000" }),
+  srow({ 席種エリアコード: "B", 券種名: "もてぎ_3歳～中学生", 前売価格: "5000" })]);
+has(f, "年齢区分の価格が逆転", "子どもが大人より高ければ出す");
+f = H.hpCheckStructure([
+  srow({ 席種エリアコード: "B", 券種名: "もてぎ_大人（24歳以上）", 前売価格: "5000" }),
+  srow({ 席種エリアコード: "B", 券種名: "もてぎ_3歳～中学生", 前売価格: "2200" })]);
+eq(f.length, 0, "大人のほうが高いのは正常");
+
+f = H.hpCheckStructure([srow({ 席種エリアコード: "C", 券種名: "大人", 前売価格: "5000", 当日価格: "4000",
+                              "アップグレード該当フラグ": "該当" })]);
+eq(f.length, 0, "UG行は構造チェックの対象外");
+
+// (c) 別枠の価格が通常コードに入っている ＝ S2指定駐車券の実例
+const master = [
+  { 席種エリア名: "MJRR1_S2指定駐車券", 前売価格: "3500", 当日価格: "3500" },
+  { 席種エリア名: "MJRR1_S2指定駐車券(販促)", 前売価格: "2000", 当日価格: "3000" },
+];
+f = H.hpCheckVariantMixup([srow({ 席種エリアコード: "MJRR1P26132", 席種エリア名: "MJRR1_S2指定駐車券",
+                                 前売価格: "2000", 当日価格: "3000" })], master);
+has(f, "別枠の価格が通常コードに入っている", "S2指定駐車券の実例を検出する");
+eq(f[0].level, "error", "これは要修正");
+
+f = H.hpCheckVariantMixup([srow({ 席種エリアコード: "MJRR1P26132", 席種エリア名: "MJRR1_S2指定駐車券",
+                                 前売価格: "3500", 当日価格: "3500" })], master);
+eq(f.length, 0, "正しい価格なら出さない");
+
+f = H.hpCheckVariantMixup([
+  srow({ 席種エリア名: "MJRR1_S2指定駐車券", 前売価格: "2000", 当日価格: "3000" }),
+  srow({ 席種エリア名: "MJRR1_S2指定駐車券(販促)", 前売価格: "2000", 当日価格: "3000" })], master);
+eq(f.length, 0, "別枠も生成されているなら判定しない");
+
+f = H.hpCheckVariantMixup([srow({ 席種エリア名: "MJRR1_S2指定駐車券", 前売価格: "2000" })], []);
+eq(f.length, 0, "マスターが無ければ判定しない");
+
+// HPナレッジが無くても構造チェックは回る
+const rs = H.hpRunAllChecks({ kind: "price_schedule", hp: null, rows: [
+  srow({ 席種エリアコード: "A", 券種名: "大人", 前売価格: "5000", 当日価格: "4000" })] });
+eq(rs.structure.length, 1, "HP無しでも構造チェックは動く");
+eq(rs.meta.warn, 1, "件数が meta に入る");
+
 // --- まとめ ---
 let r = H.hpRunAllChecks({ kind: "price_schedule", rows: [row({ 席種エリアコード: "SF1GPE27011", 席種エリア名: "F1_A1-1観戦券[T0]", 前売価格: "42000" })], hp: HP });
 eq(r.meta.error >= 1, true, "まとめ実行でerror件数が数えられる");
 eq(r.note.length, 0, "価格表では備考チェックを回さない");
 
 r = H.hpRunAllChecks({ kind: "price_schedule", rows: [row({})], hp: null });
-eq(r.meta.error, undefined, "HPナレッジが無ければ料金・販売期間は判定しない");
+eq(r.price.length + r.period.length, 0, "HPナレッジが無ければ料金・販売期間は判定しない");
 eq(r.meta.hp, false, "ナレッジ無しで走ったことを結果に残す");
 
 // HP公開待ちの間も、備考の構造チェック（同グループで自分だけ空）はHP無しで効かせる

@@ -3547,15 +3547,156 @@
         return out;
       }
 
+
+      // --- 4. HPを使わない構造チェック ---
+      //
+      // HP突合は名寄せが要るぶん精度が出ない（実データの注入テストで、
+      // 「他の席種の金額と取り違え」の検出率が0%だった）。一方これらはTSVの中だけで完結するので、
+      // ナレッジの鮮度にも名寄せの精度にも左右されない。HP公開待ちの間も使える。
+      //
+      // きっかけは実データで見つかった本物の登録ミス:
+      //   もてぎJRR26 の MJRR1P26132「S2指定駐車券」が 2,000/3,000 になっていた。
+      //   HPとマスターはどちらも 3,500円。2,000/3,000 は同名の「S2指定駐車券(販促)」の価格。
+      //   販促コードはスケジュールに生成されておらず、通常コードに販促価格が入っていた。
+      //   価格起点のHP突合では、2,000円が駐車券ページに存在するため○と判定されていた。
+
+      // 券種の年齢ランク。大きいほど高いはず（大人 > U23 > 子ども > 幼児）
+      function hpAgeRank(ken) {
+        const s = hpNormName(ken);
+        if (/幼児|3歳～未就学|未就学/.test(s)) return 1;
+        if (/子ども|こども|小学生|中学生|3歳～中学生/.test(s)) return 2;
+        if (/u23|高校生/.test(s)) return 3;
+        if (/大人|24歳以上/.test(s)) return 4;
+        return 0;   // 判定できないものは順序の検査に使わない
+      }
+
+      // 「(販促)」「(団体)」など、同じ商品の別枠コード
+      function hpVariantSuffix(name) {
+        const m = String(name || "").match(/[(（](販促|団体|法人|招待)[)）]\s*$/);
+        return m ? m[1] : "";
+      }
+      function hpBaseName(name) {
+        return hpNormName(String(name || "").replace(/[(（](販促|団体|法人|招待)[)）]\s*$/, ""));
+      }
+
+      function hpCheckStructure(rowsIn) {
+        const out = [];
+        const rows = rowsIn.filter((r) => !hpIsUgRow(r));
+
+        // (a) 当日価格が前売価格より安い
+        for (const g of hpCollapse(rows, ["席種エリアコード", "券種名", "前売価格", "当日価格"])) {
+          const row = g.row;
+          const a = hpToNumber(row.前売価格), d = hpToNumber(row.当日価格);
+          if (a === null || d === null) continue;
+          if (hpIsDummyPrice(row.前売価格) || hpIsDummyPrice(row.当日価格)) continue;
+          if (d < a) {
+            row._count = g.count;
+            out.push({ level: "warn", kind: "当日が前売より安い", row, detail: "前売 " + a.toLocaleString() + " / 当日 " + d.toLocaleString() });
+          }
+        }
+
+        // (b) 同じ席種の中で 大人 < U23 < 子ども のような逆転
+        const bySeat = new Map();
+        for (const r of rows) {
+          const k = String(r.席種エリアコード || "").trim() || hpNormName(r.席種エリア名);
+          if (!k) continue;
+          const rank = hpAgeRank(r.券種名);
+          const p = hpToNumber(r.前売価格);
+          if (!rank || p === null || hpIsDummyPrice(r.前売価格)) continue;
+          if (!bySeat.has(k)) bySeat.set(k, new Map());
+          if (!bySeat.get(k).has(rank)) bySeat.get(k).set(rank, { p, row: r });
+        }
+        bySeat.forEach((m, k) => {
+          const ranks = [...m.keys()].sort((x, y) => x - y);
+          for (let i = 1; i < ranks.length; i++) {
+            const lo = m.get(ranks[i - 1]), hi = m.get(ranks[i]);
+            if (hi.p < lo.p) {
+              out.push({
+                level: "warn", kind: "年齢区分の価格が逆転", row: hi.row,
+                detail: lo.row.券種名 + " " + lo.p.toLocaleString() + " より " + hi.row.券種名 + " " + hi.p.toLocaleString() + " が安い",
+              });
+            }
+          }
+        });
+
+        // (c) 「(販促)」等の別枠コードが生成されていないのに、通常コードにその価格が入っている
+        //     実データのS2指定駐車券がこれ。別枠が消えて価格だけ残る形は気づきにくい。
+        const variants = new Map();   // baseName -> {suffix -> [row]}
+        for (const r of rows) {
+          const base = hpBaseName(r.席種エリア名);
+          if (!base) continue;
+          const suf = hpVariantSuffix(r.席種エリア名) || "__normal";
+          if (!variants.has(base)) variants.set(base, new Map());
+          const m = variants.get(base);
+          if (!m.has(suf)) m.set(suf, []);
+          m.get(suf).push(r);
+        }
+        variants.forEach((m, base) => {
+          const normals = m.get("__normal") || [];
+          const others = [...m.keys()].filter((k) => k !== "__normal");
+          if (!normals.length || others.length) return;   // 別枠も生成されているなら判定しない
+          // 別枠が1つも無い＝スケジュール未生成の可能性。ここでは検知できないので、
+          // 「同名の別枠が存在するかどうか」は呼び出し側がマスタを渡したときだけ見る。
+        });
+
+        return out;
+      }
+
+      // 料金表マスターの席種一覧を渡せるときだけできる判定。
+      // マスターに「○○(販促)」があるのに、スケジュールには通常コードしか無く、
+      // しかもその通常コードの価格が販促側と一致する＝取り違えの疑い。
+      function hpCheckVariantMixup(rowsIn, masterRows) {
+        if (!masterRows || !masterRows.length) return [];
+        const out = [];
+        const rows = rowsIn.filter((r) => !hpIsUgRow(r));
+        const masterByName = new Map();
+        for (const m of masterRows) {
+          const key = hpBaseName(m.席種エリア名) + "|" + (hpVariantSuffix(m.席種エリア名) || "__normal");
+          if (!masterByName.has(key)) masterByName.set(key, m);
+        }
+        const tsvNames = new Set(rows.map((r) => hpNormName(r.席種エリア名)));
+        for (const g of hpCollapse(rows, ["席種エリアコード", "席種エリア名", "前売価格", "当日価格"])) {
+          const row = g.row;
+          if (hpVariantSuffix(row.席種エリア名)) continue;      // 別枠そのものは対象外
+          const base = hpBaseName(row.席種エリア名);
+          const normal = masterByName.get(base + "|__normal");
+          if (!normal) continue;
+          for (const suf of ["販促", "団体", "法人", "招待"]) {
+            const v = masterByName.get(base + "|" + suf);
+            if (!v) continue;
+            if (tsvNames.has(hpNormName(v.席種エリア名))) continue;   // 別枠も生成されている
+            const tsvA = hpToNumber(row.前売価格);
+            const normA = hpToNumber(normal.前売価格);
+            const varA = hpToNumber(v.前売価格);
+            if (tsvA === null || varA === null) continue;
+            if (tsvA === varA && normA !== null && normA !== varA) {
+              row._count = g.count;
+              out.push({
+                level: "error", kind: "別枠の価格が通常コードに入っている", row,
+                detail: "マスターの「" + normal.席種エリア名 + "」は " + normA.toLocaleString()
+                  + " だが、TSVは「" + v.席種エリア名 + "」と同じ " + tsvA.toLocaleString()
+                  + "。" + suf + "のコードはスケジュールに生成されていない",
+              });
+            }
+          }
+        }
+        return out;
+      }
+
       // まとめて走らせる。kind でどのチェックを回すか決める（備考は価格表には無い列なので分ける）。
       function hpRunAllChecks(input) {
         const rows = input.rows || [];
         const hp = input.hp || null;
         const kind = input.kind || "price_schedule";
-        const res = { price: [], period: [], note: [], meta: { rows: rows.length, kind, hp: !!hp } };
+        const res = { price: [], period: [], note: [], structure: [], meta: { rows: rows.length, kind, hp: !!hp } };
         if (kind === "price_schedule") {
-          // 料金と販売期間はHPナレッジが無いと比べる相手がいない
-          if (!hp) return res;
+          // 構造チェックはHPナレッジが要らない。名寄せにも鮮度にも左右されないので常に回す
+          res.structure = hpCheckStructure(rows).concat(hpCheckVariantMixup(rows, input.masterRows));
+          if (!hp) {
+            res.meta.error = res.structure.filter((f) => f.level === "error").length;
+            res.meta.warn = res.structure.filter((f) => f.level === "warn").length;
+            return res;
+          }
           res.price = hpCheckPrices(rows, hp);
           res.period = hpCheckSalePeriod(rows, hp);
         } else {
@@ -3563,8 +3704,9 @@
           // HPの公開待ちで何も動かないより、使える判定だけでも回す。
           res.note = hpCheckNotes(rows, hp, input.noteOpts);
         }
-        res.meta.error = res.price.concat(res.period, res.note).filter((f) => f.level === "error").length;
-        res.meta.warn = res.price.concat(res.period, res.note).filter((f) => f.level === "warn").length;
+        const all = res.price.concat(res.period, res.note, res.structure);
+        res.meta.error = all.filter((f) => f.level === "error").length;
+        res.meta.warn = all.filter((f) => f.level === "warn").length;
         return res;
       }
       // ===HP_CHECK_CORE_END===
@@ -3722,7 +3864,7 @@
       function hpShowResult(res, kind) {
         const kn = state.hpKnowledge || {};
         const age = hpAgeDays(kn.built_at);
-        const all = res.price.concat(res.period, res.note);
+        const all = res.price.concat(res.period, res.note, res.structure || []);
         const byLevel = { error: [], warn: [], info: [] };
         all.forEach((f) => (byLevel[f.level] || byLevel.info).push(f));
         const sec = (title, list, color) => {
