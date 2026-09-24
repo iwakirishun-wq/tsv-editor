@@ -184,7 +184,16 @@ eq(r.meta.error >= 1, true, "まとめ実行でerror件数が数えられる");
 eq(r.note.length, 0, "価格表では備考チェックを回さない");
 
 r = H.hpRunAllChecks({ kind: "price_schedule", rows: [row({})], hp: null });
-eq(r.meta.error, undefined, "HPナレッジが無ければ何も判定しない");
+eq(r.meta.error, undefined, "HPナレッジが無ければ料金・販売期間は判定しない");
+eq(r.meta.hp, false, "ナレッジ無しで走ったことを結果に残す");
+
+// HP公開待ちの間も、備考の構造チェック（同グループで自分だけ空）はHP無しで効かせる
+r = H.hpRunAllChecks({ kind: "seat_master", hp: null, rows: [
+  { 配席ブロック管理名: "X", 席種エリア名: "A", 券種名: "", 備考: "あり" },
+  { 配席ブロック管理名: "X", 席種エリア名: "B", 券種名: "", 備考: "" }] });
+eq(r.note.length, 1, "HPナレッジが無くても備考の構造チェックは動く");
+eq(r.note[0].kind, "備考の抜け(同グループ)", "構造チェックの種別");
+eq(r.meta.hp, false, "ナレッジ無しの印");
 
 console.log(fail ? `hp_check: ${pass} passed, ${fail} failed` : `hp_check: ${pass} passed, 0 failed`);
 process.exit(fail ? 1 : 0);

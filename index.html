@@ -3552,12 +3552,15 @@
         const rows = input.rows || [];
         const hp = input.hp || null;
         const kind = input.kind || "price_schedule";
-        const res = { price: [], period: [], note: [], meta: { rows: rows.length, kind } };
-        if (!hp) return res;
+        const res = { price: [], period: [], note: [], meta: { rows: rows.length, kind, hp: !!hp } };
         if (kind === "price_schedule") {
+          // 料金と販売期間はHPナレッジが無いと比べる相手がいない
+          if (!hp) return res;
           res.price = hpCheckPrices(rows, hp);
           res.period = hpCheckSalePeriod(rows, hp);
         } else {
+          // 備考の「同じグループで自分だけ空」はHPナレッジが無くても判定できる。
+          // HPの公開待ちで何も動かないより、使える判定だけでも回す。
           res.note = hpCheckNotes(rows, hp, input.noteOpts);
         }
         res.meta.error = res.price.concat(res.period, res.note).filter((f) => f.level === "error").length;
@@ -3694,9 +3697,18 @@
         }
         try {
           if (!state.hpKnowledge) {
-            setStatus("HPナレッジを読み込み中...");
-            state.hpKnowledge = await hpLoadKnowledge();
-            if (!state.hpKnowledge) { setStatus("HP突合チェックを中止しました"); return; }
+            // 備考の構造チェック（同じグループで自分だけ空）はHPナレッジが無くても効く。
+            // HP公開待ちの間も使えるように、ナレッジ無しで進む道を用意しておく。
+            const canRunWithout = kind !== "price_schedule";
+            const msg = canRunWithout
+              ? "HPナレッジを読み込みますか？\n\nOK: HPと突き合わせる（料金・販売期間・備考）\nキャンセル: HP無しで「備考の抜け（同グループ）」だけ調べる"
+              : "HPナレッジを読み込みます。";
+            const wantHp = canRunWithout ? confirm(msg) : true;
+            if (wantHp) {
+              setStatus("HPナレッジを読み込み中...");
+              state.hpKnowledge = await hpLoadKnowledge();
+              if (!state.hpKnowledge && !canRunWithout) { setStatus("HP突合チェックを中止しました"); return; }
+            }
           }
           const rows = hpExtractRows(kind);
           const res = hpRunAllChecks({ kind, rows, hp: state.hpKnowledge });
@@ -3738,8 +3750,12 @@
         ov.innerHTML = `<div class="modal-dialog" style="max-width:1180px;width:94vw;max-height:86vh;overflow:auto">
           <div class="modal-title">HP突合チェック結果</div>
           <p style="font-size:13px;margin:8px 0;line-height:1.7">
-            照合先: <b>${escHtml(kn.label || kn.event_key || "-")}</b> ／ 対象 ${res.meta.rows.toLocaleString()}行（${escHtml(kind)}）<br>
-            ナレッジの作成: ${escHtml(kn.built_at || "不明")}${age != null ? `（<b style="color:${age > 14 ? "#dc2626" : "inherit"}">${age}日前</b>）` : ""}
+            ${res.meta.hp
+              ? `照合先: <b>${escHtml(kn.label || kn.event_key || "-")}</b> ／ 対象 ${res.meta.rows.toLocaleString()}行（${escHtml(kind)}）<br>
+                 ナレッジの作成: ${escHtml(kn.built_at || "不明")}${age != null ? `（<b style="color:${age > 14 ? "#dc2626" : "inherit"}">${age}日前</b>）` : ""}`
+              : `<b style="color:#b45309">HPナレッジ無しで実行しました。</b>／ 対象 ${res.meta.rows.toLocaleString()}行（${escHtml(kind)}）<br>
+                 調べたのは「同じグループの他の席種には備考があるのに、この行だけ空」だけです。
+                 <b>料金・販売期間・HPとの備考差はチェックしていません。</b>`}
             ${age != null && age > 14 ? "<br><b style=\"color:#dc2626\">ナレッジが2週間以上前です。HPを取り直してから判断してください。</b>" : ""}
           </p>
           ${all.length ? "" : "<p style=\"color:#16a34a;font-weight:600\">指摘はありません。</p>"}
