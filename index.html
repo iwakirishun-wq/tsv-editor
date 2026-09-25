@@ -3322,6 +3322,25 @@
         return t.replace(/\s+/g, "").toLowerCase();
       }
 
+      // 券種名を年齢区分のキーに揃える。TSVは「鈴鹿_大人（24歳以上）」「鈴鹿_子ども（小学生・中学生）」、
+      // HPは「大人(24歳以上)」「子ども(小・中学生)」「3歳～未就学児」と書き方が違い、hpNormName では
+      // 「鈴鹿_」も括弧の中身も残るため一致しない。2026-09-25、27F1の経路価格スケジュールで
+      // 370通りすべてが「HPに無い」（参考）に落ち、AIに1件も渡らなかった原因。
+      // 共通券種は「何歳以上か」まで区別する（3歳以上共通と8歳以上共通は別の券種）。
+      function hpTicketKey(s) {
+        let t = String(s == null ? "" : s).normalize("NFKC").replace(/\s+/g, "");
+        t = t.replace(/^[^_]{1,12}_/, ""); // 鈴鹿_ / もてぎ_ などの接頭辞
+        if (!t || t === "なし") return "";
+        const m = t.match(/(\d+歳以上|中学生以上|小学生以上|高校生以上)共通/);
+        if (m) return "共通:" + m[1];
+        if (/全年齢|共通/.test(t)) return "共通";
+        if (/未就学|幼児/.test(t)) return "幼児";
+        if (/U23|アンダー/i.test(t)) return "U23";
+        if (/子ども|子供|こども|小学|小・中|中学生/.test(t)) return "子ども";
+        if (/大人/.test(t)) return "大人";
+        return hpNormName(t);
+      }
+
       // "2026/11/01 11:00" / "2026-11-01T11:00:00+09:00" の両方を受ける。
       // 落とせなければ null（勝手に解釈しない）。
       function hpParseDateTime(s) {
@@ -3345,16 +3364,18 @@
         const items = (hp && hp.items) || [];
         for (const it of items) {
           const code = String(it.seat_code || "").trim();
-          const key = hpNormName(it.seat_name) + "|" + hpNormName(it.ticket_name);
+          const key = hpNormName(it.seat_name) + "|" + hpTicketKey(it.ticket_name);
           if (code) {
-            const ck = code + "|" + hpNormName(it.ticket_name);
+            const ck = code + "|" + hpTicketKey(it.ticket_name);
             if (!byCode.has(ck)) byCode.set(ck, []);
             byCode.get(ck).push(it);
           }
           if (!byName.has(key)) byName.set(key, []);
           byName.get(key).push(it);
-          const note = String(it.note || "").trim();
-          if (note) {
+          // 実際のHP備考のみをインデックス化。
+          // 診断文字列や未確定データ（missing/ambiguous）、空備考は除外する
+          if (it.confidence === "exact" && it.note && String(it.note).trim()) {
+            const note = String(it.note).trim();
             if (code && !noteByCode.has(code)) noteByCode.set(code, note);
             const nk = hpNormName(it.seat_name);
             if (nk && !noteByName.has(nk)) noteByName.set(nk, note);
@@ -3373,7 +3394,7 @@
 
       // 1行ぶんの対応付け。戻り値の via で「何で当てたか」が分かる。
       function hpLookup(idx, row) {
-        const tk = hpNormName(row.券種名);
+        const tk = hpTicketKey(row.券種名);
         const code = String(row.席種エリアコード || "").trim();
         if (code) {
           const hit = idx.byCode.get(code + "|" + tk);
@@ -3426,11 +3447,37 @@
           if (items.some((i) => i.confidence === "conflict")) {
             out.push({
               level: "warn", kind: "HP側が食い違い", row, via,
-              detail: "HPのページ間で金額が違います: " + items.map((i) => i.advance).join(" / "),
+              detail: "HPのページ間で金額が違います: " + items.map((i) => (i.conflicting_prices ? i.conflicting_prices.join("/") : i.advance)).join(" / "),
+            });
+            continue;
+          }
+          // HP未掲載・不足データの場合（勝手にスキップして合格にしない）
+          if (items.every((i) => i.confidence === "missing")) {
+            const diag = items[0].diagnostic || "HP未掲載";
+            out.push({
+              level: "warn", kind: "HP未掲載・要確認", row, via,
+              detail: "HPに該当商品が掲載されていないか未確定です（" + diag + "）",
+            });
+            continue;
+          }
+          // 照合曖昧の場合（先頭一致で勝手に合格にしない）
+          if (items.some((i) => i.confidence === "ambiguous")) {
+            const diag = items[0].diagnostic || "照合曖昧";
+            out.push({
+              level: "warn", kind: "HP照合曖昧・要確認", row, via,
+              detail: "HP側の候補が複数または曖昧です（" + diag + "）",
             });
             continue;
           }
           const it = items[0];
+          // exact であっても前売価格が null の場合（売止めダミーを除く）
+          if (it.advance === null && !hpIsDummyPrice(row["前売価格"])) {
+            out.push({
+              level: "warn", kind: "HP価格未取得・要確認", row, via,
+              detail: "HPナレッジの前売価格が未取得です",
+            });
+            continue;
+          }
           for (const [col, hpKey, label] of [["前売価格", "advance", "前売"], ["当日価格", "same_day", "当日"]]) {
             const tsv = hpToNumber(row[col]);
             const hpv = it[hpKey] == null ? null : hpToNumber(it[hpKey]);
@@ -3476,6 +3523,11 @@
           const row = g.row;
           row._count = g.count;
           const s = hpParseDateTime(row.販売開始日時);
+          if (startHp === null) {
+            out.push({ level: "warn", kind: "HP販売開始未確定", row, detail: "HPの開始日時が未取得または競合しています。目視で確認してください" });
+          } else if (s === null) {
+            out.push({ level: "error", kind: "販売開始が空・不正", row, detail: "HP " + hp.sale.start + " / TSVの開始日時を確認してください" });
+          }
           if (startHp !== null && s !== null && s !== startHp) {
             out.push({ level: "error", kind: "販売開始が違う", row, detail: "TSV " + row.販売開始日時 + " / HP " + hp.sale.start });
           }
@@ -3487,6 +3539,13 @@
           const machine = rules.filter((r) => r.machine_checkable !== false && hpParseDateTime(r.end) !== null);
           const manual = rules.filter((r) => r.machine_checkable === false || hpParseDateTime(r.end) === null);
           const e = hpParseDateTime(row.販売終了日時);
+          if (machine.length && e === null) {
+            out.push({ level: "error", kind: "販売終了が空・不正", row, detail: "TSVの終了日時を確認してください" });
+          }
+          if (machine.length > 1 && new Set(machine.map((r) => hpParseDateTime(r.end))).size > 1) {
+            out.push({ level: "warn", kind: "HP販売終了未確定", row, detail: "複数の販売終了日時が該当します。適用条件を目視で確認してください" });
+            continue;
+          }
           if (machine.length && e !== null) {
             if (!machine.some((r) => hpParseDateTime(r.end) === e)) {
               out.push({
@@ -3684,14 +3743,23 @@
       }
 
       // まとめて走らせる。kind でどのチェックを回すか決める（備考は価格表には無い列なので分ける）。
+      function hpIsPublicSaleTarget(row) {
+        const norm = (v) => String(v ?? "").normalize("NFKC").trim();
+        const code = norm(row.席種エリアコード ?? row.seat_type_area_cd ?? row.seat_code);
+        if (code.charAt(5).toUpperCase() === "U") return false;
+        const names = [row.席種エリア名, row.seat_type_area_control_nm, row.seat_name,
+          row.word1, row.word2, row.word3].map(norm).join(" ");
+        return !/未確定|未定|販促|団体利用/.test(names);
+      }
+
       function hpRunAllChecks(input) {
-        const rows = input.rows || [];
-        const hp = input.hp || null;
+        const rows = (input.rows || []).filter(hpIsPublicSaleTarget);
+        const hp = input.hp ? { ...input.hp, items: (input.hp.items || []).filter(hpIsPublicSaleTarget) } : null;
         const kind = input.kind || "price_schedule";
         const res = { price: [], period: [], note: [], structure: [], meta: { rows: rows.length, kind, hp: !!hp } };
         if (kind === "price_schedule") {
           // 構造チェックはHPナレッジが要らない。名寄せにも鮮度にも左右されないので常に回す
-          res.structure = hpCheckStructure(rows).concat(hpCheckVariantMixup(rows, input.masterRows));
+          res.structure = hpCheckStructure(rows).concat(hpCheckVariantMixup(rows, (input.masterRows || []).filter(hpIsPublicSaleTarget)));
           if (!hp) {
             res.meta.error = res.structure.filter((f) => f.level === "error").length;
             res.meta.warn = res.structure.filter((f) => f.level === "warn").length;
@@ -3723,11 +3791,28 @@
 
       function hpCallServer(fn, arg) {
         return new Promise((resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error("GASからの応答がありません。時間をおいて再実行してください。")), 30000);
           google.script.run
-            .withSuccessHandler(resolve)
-            .withFailureHandler((e) => reject(new Error(e && e.message ? e.message : String(e))))
+            .withSuccessHandler((value) => { clearTimeout(timer); resolve(value); })
+            .withFailureHandler((e) => { clearTimeout(timer); reject(new Error(e && e.message ? e.message : String(e))); })
             [fn](arg);
         });
+      }
+
+      function hpShowNotice(message) {
+        setStatus(message);
+        const ov = document.createElement("div");
+        ov.className = "modal-overlay _hp-notice-ov";
+        ov.innerHTML = `<div class="modal-dialog" role="alertdialog" aria-modal="true" aria-label="HP突合">
+          <div class="modal-title">HP突合</div>
+          <p style="white-space:pre-wrap;line-height:1.7"></p>
+          <div class="modal-btns"><button class="_hp-notice-close btn-primary">閉じる</button></div>
+        </div>`;
+        ov.querySelector("p").textContent = message;
+        document.body.appendChild(ov);
+        const close = ov.querySelector("._hp-notice-close");
+        close.onclick = () => ov.remove();
+        close.focus();
       }
 
       // いま開いているファイルの種別。判定の対象を切り替える
@@ -3789,6 +3874,7 @@
           inp.style.display = "none";
           document.body.appendChild(inp);
           inp.onchange = () => { resolve(inp.files[0] || null); inp.remove(); };
+          inp.oncancel = () => { resolve(null); inp.remove(); };
           inp.click();
         });
         if (!file) return null;
@@ -3832,11 +3918,21 @@
       }
 
       async function runHpCheck() {
+        const button = $("btn-hp-check");
+        if (button.disabled) return;
         const kind = hpDataKind();
         if (!kind) {
-          toast("このファイルは突合の対象外です（経路価格スケジュール / 席種エリアマスタ / SEJ を開いてください）");
+          hpShowNotice("このファイルは突合の対象外です（経路価格スケジュール / 席種エリアマスタ / SEJ を開いてください）");
           return;
         }
+        if (!hpExtractRows(kind).some(hpIsPublicSaleTarget)) {
+          hpShowNotice("条件に一致するHP突合対象がありません。\nコードの6文字目がU、または名称に未確定・未定・販促・団体利用を含む行は対象外です。");
+          return;
+        }
+        const label = button.querySelector("span:not(.rb-icon)");
+        const originalLabel = label.textContent;
+        button.disabled = true;
+        label.textContent = "読み込み中…";
         try {
           if (!state.hpKnowledge) {
             // 備考の構造チェック（同じグループで自分だけ空）はHPナレッジが無くても効く。
@@ -3856,8 +3952,10 @@
           const res = hpRunAllChecks({ kind, rows, hp: state.hpKnowledge });
           hpShowResult(res, kind);
         } catch (e) {
-          toast("HP突合チェックに失敗: " + e.message);
-          setStatus("HP突合チェックに失敗: " + e.message, false);
+          hpShowNotice("HP突合チェックに失敗: " + e.message);
+        } finally {
+          button.disabled = false;
+          label.textContent = originalLabel;
         }
       }
 
@@ -3891,6 +3989,7 @@
         ov.className = "modal-overlay _hp-res-ov";
         ov.innerHTML = `<div class="modal-dialog" style="max-width:1180px;width:94vw;max-height:86vh;overflow:auto">
           <div class="modal-title">HP突合チェック結果</div>
+          <p style="font-size:12px">対象：コードの6文字目がU以外。名称に未確定・未定・販促・団体利用を含む行は除外しています。</p>
           <p style="font-size:13px;margin:8px 0;line-height:1.7">
             ${res.meta.hp
               ? `照合先: <b>${escHtml(kn.label || kn.event_key || "-")}</b> ／ 対象 ${res.meta.rows.toLocaleString()}行（${escHtml(kind)}）<br>
@@ -3900,7 +3999,7 @@
                  <b>料金・販売期間・HPとの備考差はチェックしていません。</b>`}
             ${age != null && age > 14 ? "<br><b style=\"color:#dc2626\">ナレッジが2週間以上前です。HPを取り直してから判断してください。</b>" : ""}
           </p>
-          ${all.length ? "" : "<p style=\"color:#16a34a;font-weight:600\">指摘はありません。</p>"}
+          ${res.meta.rows === 0 ? "<p>条件に一致するHP突合対象がありません。</p>" : all.length ? "" : "<p style=\"color:#16a34a;font-weight:600\">指摘はありません。</p>"}
           ${sec("要修正", byLevel.error, "#dc2626")}
           ${sec("要確認", byLevel.warn, "#b45309")}
           ${sec("参考・要目視", byLevel.info, "#6b7280")}

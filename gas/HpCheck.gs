@@ -18,7 +18,7 @@
  */
 function loadHpKnowledgeData_() {
   var props = PropertiesService.getScriptProperties();
-  var fileId = props.getProperty('HP_KNOWLEDGE_FILE_ID');
+  var fileId = props.getProperty('HP_KNOWLEDGE_FILE_ID') || DEFAULT_HP_KNOWLEDGE_FILE_ID;
   if (!fileId || !fileId.trim()) {
     return { error: 'HP_KNOWLEDGE_FILE_ID が未設定です' };
   }
@@ -314,3 +314,124 @@ function askGemini(payload) {
     return { error: 'askGemini の実行中にエラーが発生しました: ' + e.message };
   }
 }
+
+var DEFAULT_HP_KNOWLEDGE_FILE_ID = '1kJ-2JnSVOH56wBc_6-nt8Midqmx07ACg';
+
+/**
+ * 管理者本人限定の実行権限ガード
+ */
+function assertAdminUser_() {
+  var activeUser = Session.getActiveUser().getEmail();
+  var effectiveUser = Session.getEffectiveUser().getEmail();
+  if (activeUser && effectiveUser && activeUser !== effectiveUser) {
+    throw new Error('管理者本人以外はこの操作を実行できません (active: ' + activeUser + ', effective: ' + effectiveUser + ')');
+  }
+}
+
+/**
+ * 指定されたファイルIDの存在とスキーマを検証してからプロパティに保存する内部処理
+ * @param {string} fileId
+ * @return {string} 実行結果
+ */
+function setupHpKnowledgeWithId_(fileId) {
+  assertAdminUser_();
+
+  if (!fileId || typeof fileId !== 'string' || !fileId.trim()) {
+    throw new Error('有効な fileId を指定してください');
+  }
+  fileId = fileId.trim();
+
+  /* 1. Drive ファイルの存在確認 */
+  var file;
+  try {
+    file = DriveApp.getFileById(fileId);
+  } catch (e) {
+    throw new Error('Driveファイルが見つかりません (ID: ' + fileId + '): ' + e.message);
+  }
+  if (!file) {
+    throw new Error('Driveファイルが見つかりません (ID: ' + fileId + ')');
+  }
+
+  try {
+    if (file.isTrashed && file.isTrashed()) {
+      throw new Error('指定されたファイルはゴミ箱にあります (ID: ' + fileId + ')');
+    }
+  } catch (_) {}
+
+  /* 2. ファイル読み取りとスキーマ検証 */
+  var content;
+  try {
+    content = file.getBlob().getDataAsString('UTF-8');
+  } catch (e) {
+    throw new Error('ナレッジファイルの読み取りに失敗しました: ' + e.message);
+  }
+  if (!content || !content.trim()) {
+    throw new Error('ナレッジファイルが空です');
+  }
+
+  var data;
+  try {
+    data = JSON.parse(content);
+  } catch (e) {
+    throw new Error('ナレッジJSONの解析に失敗しました: ' + e.message);
+  }
+
+  if (!data || typeof data !== 'object') {
+    throw new Error('ナレッジデータの形式が不正です（オブジェクトではありません）');
+  }
+  if (data.schema !== 'hp_price_knowledge/1') {
+    throw new Error('未対応のスキーマです (期待値: hp_price_knowledge/1, 実際: ' + (data.schema || 'なし') + ')');
+  }
+  if (!data.events || typeof data.events !== 'object') {
+    throw new Error('ナレッジデータに events オブジェクトが存在しません');
+  }
+
+  /* 3. 検証成功時のみスクリプトプロパティを保存 */
+  PropertiesService.getScriptProperties().setProperty('HP_KNOWLEDGE_FILE_ID', fileId);
+  return 'HP_KNOWLEDGE_FILE_ID を正常に設定しました (ID: ' + fileId + ', schema: ' + data.schema + ', built_at: ' + (data.built_at || '不明') + ')';
+}
+
+/**
+ * HP_KNOWLEDGE_FILE_ID を既定の固定IDでセットアップする（引数なし・エディタ実行用）
+ * GASエディタの「実行」ボタンから引数なしで直接呼び出し可能。
+ * スキーマ読み取りを検証してからプロパティを保存する。管理者本人限定。
+ * @return {string} 実行結果
+ */
+function setupHpKnowledgeDefault() {
+  return setupHpKnowledgeWithId_(DEFAULT_HP_KNOWLEDGE_FILE_ID);
+}
+
+/**
+ * HP_KNOWLEDGE_FILE_ID を設定する（任意のfileId指定用）
+ * スキーマ読み取りを検証してからプロパティを保存する。管理者本人限定。
+ * @param {string} fileId Google Drive 上の HP料金ナレッジ.json のファイルID
+ * @return {string} 実行結果
+ */
+function setHpKnowledgeFileId(fileId) {
+  return setupHpKnowledgeWithId_(fileId);
+}
+
+/**
+ * HPナレッジの接続状態を確認する（管理者診断用）
+ * @return {Object} 状態情報
+ */
+function getHpKnowledgeStatus() {
+  var props = PropertiesService.getScriptProperties();
+  var fileId = props.getProperty('HP_KNOWLEDGE_FILE_ID') || DEFAULT_HP_KNOWLEDGE_FILE_ID;
+  if (!fileId) {
+    return { configured: false, error: 'HP_KNOWLEDGE_FILE_ID が未設定です' };
+  }
+  var res = loadHpKnowledgeData_();
+  if (res.error) {
+    return { configured: true, fileId: fileId, error: res.error };
+  }
+  var events = listHpEvents();
+  return {
+    configured: true,
+    fileId: fileId,
+    schema: res.data.schema,
+    built_at: res.data.built_at,
+    events: events
+  };
+}
+

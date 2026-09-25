@@ -18,7 +18,7 @@ if (!m) {
 const factory = new Function(
   m[1] +
     "\nreturn { hpIsDummyPrice, hpToNumber, hpNormName, hpParseDateTime, hpBuildIndex," +
-    " hpLookup, hpNoteForSeat, hpRulesForRow, hpIsUgRow, hpCollapse, hpCheckPrices, hpCheckSalePeriod, hpCheckNotes, hpAgeRank, hpVariantSuffix, hpBaseName, hpCheckStructure, hpCheckVariantMixup, hpRunAllChecks };"
+    " hpLookup, hpTicketKey, hpNoteForSeat, hpRulesForRow, hpIsUgRow, hpCollapse, hpCheckPrices, hpCheckSalePeriod, hpCheckNotes, hpAgeRank, hpVariantSuffix, hpBaseName, hpCheckStructure, hpCheckVariantMixup, hpRunAllChecks };"
 );
 const H = factory();
 
@@ -254,6 +254,81 @@ r = H.hpRunAllChecks({ kind: "seat_master", hp: null, rows: [
 eq(r.note.length, 1, "HPナレッジが無くても備考の構造チェックは動く");
 eq(r.note[0].kind, "備考の抜け(同グループ)", "構造チェックの種別");
 eq(r.meta.hp, false, "ナレッジ無しの印");
+
+// --- 検品差し戻し対応: missing / ambiguous / diagnostic / 価格未取得 の突合テスト ---
+const HP_UNVERIFIED = {
+  label: "2027 F1日本グランプリ(未確定・missing含む)",
+  sale: { start: null, rules: [] },
+  items: [
+    { seat_name: "MISSING_SEAT観戦券", seat_code: "SMISSING01", ticket_name: "大人(24歳以上)", advance: null, same_day: null, note: "", diagnostic: "HP未掲載または券種照合未確定 (ページ: synth_p1)", confidence: "missing" },
+    { seat_name: "AMBIGUOUS_SEAT観戦券", seat_code: "SAMBIG01", ticket_name: "大人(24歳以上)", advance: 50000, same_day: null, note: "", diagnostic: "同一ページ内に複数の候補商品が存在するため未確定", confidence: "ambiguous" },
+    { seat_name: "NULL_PRICE_SEAT観戦券", seat_code: "SNULL01", ticket_name: "大人(24歳以上)", advance: null, same_day: null, note: "", confidence: "exact" },
+  ],
+};
+
+// 1. missing アイテムが渡された場合、スキップして合格にせず「HP未掲載・要確認」を出す
+f = H.hpCheckPrices([row({ 席種エリアコード: "SMISSING01", 席種エリア名: "MISSING_SEAT観戦券", 前売価格: "40000" })], HP_UNVERIFIED);
+has(f, "HP未掲載・要確認", "missingアイテムは比較をスキップせず要確認を出す");
+hasNot(f, "前売が違う", "missingアイテムで金額違いを断定しない");
+
+// 2. ambiguous アイテムが渡された場合、「HP照合曖昧・要確認」を出す
+f = H.hpCheckPrices([row({ 席種エリアコード: "SAMBIG01", 席種エリア名: "AMBIGUOUS_SEAT観戦券", 前売価格: "50000" })], HP_UNVERIFIED);
+has(f, "HP照合曖昧・要確認", "ambiguousアイテムは先頭一致で合格にせず要確認を出す");
+
+// 3. advance が null の場合、「HP価格未取得・要確認」を出す
+f = H.hpCheckPrices([row({ 席種エリアコード: "SNULL01", 席種エリア名: "NULL_PRICE_SEAT観戦券", 前売価格: "50000" })], HP_UNVERIFIED);
+has(f, "HP価格未取得・要確認", "価格未取得アイテムは要確認を出す");
+
+// 4. missing アイテムの diagnostic 文字列が hpCheckNotes で「備考の抜け」と誤検出されないこと
+f = H.hpCheckNotes([{ 配席ブロック管理名: "X", 席種エリアコード: "SMISSING01", 席種エリア名: "MISSING_SEAT観戦券", 券種名: "大人(24歳以上)", 備考: "" }], HP_UNVERIFIED);
+eq(f.length, 0, "missingアイテムの診断文字列をHP備考として誤検出しないこと");
+
+f = H.hpCheckSalePeriod([row({ 販売開始日時: "", 販売終了日時: "", 席種エリア名: "V1" })], {
+  sale: { start: "2026/11/15 11:00", rules: [{scope: "V1", end: "2027/04/25 23:59"}] }
+});
+has(f, "販売開始が空・不正", "空の開始を見逃さない");
+has(f, "販売終了が空・不正", "空の終了を見逃さない");
+f = H.hpCheckSalePeriod([row()], {sale: {start: null, rules: []}});
+has(f, "HP販売開始未確定", "不明なHP開始は要確認");
+
+for (const kind of ["price_schedule", "seat_master", "sej"]) {
+  const excluded = [
+    {席種エリアコード: "SF1GPU001", 席種エリア名: "通常席"},
+    ...["未確定", "未定", "販促", "団体利用"].map(name => ({席種エリアコード: "SF1GPE001", 席種エリア名: "V1(" + name + ")"})),
+    {seat_type_area_cd: "SF1GPU002", word1: "通常席"},
+    {seat_type_area_cd: "SF1GPE002", word1: "V1", word2: "団体利用"}
+  ];
+  const result = H.hpRunAllChecks({kind, rows: excluded, hp: {items: [], sale: {}}});
+  eq(result.meta.rows, 0, kind + " 一般売り対象外を除外");
+  eq(result.price.concat(result.period, result.note, result.structure).length, 0, kind + " 除外行を指摘に出さない");
+}
+r = H.hpRunAllChecks({kind: "price_schedule", rows: [row({席種エリアコード: "UF1GPE001", 席種エリア名: "通常席"})], hp: {items: []}});
+eq(r.meta.rows, 1, "6文字目以外のUは除外しない");
+
+// --- 券種名の揃え方（2026-09-25: 27F1で370通りすべてが「HPに無い」に落ちた回帰） ---
+// TSV「鈴鹿_大人（24歳以上）」とHP「大人(24歳以上)」は同じ券種。接頭辞・括弧の中身の書き方が違うだけ
+eq(H.hpTicketKey("鈴鹿_大人（24歳以上）"), H.hpTicketKey("大人(24歳以上)"), "大人: TSVとHPの表記差を吸収");
+eq(H.hpTicketKey("鈴鹿_U23（高校生～23歳）"), H.hpTicketKey("U23(高校生～23歳)"), "U23: TSVとHPの表記差を吸収");
+eq(H.hpTicketKey("鈴鹿_子ども（小学生・中学生）"), H.hpTicketKey("子ども(小・中学生)"), "子ども: 小学生・中学生 と 小・中学生");
+eq(H.hpTicketKey("鈴鹿_幼児（3歳～未就学児）"), H.hpTicketKey("3歳～未就学児"), "幼児: HPは「幼児」と書かない");
+eq(H.hpTicketKey("鈴鹿_3歳以上共通"), H.hpTicketKey("1名・3歳以上共通"), "3歳以上共通");
+eq(H.hpTicketKey("鈴鹿_3歳以上共通") === H.hpTicketKey("鈴鹿_8歳以上共通"), false, "3歳以上共通と8歳以上共通は別の券種");
+eq(H.hpTicketKey("鈴鹿_大人（24歳以上）") === H.hpTicketKey("鈴鹿_U23（高校生～23歳）"), false, "大人とU23は別");
+eq(H.hpTicketKey("なし"), "", "駐車券の券種なしは空");
+{
+  // 実データの形で、席種エリアコード＋券種で引けること
+  const hp = { items: [
+    { seat_code: "SF1GPE27031", seat_name: "F1_B1観戦券[T2]", ticket_name: "子ども(小・中学生)", advance: 6000, same_day: null, confidence: "exact" },
+    { seat_code: "SF1GPE27031", seat_name: "F1_B1観戦券[T2]", ticket_name: "3歳～未就学児", advance: 4200, same_day: null, confidence: "exact" },
+  ] };
+  const rows = [
+    row({ 席種エリアコード: "SF1GPE27031", 席種エリア名: "F1_B1観戦券[T2]", 券種名: "鈴鹿_子ども（小学生・中学生）", 前売価格: "6000", 当日価格: "9600" }),
+    row({ 席種エリアコード: "SF1GPE27031", 席種エリア名: "F1_B1観戦券[T2]", 券種名: "鈴鹿_幼児（3歳～未就学児）", 前売価格: "4100", 当日価格: "6700" }),
+  ];
+  const f = H.hpCheckPrices(rows, hp);
+  hasNot(f, "HPに無い", "券種名の表記差があってもHPに無いにしない");
+  has(f, "前売が違う", "幼児の前売4,100（HPは4,200）を要修正として拾う");
+}
 
 console.log(fail ? `hp_check: ${pass} passed, ${fail} failed` : `hp_check: ${pass} passed, 0 failed`);
 process.exit(fail ? 1 : 0);
