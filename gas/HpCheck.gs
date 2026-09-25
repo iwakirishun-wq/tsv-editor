@@ -192,7 +192,8 @@ function askGemini(payload) {
 
     var model = props.getProperty('GEMINI_MODEL');
     if (!model || !model.trim()) {
-      model = 'gemini-2.5-flash';
+      // 2026-09-25: gemini-2.5-flash は新規ユーザーに提供終了（HTTP 404）。APIの案内どおり 3.8-flash を既定にする
+      model = 'gemini-3.8-flash';
     } else {
       model = model.trim();
     }
