@@ -3775,6 +3775,41 @@
         return out;
       }
 
+      // --- 5. 席種エリアマスタのフラグ（HPを使わない機械判定・AIに送らない） ---
+      // ルールはSHUN確認済み（2026-09-26）:
+      //  ・指定席（指定席自由席区分=1 かつ 在庫種別=1）で名前に「○名」がある、またはBOXフラグ=1 の席種は
+      //    BOXフラグ=1・座席数=○ でなければNG。数在庫の「(○名定員)」（シマノの休憩スペース等）は対象外。
+      //    実データでSTAI26のR-BOX（8名なのに座席数6、6名なのに4）の3件を検出。
+      //  ・名前に 引換/オプション/交換 がある券は単日入場フラグ=1 が必要。
+      //  ・駐車券（コード6桁目P）は駐車券フラグ=1 が必要。
+      //    ※「駐車券は入場可フラグ=0」は実データ882件すべてが1で実態と合わないため入れていない。
+      function hpCheckSeatFlags(rows) {
+        const out = [];
+        const nk = (v) => String(v == null ? "" : v).normalize("NFKC").trim();
+        for (const row of rows) {
+          const name = nk(row.席種エリア名);
+          const code = nk(row.席種エリアコード);
+          const reserved = nk(row.rsve_unrsve_kbn) === "1" && nk(row.seattype_stock_control_typ) === "1";
+          const box = nk(row.box_seat_flg), cnt = nk(row.seat_cnt);
+          const m = name.match(/(\d+)\s*名/);
+          if (reserved && (m || box === "1")) {
+            const want = m ? m[1] : null;
+            const probs = [];
+            if (box !== "1") probs.push("BOXフラグが " + (box || "空") + "（1が必要）");
+            if (!cnt || cnt === "0") probs.push("座席数が未設定");
+            else if (want && cnt !== want) probs.push("座席数が " + cnt + "（名前は" + want + "名）");
+            if (probs.length) out.push({ level: "error", kind: "BOXの座席数・フラグ", row, detail: probs.join(" / "), noAi: true });
+          }
+          if (/引換|オプション|交換/.test(name) && nk(row.single_day_admission_flg) !== "1") {
+            out.push({ level: "error", kind: "単日入場フラグ", row, detail: "引換・オプションの券なのに単日入場フラグが " + (nk(row.single_day_admission_flg) || "空") + "（1が必要）", noAi: true });
+          }
+          if (code.length >= 6 && code.charAt(5).toUpperCase() === "P" && nk(row.parking_ticket_flg) !== "1") {
+            out.push({ level: "error", kind: "駐車券フラグ", row, detail: "駐車券コード（6桁目P）なのに駐車券フラグが " + (nk(row.parking_ticket_flg) || "空") + "（1が必要）", noAi: true });
+          }
+        }
+        return out;
+      }
+
       // まとめて走らせる。kind でどのチェックを回すか決める（備考は価格表には無い列なので分ける）。
       function hpIsPublicSaleTarget(row) {
         const norm = (v) => String(v ?? "").normalize("NFKC").trim();
@@ -3804,6 +3839,7 @@
           // 備考の「同じグループで自分だけ空」はHPナレッジが無くても判定できる。
           // HPの公開待ちで何も動かないより、使える判定だけでも回す。
           res.note = hpCheckNotes(rows, hp, input.noteOpts);
+          if (kind === "seat_master") res.structure = hpCheckSeatFlags(rows);
         }
         const all = res.price.concat(res.period, res.note, res.structure);
         res.meta.error = all.filter((f) => f.level === "error").length;
@@ -3892,7 +3928,8 @@
         const pick = {
           price_schedule: ["席種エリアコード", "席種エリア名", "券種名", "前売価格", "当日価格", "販売開始日時", "販売終了日時",
                            "アップグレード該当フラグ", "アップグレード元席種エリアコード"],
-          seat_master: ["seat_type_area_cd", "seat_type_area_control_nm", "seat_type_area_disp_nm", "nte", "grp_nm"],
+          seat_master: ["seat_type_area_cd", "seat_type_area_control_nm", "seat_type_area_disp_nm", "nte", "grp_nm",
+                        "rsve_unrsve_kbn", "seattype_stock_control_typ", "box_seat_flg", "seat_cnt", "single_day_admission_flg", "parking_ticket_flg"],
           sej: ["seat_type_area_cd", "word1", "word2", "word3"],
         }[kind] || [];
         const idx = pick.map(at);
@@ -4260,7 +4297,7 @@
         ov.querySelector("._hp-reload").onclick = () => { state.hpKnowledge = null; ov.remove(); runHpCheck(); };
         ov.querySelector("._hp-ai").onclick = async () => {
           const out = ov.querySelector("._hp-ai-out");
-          const picked = byLevel.error.concat(byLevel.warn, byLevel.ai).slice(0, 200);
+          const picked = byLevel.error.concat(byLevel.warn, byLevel.ai).filter((f) => !f.noAi).slice(0, 200);
           // id で回答と元の指摘を結び付ける（AIに行番号や席種名を書き写させると取り違えるため）
           const send = picked.map((f, i) => f.level === "ai"
             ? { id: i + 1, 種別: f.kind, 席種表示名: f.seats || [], 件数: f.row ? f.row._count : 1, 現行の備考: f.note, HPページ: f.hpPages || [] }

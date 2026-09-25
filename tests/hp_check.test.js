@@ -18,7 +18,7 @@ if (!m) {
 const factory = new Function(
   m[1] +
     "\nreturn { hpIsDummyPrice, hpToNumber, hpNormName, hpParseDateTime, hpBuildIndex," +
-    " hpLookup, hpTicketKey, hpGroupKey, hpGroupScore, hpNoteForSeat, hpRulesForRow, hpIsUgRow, hpCollapse, hpCheckPrices, hpCheckSalePeriod, hpCheckNotes, hpAgeRank, hpVariantSuffix, hpBaseName, hpCheckStructure, hpCheckVariantMixup, hpRunAllChecks };"
+    " hpLookup, hpTicketKey, hpGroupKey, hpGroupScore, hpCheckSeatFlags, hpNoteForSeat, hpRulesForRow, hpIsUgRow, hpCollapse, hpCheckPrices, hpCheckSalePeriod, hpCheckNotes, hpAgeRank, hpVariantSuffix, hpBaseName, hpCheckStructure, hpCheckVariantMixup, hpRunAllChecks };"
 );
 const H = factory();
 
@@ -374,6 +374,21 @@ eq(H.hpTicketKey("なし"), "", "駐車券の券種なしは空");
   eq(H.hpGroupScore("もてぎ_SGT26", "鈴鹿_SGT26", "") < H.hpGroupScore("鈴鹿_SGT26", "鈴鹿_SGT26", ""), true, "同じシリーズでも会場が違えば下げる");
   eq(H.hpGroupScore("鈴鹿_26F1", "鈴鹿_27F1", "") < H.hpGroupScore("鈴鹿_27F1", "鈴鹿_27F1", ""), true, "年だけ違うF1（26F1）は既定で選ばない");
   eq(H.hpGroupScore("もてぎ_MTGP26", "鈴鹿_27F1", ""), 0, "無関係なグループは0");
+}
+
+// --- 席種エリアマスタのフラグ（2026-09-26 SHUN確認のルール） ---
+{
+  const sm = (o) => Object.assign({ 席種エリアコード: "SSTAI26E001", 席種エリア名: "", rsve_unrsve_kbn: "1", seattype_stock_control_typ: "1", box_seat_flg: "", seat_cnt: "", single_day_admission_flg: "", parking_ticket_flg: "" }, o);
+  const kinds = (o) => H.hpCheckSeatFlags([sm(o)]).map((f) => f.kind);
+  eq(kinds({ 席種エリア名: "STAI26_R-BOX L 8名(スロープ入口)観戦券", box_seat_flg: "1", seat_cnt: "6" }).includes("BOXの座席数・フラグ"), true, "R-BOX 8名で座席数6はNG（実データ）");
+  eq(kinds({ 席種エリア名: "R-BOX L 8名", box_seat_flg: "1", seat_cnt: "8" }).length, 0, "8名・座席数8・BOX=1はOK");
+  eq(kinds({ 席種エリア名: "S-BOX M(6名)", box_seat_flg: "0", seat_cnt: "6" }).includes("BOXの座席数・フラグ"), true, "指定席で(○名)なのにBOXフラグ0はNG");
+  eq(kinds({ 席種エリア名: "GRAN VIEW", box_seat_flg: "1", seat_cnt: "" }).includes("BOXの座席数・フラグ"), true, "BOXフラグ1で座席数未設定はNG");
+  eq(kinds({ 席種エリア名: "ﾎｽﾋﾟﾀﾘﾃｨ休憩スペース(4名定員)", rsve_unrsve_kbn: "2", seattype_stock_control_typ: "2", box_seat_flg: "0", seat_cnt: "1" }).length, 0, "数在庫の(○名定員)は対象外（シマノ）");
+  eq(kinds({ 席種エリア名: "MJRR1_[要引換]パドックパス", rsve_unrsve_kbn: "2", seattype_stock_control_typ: "2" }).includes("単日入場フラグ"), true, "引換券で単日入場フラグ空はNG（実データ）");
+  eq(kinds({ 席種エリア名: "[要引換]16-23ZERO円パス", rsve_unrsve_kbn: "2", seattype_stock_control_typ: "2", single_day_admission_flg: "1" }).length, 0, "引換券で単日入場フラグ1はOK");
+  eq(kinds({ 席種エリアコード: "SF1GPP27011", 席種エリア名: "P1駐車場", rsve_unrsve_kbn: "2", seattype_stock_control_typ: "2", parking_ticket_flg: "0" }).includes("駐車券フラグ"), true, "駐車券コードで駐車券フラグ0はNG");
+  eq(H.hpCheckSeatFlags([sm({ 席種エリア名: "S-BOX M(6名)", box_seat_flg: "0", seat_cnt: "6" })])[0].noAi, true, "フラグの誤りはAIに送らない");
 }
 
 console.log(fail ? `hp_check: ${pass} passed, ${fail} failed` : `hp_check: ${pass} passed, 0 failed`);
