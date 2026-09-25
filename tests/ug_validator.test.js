@@ -672,24 +672,6 @@ for (const s of CUTOFF_SCENARIOS) {
     ["B1子ども→Q1-2は券種は値上がりでも席種最高額が下がるので不可（従来どおり）", val.canUpgrade(B1.name, B1.cd, "鈴鹿_子ども（小学生・中学生）", Q12.name, Q12.cd, "鈴鹿_3歳以上共通"), false],
     ["幼児→当日だけ安い幼児（6,700→6,200）は子ども系なので従来どおり可（0円）", val.canUpgrade("F1_A1-1ｳﾙﾄﾗｱｳﾄﾚｯﾄ観戦券[T0]", "SF1GPE27015", "鈴鹿_幼児（3歳～未就学児）", E2O.name, E2O.cd, "鈴鹿_幼児（3歳～未就学児）"), true],
   ];
-  // 「8歳以上共通」「中学生以上共通」は大人系ではない＝子ども・幼児へのUGは値下がりでも可（0円）
-  {
-    const P8 = { name: "8歳以上席", cd: "SF1GPE27998" }, JH = { name: "中学生以上席", cd: "SF1GPE27997" };
-    const val3 = buildUgValidator([
-      priceRow(P8.name, P8.cd, "鈴鹿_8歳以上共通", 20000, 30000),
-      priceRow(JH.name, JH.cd, "鈴鹿_中学生以上共通", 20000, 30000),
-      priceRow(B1.name, B1.cd, "鈴鹿_大人（24歳以上）", 75400, 120600),
-      priceRow(B1.name, B1.cd, "鈴鹿_子ども（小学生・中学生）", 6000, 9600),
-      priceRow(B1.name, B1.cd, "鈴鹿_幼児（3歳～未就学児）", 4200, 6700),
-    ], c, v, null);
-    for (const [s, sa] of [[P8, "鈴鹿_8歳以上共通"], [JH, "鈴鹿_中学生以上共通"]]) {
-      for (const da of ["鈴鹿_子ども（小学生・中学生）", "鈴鹿_幼児（3歳～未就学児）"]) {
-        const got = val3.canUpgrade(s.name, s.cd, sa, B1.name, B1.cd, da);
-        if (got === true) pass++;
-        else { fail++; console.error(`NG [${sa}→${da} は可のはず]: 実際 ${got}`); }
-      }
-    }
-  }
   // 元が「大人」でも、共通券種の先が安ければ不可（大人 75,400 → 3歳以上共通 75,000 を別データで再現。
   // 席種最高額を先>元にするため先席種に高額の別券種を持たせる）
   {

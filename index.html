@@ -2959,10 +2959,7 @@
         // 生成されていた（27F1で84件。2026-09-25 SHUN指示で不可に変更・正本§2-12）。
         // 元が子ども・幼児・U23 の値下がりは従来どおり可（§3 の「マイナス→0円」）。
         // ダミー価格・未設定の側は比較しない＝許可側（最高額比較と同じ扱い）。
-        // 大人系 = 大人券、または「3歳以上共通」「全年齢」のように全年齢をカバーする共通券（＝その席の大人料金）。
-        // 「8歳以上共通」「中学生以上共通」等は子ども・幼児へのUGが可能な券種なので大人系に含めない（SHUN指示 2026-09-25）
-        const isAdultClassAge = (age) => ugAgeRank(age) === 4 ||
-          (ugAgeSpan(age).common && /(^|[^0-9])3\s*歳以上|全年齢/.test(String(age || "").normalize("NFKC")));
+        const isAdultClassAge = (age) => ugAgeRank(age) === 4 || ugAgeSpan(age).common;
         const isTicketDowngrade = (srcAge, s, d) => isAdultClassAge(srcAge) && !!s && !!d && ["adv", "day"].some((w) =>
           s[w] != null && d[w] != null && !ugIsDummyPrice(s[w]) && !ugIsDummyPrice(d[w]) && d[w] < s[w]);
         // 席種カテゴリ: 指定席 / エリア / その他 / 駐車券
