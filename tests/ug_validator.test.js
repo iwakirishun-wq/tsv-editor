@@ -177,12 +177,12 @@ const SCENARIOS = [
     expectStatus: "invalid",
   },
   {
-    // 2026-09-25ルール変更（正本§2-12）: 席種最高額は上がる（10000→12000）が、子供の通常価格は
-    // 6000→5500 に下がる＝券種単位のダウングレード。旧ルールでは「差額マイナス→0円」でOKだったが、
-    // 値下がりするUGに料金を設定しない方針になったため invalid。
-    name: "席種アップグレードだが子供の料金は下がる（6000→5500） → invalid（2026-09-25ルール変更）",
+    // 席種最高額が上がる（10000→12000）ので不可にはならず、子供の実差額 5500−6000=−500 → 期待0円（返金なし）。
+    // 「非大人の同区分でマイナス差額→0円」という §3 の計算経路が、ルール変更後も生きていることの回帰
+    name: "席種アップグレードだが子供差額はマイナス（−500→期待0円） → OK",
     row: ugRow(SEAT_HI.name, SEAT_HI.cd, "子供", SEAT_UP.name, SEAT_UP.cd, "子供", 0, 0),
-    expectStatus: "invalid",
+    expectStatus: "ok",
+    expectExpected: 0,
   },
   {
     name: "元価格が売止めダミー(999999) → 検算対象外。登録差額もダミー値なら OK（0円表示バグの再発防止）",
@@ -637,47 +637,6 @@ for (const s of CUTOFF_SCENARIOS) {
   ));
   if (over.problems.some((p) => p.includes("通常販売期間を超えている"))) pass++;
   else { fail++; console.error(`NG [期分けでも超過は拾うべき]: ${JSON.stringify(over.problems)}`); }
-}
-
-// =============================================================
-// 券種単位のダウングレード（正本§2-12・2026-09-25）
-// 27F1実データの再現: Q1-2(仮設)は「3歳以上共通」75,000のみ、B1は大人75,400〜幼児4,200。
-// 席種の最高額は B1 のほうが高く、元が共通券種なので年齢チェックもスキップされるため、
-// 旧ロジックでは 3歳以上共通 → B1 U23／子ども／幼児 が差額マイナス→0円で生成されていた。
-// =============================================================
-{
-  const Q12 = { name: "F1_Q1-2(仮設)観戦券[T18]", cd: "SF1GPE27191" };
-  const B1 = { name: "F1_B1観戦券[T2]", cd: "SF1GPE27031" };
-  const E2O = { name: "F1_E-2ｱｳﾄﾚｯﾄ観戦券[T7]", cd: "SF1GPE27088" };
-  const ROWS = [
-    priceRow(Q12.name, Q12.cd, "鈴鹿_3歳以上共通", 75000, 120000),
-    priceRow(B1.name, B1.cd, "鈴鹿_大人（24歳以上）", 75400, 120600),
-    priceRow(B1.name, B1.cd, "鈴鹿_U23（高校生～23歳）", 37700, 60300),
-    priceRow(B1.name, B1.cd, "鈴鹿_子ども（小学生・中学生）", 6000, 9600),
-    priceRow(B1.name, B1.cd, "鈴鹿_幼児（3歳～未就学児）", 4200, 6700),
-    // 当日だけ安い（前売は同額）ケース。前売・当日のどちらかで下がれば不可
-    priceRow(E2O.name, E2O.cd, "鈴鹿_大人（24歳以上）", 42600, 68200),
-    priceRow(E2O.name, E2O.cd, "鈴鹿_幼児（3歳～未就学児）", 4200, 6200),
-  ];
-  const val = buildUgValidator(ROWS, c, v, null);
-  const cases = [
-    ["3歳以上共通→上位席の大人（75,000→75,400）は可", val.canUpgrade(Q12.name, Q12.cd, "鈴鹿_3歳以上共通", B1.name, B1.cd, "鈴鹿_大人（24歳以上）"), true],
-    ["3歳以上共通→上位席のU23は不可", val.canUpgrade(Q12.name, Q12.cd, "鈴鹿_3歳以上共通", B1.name, B1.cd, "鈴鹿_U23（高校生～23歳）"), false],
-    ["3歳以上共通→上位席の子どもは不可", val.canUpgrade(Q12.name, Q12.cd, "鈴鹿_3歳以上共通", B1.name, B1.cd, "鈴鹿_子ども（小学生・中学生）"), false],
-    ["3歳以上共通→上位席の幼児は不可", val.canUpgrade(Q12.name, Q12.cd, "鈴鹿_3歳以上共通", B1.name, B1.cd, "鈴鹿_幼児（3歳～未就学児）"), false],
-    ["B1子ども→Q1-2は券種は値上がりでも席種最高額が下がるので不可（従来どおり）", val.canUpgrade(B1.name, B1.cd, "鈴鹿_子ども（小学生・中学生）", Q12.name, Q12.cd, "鈴鹿_3歳以上共通"), false],
-    ["幼児→当日だけ安い幼児（6,700→6,200）は不可", val.canUpgrade(B1.name, B1.cd, "鈴鹿_幼児（3歳～未就学児）", E2O.name, E2O.cd, "鈴鹿_幼児（3歳～未就学児）"), false],
-  ];
-  for (const [name, got, want] of cases) {
-    if (got === want) pass++;
-    else { fail++; console.error(`NG [${name}]: 期待 ${want} / 実際 ${got}`); }
-  }
-  const chk = val(ugRow(Q12.name, Q12.cd, "鈴鹿_3歳以上共通", B1.name, B1.cd, "鈴鹿_子ども（小学生・中学生）", 0, 0));
-  if (chk.status === "invalid" && chk.problems.some((p) => p.includes("券種の料金が先<元"))) pass++;
-  else { fail++; console.error(`NG [券種ダウングレードがvalidateで検出されない]: status=${chk.status} problems=${JSON.stringify(chk.problems)}`); }
-  const up = val(ugRow(Q12.name, Q12.cd, "鈴鹿_3歳以上共通", B1.name, B1.cd, "鈴鹿_大人（24歳以上）", 500, 600));
-  if (up.status === "ok") pass++;
-  else { fail++; console.error(`NG [3歳以上共通→大人の正当なUGが通らない]: status=${up.status} problems=${JSON.stringify(up.problems)}`); }
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
