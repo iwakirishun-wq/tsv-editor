@@ -162,6 +162,39 @@ function getHpKnowledge(eventKey) {
  * @param {{ rows?: Array<Object>, question?: string }} payload
  * @return {{ text?: string, error?: string, truncated?: boolean, truncated_message?: string }}
  */
+// モデル名は URL のパスに入るので、英数字と . - _ だけを通す（それ以外は無視して既定に戻す）
+function sanitizeGeminiModel_(name) {
+  var s = String(name || '').trim().replace(/^models\//, '');
+  return /^[A-Za-z0-9._-]{1,80}$/.test(s) ? s : '';
+}
+
+/**
+ * 画面のモデル選択用。APIキーで今使えるモデルのうち、generateContent に対応するものを返す。
+ * 一覧をコードに書き込まないので、モデルが入れ替わってもそのまま選べる。
+ * @return {{ models?: Array<{id: string, name: string}>, error?: string }}
+ */
+function listGeminiModels() {
+  try {
+    var apiKey = (PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY') || '').trim();
+    if (!apiKey) return { error: 'GEMINI_API_KEY が未設定です' };
+    var S = String.fromCharCode(47);
+    var url = 'https:' + S + S + 'generativelanguage.googleapis.com' + S + 'v1beta' + S + 'models?pageSize=1000';
+    var res = UrlFetchApp.fetch(url, { method: 'get', headers: { 'x-goog-api-key': apiKey }, muteHttpExceptions: true });
+    if (res.getResponseCode() !== 200) {
+      return { error: 'モデル一覧の取得に失敗しました (HTTP ' + res.getResponseCode() + ')' };
+    }
+    var list = (JSON.parse(res.getContentText()).models || []).filter(function (m) {
+      return (m.supportedGenerationMethods || []).indexOf('generateContent') >= 0 && /gemini/i.test(m.name || '');
+    }).map(function (m) {
+      return { id: String(m.name || '').replace(/^models\//, ''), name: m.displayName || '' };
+    });
+    list.sort(function (a, b) { return a.id < b.id ? 1 : a.id > b.id ? -1 : 0; });
+    return { models: list };
+  } catch (e) {
+    return { error: 'listGeminiModels の実行中にエラーが発生しました: ' + e.message };
+  }
+}
+
 function askGemini(payload) {
   try {
     var props = PropertiesService.getScriptProperties();
@@ -190,12 +223,11 @@ function askGemini(payload) {
       isTruncated = true;
     }
 
-    var model = props.getProperty('GEMINI_MODEL');
-    if (!model || !model.trim()) {
-      // 2026-09-25: gemini-2.5-flash は新規ユーザーに提供終了（HTTP 404）。APIの案内どおり 3.8-flash を既定にする
+    // モデルの決め方: 画面で選んだもの > スクリプトプロパティ GEMINI_MODEL > 既定。
+    // モデルは入れ替わりが早い（2026-09-25に 2.5-flash が新規提供終了）ので、画面から変えられるようにした
+    var model = sanitizeGeminiModel_(payload.model) || sanitizeGeminiModel_(props.getProperty('GEMINI_MODEL'));
+    if (!model) {
       model = 'gemini-3.8-flash';
-    } else {
-      model = model.trim();
     }
 
     var promptLines = [];
@@ -248,6 +280,10 @@ function askGemini(payload) {
         temperature: 0.2
       }
     };
+    // 画面で表に並べるため、JSONで返させる指定（2026-09-26。Markdownの長文だと読みにくかった）
+    if (payload.format === 'json') {
+      requestPayload.generationConfig.responseMimeType = 'application/json';
+    }
 
     var fetchOptions = {
       method: 'post',
@@ -311,8 +347,18 @@ function askGemini(payload) {
       return { error: 'Gemini API の応答に候補 (candidates) が見つかりませんでした' };
     }
 
+    // 使用量（料金計算用）。思考トークンは出力として課金されるので output に含める
+    var um = resJson.usageMetadata || {};
+    var thoughts = Number(um.thoughtsTokenCount || 0);
     var result = {
-      text: generatedText
+      text: generatedText,
+      model: model,
+      usage: {
+        input: Number(um.promptTokenCount || 0),
+        output: Number(um.candidatesTokenCount || 0) + thoughts,
+        thoughts: thoughts,
+        total: Number(um.totalTokenCount || 0)
+      }
     };
 
     if (isTruncated) {

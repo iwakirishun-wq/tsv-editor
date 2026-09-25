@@ -3624,7 +3624,7 @@
             if (!groups.has(k)) groups.set(k, { row, page, note: tsvNote, count: 0, seats: [] });
             const g = groups.get(k);
             g.count++;
-            if (g.seats.length < 12) g.seats.push(String(row.席種エリア名 || row.席種エリアコード || ""));
+            if (g.seats.length < 12) g.seats.push(String(row.表示名 || row.席種エリア名 || row.席種エリアコード || ""));
           }
           for (const g of groups.values()) {
             const pages = (g.page && pn[g.page] ? [g.page] : []).concat(common);
@@ -3864,7 +3864,7 @@
         const pick = {
           price_schedule: ["席種エリアコード", "席種エリア名", "券種名", "前売価格", "当日価格", "販売開始日時", "販売終了日時",
                            "アップグレード該当フラグ", "アップグレード元席種エリアコード"],
-          seat_master: ["seat_type_area_cd", "seat_type_area_control_nm", "nte", "grp_nm"],
+          seat_master: ["seat_type_area_cd", "seat_type_area_control_nm", "seat_type_area_disp_nm", "nte", "grp_nm"],
           sej: ["seat_type_area_cd", "word1", "word2", "word3"],
         }[kind] || [];
         const idx = pick.map(at);
@@ -3879,6 +3879,7 @@
           if (kind === "seat_master") {
             o.配席ブロック管理名 = o.grp_nm;
             o.席種エリア名 = o.seat_type_area_control_nm;
+            o.表示名 = o.seat_type_area_disp_nm;
             o.席種エリアコード = o.seat_type_area_cd;
             o.備考 = o.nte;
             o.券種名 = "";
@@ -3993,6 +3994,108 @@
         }
       }
 
+      // ===== AI照合の設定（モデル・単価）と使用料 =====
+      // モデルは入れ替わりが早い（2026-09-25に gemini-2.5-flash が新規提供終了）ので、画面で選べて手入力もできるようにする。
+      // 単価の既定値の出典: https://ai.google.dev/gemini-api/docs/pricing（2026-09-24更新、有料枠・テキスト、USD/100万トークン）。
+      // 「*」付きの 3.6〜3.8-flash は2026-12-31までの期間限定価格。値は画面で上書きでき、上書きはこのブラウザに保存する。
+      const HP_AI_DEFAULT_MODEL = "gemini-3.8-flash";
+      const HP_AI_PRICE_DEFAULTS = {
+        "gemini-3.8-flash": [0.75, 3.75], "gemini-3.7-flash": [0.75, 3.75], "gemini-3.6-flash": [0.75, 3.75],
+        "gemini-3.5-flash": [1.5, 9], "gemini-3.5-flash-lite": [0.3, 2.5], "gemini-3.1-flash-lite": [0.25, 1.5],
+        "gemini-3.1-pro-preview": [2, 12], "gemini-3-flash-preview": [0.5, 3],
+        "gemini-2.5-pro": [1.25, 10], "gemini-2.5-flash": [0.3, 2.5], "gemini-2.5-flash-lite": [0.1, 0.4],
+      };
+      const HP_AI_STORE = "tsvEditor.hpAi";
+      function hpAiLoad() {
+        let s = null;
+        try { s = JSON.parse(localStorage.getItem(HP_AI_STORE) || "null"); } catch (e) { s = null; }
+        s = s && typeof s === "object" ? s : {};
+        if (!s.model) s.model = HP_AI_DEFAULT_MODEL;
+        if (!s.prices || typeof s.prices !== "object") s.prices = {};
+        if (!(Number(s.jpy) > 0)) s.jpy = 150;
+        const ym = new Date().toISOString().slice(0, 7);
+        if (!s.month || s.month.ym !== ym) s.month = { ym, usd: 0, calls: 0 };
+        return s;
+      }
+      function hpAiSave(s) {
+        try { localStorage.setItem(HP_AI_STORE, JSON.stringify(s)); } catch (e) { /* 保存できない環境でも動作は続ける */ }
+      }
+      function hpAiPrice(s, model) {
+        return (s.prices && s.prices[model]) || HP_AI_PRICE_DEFAULTS[model] || null;
+      }
+      const hpUsd = (v) => "$" + (v < 0.01 ? v.toFixed(4) : v.toFixed(2));
+      const hpYen = (v, s) => "約" + Math.round(v * s.jpy).toLocaleString("ja-JP") + "円";
+
+      function hpAiCfgHtml() {
+        return `<div class="_hp-ai-cfg" style="margin-top:12px;padding:8px 10px;border:1px solid var(--border);border-radius:4px;font-size:12px;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center">
+          <label>AIモデル <input class="_hp-ai-model" list="_hp-ai-models" style="width:230px;height:26px" placeholder="一覧から選ぶか手入力" spellcheck="false"></label>
+          <datalist id="_hp-ai-models"></datalist>
+          <label>単価（USD/100万トークン） 入力 <input class="_hp-ai-pin" type="number" min="0" step="0.01" style="width:70px;height:26px"></label>
+          <label>出力 <input class="_hp-ai-pout" type="number" min="0" step="0.01" style="width:70px;height:26px"></label>
+          <label>円換算 <input class="_hp-ai-jpy" type="number" min="1" step="1" style="width:64px;height:26px"> 円/ドル</label>
+          <span class="_hp-ai-month" style="color:#6b7280"></span>
+        </div>`;
+      }
+
+      // 設定欄の初期化。モデル一覧はGASから「今使えるもの」を取る（取れなければ既知の一覧だけ出す）
+      function hpAiCfgInit(ov) {
+        const s = hpAiLoad();
+        const $m = ov.querySelector("._hp-ai-model"), $in = ov.querySelector("._hp-ai-pin"),
+          $out = ov.querySelector("._hp-ai-pout"), $jpy = ov.querySelector("._hp-ai-jpy"),
+          $dl = ov.querySelector("#_hp-ai-models"), $month = ov.querySelector("._hp-ai-month");
+        const fillList = (ids) => {
+          const all = [...new Set([...(ids || []), ...Object.keys(HP_AI_PRICE_DEFAULTS)])];
+          $dl.innerHTML = all.map((id) => `<option value="${escHtml(id)}">`).join("");
+        };
+        const showPrice = () => {
+          const pr = hpAiPrice(s, $m.value.trim());
+          $in.value = pr ? pr[0] : "";
+          $out.value = pr ? pr[1] : "";
+        };
+        const showMonth = () => {
+          $month.textContent = `今月の累計（このブラウザ）: ${hpUsd(s.month.usd)}（${hpYen(s.month.usd, s)}）・${s.month.calls}回`;
+        };
+        $m.value = s.model;
+        $jpy.value = s.jpy;
+        fillList(state.hpAiModels);
+        showPrice();
+        showMonth();
+        $m.onchange = () => { s.model = $m.value.trim() || HP_AI_DEFAULT_MODEL; $m.value = s.model; hpAiSave(s); showPrice(); };
+        const savePrice = () => {
+          const a = Number($in.value), b = Number($out.value);
+          if ($in.value !== "" && $out.value !== "" && a >= 0 && b >= 0) { s.prices[$m.value.trim()] = [a, b]; hpAiSave(s); }
+        };
+        $in.onchange = savePrice;
+        $out.onchange = savePrice;
+        $jpy.onchange = () => { if (Number($jpy.value) > 0) { s.jpy = Number($jpy.value); hpAiSave(s); showMonth(); } };
+        if (hpIsGas() && !state.hpAiModels) {
+          hpCallServer("listGeminiModels").then((r) => {
+            if (r && Array.isArray(r.models)) { state.hpAiModels = r.models.map((x) => x.id); fillList(state.hpAiModels); }
+          }).catch(() => { /* 一覧が取れなくても手入力で使える */ });
+        }
+        return { settings: s, model: () => $m.value.trim() || HP_AI_DEFAULT_MODEL, showMonth };
+      }
+
+      // 1回ぶんの使用量と料金。単価が分からないモデルはトークン数だけ出す
+      function hpAiUsageHtml(r, cfg) {
+        const s = cfg.settings;
+        const u = (r && r.usage) || null;
+        const model = (r && r.model) || cfg.model();
+        if (!u) return `<div style="font-size:12px;color:#6b7280;margin-bottom:6px">モデル ${escHtml(model)}（使用量は取得できませんでした）</div>`;
+        const pr = hpAiPrice(s, model);
+        const tokens = `入力 ${u.input.toLocaleString("ja-JP")}・出力 ${u.output.toLocaleString("ja-JP")}${u.thoughts ? `（うち思考 ${u.thoughts.toLocaleString("ja-JP")}）` : ""} トークン`;
+        let cost = "単価が未設定のため料金は計算していません（上の欄で入力できます）";
+        if (pr) {
+          const usd = (u.input * pr[0] + u.output * pr[1]) / 1e6;
+          s.month.usd += usd;
+          s.month.calls += 1;
+          hpAiSave(s);
+          cfg.showMonth();
+          cost = `今回の料金 <b>${hpUsd(usd)}</b>（${hpYen(usd, s)}）`;
+        }
+        return `<div style="font-size:12px;margin-bottom:8px;padding:5px 8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px">モデル <b>${escHtml(model)}</b> ／ ${tokens} ／ ${cost}</div>`;
+      }
+
       function hpShowResult(res, kind) {
         const kn = state.hpKnowledge || {};
         const age = hpAgeDays(kn.built_at);
@@ -4038,7 +4141,8 @@
           ${sec("要確認", byLevel.warn, "#b45309")}
           ${sec("AIで照合する備考（同じ備考×同じHPページは1件にまとめています）", byLevel.ai, "#2563eb")}
           ${sec("参考・要目視", byLevel.info, "#6b7280")}
-          <div class="modal-btns" style="margin-top:14px">
+          ${hpAiCfgHtml()}
+          <div class="modal-btns" style="margin-top:10px">
             <button class="_hp-ai btn-default"${byLevel.error.length + byLevel.warn.length + byLevel.ai.length ? "" : " disabled"}>AIに説明させる（差分行・照合対象の備考のみ送信）</button>
             <button class="_hp-reload btn-default">ナレッジを読み直す</button>
             <button class="_hp-close btn-primary">閉じる</button>
@@ -4046,34 +4150,125 @@
           <div class="_hp-ai-out" style="display:none;margin-top:10px;padding:10px;background:#fafafa;border:1px solid var(--border);font-size:13px;white-space:pre-wrap"></div>
         </div>`;
         document.body.appendChild(ov);
+        const aiCfg = hpAiCfgInit(ov);
         ov.querySelector("._hp-close").onclick = () => ov.remove();
         ov.querySelector("._hp-reload").onclick = () => { state.hpKnowledge = null; ov.remove(); runHpCheck(); };
         ov.querySelector("._hp-ai").onclick = async () => {
           const out = ov.querySelector("._hp-ai-out");
           const picked = byLevel.error.concat(byLevel.warn, byLevel.ai).slice(0, 200);
-          const send = picked.map((f) => f.level === "ai"
-            ? { 行: f.row && f.row._row != null ? f.row._row + 1 : null, 種別: f.kind, 席種: (f.seats || []).join(" / "), 件数: f.row ? f.row._count : 1, TSV備考: f.note, HPページ: f.hpPages || [] }
-            : { 行: f.row && f.row._row != null ? f.row._row + 1 : null, 種別: f.kind, 席種: f.row ? f.row.席種エリア名 : "", 券種: f.row ? f.row.券種名 : "", 内容: f.detail });
+          // id で回答と元の指摘を結び付ける（AIに行番号や席種名を書き写させると取り違えるため）
+          const send = picked.map((f, i) => f.level === "ai"
+            ? { id: i + 1, 種別: f.kind, 席種表示名: f.seats || [], 件数: f.row ? f.row._count : 1, 現行の備考: f.note, HPページ: f.hpPages || [] }
+            : { id: i + 1, 種別: f.kind, 席種表示名: [f.row ? (f.row.表示名 || f.row.席種エリア名 || "") : ""], 券種: f.row ? f.row.券種名 : "", 内容: f.detail });
           // 参照されるページのHP記載だけを添える（ナレッジ全体は送らない）
           const pn = (state.hpKnowledge && state.hpKnowledge.page_notes) || {};
           const context = {};
           for (const f of picked) for (const pid of f.hpPages || []) if (pn[pid] && !context[pid]) context[pid] = pn[pid].lines;
-          const hasAi = picked.some((f) => f.level === "ai");
-          const question = hasAi
-            ? "「備考をHPと照合(AI)」の各行について、TSV備考の内容（有効期間・利用できる日・パークパスポート等の特典・座席指定・年齢や同伴の条件など）が、HP側の記載と矛盾していないか・HPにある重要な条件が抜けていないかを判定してください。表記の違いだけで内容が同じものは『問題なし』、直すべきものは『要修正』として、行番号・席種・理由・HPの該当記載を挙げてください。HPに根拠が見当たらないものは推測せず『HPに記載なし』としてください。その他の行は、表記違いだけのものと本当に直すべきものを分けて説明してください。"
-            : "この突合結果のうち、実質同じ内容なのに表記が違うだけのものと、本当に直すべきものを分けて説明してください。";
+          const question = [
+            "各行（id）について判定し、次のJSONだけを返してください。前置きや説明文は不要です。",
+            '{"総評":"全体の要点を1〜3文","results":[{"id":1,"判定":"要修正|HPに記載なし|問題なし","修正案":"要修正のときだけ、直した後の備考全文（元の<br>区切りの形式を保つ）。それ以外は空文字","理由":"1〜2文","HP根拠":[{"ページ":"ページID","記載":"HPの該当記載をそのまま引用"}]}]}',
+            "判定の基準:",
+            "・要修正 = 現行の備考がHPの記載と矛盾している、またはHPにある重要な条件（有効期間・利用できる日・特典・座席指定・年齢や保護者同伴の条件など）が抜けている。",
+            "・HPに記載なし = 現行の備考の根拠が、渡したHPの記載の中に見当たらない（推測で要修正にしない）。",
+            "・問題なし = 内容がHPと一致している（表記の違いだけのものも含む）。",
+            "・「備考をHPと照合(AI)」以外の行（価格や備考の抜けの指摘）も同じ3区分で判定し、修正案には直すべき値を書く。",
+            "・HP根拠の「記載」はHP側の文をそのまま引用し、言い換えない。根拠が無ければ空配列。",
+          ].join("\n");
           if (!hpIsGas()) { out.style.display = ""; out.textContent = "AI照合はGAS版でのみ使えます（APIキーをサーバー側に置いているため）。"; return; }
-          if (!confirm(`差分 ${send.length} 件をGemini APIへ送ります。TSV全体は送りません。続けますか？`)) return;
+          if (!confirm(`差分・照合対象 ${send.length} 件をGemini APIへ送ります。TSV全体は送りません。続けますか？`)) return;
           out.style.display = "";
-          out.textContent = "Geminiに問い合わせ中...";
+          out.style.whiteSpace = "pre-wrap";
+          out.textContent = "Gemini（" + aiCfg.model() + "）に問い合わせ中...";
           try {
-            const r = await hpCallServer("askGemini", { rows: send, question, context });
-            out.textContent = r && r.error ? "失敗: " + r.error : ((r.truncated_message ? r.truncated_message + "\n\n" : "") + (r.text || "(応答が空でした)"));
+            const r = await hpCallServer("askGemini", { rows: send, question, context, format: "json", model: aiCfg.model() });
+            if (r && r.error) { out.textContent = "失敗: " + r.error; return; }
+            const parsed = hpParseAiJson(r && r.text);
+            const usageHtml = hpAiUsageHtml(r, aiCfg);
+            out.style.whiteSpace = "normal";
+            if (!parsed) {
+              // 形式が崩れたときは生の回答をそのまま見せる（黙って捨てない）
+              out.innerHTML = usageHtml + `<div style="white-space:pre-wrap">${escHtml((r && r.truncated_message ? r.truncated_message + "\n\n" : "") + ((r && r.text) || "(応答が空でした)"))}</div>`;
+              return;
+            }
+            out.innerHTML = usageHtml + hpRenderAiResult(parsed, picked, r.truncated_message);
           } catch (e) {
             out.textContent = "失敗: " + e.message;
           }
         };
         setStatus(`HP突合チェック: 要修正 ${byLevel.error.length} / 要確認 ${byLevel.warn.length} / 参考 ${byLevel.info.length}`, !byLevel.error.length);
+      }
+
+      // AIの回答（JSON）を読む。```json で囲まれていても、前後に文が付いていても本体だけ抜く
+      function hpParseAiJson(text) {
+        if (!text) return null;
+        const s = String(text).trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
+        const a = s.indexOf("{"), b = s.lastIndexOf("}");
+        if (a < 0 || b <= a) return null;
+        try {
+          const o = JSON.parse(s.slice(a, b + 1));
+          return o && Array.isArray(o.results) ? o : null;
+        } catch (e) { return null; }
+      }
+
+      // 判定ごとに色を分けた表にする（2026-09-26: Markdownの長文が読みにくかったため）。
+      // 並びは 要修正 → HPに記載なし → 問題なし。問題なしは折りたたむ
+      function hpRenderAiResult(parsed, picked, truncatedMsg) {
+        const V = {
+          "要修正": { bg: "#fef2f2", fg: "#b91c1c" },
+          "HPに記載なし": { bg: "#fffbeb", fg: "#b45309" },
+          "問題なし": { bg: "#f0fdf4", fg: "#15803d" },
+        };
+        const order = ["要修正", "HPに記載なし", "問題なし"];
+        // 備考の <br> は改行として見せる（文字はエスケープしてから <br> だけ戻す）
+        const note = (s) => escHtml(String(s || "")).replace(/&lt;br\s*\/?&gt;/gi, "<br>");
+        const byId = new Map(picked.map((f, i) => [i + 1, f]));
+        const groups = { "要修正": [], "HPに記載なし": [], "問題なし": [] };
+        for (const r of parsed.results) {
+          const v = order.includes(r["判定"]) ? r["判定"] : "HPに記載なし";
+          groups[v].push(r);
+        }
+        const th = 'style="border:1px solid #e5e7eb;padding:4px 6px;background:#f3f4f6;text-align:left;white-space:nowrap;writing-mode:horizontal-tb;height:auto;position:static"';
+        const td = 'style="border:1px solid #e5e7eb;padding:4px 6px;vertical-align:top;white-space:normal;height:auto;writing-mode:horizontal-tb;text-align:left"';
+        const table = (list, v) => {
+          const c = V[v];
+          const rows = list.map((r) => {
+            const f = byId.get(Number(r.id)) || {};
+            const seats = (f.seats && f.seats.length ? f.seats : [f.row ? (f.row.表示名 || f.row.席種エリア名 || "") : ""]).filter(Boolean);
+            const cnt = f.row && f.row._count > 1
+              ? `<div style="color:#6b7280;font-size:11px">${f.row._count}行${f.row._row != null ? "（先頭 " + (f.row._row + 1) + "行目）" : ""}</div>`
+              : (f.row && f.row._row != null ? `<div style="color:#6b7280;font-size:11px">${f.row._row + 1}行目</div>` : "");
+            const current = f.level === "ai" ? f.note : (f.detail || "");
+            const fix = String(r["修正案"] || "").trim();
+            const ev = (r["HP根拠"] || []).map((h) =>
+              `<div style="margin-top:3px;padding:2px 4px;background:#f8fafc;border-left:3px solid #94a3b8;font-size:11px"><span style="color:#64748b">${escHtml(h["ページ"] || "")}</span><br>${escHtml(h["記載"] || "")}</div>`).join("");
+            return `<tr style="background:${c.bg}">
+              <td ${td}><span style="display:inline-block;padding:1px 6px;border-radius:9px;background:${c.fg};color:#fff;font-size:11px;white-space:nowrap">${escHtml(v)}</span></td>
+              <td ${td}><b>${seats.map(escHtml).join("<br>")}</b>${cnt}</td>
+              <td ${td}>${note(current)}</td>
+              <td ${td}>${fix ? `<span style="color:#15803d;font-weight:600">${note(fix)}</span>` : '<span style="color:#9ca3af">―</span>'}</td>
+              <td ${td}>${escHtml(r["理由"] || "")}${ev}</td>
+            </tr>`;
+          }).join("");
+          return `<table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;margin-top:4px">
+            <colgroup><col style="width:92px"><col style="width:170px"><col><col><col style="width:30%"></colgroup>
+            <thead><tr><th ${th}>判定</th><th ${th}>席種エリア表示名</th><th ${th}>現行</th><th ${th}>修正案</th><th ${th}>理由・HPの根拠</th></tr></thead>
+            <tbody>${rows}</tbody></table>`;
+        };
+        const counts = order.map((v) => `<span style="color:${V[v].fg};font-weight:600">${v} ${groups[v].length}件</span>`).join("　");
+        let html = `<div style="font-size:13px;margin-bottom:6px">${counts}</div>`;
+        if (parsed["総評"]) html += `<div style="margin-bottom:8px;padding:6px 8px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:4px;font-size:12px">${escHtml(parsed["総評"])}</div>`;
+        if (truncatedMsg) html += `<div style="color:#b45309;font-size:12px;margin-bottom:6px">${escHtml(truncatedMsg)}</div>`;
+        for (const v of order) {
+          if (!groups[v].length) continue;
+          const body = table(groups[v], v);
+          html += v === "問題なし"
+            ? `<details style="margin-top:10px"><summary style="cursor:pointer;color:${V[v].fg};font-weight:600">${v}（${groups[v].length}件）を表示</summary>${body}</details>`
+            : `<h4 style="margin:10px 0 2px;color:${V[v].fg}">${v}（${groups[v].length}件）</h4>${body}`;
+        }
+        const answered = new Set(parsed.results.map((r) => Number(r.id)));
+        const missing = picked.filter((_, i) => !answered.has(i + 1)).length;
+        if (missing > 0) html += `<div style="margin-top:8px;color:#b45309;font-size:12px">AIが判定を返さなかった項目が ${missing} 件あります。もう一度実行してください。</div>`;
+        return html;
       }
 
       // 縦書きヘッダー切り替え（列幅節約）

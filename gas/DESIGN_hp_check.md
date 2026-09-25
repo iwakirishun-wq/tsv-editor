@@ -174,7 +174,7 @@ askGemini({ rows, question })// → Gemini応答。キーは Script Properties �
    |---|---|
    | `HP_KNOWLEDGE_FILE_ID` | Drive上の `HP料金ナレッジ.json` のファイルID |
    | `GEMINI_API_KEY` | Gemini APIキー |
-   | `GEMINI_MODEL` | 省略時 `gemini-3.8-flash`（2026-09-25変更。2.5-flashは新規ユーザー提供終了） |
+   | `GEMINI_MODEL` | 省略時 `gemini-3.8-flash`（2026-09-25変更。2.5-flashは新規ユーザー提供終了）。画面の「AIモデル」欄で選んだ値が優先（一覧は `listGeminiModels` でAPIから取得、手入力可） |
 
 3. 販売期間の `scope` 判定は、scope文字列と席種名のキーワード一致という単純な方式。
    実際のHPの書き方を見てから精度を詰める
