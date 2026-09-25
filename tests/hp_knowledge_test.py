@@ -525,6 +525,32 @@ class TestSeatMatching20260925(unittest.TestCase):
         self.assertIn(hp_knowledge.extract_seat_core_id("B1車いす"), hp_knowledge.seat_core_variants("F1_B1車いす同伴観戦券[T2]"))
 
 
+class TestPageNotes20260925(unittest.TestCase):
+    """備考のAI照合用に、ページ別のHP記載を持たせる（2026-09-25）。"""
+
+    def test_keeps_note_lines_and_drops_boilerplate(self):
+        text = "\n".join([
+            "4日間のパーク入園、パークパスポート", "※7歳以下のお子さまはご利用いただけません。",
+            "※MobilityStationを初めてご利用の方は事前の会員登録をお願いいたします", "※写真はイメージです。",
+            "75,400円", "マップ", "※7歳以下のお子さまはご利用いただけません。",
+        ])
+        lines = hp_knowledge.extract_page_note_lines(text)
+        self.assertIn("4日間のパーク入園、パークパスポート", lines)
+        self.assertIn("※7歳以下のお子さまはご利用いただけません。", lines)
+        self.assertEqual(lines.count("※7歳以下のお子さまはご利用いただけません。"), 1)
+        self.assertFalse(any("MobilityStation" in l or "写真" in l or l == "75,400円" or l == "マップ" for l in lines))
+
+    def test_event_has_page_notes_and_common_pages(self):
+        pages = [
+            {"source_id": "p_seat", "url": "u1", "text": "B1\n価格（税込）\n大人（24歳以上）\n75,400円\n※B1の注意"},
+            {"source_id": "p_guide", "url": "u2", "text": "※観戦券は4日間有効"},
+        ]
+        mapping = [{"席種エリアコード": "SF1GPE27031", "席種名": "F1_B1観戦券[T2]", "hp_source_id": "p_seat", "status": "auto"}]
+        ev = hp_knowledge.build_event_knowledge("F1_27", {"label": "t"}, pages, mapping)
+        self.assertIn("p_seat", ev["page_notes"])
+        self.assertEqual(ev["common_pages"], ["p_guide"])
+
+
 class TestRealHpKnowledgeGenerated(unittest.TestCase):
     """14. 実生成ファイル (HP料金ナレッジ.json) の整合性テスト"""
 

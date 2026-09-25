@@ -330,5 +330,39 @@ eq(H.hpTicketKey("なし"), "", "駐車券の券種なしは空");
   has(f, "前売が違う", "幼児の前売4,100（HPは4,200）を要修正として拾う");
 }
 
+// --- 備考のAI照合（2026-09-25: 125行の備考がHPと比べられないまま「指摘なし」になっていた回帰） ---
+{
+  const note = "※4/8(木)~11(日)有効<br>※期間中、本券はﾊﾟｰｸﾊﾟｽﾎﾟｰﾄとして利用可";
+  const sm = (code, name, nte) => ({ 席種エリアコード: code, 席種エリア名: name, 配席ブロック管理名: "鈴鹿_27F1", 備考: nte, 券種名: "" });
+  const rows = [
+    sm("SF1GPE27011", "F1_A1-1観戦券[T0]", note),
+    sm("SF1GPE27012", "F1_A1-2(仮設)観戦券[T0]", note),
+    sm("SF1GPE27031", "F1_B1観戦券[T2]", note),
+    sm("SF1GPE27999", "F1_未対応席", ""),
+  ];
+  const hp = {
+    items: [
+      { seat_code: "SF1GPE27011", ticket_name: "大人(24歳以上)", page: "suzuka_f1_2027_seat_a1", confidence: "exact" },
+      { seat_code: "SF1GPE27012", ticket_name: "大人(24歳以上)", page: "suzuka_f1_2027_seat_a1", confidence: "exact" },
+      { seat_code: "SF1GPE27031", ticket_name: "大人(24歳以上)", page: "suzuka_f1_2027_seat_b1", confidence: "exact" },
+    ],
+    page_notes: {
+      suzuka_f1_2027_seat_a1: { lines: ["※A1の注意"] },
+      suzuka_f1_2027_seat_b1: { lines: ["※B1の注意"] },
+      suzuka_f1_ticket_readme: { lines: ["4日間のパーク入園、パークパスポート"] },
+    },
+    common_pages: ["suzuka_f1_ticket_readme"],
+  };
+  const f = H.hpCheckNotes(rows, hp).filter((x) => x.kind === "備考をHPと照合(AI)");
+  eq(f.length, 2, "同じ備考×同じHPページはまとめる（A1-1とA1-2は1件、B1は別ページで1件）");
+  eq(f.every((x) => x.level === "ai" && x.aiTarget), true, "AI照合の対象として出す");
+  const a1 = f.find((x) => x.hpPages[0] === "suzuka_f1_2027_seat_a1");
+  eq(a1 && a1.row._count, 2, "まとめた行数を持つ");
+  eq(a1 && a1.hpPages.includes("suzuka_f1_ticket_readme"), true, "共通ページ（チケット案内）も照合に添える");
+  eq(f.some((x) => x.note === ""), false, "備考が空の行はAI照合に回さない");
+  // ページ別記載の無い旧ナレッジでは従来どおり（AI照合の行を作らない）
+  eq(H.hpCheckNotes(rows, { items: hp.items }).some((x) => x.kind === "備考をHPと照合(AI)"), false, "page_notes が無いナレッジでは出さない");
+}
+
 console.log(fail ? `hp_check: ${pass} passed, ${fail} failed` : `hp_check: ${pass} passed, 0 failed`);
 process.exit(fail ? 1 : 0);

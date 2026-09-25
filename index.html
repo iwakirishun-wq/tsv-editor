@@ -3603,6 +3603,39 @@
             }
           }
         }
+        // 備考の中身の照合はAIに任せる。上の2つだけだと、HPナレッジに席種ごとの備考がほぼ無いため
+        // （27F1で1件）125行の備考がHPと比べられないまま「指摘なし」になり、AIにも渡らなかった（2026-09-25）。
+        // 備考がある行は、その席種のHPページと共通ページ（チケット案内等）の記載を添えてAI照合の対象にする。
+        // 同じ備考×同じページは1件にまとめる（送る量を抑え、AIの回答も読みやすくする）。
+        if (hp && hp.page_notes) {
+          const pn = hp.page_notes;
+          const common = (hp.common_pages || []).filter((p) => pn[p]);
+          const pageByCode = new Map();
+          for (const it of hp.items || []) {
+            const c = String(it.seat_code || "").trim();
+            if (c && it.page && !pageByCode.has(c)) pageByCode.set(c, it.page);
+          }
+          const groups = new Map();
+          for (const row of rows) {
+            const tsvNote = String(row[noteKey] || "").trim();
+            if (!tsvNote) continue;
+            const page = pageByCode.get(String(row.席種エリアコード || "").trim()) || "";
+            const k = tsvNote + "\u0000" + page;
+            if (!groups.has(k)) groups.set(k, { row, page, note: tsvNote, count: 0, seats: [] });
+            const g = groups.get(k);
+            g.count++;
+            if (g.seats.length < 12) g.seats.push(String(row.席種エリア名 || row.席種エリアコード || ""));
+          }
+          for (const g of groups.values()) {
+            const pages = (g.page && pn[g.page] ? [g.page] : []).concat(common);
+            out.push({
+              level: "ai", kind: "備考をHPと照合(AI)", row: Object.assign({}, g.row, { _count: g.count }),
+              aiTarget: true, hpPages: pages, seats: g.seats, note: g.note,
+              detail: "備考「" + (g.note.length > 70 ? g.note.slice(0, 70) + "…" : g.note) + "」（" + g.count + "行）→ "
+                + (g.page ? "HPページ " + g.page : "席種に対応するHPページなし") + (common.length ? "＋共通" + common.length + "ページ" : "") + " とAIで照合",
+            });
+          }
+        }
         return out;
       }
 
@@ -3886,7 +3919,8 @@
         const key = keys.length === 1 ? keys[0] : await hpPickEvent(keys.map((k) => ({ key: k, label: (data.events[k] || {}).label || k })));
         if (!key) return null;
         const ev = data.events[key] || {};
-        return { schema: data.schema, built_at: data.built_at || null, event_key: key, label: ev.label || key, sale: ev.sale || null, items: ev.items || [] };
+        return { schema: data.schema, built_at: data.built_at || null, event_key: key, label: ev.label || key, sale: ev.sale || null, items: ev.items || [],
+          page_notes: ev.page_notes || {}, common_pages: ev.common_pages || [] };
       }
 
       function hpPickEvent(evs) {
@@ -3963,7 +3997,7 @@
         const kn = state.hpKnowledge || {};
         const age = hpAgeDays(kn.built_at);
         const all = res.price.concat(res.period, res.note, res.structure || []);
-        const byLevel = { error: [], warn: [], info: [] };
+        const byLevel = { error: [], warn: [], ai: [], info: [] };
         all.forEach((f) => (byLevel[f.level] || byLevel.info).push(f));
         const sec = (title, list, color) => {
           if (!list.length) return "";
@@ -4002,9 +4036,10 @@
           ${res.meta.rows === 0 ? "<p>条件に一致するHP突合対象がありません。</p>" : all.length ? "" : "<p style=\"color:#16a34a;font-weight:600\">指摘はありません。</p>"}
           ${sec("要修正", byLevel.error, "#dc2626")}
           ${sec("要確認", byLevel.warn, "#b45309")}
+          ${sec("AIで照合する備考（同じ備考×同じHPページは1件にまとめています）", byLevel.ai, "#2563eb")}
           ${sec("参考・要目視", byLevel.info, "#6b7280")}
           <div class="modal-btns" style="margin-top:14px">
-            <button class="_hp-ai btn-default"${byLevel.error.length + byLevel.warn.length ? "" : " disabled"}>AIに説明させる（差分行のみ送信）</button>
+            <button class="_hp-ai btn-default"${byLevel.error.length + byLevel.warn.length + byLevel.ai.length ? "" : " disabled"}>AIに説明させる（差分行・照合対象の備考のみ送信）</button>
             <button class="_hp-reload btn-default">ナレッジを読み直す</button>
             <button class="_hp-close btn-primary">閉じる</button>
           </div>
@@ -4015,14 +4050,24 @@
         ov.querySelector("._hp-reload").onclick = () => { state.hpKnowledge = null; ov.remove(); runHpCheck(); };
         ov.querySelector("._hp-ai").onclick = async () => {
           const out = ov.querySelector("._hp-ai-out");
-          const send = byLevel.error.concat(byLevel.warn).slice(0, 200)
-            .map((f) => ({ 行: f.row && f.row._row != null ? f.row._row + 1 : null, 種別: f.kind, 席種: f.row ? f.row.席種エリア名 : "", 券種: f.row ? f.row.券種名 : "", 内容: f.detail }));
+          const picked = byLevel.error.concat(byLevel.warn, byLevel.ai).slice(0, 200);
+          const send = picked.map((f) => f.level === "ai"
+            ? { 行: f.row && f.row._row != null ? f.row._row + 1 : null, 種別: f.kind, 席種: (f.seats || []).join(" / "), 件数: f.row ? f.row._count : 1, TSV備考: f.note, HPページ: f.hpPages || [] }
+            : { 行: f.row && f.row._row != null ? f.row._row + 1 : null, 種別: f.kind, 席種: f.row ? f.row.席種エリア名 : "", 券種: f.row ? f.row.券種名 : "", 内容: f.detail });
+          // 参照されるページのHP記載だけを添える（ナレッジ全体は送らない）
+          const pn = (state.hpKnowledge && state.hpKnowledge.page_notes) || {};
+          const context = {};
+          for (const f of picked) for (const pid of f.hpPages || []) if (pn[pid] && !context[pid]) context[pid] = pn[pid].lines;
+          const hasAi = picked.some((f) => f.level === "ai");
+          const question = hasAi
+            ? "「備考をHPと照合(AI)」の各行について、TSV備考の内容（有効期間・利用できる日・パークパスポート等の特典・座席指定・年齢や同伴の条件など）が、HP側の記載と矛盾していないか・HPにある重要な条件が抜けていないかを判定してください。表記の違いだけで内容が同じものは『問題なし』、直すべきものは『要修正』として、行番号・席種・理由・HPの該当記載を挙げてください。HPに根拠が見当たらないものは推測せず『HPに記載なし』としてください。その他の行は、表記違いだけのものと本当に直すべきものを分けて説明してください。"
+            : "この突合結果のうち、実質同じ内容なのに表記が違うだけのものと、本当に直すべきものを分けて説明してください。";
           if (!hpIsGas()) { out.style.display = ""; out.textContent = "AI照合はGAS版でのみ使えます（APIキーをサーバー側に置いているため）。"; return; }
           if (!confirm(`差分 ${send.length} 件をGemini APIへ送ります。TSV全体は送りません。続けますか？`)) return;
           out.style.display = "";
           out.textContent = "Geminiに問い合わせ中...";
           try {
-            const r = await hpCallServer("askGemini", { rows: send, question: "この突合結果のうち、実質同じ内容なのに表記が違うだけのものと、本当に直すべきものを分けて説明してください。" });
+            const r = await hpCallServer("askGemini", { rows: send, question, context });
             out.textContent = r && r.error ? "失敗: " + r.error : ((r.truncated_message ? r.truncated_message + "\n\n" : "") + (r.text || "(応答が空でした)"));
           } catch (e) {
             out.textContent = "失敗: " + e.message;

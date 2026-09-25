@@ -147,7 +147,10 @@ function getHpKnowledge(eventKey) {
       event_key: eventKey,
       label: ev.label || eventKey,
       sale: ev.sale || null,
-      items: ev.items || []
+      items: ev.items || [],
+      // 備考のAI照合で使うページ別のHP記載（2026-09-25追加。無いナレッジでは空）
+      page_notes: ev.page_notes || {},
+      common_pages: ev.common_pages || []
     };
   } catch (e) {
     return { error: 'getHpKnowledge の実行中にエラーが発生しました: ' + e.message };
@@ -216,6 +219,13 @@ function askGemini(payload) {
 
     promptLines.push('【対象の差分行データ (JSON)】');
     promptLines.push(JSON.stringify(targetRows, null, 2));
+
+    // 備考のAI照合用: 各行の「HPページ」で参照するHP記載の抜粋（ページID -> 行の配列）
+    if (payload.context && typeof payload.context === 'object') {
+      promptLines.push('');
+      promptLines.push('【HP側の記載（ページ別の抜粋。各行のHPページ欄のIDで参照）】');
+      promptLines.push(JSON.stringify(payload.context, null, 2));
+    }
 
     var fullPrompt = promptLines.join('\n');
 
