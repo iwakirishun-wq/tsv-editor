@@ -639,5 +639,31 @@ for (const s of CUTOFF_SCENARIOS) {
   else { fail++; console.error(`NG [期分けでも超過は拾うべき]: ${JSON.stringify(over.problems)}`); }
 }
 
+// =============================================================
+// 共通券種 → 上位席の年齢別券種（2026-09-25 SHUN確認・正本§11）
+// 27F1実データ: Q1-2(仮設)は「3歳以上共通」75,000のみ、B1は大人75,400〜幼児4,200。
+// 席種の最高額が上がる（75,000→75,400）のでUGは成立し、先の券種が安い場合は
+// 「システム上返金はないのでマイナスは0円で正解」。値下がりを理由に不可にしてはいけない
+// （一度不可にして撤回した経緯あり）。8歳以上共通・中学生以上共通も同じ扱い。
+// =============================================================
+{
+  const Q12 = { name: "F1_Q1-2(仮設)観戦券[T18]", cd: "SF1GPE27191" };
+  const B1 = { name: "F1_B1観戦券[T2]", cd: "SF1GPE27031" };
+  const ROWS = [
+    priceRow(Q12.name, Q12.cd, "鈴鹿_3歳以上共通", 75000, 120000),
+    priceRow(B1.name, B1.cd, "鈴鹿_大人（24歳以上）", 75400, 120600),
+    priceRow(B1.name, B1.cd, "鈴鹿_U23（高校生～23歳）", 37700, 60300),
+    priceRow(B1.name, B1.cd, "鈴鹿_子ども（小学生・中学生）", 6000, 9600),
+    priceRow(B1.name, B1.cd, "鈴鹿_幼児（3歳～未就学児）", 4200, 6700),
+  ];
+  const val = buildUgValidator(ROWS, c, v, null);
+  for (const [age, adv, day] of [["鈴鹿_大人（24歳以上）", 500, 600], ["鈴鹿_U23（高校生～23歳）", 0, 0], ["鈴鹿_子ども（小学生・中学生）", 0, 0], ["鈴鹿_幼児（3歳～未就学児）", 0, 0]]) {
+    const ok = val.canUpgrade(Q12.name, Q12.cd, "鈴鹿_3歳以上共通", B1.name, B1.cd, age);
+    const chk = val(ugRow(Q12.name, Q12.cd, "鈴鹿_3歳以上共通", B1.name, B1.cd, age, adv, day));
+    if (ok && chk.status === "ok") pass++;
+    else { fail++; console.error(`NG [3歳以上共通→B1 ${age} は可・${adv}/${day}円のはず]: canUpgrade=${ok} status=${chk.status} ${JSON.stringify(chk.problems)}`); }
+  }
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
