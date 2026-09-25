@@ -18,7 +18,7 @@ if (!m) {
 const factory = new Function(
   m[1] +
     "\nreturn { hpIsDummyPrice, hpToNumber, hpNormName, hpParseDateTime, hpBuildIndex," +
-    " hpLookup, hpTicketKey, hpNoteForSeat, hpRulesForRow, hpIsUgRow, hpCollapse, hpCheckPrices, hpCheckSalePeriod, hpCheckNotes, hpAgeRank, hpVariantSuffix, hpBaseName, hpCheckStructure, hpCheckVariantMixup, hpRunAllChecks };"
+    " hpLookup, hpTicketKey, hpGroupKey, hpGroupScore, hpNoteForSeat, hpRulesForRow, hpIsUgRow, hpCollapse, hpCheckPrices, hpCheckSalePeriod, hpCheckNotes, hpAgeRank, hpVariantSuffix, hpBaseName, hpCheckStructure, hpCheckVariantMixup, hpRunAllChecks };"
 );
 const H = factory();
 
@@ -362,6 +362,18 @@ eq(H.hpTicketKey("なし"), "", "駐車券の券種なしは空");
   eq(f.some((x) => x.note === ""), false, "備考が空の行はAI照合に回さない");
   // ページ別記載の無い旧ナレッジでは従来どおり（AI照合の行を作らない）
   eq(H.hpCheckNotes(rows, { items: hp.items }).some((x) => x.kind === "備考をHPと照合(AI)"), false, "page_notes が無いナレッジでは出さない");
+}
+
+// --- 照合するグループの推定（2026-09-26: マスタ全件をAIに回さないため） ---
+{
+  const best = (evKey, label, groups) => groups.map((g) => [g, H.hpGroupScore(g, evKey, label)]).sort((a, b) => b[1] - a[1])[0][0];
+  const master = ["鈴鹿_26F1", "鈴鹿_25F1", "鈴鹿_F1", "鈴鹿_27F1", "鈴鹿_27F1(金)", "鈴鹿_27F1(木)", "鈴鹿_IGTC26", "もてぎ_JRR26", "もてぎ_SGT26", "鈴鹿_SGT26", "もてぎ_MTGP26", "鈴鹿_MFJ26"];
+  eq(best("鈴鹿_27F1", "2027 F1日本グランプリ（鈴鹿）", master), "鈴鹿_27F1", "27F1は同名グループ（(金)(木)や26F1より優先）");
+  eq(best("鈴鹿_IGTC(26)", "IGTC26（鈴鹿1000km）", master), "鈴鹿_IGTC26", "括弧の有無の表記ゆれを吸収");
+  eq(best("もてぎ_JRR26", "JRR26", master), "もてぎ_JRR26", "もてぎJRR26");
+  eq(H.hpGroupScore("もてぎ_SGT26", "鈴鹿_SGT26", "") < H.hpGroupScore("鈴鹿_SGT26", "鈴鹿_SGT26", ""), true, "同じシリーズでも会場が違えば下げる");
+  eq(H.hpGroupScore("鈴鹿_26F1", "鈴鹿_27F1", "") < H.hpGroupScore("鈴鹿_27F1", "鈴鹿_27F1", ""), true, "年だけ違うF1（26F1）は既定で選ばない");
+  eq(H.hpGroupScore("もてぎ_MTGP26", "鈴鹿_27F1", ""), 0, "無関係なグループは0");
 }
 
 console.log(fail ? `hp_check: ${pass} passed, ${fail} failed` : `hp_check: ${pass} passed, 0 failed`);

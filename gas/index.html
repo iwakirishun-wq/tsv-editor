@@ -3810,6 +3810,34 @@
         res.meta.warn = all.filter((f) => f.level === "warn").length;
         return res;
       }
+      // ===== 照合するグループの決定 =====
+      // 席種エリアマスタは全イベント分（実データで4,743行・数百グループ）が1ファイルに入っている。
+      // そのままHP突合するとAI照合に全グループが回り、コストも精度も悪くなる（2026-09-26 SHUN指摘）。
+      // HPナレッジのイベント（例「鈴鹿_27F1」）とグループ名の近さで候補を決め、確認してから絞り込む。
+      function hpGroupKey(s) {
+        return String(s || "").normalize("NFKC").replace(/[\s()（）\[\]【】_\-・･]/g, "").toUpperCase();
+      }
+      // 大きいほどイベントに近い。0 = 関係なし
+      function hpGroupScore(group, eventKey, eventLabel) {
+        const g = hpGroupKey(group);
+        if (!g) return 0;
+        let best = 0;
+        for (const ev of [eventKey, eventLabel]) {
+          const e = hpGroupKey(ev);
+          if (!e) continue;
+          if (g === e) return 100;
+          if (g.includes(e) || e.includes(g)) best = Math.max(best, 60);
+          // 「27F1」「SGT26」「MTGP26」のような英数字の塊と、会場名（鈴鹿/もてぎ）の一致で近さを測る
+          const tok = (x) => new Set((x.match(/[A-Z]*\d+[A-Z0-9]*|[A-Z]{2,}\d*/g) || []));
+          const gt = tok(g), et = tok(e);
+          let shared = 0;
+          et.forEach((t) => { if (gt.has(t)) shared++; });
+          const venue = ["鈴鹿", "もてぎ"].some((v) => g.includes(v) && e.includes(v)) ? 10 : 0;
+          if (shared) best = Math.max(best, Math.min(55, 30 * shared + venue));
+        }
+        return best;
+      }
+
       // ===HP_CHECK_CORE_END===
 
       // ===== HP突合チェック（UI側） =====
@@ -3952,6 +3980,68 @@
         return Math.floor((Date.now() - t) / 86400000);
       }
 
+      // 戻り値: { rows, groups } / null（中止）。グループ列が無い・1グループしか無いときはそのまま通す
+      function hpChooseGroups(rows, kind, kn) {
+        const key = kind === "seat_master" ? "配席ブロック管理名" : null;
+        if (!key) return Promise.resolve({ rows, groups: [] });
+        const counts = new Map();
+        for (const r of rows) {
+          const g = String(r[key] || "").trim() || "(グループなし)";
+          counts.set(g, (counts.get(g) || 0) + 1);
+        }
+        if (counts.size <= 1) return Promise.resolve({ rows, groups: [...counts.keys()] });
+        const evKey = kn && kn.event_key, evLabel = kn && kn.label;
+        const list = [...counts.entries()].map(([g, n]) => ({ g, n, score: kn ? hpGroupScore(g, evKey, evLabel) : 0 }))
+          .sort((a, b) => b.score - a.score || b.n - a.n || a.g.localeCompare(b.g, "ja"));
+        const top = list[0].score;
+        // 一番近いグループだけを既定で選ぶ（同点なら全部）。近いものが無ければ何も選ばない＝必ず人が選ぶ
+        const preset = new Set(top > 0 ? list.filter((x) => x.score === top).map((x) => x.g) : []);
+        return new Promise((resolve) => {
+          const ov = document.createElement("div");
+          ov.className = "modal-overlay _hp-grp-ov";
+          const shown = list.slice(0, 400);
+          ov.innerHTML = `<div class="modal-dialog" style="max-width:640px;width:92vw">
+            <div class="modal-title">照合するグループ</div>
+            <p style="font-size:12px;line-height:1.6;margin:6px 0">
+              ${kn ? `HPナレッジ「<b>${escHtml(evLabel || evKey || "")}</b>」に近いグループを選んでいます。` : "HPナレッジ無しで実行します。対象のグループを選んでください。"}
+              全${rows.length.toLocaleString()}行・${counts.size}グループのうち、選んだグループだけを照合・AI送信します。</p>
+            <input class="_hp-grp-q" placeholder="グループ名で絞り込み" style="width:100%;height:28px;margin-bottom:6px">
+            <div class="_hp-grp-list" style="max-height:46vh;overflow:auto;border:1px solid var(--border);padding:4px 6px;font-size:12px">
+              ${shown.map((x, i) => `<label style="display:flex;gap:6px;align-items:center;padding:2px 0" data-g="${escHtml(x.g)}">
+                <input type="checkbox" data-i="${i}"${preset.has(x.g) ? " checked" : ""}>
+                <span style="flex:1">${escHtml(x.g)}</span>
+                <span style="color:#6b7280">${x.n.toLocaleString()}行${x.score >= 60 ? '<b style="color:#2563eb;margin-left:6px">一致</b>' : x.score > 0 ? '<span style="color:#2563eb;margin-left:6px">近い</span>' : ""}</span></label>`).join("")}
+            </div>
+            <div class="_hp-grp-sum" style="font-size:12px;margin-top:6px"></div>
+            <div class="modal-btns">
+              <button class="_hp-cancel btn-default">キャンセル</button>
+              <button class="_hp-ok btn-primary">このグループで照合</button>
+            </div>
+          </div>`;
+          document.body.appendChild(ov);
+          const boxes = [...ov.querySelectorAll("input[type=checkbox]")];
+          const sum = ov.querySelector("._hp-grp-sum"), ok = ov.querySelector("._hp-ok");
+          const refresh = () => {
+            const sel = boxes.filter((b) => b.checked).map((b) => shown[+b.dataset.i]);
+            const n = sel.reduce((s, x) => s + x.n, 0);
+            sum.textContent = sel.length ? `選択: ${sel.length}グループ・${n.toLocaleString()}行` : "グループを選んでください";
+            ok.disabled = !sel.length;
+          };
+          boxes.forEach((b) => (b.onchange = refresh));
+          ov.querySelector("._hp-grp-q").oninput = (e) => {
+            const q = hpGroupKey(e.target.value);
+            ov.querySelectorAll("._hp-grp-list label").forEach((l) => { l.style.display = !q || hpGroupKey(l.dataset.g).includes(q) ? "" : "none"; });
+          };
+          refresh();
+          const done = (v) => { ov.remove(); resolve(v); };
+          ov.querySelector("._hp-cancel").onclick = () => done(null);
+          ok.onclick = () => {
+            const groups = new Set(boxes.filter((b) => b.checked).map((b) => shown[+b.dataset.i].g));
+            done({ rows: rows.filter((r) => groups.has(String(r[key] || "").trim() || "(グループなし)")), groups: [...groups] });
+          };
+        });
+      }
+
       async function runHpCheck() {
         const button = $("btn-hp-check");
         if (button.disabled) return;
@@ -3983,8 +4073,10 @@
               if (!state.hpKnowledge && !canRunWithout) { setStatus("HP突合チェックを中止しました"); return; }
             }
           }
-          const rows = hpExtractRows(kind);
-          const res = hpRunAllChecks({ kind, rows, hp: state.hpKnowledge });
+          const scope = await hpChooseGroups(hpExtractRows(kind), kind, state.hpKnowledge);
+          if (!scope) { setStatus("HP突合チェックを中止しました"); return; }
+          const res = hpRunAllChecks({ kind, rows: scope.rows, hp: state.hpKnowledge });
+          res.meta.groups = scope.groups;
           hpShowResult(res, kind);
         } catch (e) {
           hpShowNotice("HP突合チェックに失敗: " + e.message);
@@ -4013,6 +4105,7 @@
         if (!s.model) s.model = HP_AI_DEFAULT_MODEL;
         if (!s.prices || typeof s.prices !== "object") s.prices = {};
         if (!(Number(s.jpy) > 0)) s.jpy = 150;
+        if (!(Number(s.limitYen) > 0)) s.limitYen = 10;
         const ym = new Date().toISOString().slice(0, 7);
         if (!s.month || s.month.ym !== ym) s.month = { ym, usd: 0, calls: 0 };
         return s;
@@ -4026,6 +4119,14 @@
       const hpUsd = (v) => "$" + (v < 0.01 ? v.toFixed(4) : v.toFixed(2));
       const hpYen = (v, s) => "約" + Math.round(v * s.jpy).toLocaleString("ja-JP") + "円";
 
+      function hpAiEstimate(cfg, chars, items) {
+        const inTok = Math.ceil(chars * 1.0) + 600;
+        const outTok = items * 150 + 2000;
+        const pr = hpAiPrice(cfg.settings, cfg.model());
+        const yen = pr ? ((inTok * pr[0] + outTok * pr[1]) / 1e6) * cfg.settings.jpy : null;
+        return { inTok, outTok, yen };
+      }
+
       function hpAiCfgHtml() {
         return `<div class="_hp-ai-cfg" style="margin-top:12px;padding:8px 10px;border:1px solid var(--border);border-radius:4px;font-size:12px;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center">
           <label>AIモデル <input class="_hp-ai-model" list="_hp-ai-models" style="width:230px;height:26px" placeholder="一覧から選ぶか手入力" spellcheck="false"></label>
@@ -4033,6 +4134,7 @@
           <label>単価（USD/100万トークン） 入力 <input class="_hp-ai-pin" type="number" min="0" step="0.01" style="width:70px;height:26px"></label>
           <label>出力 <input class="_hp-ai-pout" type="number" min="0" step="0.01" style="width:70px;height:26px"></label>
           <label>円換算 <input class="_hp-ai-jpy" type="number" min="1" step="1" style="width:64px;height:26px"> 円/ドル</label>
+          <label>1回の上限 <input class="_hp-ai-limit" type="number" min="1" step="1" style="width:56px;height:26px"> 円</label>
           <span class="_hp-ai-month" style="color:#6b7280"></span>
         </div>`;
       }
@@ -4068,6 +4170,9 @@
         $in.onchange = savePrice;
         $out.onchange = savePrice;
         $jpy.onchange = () => { if (Number($jpy.value) > 0) { s.jpy = Number($jpy.value); hpAiSave(s); showMonth(); } };
+        const $lim = ov.querySelector("._hp-ai-limit");
+        $lim.value = s.limitYen;
+        $lim.onchange = () => { if (Number($lim.value) > 0) { s.limitYen = Number($lim.value); hpAiSave(s); } };
         if (hpIsGas() && !state.hpAiModels) {
           hpCallServer("listGeminiModels").then((r) => {
             if (r && Array.isArray(r.models)) { state.hpAiModels = r.models.map((x) => x.id); fillList(state.hpAiModels); }
@@ -4129,7 +4234,7 @@
           <p style="font-size:12px">対象：コードの6文字目がU以外。名称に未確定・未定・販促・団体利用を含む行は除外しています。</p>
           <p style="font-size:13px;margin:8px 0;line-height:1.7">
             ${res.meta.hp
-              ? `照合先: <b>${escHtml(kn.label || kn.event_key || "-")}</b> ／ 対象 ${res.meta.rows.toLocaleString()}行（${escHtml(kind)}）<br>
+              ? `照合先: <b>${escHtml(kn.label || kn.event_key || "-")}</b> ／ 対象 ${res.meta.rows.toLocaleString()}行（${escHtml(kind)}）${res.meta.groups && res.meta.groups.length ? ` ／ グループ: <b>${escHtml(res.meta.groups.join("、"))}</b>` : ""}<br>
                  ナレッジの作成: ${escHtml(kn.built_at || "不明")}${age != null ? `（<b style="color:${age > 14 ? "#dc2626" : "inherit"}">${age}日前</b>）` : ""}`
               : `<b style="color:#b45309">HPナレッジ無しで実行しました。</b>／ 対象 ${res.meta.rows.toLocaleString()}行（${escHtml(kind)}）<br>
                  調べたのは「同じグループの他の席種には備考があるのに、この行だけ空」だけです。
@@ -4175,7 +4280,14 @@
             "・HP根拠の「記載」はHP側の文をそのまま引用し、言い換えない。根拠が無ければ空配列。",
           ].join("\n");
           if (!hpIsGas()) { out.style.display = ""; out.textContent = "AI照合はGAS版でのみ使えます（APIキーをサーバー側に置いているため）。"; return; }
-          if (!confirm(`差分・照合対象 ${send.length} 件をGemini APIへ送ります。TSV全体は送りません。続けますか？`)) return;
+          // 概算: 日本語はおおむね1文字≒1トークン。出力は1件あたり約150トークン＋思考分を見込む
+          const est = hpAiEstimate(aiCfg, JSON.stringify(send).length + JSON.stringify(context).length + question.length, send.length);
+          const estLine = est.yen == null ? "（単価未設定のため料金の見込みは出せません）"
+            : `見込み: 約${Math.max(1, Math.round(est.yen))}円（入力 約${est.inTok.toLocaleString("ja-JP")}・出力 約${est.outTok.toLocaleString("ja-JP")}トークン）`;
+          const over = est.yen != null && est.yen > aiCfg.settings.limitYen;
+          const msg = `差分・照合対象 ${send.length} 件をGemini（${aiCfg.model()}）へ送ります。TSV全体は送りません。\n${estLine}`
+            + (over ? `\n\n⚠ 1回の上限 ${aiCfg.settings.limitYen}円 を超える見込みです。グループや対象を絞ってから実行することをおすすめします。それでも送りますか？` : "\n続けますか？");
+          if (!confirm(msg)) return;
           out.style.display = "";
           out.style.whiteSpace = "pre-wrap";
           out.textContent = "Gemini（" + aiCfg.model() + "）に問い合わせ中...";
