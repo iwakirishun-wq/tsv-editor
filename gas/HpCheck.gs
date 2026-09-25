@@ -150,7 +150,8 @@ function getHpKnowledge(eventKey) {
       items: ev.items || [],
       // 備考のAI照合で使うページ別のHP記載（2026-09-25追加。無いナレッジでは空）
       page_notes: ev.page_notes || {},
-      common_pages: ev.common_pages || []
+      common_pages: ev.common_pages || [],
+      group_aliases: ev.group_aliases || []
     };
   } catch (e) {
     return { error: 'getHpKnowledge の実行中にエラーが発生しました: ' + e.message };

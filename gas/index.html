@@ -3801,7 +3801,10 @@
             if (probs.length) out.push({ level: "error", kind: "BOXの座席数・フラグ", row, detail: probs.join(" / "), noAi: true });
           }
           if (/引換|オプション|交換/.test(name) && nk(row.single_day_admission_flg) !== "1") {
-            out.push({ level: "error", kind: "単日入場フラグ", row, detail: "引換・オプションの券なのに単日入場フラグが " + (nk(row.single_day_admission_flg) || "空") + "（1が必要）", noAi: true });
+            // グッズ引換券は入場券ではないため、単日入場フラグが要るかは運用次第（SHUN指示で要確認扱い）
+            const goods = /グッズ/.test(name);
+            out.push({ level: goods ? "warn" : "error", kind: goods ? "単日入場フラグ(グッズ・要確認)" : "単日入場フラグ", row,
+              detail: (goods ? "グッズ引換の券で単日入場フラグが " : "引換・オプションの券なのに単日入場フラグが ") + (nk(row.single_day_admission_flg) || "空") + (goods ? "（入場券でなければ不要の場合あり）" : "（1が必要）"), noAi: true });
           }
           if (code.length >= 6 && code.charAt(5).toUpperCase() === "P" && nk(row.parking_ticket_flg) !== "1") {
             out.push({ level: "error", kind: "駐車券フラグ", row, detail: "駐車券コード（6桁目P）なのに駐車券フラグが " + (nk(row.parking_ticket_flg) || "空") + "（1が必要）", noAi: true });
@@ -3986,7 +3989,7 @@
         if (!key) return null;
         const ev = data.events[key] || {};
         return { schema: data.schema, built_at: data.built_at || null, event_key: key, label: ev.label || key, sale: ev.sale || null, items: ev.items || [],
-          page_notes: ev.page_notes || {}, common_pages: ev.common_pages || [] };
+          page_notes: ev.page_notes || {}, common_pages: ev.common_pages || [], group_aliases: ev.group_aliases || [] };
       }
 
       function hpPickEvent(evs) {
@@ -4028,7 +4031,10 @@
         }
         if (counts.size <= 1) return Promise.resolve({ rows, groups: [...counts.keys()] });
         const evKey = kn && kn.event_key, evLabel = kn && kn.label;
-        const list = [...counts.entries()].map(([g, n]) => ({ g, n, score: kn ? hpGroupScore(g, evKey, evLabel) : 0 }))
+        // 席種エリアマスタでのグループ名がイベント名と違う場合（MotoGP26 → もてぎ_MTGP26）はナレッジの別名でも当てる
+        const aliases = (kn && kn.group_aliases) || [];
+        const scoreOf = (g) => Math.max(hpGroupScore(g, evKey, evLabel), ...aliases.map((a) => hpGroupScore(g, a, "")));
+        const list = [...counts.entries()].map(([g, n]) => ({ g, n, score: kn ? scoreOf(g) : 0 }))
           .sort((a, b) => b.score - a.score || b.n - a.n || a.g.localeCompare(b.g, "ja"));
         const top = list[0].score;
         // 一番近いグループだけを既定で選ぶ（同点なら全部）。近いものが無ければ何も選ばない＝必ず人が選ぶ

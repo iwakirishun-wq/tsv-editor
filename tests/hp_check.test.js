@@ -389,6 +389,7 @@ eq(H.hpTicketKey("なし"), "", "駐車券の券種なしは空");
   eq(kinds({ 席種エリア名: "[要引換]16-23ZERO円パス", rsve_unrsve_kbn: "2", seattype_stock_control_typ: "2", single_day_admission_flg: "1" }).length, 0, "引換券で単日入場フラグ1はOK");
   eq(kinds({ 席種エリアコード: "SF1GPP27011", 席種エリア名: "P1駐車場", rsve_unrsve_kbn: "2", seattype_stock_control_typ: "2", parking_ticket_flg: "0" }).includes("駐車券フラグ"), true, "駐車券コードで駐車券フラグ0はNG");
   eq(H.hpCheckSeatFlags([sm({ 席種エリア名: "S-BOX M(6名)", box_seat_flg: "0", seat_cnt: "6" })])[0].noAi, true, "フラグの誤りはAIに送らない");
+  { const g = H.hpCheckSeatFlags([sm({ 席種エリア名: "SGT1_ARTAｸﾞｯｽﾞ引換券", rsve_unrsve_kbn: "2", seattype_stock_control_typ: "2" })]); eq(g.length === 1 && g[0].level === "warn", true, "グッズ引換券は要確認（NGにしない）"); }
 }
 
 console.log(fail ? `hp_check: ${pass} passed, ${fail} failed` : `hp_check: ${pass} passed, 0 failed`);
