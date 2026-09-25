@@ -2951,6 +2951,14 @@
         };
         // 0円商品はUGの元にも先にもできない（前売・当日いずれかが0円ならブロック）。VBA CheckUpgrade 準拠
         const hasZeroPrice = (rec) => !!rec && (rec.adv === 0 || rec.day === 0);
+        // 券種単位のダウングレード: 先の券種の通常価格が元の券種より安い（前売・当日のどちらかで）。
+        // 席種の最高額比較（isSeatDowngrade）は「席種として上位か」しか見ないため、
+        // 「3歳以上共通」だけの席種（Q1-2・Q2・V2系）から上位席の U23／子ども／幼児 へのUGが
+        // 年齢チェック（共通はスキップ）も席種チェックも素通りし、差額マイナス→0円のUG行が
+        // 大量に生成されていた（27F1で84件。2026-09-25 SHUN指示で不可に変更・正本§2-12）。
+        // ダミー価格・未設定の側は比較しない＝許可側（最高額比較と同じ扱い）。
+        const isTicketDowngrade = (s, d) => !!s && !!d && ["adv", "day"].some((w) =>
+          s[w] != null && d[w] != null && !ugIsDummyPrice(s[w]) && !ugIsDummyPrice(d[w]) && d[w] < s[w]);
         // 席種カテゴリ: 指定席 / エリア / その他 / 駐車券
         //  判定はマスタ・コードを正とする（席種名での決め打ちはしない）:
         //   コード6桁目 O=その他（パドック/パス等・UG例外的に可）/ P=駐車券
@@ -3045,6 +3053,8 @@
           if (ugAgeSpanReason(srcAge, dstAge)) return false;
           // 公式HPでUG対象外と明示された席種（2026-08-18ルール。VBA側から2026-08-24に移植）
           if (isUgExcludedSeat(srcSeat) || isUgExcludedSeat(dstSeat)) return false;
+          // 券種の通常価格が下がるUGは作らない（正本§2-12・2026-09-25）
+          if (isTicketDowngrade(any.get(srcSeat + "|" + srcAge), any.get(dstSeat + "|" + dstAge))) return false;
           const sameAgeCatPre = (sr !== 0 && sr === dr) || srcAge === dstAge;
           // 木曜日券・木・金曜日券は同一席種内の年齢区分変更のみ（2026-08-19ルール。VBA側から移植）
           if (isSameSeatOnlyUg(srcSeat) || isSameSeatOnlyUg(dstSeat)) {
@@ -3147,6 +3157,13 @@
           // 高額席から安い席への0円UGが生成される穴を塞ぐため（VBAが2026-07-12に先行導入した基準）。
           if (!sameSeat && !srcWc && !dstWc && !srcComp && !dstComp && isSeatDowngrade(maxByCond, condKey(row) + "|" + srcSeat, condKey(row) + "|" + dstSeat)) {
             problems.push("席種の最高額が先<元のためUG不可");
+          }
+          // 券種の通常価格が下がるUG（差額マイナス→0円）は不可（正本§2-12・2026-09-25）
+          {
+            const ckD = condKey(row);
+            if (!sameSeat && isTicketDowngrade(lookup(ckD, srcSeat, srcAge), lookup(ckD, dstSeat, dstAge))) {
+              problems.push("券種の料金が先<元のためUG不可（ダウングレード）");
+            }
           }
           // マスタ連携時: マスタ未登録の席種を注記
           if (seatMeta) {
