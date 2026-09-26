@@ -1914,6 +1914,7 @@
                 <label><input type="checkbox" data-flag="colorView"> カラー表示</label>
                 <label><input type="checkbox" data-flag="gateView"> ゲート表示</label>
                 <label><input type="checkbox" data-flag="parkingCheck"> 駐車券検査</label>
+                <label><input type="checkbox" data-flag="singleDayCheck"> 単日入場検査</label>
                 <label><input type="checkbox" data-flag="boxCheck"> 区画席検査</label>
                 <label><input type="checkbox" data-flag="kanaCheck"> カナ検査</label>
                 <label><input type="checkbox" data-flag="bikoHtmlCheck"> 備考HTML変換</label>
@@ -2243,6 +2244,7 @@
           <div class="man-btn-row"><span class="man-btn-label">カラー表示</span><span class="man-btn-desc">表示カラーコード列の色をセル背景でプレビュー（切替）。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">ゲート表示</span><span class="man-btn-desc">ゲート用公演種別の番号にゲート名を併記。対応表は列ヘッダーのコメントから読み取り（切替）。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">駐車券検査</span><span class="man-btn-desc">エリアコード6桁目P ⇔ 駐車券フラグ1 を検査。✓OK / ✗NG どちらも表示（切替）。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">単日入場検査</span><span class="man-btn-desc">駐車券（6桁目P）と引換・オプション券の単日入場フラグを検査。備考の「…有効」の行の曜日から有効日数を数え、<b>2日以上有効なら1が必要</b>、<b>1日だけ有効（[日曜のみ]など）なら2日目の入場が無いので不要</b>。日数が読めない場合は要確認（切替）。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">カナ検査</span><span class="man-btn-desc">全角カタカナが残っているセルをオレンジ表示。システム取込は半角ｶﾅ必須のため（切替）。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">区画席検査</span><span class="man-btn-desc">席種名に「（〇名）」がある行は、6桁目E/P・BOX席フラグ1・席数2以上が揃っているか検査。✓OK / ✗不足項目を表示（切替）。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">HP突合</span><span class="man-btn-desc">HPナレッジ（<b>HP料金ナレッジ.json</b>／スキーマ <code>hp_price_knowledge/1</code>）と突き合わせ、<b>料金・販売期間・備考の抜け</b>を検出します。<br>・<b>経路価格スケジュール</b> → 前売/当日価格と販売開始/終了日時。アップグレード行は差額であって席種の値段ではないので対象外。同じ席種×券種×金額は販売経路・会員ランクのぶん重複するのでまとめて1件（×N行で件数表示）<br>・<b>席種エリアマスタ / SEJ</b> → 備考の抜け。「同じグループの他の席種には備考があるのにこの行だけ空」と「HPに記載があるのにTSVが空」の2通り<br>HPのページ間で金額が食い違う項目は<b>どちらかを正と決めず</b>「HP側が食い違い」として別枠に出します。「決勝レース終了まで」のように日時に落とせない販売期間は判定せず<b>要目視</b>に回します。<br>ナレッジの作成日と経過日数を必ず表示します（2週間以上前なら赤字で警告）。GAS版ではDrive上のナレッジを自動で読み、ローカルではJSONを選んで読み込みます。<br><b>AIに説明させる</b>を押すと、差分になった行だけをGeminiへ送って「表記違いだけのもの」と「本当に直すべきもの」を分けさせられます（GAS版のみ。TSV全体は送りません）。</span></div>
@@ -2411,6 +2413,7 @@
         colorView: false,    // disp_color_cd をセル背景色で表示
         gateView: false,     // gate_stage_typ1 にゲート名を併記
         parkingCheck: false, // 席種エリアコード6桁目P ⇔ 駐車券フラグ1 の検査
+        singleDayCheck: false, // 単日入場フラグ（複数日有効の駐車券・引換券は1、1日だけ有効なら不要）
         kanaCheck: false,    // 全角カタカナ検出（半角カナ必須フィールド用）
         boxCheck: false,     // 区画席（（〇名）席種）の設定検査
         ikkatsuCheck: false, // 席種一括設定チェック（23列）のインライン検品
@@ -2490,17 +2493,17 @@
 
       // 検品トグル各項目のラベルと、統合ボタンが束ねている項目一覧（ドロップダウンUIと共有）
       const INSPECT_FLAG_LABELS = {
-        colorView: "カラー表示", gateView: "ゲート表示", parkingCheck: "駐車券検査",
+        colorView: "カラー表示", gateView: "ゲート表示", parkingCheck: "駐車券検査", singleDayCheck: "単日入場検査",
         boxCheck: "区画席検査", kanaCheck: "カナ検査", bikoHtmlCheck: "備考HTML変換",
         sejWordLenCheck: "Word文字数チェック(50字超)",
       };
       const INSPECT_GROUPS = {
-        "btn-seatmaster-check": ["colorView", "gateView", "parkingCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck"],
+        "btn-seatmaster-check": ["colorView", "gateView", "parkingCheck", "singleDayCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck"],
         "btn-sej-check": ["kanaCheck", "sejWordLenCheck"],
       };
       // タブごとに保存・復元する検品トグル（タブ切り替えで勝手にOFFにならないようにする）。
       // spaceCheckはマスタ非依存・全列対象でデータ構造に紐づかないため全タブ共通のまま（ここには含めない）。
-      const INSPECT_TAB_FLAGS = ["colorView", "gateView", "parkingCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck", "sejWordLenCheck", "ikkatsuCheck"];
+      const INSPECT_TAB_FLAGS = ["colorView", "gateView", "parkingCheck", "singleDayCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck", "sejWordLenCheck", "ikkatsuCheck"];
       // カナ検査の対象列（半角カナ必須の略称/備考系のみ。席種名・試合名等のフルネーム列は全角カナが正しいため対象外）。
       // 前提条件チェックと描画ロジックで共用する。
       const KANA_TEXT_COLS = new Set([
@@ -2529,6 +2532,11 @@
         if (key === "parkingCheck") {
           if (!_hasHeader("seat_type_area_cd") || !_hasHeader("parking_ticket_flg")) {
             return "対象列(席種エリアコード/駐車券フラグ)がありません";
+          }
+        }
+        if (key === "singleDayCheck") {
+          if (!_hasHeader("single_day_admission_flg") || !_hasHeader("nte")) {
+            return "対象列(単日入場フラグ/備考)がありません";
           }
         }
         if (key === "boxCheck") {
@@ -3783,6 +3791,27 @@
       //  ・名前に 引換/オプション/交換 がある券は単日入場フラグ=1 が必要。
       //  ・駐車券（コード6桁目P）は駐車券フラグ=1 が必要。
       //    ※「駐車券は入場可フラグ=0」は実データ882件すべてが1で実態と合わないため入れていない。
+      //  ・単日入場フラグは「複数日有効で、期間中1回だけ認証する」券に要る。1日だけ有効な券
+      //    （[日曜のみ]の駐車券など）は2日目の入場が無いので不要（SHUN指示 2026-09-26）。
+      //    よって 1日だけ有効 → 引換券でも要求しない / 複数日有効の駐車券 → 1が必要。
+
+      // 有効日数の目安。備考の最初の「…有効」の行に出てくる曜日の種類数を返す（1=1日だけ、2以上=複数日。
+      //   「金~日」は曜日2種類なので2を返す＝実日数ではない。1か複数かの判定にだけ使う）。
+      //   「4/11(日)0:00~19:30有効」→1 /「4/9(金)0:00~11(日)23:59有効」→複数 /「3/28(土)0:00~19:30(日)有効」→複数
+      // 備考から読めなければ名前の [日曜のみ] 等で判断し、それでも分からなければ null（判定しない）。
+      function hpValidDayCount(row) {
+        const nk = (v) => String(v == null ? "" : v).normalize("NFKC");
+        const note = nk(row.備考 != null ? row.備考 : row.nte);
+        const line = note.split(/<br\s*\/?>|\n/i).find((s) => /有効/.test(s) && /\([月火水木金土日]\)/.test(s));
+        if (line) {
+          const days = new Set((line.split("有効")[0].match(/\(([月火水木金土日])\)/g) || []).map((s) => s.charAt(1)));
+          if (days.size) return days.size;
+        }
+        const name = nk(row.席種エリア名 || row.seat_type_area_control_nm || "");
+        if (/[月火水木金土日](曜日?)?(のみ|限定)/.test(name) && !/[月火水木金土日]\s*[・･]\s*[月火水木金土日]/.test(name)) return 1;
+        return null;
+      }
+
       function hpCheckSeatFlags(rows) {
         const out = [];
         const nk = (v) => String(v == null ? "" : v).normalize("NFKC").trim();
@@ -3800,7 +3829,14 @@
             else if (want && cnt !== want) probs.push("座席数が " + cnt + "（名前は" + want + "名）");
             if (probs.length) out.push({ level: "error", kind: "BOXの座席数・フラグ", row, detail: probs.join(" / "), noAi: true });
           }
-          if (/引換|オプション|交換/.test(name) && nk(row.single_day_admission_flg) !== "1") {
+          const validDays = hpValidDayCount(row);
+          const isParking = code.length >= 6 && code.charAt(5).toUpperCase() === "P";
+          if (isParking && validDays != null && validDays >= 2 && nk(row.single_day_admission_flg) !== "1") {
+            out.push({ level: "error", kind: "単日入場フラグ", row,
+              detail: "複数日有効の駐車券なのに単日入場フラグが " + (nk(row.single_day_admission_flg) || "空") + "（1が必要）", noAi: true });
+          }
+          const parkingReported = isParking && validDays != null && validDays >= 2;
+          if (validDays !== 1 && !parkingReported && /引換|オプション|交換/.test(name) && nk(row.single_day_admission_flg) !== "1") {
             // グッズ引換券は入場券ではないため、単日入場フラグが要るかは運用次第（SHUN指示で要確認扱い）
             const goods = /グッズ/.test(name);
             out.push({ level: goods ? "warn" : "error", kind: goods ? "単日入場フラグ(グッズ・要確認)" : "単日入場フラグ", row,
@@ -5068,7 +5104,7 @@
         }
         // 検品表示トグル（チケットタブ）: 関連項目をまとめたグループボタン
         $("btn-seatmaster-check").onclick = () => {
-          toggleInspectGroup(["colorView", "gateView", "parkingCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck"], "btn-seatmaster-check", "席種エリアマスタチェック");
+          toggleInspectGroup(["colorView", "gateView", "parkingCheck", "singleDayCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck"], "btn-seatmaster-check", "席種エリアマスタチェック");
         };
         $("btn-sej-check").onclick = () => {
           toggleInspectGroup(["kanaCheck", "sejWordLenCheck"], "btn-sej-check", "SEJチェック");
@@ -7212,7 +7248,7 @@
         return (
           visCols.join(",") + "|" + rowH + "|" +
           visCols.map((c) => state.colWidths[c] || 80).join(",") + "|" +
-          [state.colorView, state.gateView, state.parkingCheck, state.boxCheck,
+          [state.colorView, state.gateView, state.parkingCheck, state.singleDayCheck, state.boxCheck,
            state.kanaCheck, state.bikoHtmlCheck, state.ikkatsuCheck,
            state.sejWordLenCheck, state.spaceCheck, !!state.sejMaster, state.wrapCells]
             .map((b) => (b ? 1 : 0)).join("")
@@ -7401,6 +7437,11 @@
         const gateMap = gateColIdx !== -1 ? getGateMap() : null;
         const parkCodeIdx = state.parkingCheck ? _hIdx("seat_type_area_cd") : -1;
         const parkFlagIdx = state.parkingCheck ? _hIdx("parking_ticket_flg") : -1;
+        // 単日入場検査: 複数日有効の駐車券・引換券は1が必要、1日だけ有効なら不要（判定は hpValidDayCount と共通）
+        const sdFlagIdx = state.singleDayCheck ? _hIdx("single_day_admission_flg") : -1;
+        const sdCodeIdx = state.singleDayCheck ? _hIdx("seat_type_area_cd") : -1;
+        const sdNoteIdx = state.singleDayCheck ? _hIdx("nte") : -1;
+        const sdNameIdx = state.singleDayCheck ? _hIdx("seat_type_area_control_nm") : -1;
         // 区画席検査: 席種名（〇名）行の設定チェック
         const boxNmIdx = state.boxCheck ? (_hIdx("seat_type_area_disp_nm") !== -1 ? _hIdx("seat_type_area_disp_nm") : _hIdx("seat_type_area_control_nm")) : -1;
         const boxCodeIdx = state.boxCheck ? _hIdx("seat_type_area_cd") : -1;
@@ -7631,6 +7672,18 @@
               if (isP && flagIs1) displayVal = cellNote(cls, displayVal, "ok", "駐車券OK");
               else if (isP && !flagIs1) displayVal = cellNote(cls, displayVal, "ng", "駐車券(P)は1必須");
               else if (!isP && flagIs1) displayVal = cellNote(cls, displayVal, "warn", "Pでないのに1");
+            }
+            // 単日入場検査
+            if (j === sdFlagIdx && sdFlagIdx !== -1) {
+              const code = sdCodeIdx !== -1 ? String(row[sdCodeIdx] ?? "").trim() : "";
+              const name = sdNameIdx !== -1 ? String(row[sdNameIdx] ?? "") : "";
+              const days = hpValidDayCount({ 備考: sdNoteIdx !== -1 ? row[sdNoteIdx] : "", 席種エリア名: name });
+              const isP = code.length >= 6 && code[5].toUpperCase() === "P";
+              const needType = isP || /引換|オプション|交換/.test(name.normalize("NFKC"));
+              const is1 = cellVal.trim() === "1";
+              if (needType && days === 1) displayVal = cellNote(cls, displayVal, "ok", "1日のみ有効(不要)");
+              else if (needType && days != null && days >= 2) displayVal = is1 ? cellNote(cls, displayVal, "ok", "複数日有効OK") : cellNote(cls, displayVal, "ng", "複数日有効は1必須");
+              else if (needType && !is1) displayVal = cellNote(cls, displayVal, "warn", "有効日数不明");
             }
             // 半角カナ検査: 全角カタカナを含むセルを警告表示（半角ｶﾅ必須のテキスト列のみ対象）
             if (state.kanaCheck && kanaCheckCols.has(j) && cellVal && /[ァ-ヶー]/.test(cellVal)) {
@@ -10517,7 +10570,7 @@
         if (_bm) { _bm.classList.remove("active-state"); _bm.setAttribute("aria-pressed","false"); }
         document.body.classList.remove("marker-mode");
         // 検品表示トグルは現在のデータの列構成に紐づくため、別ファイル/タブへ持ち越さずリセットする
-        ["colorView", "gateView", "parkingCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck", "sejWordLenCheck", "ikkatsuCheck"].forEach((k) => { state[k] = false; });
+        ["colorView", "gateView", "parkingCheck", "singleDayCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck", "sejWordLenCheck", "ikkatsuCheck"].forEach((k) => { state[k] = false; });
         const _bik = $("btn-ikkatsu-check");
         if (_bik) { _bik.classList.remove("active-state"); _bik.setAttribute("aria-pressed", "false"); }
         syncInspectUI();

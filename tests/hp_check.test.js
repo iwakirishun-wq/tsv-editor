@@ -18,7 +18,7 @@ if (!m) {
 const factory = new Function(
   m[1] +
     "\nreturn { hpIsDummyPrice, hpToNumber, hpNormName, hpParseDateTime, hpBuildIndex," +
-    " hpLookup, hpTicketKey, hpGroupKey, hpGroupScore, hpCheckSeatFlags, hpNoteForSeat, hpRulesForRow, hpIsUgRow, hpCollapse, hpCheckPrices, hpCheckSalePeriod, hpCheckNotes, hpAgeRank, hpVariantSuffix, hpBaseName, hpCheckStructure, hpCheckVariantMixup, hpRunAllChecks };"
+    " hpLookup, hpTicketKey, hpGroupKey, hpGroupScore, hpCheckSeatFlags, hpValidDayCount, hpNoteForSeat, hpRulesForRow, hpIsUgRow, hpCollapse, hpCheckPrices, hpCheckSalePeriod, hpCheckNotes, hpAgeRank, hpVariantSuffix, hpBaseName, hpCheckStructure, hpCheckVariantMixup, hpRunAllChecks };"
 );
 const H = factory();
 
@@ -390,6 +390,29 @@ eq(H.hpTicketKey("なし"), "", "駐車券の券種なしは空");
   eq(kinds({ 席種エリアコード: "SF1GPP27011", 席種エリア名: "P1駐車場", rsve_unrsve_kbn: "2", seattype_stock_control_typ: "2", parking_ticket_flg: "0" }).includes("駐車券フラグ"), true, "駐車券コードで駐車券フラグ0はNG");
   eq(H.hpCheckSeatFlags([sm({ 席種エリア名: "S-BOX M(6名)", box_seat_flg: "0", seat_cnt: "6" })])[0].noAi, true, "フラグの誤りはAIに送らない");
   { const g = H.hpCheckSeatFlags([sm({ 席種エリア名: "SGT1_ARTAｸﾞｯｽﾞ引換券", rsve_unrsve_kbn: "2", seattype_stock_control_typ: "2" })]); eq(g.length === 1 && g[0].level === "warn", true, "グッズ引換券は要確認（NGにしない）"); }
+}
+
+// --- 単日入場フラグ: 1日だけ有効な券は不要、複数日有効の駐車券は1が必要（2026-09-26 SHUN指示） ---
+{
+  const pk = (o) => Object.assign({ 席種エリアコード: "SF1GPP27114", 席種エリア名: "", rsve_unrsve_kbn: "2", seattype_stock_control_typ: "2", box_seat_flg: "0", seat_cnt: "1", single_day_admission_flg: "", parking_ticket_flg: "1", 備考: "" }, o);
+  const kinds = (o) => H.hpCheckSeatFlags([pk(o)]).map((f) => f.kind);
+  // 有効日数の読み取り（27F1・26F1の実データの書き方）
+  eq(H.hpValidDayCount({ 備考: "※4/11(日)0：00~19：30有効<br>※5m×2.5mまでの車両" }), 1, "日曜のみ（時刻の範囲）は1日");
+  eq(H.hpValidDayCount({ 備考: "※4/9(金)0：00~11(日)23：59有効<br>※5m×2.5mまでの車両" }), 2, "金〜日は複数日（曜日2種類）");
+  eq(H.hpValidDayCount({ 備考: "※3/28(土)0：00～19：30(日)有効" }), 2, "26F1の変則表記（終了側に曜日だけ）も複数日");
+  eq(H.hpValidDayCount({ 備考: "※3/29(日)0：00～29(日)24：00有効" }), 1, "同じ日の0:00〜24:00は1日");
+  eq(H.hpValidDayCount({ 備考: "", 席種エリア名: "F1_[日曜のみ]P3(舗装)駐車場" }), 1, "備考が無ければ名前の[日曜のみ]で1日");
+  eq(H.hpValidDayCount({ 備考: "", 席種エリア名: "F1_[土・日]鈴鹿大学駐車場" }), null, "[土・日]は1日と判定しない");
+  eq(H.hpValidDayCount({ 備考: "※駐車枠の指定はできません" }), null, "読めなければ null");
+  // 判定
+  eq(kinds({ 席種エリア名: "F1_[日曜のみ]みその駐車場", 備考: "※4/11(日)0：00~19：30有効" }).length, 0, "日曜のみの駐車券は単日入場フラグ空でOK（27F1実データ）");
+  eq(kinds({ 席種エリア名: "F1_[日曜のみ]みその駐車場", 備考: "※4/11(日)0：00~19：30有効", single_day_admission_flg: "1" }).length, 0, "日曜のみで1でも指摘しない");
+  eq(kinds({ 席種エリアコード: "SF1GPP27071", 席種エリア名: "F1_P7駐車場", 備考: "※4/9(金)0：00~11(日)23：59有効" }).includes("単日入場フラグ"), true, "3日間有効の駐車券で空はNG");
+  eq(kinds({ 席種エリアコード: "SF1GPP27071", 席種エリア名: "F1_P7駐車場", 備考: "※4/9(金)0：00~11(日)23：59有効", single_day_admission_flg: "1" }).length, 0, "3日間有効の駐車券で1はOK");
+  eq(kinds({ 席種エリアコード: "SF1GPP27071", 席種エリア名: "F1_P7駐車場", 備考: "" }).length, 0, "有効日数が読めない駐車券は指摘しない");
+  eq(kinds({ 席種エリアコード: "SMJRR1O001", 席種エリア名: "MJRR1_[日曜のみ][要引換]パドックパス", 備考: "※8/30(日)のみ有効" }).length, 0, "1日だけ有効な引換券は不要");
+  eq(kinds({ 席種エリアコード: "SMJRR1O001", 席種エリア名: "MJRR1_[要引換]パドックパス", 備考: "※8/29(土)~30(日)有効" }).includes("単日入場フラグ"), true, "複数日有効の引換券は従来どおり1が必要");
+  eq(kinds({ 席種エリアコード: "SF1GPP27071", 席種エリア名: "F1_[要引換]P7駐車場", 備考: "※4/9(金)~11(日)有効" }).filter((k) => k === "単日入場フラグ").length, 1, "駐車券かつ引換は二重に出さない");
 }
 
 console.log(fail ? `hp_check: ${pass} passed, ${fail} failed` : `hp_check: ${pass} passed, 0 failed`);
