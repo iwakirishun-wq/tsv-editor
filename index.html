@@ -12272,6 +12272,212 @@
         return escHtml(v);
       }
 
+      // ===DAY_CUTOFF_CORE_START=== UI/stateに依存しない純粋ロジック（tests/day_cutoff.test.js が抽出して検証する）
+      function _dayCutoffWeekdayJa(dateStr) {
+        const m = String(dateStr ?? "").trim().match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+        if (!m) return "";
+        const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+        if (isNaN(d.getTime())) return "";
+        return "日月火水木金土"[d.getDay()] || "";
+      }
+
+      function estimateDayCutoffCandidate(headers, rows) {
+        const H = (headers || []).map(h => String(h).trim());
+        const ix = (n) => H.indexOf(n);
+        const ixAny = (...names) => { for (const n of names) { const i = ix(n); if (i !== -1) return i; } return -1; };
+        const seatCdIdx = ixAny("席種エリアコード", "seat_type_area_cd");
+        const seatIdx = ix("席種エリア名");
+        const ugFlagIdx = ix("アップグレード該当フラグ");
+        const endIdx = ix("販売終了日時");
+
+        const getVal = (row, idx, name) => {
+          if (!row) return "";
+          if (Array.isArray(row)) return idx >= 0 ? (row[idx] ?? "") : "";
+          if (typeof row === "object") {
+            if (name && row[name] != null) return row[name];
+            if (idx >= 0 && row[idx] != null) return row[idx];
+            return "";
+          }
+          return "";
+        };
+
+        const isParkingRow = (row) => {
+          const ug = String(getVal(row, ugFlagIdx, "アップグレード該当フラグ")).normalize("NFKC").trim();
+          if (ug === "該当" || ug === "1") return false;
+
+          const seatCd = String(getVal(row, seatCdIdx, "席種エリアコード") || getVal(row, seatCdIdx, "seat_type_area_cd")).normalize("NFKC").trim();
+          if (seatCd.length >= 6 && seatCd[5].toUpperCase() === "P") {
+            return true;
+          }
+          const seat = String(getVal(row, seatIdx, "席種エリア名")).normalize("NFKC");
+          if (seat.includes("駐車")) {
+            return true;
+          }
+          return false;
+        };
+
+        const parseEnd = (raw) => {
+          const m = String(raw || "").normalize("NFKC").trim().match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);
+          if (!m) return null;
+          const hasTime = m[4] != null;
+          const y = m[1];
+          const mon = String(m[2]).padStart(2, "0");
+          const d = String(m[3]).padStart(2, "0");
+          const hh = String(m[4] ?? "00").padStart(2, "0");
+          const mm = String(m[5] ?? "00").padStart(2, "0");
+          return {
+            year: y,
+            month: mon,
+            day: d,
+            dateKey: `${y}-${mon}-${d}`,
+            slashDate: `${y}/${mon}/${d}`,
+            hh,
+            mm,
+            timeKey: `${hh}:${mm}`,
+            hasTime,
+            fullKey: `${y}-${mon}-${d} ${hh}:${mm}`,
+          };
+        };
+
+        const nextDay = (dateKey) => {
+          const parts = dateKey.split("-");
+          const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+          d.setDate(d.getDate() + 1);
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        };
+
+        let parkingRowCount = 0;
+        const parkingEndCounts = new Map();
+        const count2359 = new Map();
+        const countAll = new Map();
+
+        for (const row of (rows || [])) {
+          const rawEnd = getVal(row, endIdx, "販売終了日時");
+          const parsed = parseEnd(rawEnd);
+
+          if (isParkingRow(row)) {
+            parkingRowCount++;
+            if (parsed) {
+              const rec = parkingEndCounts.get(parsed.fullKey) || { count: 0, parsed };
+              rec.count++;
+              parkingEndCounts.set(parsed.fullKey, rec);
+            }
+          }
+
+          if (parsed) {
+            const dateKey = parsed.dateKey;
+            if (parsed.hh === "23" && parsed.mm === "59") {
+              const r = count2359.get(dateKey) || { n: 0, dateKey };
+              r.n++;
+              count2359.set(dateKey, r);
+            }
+            // 時刻なしの終了日時は従来どおり 11:00 を代表時刻にする（変更前の推定と同じ）
+            const rec = countAll.get(dateKey) || { n: 0, dateKey, time: parsed.hasTime ? `${parsed.hh}:${parsed.mm}` : "11:00" };
+            rec.n++;
+            countAll.set(dateKey, rec);
+          }
+        }
+
+        // 新ルール: 駐車場の行の販売終了日時が最も多い日時の翌日0:00（同数なら遅い日時）
+        if (parkingRowCount > 0 && parkingEndCounts.size > 0) {
+          let best = null;
+          for (const rec of parkingEndCounts.values()) {
+            if (!best || rec.count > best.count || (rec.count === best.count && rec.parsed.fullKey > best.parsed.fullKey)) {
+              best = rec;
+            }
+          }
+          const candDate = nextDay(best.parsed.dateKey);
+          const candTime = "00:00";
+          const wd = _dayCutoffWeekdayJa(best.parsed.slashDate);
+          const wdStr = wd ? `(${wd})` : "";
+          const basis = `駐車場 ${parkingRowCount}行のうち最多の販売終了 ${best.parsed.slashDate}${wdStr} ${best.parsed.timeKey}（${best.count}行）の翌日0:00`;
+          return { date: candDate, time: candTime, basis };
+        }
+
+        // 駐車場の行はあるが販売終了日時が1件も読めない: 他の行から推すと根拠が食い違うので推定しない（手入力）
+        if (parkingRowCount > 0) {
+          return { date: "", time: "00:00", basis: `駐車場 ${parkingRowCount}行の販売終了日時が読めないため推定できません。日時を手で入力してください` };
+        }
+
+        // 駐車場の行が無い場合のフォールバック（23:59終了が最多の日の翌日0:00 → 無ければ最多の終了日時）
+        const pickMostDate = (map) => {
+          let best = null;
+          for (const [k, v] of map) {
+            if (!best || v.n > best.v.n || (v.n === best.v.n && k > best.k)) {
+              best = { k, v };
+            }
+          }
+          return best;
+        };
+
+        const best2359 = pickMostDate(count2359);
+        if (best2359) {
+          const candDate = nextDay(best2359.k);
+          const candTime = "00:00";
+          const basis = "駐車場の行が無いため、23:59終了が最多の日の翌日0:00";
+          return { date: candDate, time: candTime, basis };
+        }
+
+        const bestAll = pickMostDate(countAll);
+        if (bestAll) {
+          let candDate = bestAll.k;
+          let candTime = bestAll.v.time;
+          if (candTime === "23:59") {
+            candDate = nextDay(candDate);
+            candTime = "00:00";
+          }
+          const basis = "駐車場の行が無いため、最多の販売終了日時";
+          return { date: candDate, time: candTime, basis };
+        }
+
+        return { date: "", time: "00:00", basis: "販売終了日時が無いため推定不可" };
+      }
+
+      // 日時の書式（マトリクス用）: 年は省略、「M/D(曜) HH:MM」（月日の先頭0は付けない）
+      function dtMatrix(s) {
+        s = String(s || "").normalize("NFKC").trim();
+        if (!s) return "";
+        let m = s.match(/\d{4}[\/\-](\d{1,2})[\/\-](\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);
+        if (!m) m = s.match(/^(\d{1,2})[\/\-](\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);
+        if (!m) return s;
+        const mon = String(Number(m[1]));
+        const day = String(Number(m[2]));
+        const wd = _dayCutoffWeekdayJa(s);
+        const wdStr = wd ? `(${wd})` : "";
+        const md = `${mon}/${day}${wdStr}`;
+        if (m[3] != null) {
+          const hh = String(m[3]).padStart(2, "0");
+          const mm = String(m[4] ?? "00").padStart(2, "0");
+          return `${md} ${hh}:${mm}`;
+        }
+        return md;
+      }
+
+      // 日時の比較キー（年を含む "YYYY-MM-DD HH:MM"）。表示は年を省くが、比較は年込みで行う
+      //  （年を省いた文字列で比べると、年違いで月日・曜日が同じ期間を同一とみなしてしまう）
+      function _periodKey(raw) {
+        const s = String(raw ?? "").normalize("NFKC").trim();
+        if (!s) return "";
+        const m = s.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);
+        if (!m) return s;
+        const p2 = (x) => String(x).padStart(2, "0");
+        return `${m[1]}-${p2(m[2])}-${p2(m[3])}` + (m[4] != null ? ` ${p2(m[4])}:${m[5]}` : "");
+      }
+
+      // 販売期間差分フォーマット（マトリクス用: 基本期間と同じなら空文字、違う側だけ短く出力）
+      //  引数は生の日時（基本期間も生の値）。片側が空なら「開始未設定」「終了未設定」を出して欠落を隠さない。
+      function formatPeriodDiff(startRaw, endRaw, baseStartRaw, baseEndRaw) {
+        const sKey = _periodKey(startRaw), eKey = _periodKey(endRaw);
+        const bsKey = _periodKey(baseStartRaw), beKey = _periodKey(baseEndRaw);
+        const sPart = sKey === bsKey ? null : (sKey ? dtMatrix(startRaw) : "開始未設定");
+        const ePart = eKey === beKey ? null : (eKey ? dtMatrix(endRaw) : "終了未設定");
+        if (sPart == null && ePart == null) return "";
+        if (sPart != null && ePart != null) return `${sPart}〜${ePart}`;
+        if (sPart != null) return `${sPart}〜`;
+        return `〜${ePart}`;
+      }
+      // ===DAY_CUTOFF_CORE_END===
+
       // ===== 経路価格スケジュール → チェック用HTML出力 =====
       // 通常価格表 / UGマトリクス / UG一覧 を任意選択で出力。会員ランクは全件出力し、
       // 出力先HTMLで列ごとの並べ替え・絞り込み（会員ランク/販売期間/席種名など）が可能。
@@ -12303,53 +12509,9 @@
         if (!rowIndices.length) { setStatus("⚠ 表示する行がありません"); return; }
         const isFiltered = rowIndices.length < state.data.length;
 
-        // 当日/前売の境界日時の推定（ユーザー確定ルール・2026-07-07）:
-        //  価格経路スケジュール内の「販売終了が 23:59（その日の最後の1分）の行」の日付で最も件数が多い日を
-        //  “前売の最終日”とみなし、その 23:59 の1分後＝翌日00:00 を当日開始の候補にする。
-        //  ここでは候補を出すだけで、実際の境界は出力ダイアログでユーザーが確認・変更できる（曜日も表示）。
-        const endIdx = H.indexOf("販売終了日時");
-        let candidateDate = "", candidateTime = "00:00";
-        if (endIdx !== -1) {
-          const parseEnd = (raw) => String(raw || "").match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);
-          const nextDay = (dateKey) => {
-            const d = new Date(dateKey + "T00:00:00");
-            d.setDate(d.getDate() + 1);
-            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-          };
-          const pickMost = (map) => {
-            let best = null;
-            // 同数なら遅い日付を採用（イベント最終日側に倒す）
-            for (const [k, v] of map) if (!best || v.n > best.v.n || (v.n === best.v.n && k > best.k)) best = { k, v };
-            return best;
-          };
-          const count2359 = new Map(); // 23:59終了行の日付ごとの件数
-          const countAll = new Map();  // フォールバック用: 全終了日時の日付ごと（代表時刻も保持）
-          for (const i of rowIndices) {
-            const m = parseEnd(state.data[i]?.[endIdx]);
-            if (!m) continue;
-            const dateKey = `${m[1]}-${String(m[2]).padStart(2, "0")}-${String(m[3]).padStart(2, "0")}`;
-            const hh = String(m[4] ?? "").padStart(2, "0"), mm = String(m[5] ?? "").padStart(2, "0");
-            if (hh === "23" && mm === "59") {
-              const r = count2359.get(dateKey) || { n: 0 }; r.n++; count2359.set(dateKey, r);
-            }
-            const rec = countAll.get(dateKey) || { n: 0, time: `${String(m[4] || 11).padStart(2, "0")}:${String(m[5] || 0).padStart(2, "0")}` };
-            rec.n++; countAll.set(dateKey, rec);
-          }
-          const best2359 = pickMost(count2359);
-          if (best2359) {
-            // 最多の「23:59終了日」＋1分＝翌日00:00 を当日開始候補に
-            candidateDate = nextDay(best2359.k);
-            candidateTime = "00:00";
-          } else {
-            // 23:59終了の行が無い場合のみ、従来どおり最多の販売終了日時を候補にする
-            const best = pickMost(countAll);
-            if (best) {
-              candidateDate = best.k;
-              candidateTime = best.v.time;
-              if (candidateTime === "23:59") { candidateDate = nextDay(candidateDate); candidateTime = "00:00"; }
-            }
-          }
-        }
+        // 当日/前売の境界日時の推定（ユーザー確定ルール・2026-09-27）
+        const visibleRows = rowIndices.map(i => state.data[i]);
+        const { date: candidateDate, time: candidateTime, basis: candidateBasis } = estimateDayCutoffCandidate(state.headers, visibleRows);
         const weekdayLabel = (dateStr) => {
           if (!dateStr) return "";
           const d = new Date(dateStr + "T00:00:00");
@@ -12373,7 +12535,7 @@
             </div>
             <div style="border:1px solid #e2e8ee;border-radius:6px;padding:10px 12px;margin-bottom:16px;background:#f8fafc">
               <div style="font-weight:600;margin-bottom:4px">当日／前売の境界日時（999999ダミー判定に使用）</div>
-              <div style="color:#737373;font-size:11.5px;margin-bottom:8px">この日時より後を「当日」、前を「前売り」として999999(ダミー価格)の検算に使います。候補は<b>販売終了が23:59の行が最も多い日の翌日0:00</b>（＝前売最終日の1分後）を自動推定したものです。日付は必ずカレンダーで確認し、曜日が想定と合っているか確認してください。</div>
+              <div style="color:#737373;font-size:11.5px;margin-bottom:8px">この日時より後を「当日」、前を「前売り」として999999(ダミー価格)の検算に使います。<br>候補: <b>${escHtml(candidateBasis)}</b><br>日付は必ずカレンダーで確認し、曜日が想定と合っているか確認してください。</div>
               <div style="display:flex;align-items:center;gap:6px">
                 <input type="date" id="px-cutoff-date" value="${candidateDate}" style="font-size:13px;padding:4px 6px">
                 <input type="time" id="px-cutoff-time" value="${candidateTime}" style="font-size:13px;padding:4px 6px">
@@ -12636,9 +12798,46 @@ ${_sortableTable(labels, rowsHtml)}` };
           let missingTotal = 0;
           let mxBody = "";
           for (const [k, list] of byCond) {
-            // 基準価格マップ（席種|券種 → {adv,day}）
+            // 販売条件ブロックごとに「基本の販売期間」を決める: UG行の販売期間（開始,終了の組）の最頻値
+            const periodCounts = new Map();
+            for (const row of list) {
+              const s = v(row, c.start), e = v(row, c.end);
+              if (!s && !e) continue;
+              const pKey = s + "|||" + e;
+              const rec = periodCounts.get(pKey) || { count: 0, s, e };
+              rec.count++;
+              periodCounts.set(pKey, rec);
+            }
+            let basePeriod = null;
+            for (const rec of periodCounts.values()) {
+              if (!basePeriod || rec.count > basePeriod.count) {
+                basePeriod = rec;
+              }
+            }
+            let baseStartFmt = "", baseEndFmt = "", basePeriodHtml = "";
+            const baseStartRaw = basePeriod ? basePeriod.s : "", baseEndRaw = basePeriod ? basePeriod.e : "";
+            if (basePeriod) {
+              baseStartFmt = basePeriod.s ? dtMatrix(basePeriod.s) : "";
+              baseEndFmt = basePeriod.e ? dtMatrix(basePeriod.e) : "";
+              if (baseStartFmt || baseEndFmt) {
+                const periodText = (baseStartFmt && baseEndFmt)
+                  ? `販売期間 ${baseStartFmt} → ${baseEndFmt}`
+                  : `販売期間 ${baseStartFmt || baseEndFmt}`;
+                basePeriodHtml = `<span class="cond-period">${escHtml(periodText)}</span>`;
+              }
+            }
+
+            // 基準価格マップ（席種|券種 → {adv,day,code,start,end}）
             const priceMap = {};
-            for (const row of (normalsByCond[k] || [])) priceMap[v(row, c.seat) + "|" + v(row, c.age)] = { adv: v(row, c.adv), day: v(row, c.day), code: v(row, c.seatCd), period: period(row) };
+            for (const row of (normalsByCond[k] || [])) {
+              priceMap[v(row, c.seat) + "|" + v(row, c.age)] = {
+                adv: v(row, c.adv),
+                day: v(row, c.day),
+                code: v(row, c.seatCd),
+                start: v(row, c.start),
+                end: v(row, c.end),
+              };
+            }
 
             const fromSeats = [], toSeats = [], fromAges = {}, toAges = {}, map = new Map();
             const seatCode = {};
@@ -12664,15 +12863,29 @@ ${_sortableTable(labels, rowsHtml)}` };
             for (const ts of toSeats) for (const ta of toAges[ts]) toCols.push({ ts, ta });
 
             // ヘッダー: 行1=先席種(colspan,色,カテゴリ) / 行2=先券種＋先基準価格
-            // 販売期間（開始〜終了）はヘッダーが狭く横にはみ出るため、開始日と終了日の間で改行する
-            const periodHtml = (p) => p.period ? `<br><span class="hp-period">${escHtml(p.period).replace("〜", "<br>〜")}</span>` : "";
+            // 通常価格の期間: 基本期間と同じなら省略、違うときだけ差分を短く表示
+            const periodHeaderHtml = (p) => {
+              if (!p) return "";
+              const diff = formatPeriodDiff(p.start, p.end, baseStartRaw, baseEndRaw);
+              if (!diff) return "";
+              const formatted = (diff.indexOf("〜") > 0 && !diff.endsWith("〜"))
+                ? escHtml(diff).replace("〜", "<br>〜")
+                : escHtml(diff);
+              return `<br><span class="hp-period-diff">${formatted}</span>`;
+            };
+            const periodRowHtml = (p) => {
+              if (!p) return "";
+              const diff = formatPeriodDiff(p.start, p.end, baseStartRaw, baseEndRaw);
+              if (!diff) return "";
+              return `<br><span class="hp-period-diff">${escHtml(diff)}</span>`;
+            };
             let head = `<tr><th class="corner" colspan="2" rowspan="2">元＼先</th>`;
             for (const ts of toSeats) head += `<th class="seathdr" colspan="${toAges[ts].length}" style="background:${seatColor(ts)}"><span class="seathdr-label">${escHtml(seatLabel(ts, seatCode[ts]))}${catBadge(seatCat(seatCode[ts], ts))}</span></th>`;
             head += `</tr><tr>`;
             let prevTsHead = null;
             for (const ts of toSeats) for (const ta of toAges[ts]) {
               const p = priceMap[ts + "|" + ta];
-              const pr = p ? `<div class="hp">前${money(p.adv)}<br>当${money(p.day)}${periodHtml(p)}</div>` : "";
+              const pr = p ? `<div class="hp">前${money(p.adv)}<br>当${money(p.day)}${periodHeaderHtml(p)}</div>` : "";
               const colSep = ts !== prevTsHead ? " mx-colsep" : "";
               prevTsHead = ts;
               head += `<th class="agehdr${colSep}">${escHtml(ageLabel(ta))}${pr}</th>`;
@@ -12688,7 +12901,7 @@ ${_sortableTable(labels, rowsHtml)}` };
                 // 各行に複製して常に表示する（見た目のグループ分けは背景色とseat-sep枠線で行う）
                 bodyRows += `<th class="rowh seatrow" style="background:${seatColor(fs)}">${escHtml(seatLabel(fs, seatCode[fs]))}${catBadge(seatCat(seatCode[fs], fs))}</th>`;
                 const p = priceMap[fs + "|" + fa];
-                const pr = p ? `<div class="hp">前${money(p.adv)} 当${money(p.day)}${periodHtml(p)}</div>` : "";
+                const pr = p ? `<div class="hp">前${money(p.adv)} 当${money(p.day)}${periodRowHtml(p)}</div>` : "";
                 bodyRows += `<th class="agehdr rowh agecol">${escHtml(ageLabel(fa))}${pr}</th>`;
                 let prevTsBody = null;
                 for (const { ts, ta } of toCols) {
@@ -12745,17 +12958,21 @@ ${_sortableTable(labels, rowsHtml)}` };
                     ? `<div class="exp-badge">先－元 ${(!chk.sameSeat && rawAdvDiff != null && rawAdvDiff !== chk.expected)
                         ? `${rawAdvDiff.toLocaleString("ja-JP")}→${chk.expected.toLocaleString("ja-JP")}`
                         : chk.expected.toLocaleString("ja-JP")}</div>` : "";
-                  bodyRows += `<td class="mxc${cls}${colSep}" data-mid="${mid}" title="${escHtml(tip)}">${expBadge}<div class="adv${chk.advNg ? " l-ng" : ""}">前売 ${escHtml(money(v(row, c.adv)))}</div><div class="day${chk.dayNg ? " l-ng" : ""}">当日 ${escHtml(money(v(row, c.day)))}</div><div class="per">${escHtml(period(row))}</div>${dg}${reason}</td>`;
+                  const diffPer = formatPeriodDiff(v(row, c.start), v(row, c.end), baseStartRaw, baseEndRaw);
+                  const perHtml = diffPer ? `<div class="per"><span class="per-diff">${escHtml(diffPer)}</span></div>` : "";
+                  const advHtml = `<div class="adv${chk.advNg ? " l-ng" : ""}"><span class="lbl">前売</span> <span class="val">${escHtml(money(v(row, c.adv)))}</span></div>`;
+                  const dayHtml = `<div class="day${chk.dayNg ? " l-ng" : ""}"><span class="lbl">当日</span> <span class="val">${escHtml(money(v(row, c.day)))}</span></div>`;
+                  bodyRows += `<td class="mxc${cls}${colSep}" data-mid="${mid}" title="${escHtml(tip)}">${expBadge}${advHtml}${dayHtml}${perHtml}${dg}${reason}</td>`;
                 }
                 bodyRows += `</tr>`;
               });
             }
-            mxBody += `<div class="cond-block" data-cond="${escHtml(k)}"><h3>${escHtml(k)}</h3><div class="scroll mxscroll"><table class="mx">${head}${bodyRows}</table></div></div>`;
+            mxBody += `<div class="cond-block" data-cond="${escHtml(k)}"><h3>${escHtml(k)}${basePeriodHtml}</h3><div class="scroll mxscroll"><table class="mx">${head}${bodyRows}</table></div></div>`;
           }
           const ngBadge = ngTotal ? `　<span class="badge-ng">NG ${ngTotal}件</span>` : `　<span class="badge-ok">検算OK</span>`;
           const missingBadge = missingTotal ? `　<span class="badge-ng" style="background:#b45309">登録漏れ?候補 ${missingTotal}件</span>` : "";
           sections.matrix = { title: "UGマトリクス", body: `<h2>🔢 アップグレードマトリクス（俯瞰）${ngBadge}${missingBadge}</h2>
-<p class="legend">行=元席種/券種、列=先席種/券種（大人の前売価格の安い順）。見出しには通常価格の販売期間も併記。席種は表示略称＋区分（<span class="catb cat-r">指定席</span><span class="catb cat-a">数在庫</span><span class="catb cat-o">その他</span>）。各セル: 先－元=期待差額（緑） / 前売・当日=実際の金額 / 下=販売期間（曜日付き）。<b>期待差額</b>は差額0円なら全組合せ500（手数料）・同区分の大人は1〜500も500・U23/子供/幼児は実差額(マイナス→0)、異区分間はマイナス→0・1〜500→500・500超→実差額。<b>不一致は文字が赤・セルが薄ピンク</b>。<b>「？」の橙セル</b>はUG登録が無いセルのうち、先のほうが価格が高く対象外ルールにも当たらないため登録漏れの可能性がある候補（推測なので必ず人が確認してください）。クリックでマーク</p>${mxBody}` };
+<p class="legend">行=元席種/券種、列=先席種/券種（大人の前売価格の安い順）。基本の販売期間は各ブロック見出しに表示。席種は表示略称＋区分（<span class="catb cat-r">指定席</span><span class="catb cat-a">数在庫</span><span class="catb cat-o">その他</span>）。各セル: 先－元=期待差額（緑） / 前売・当日=実際の金額（数字太字） / 橙ラベル=基本と異なる販売期間（差分のみ短縮表示、見出しの通常価格も同様）。<b>期待差額</b>は差額0円なら全組合せ500（手数料）・同区分の大人は1〜500も500・U23/子供/幼児は実差額(マイナス→0)、異区分間はマイナス→0・1〜500→500・500超→実差額。<b>不一致は文字が赤・セルが薄ピンク</b>。<b>「？」の橙セル</b>はUG登録が無いセルのうち、先のほうが価格が高く対象外ルールにも当たらないため登録漏れの可能性がある候補（推測なので必ず人が確認してください）。クリックでマーク</p>${mxBody}` };
         }
 
         // --- UG一覧（席種ペアでセル結合・元⇒先・金額対比・差異強調） ---
@@ -12957,13 +13174,20 @@ table.mx th.agecol { position: sticky; left: 58px; z-index: 5; width: 92px; min-
 table.mx th.corner { position: sticky; top: 0; left: 0; z-index: 7; background: #e2e8ee; }
 table.mx .hp { font-size: 9px; font-weight: 400; color: #777; line-height: 1.15; margin-top: 1px; }
 table.mx .hp-period { color: #999; white-space: nowrap; }
+table.mx .hp-period-diff { display: inline-block; font-size: 8.5px; font-weight: 600; color: #c2410c; background: #ffedd5; border: 1px solid #fed7aa; border-radius: 3px; padding: 0 3px; line-height: 1.25; margin-top: 2px; }
+.cond-period { font-size: 11.5px; font-weight: 400; color: #4b5563; margin-left: 12px; }
 td.mxc { cursor: pointer; position: relative; min-width: 76px; }
 /* 差額(先−元)・前売・当日は読み比べやすいよう文字サイズを統一 */
 td.mxc .exp-badge { font-weight: 700; font-size: 11px; color: #1d4ed8; line-height: 1.2; }
-td.mxc .adv { font-weight: 600; font-size: 11px; color: #16a34a; }
-td.mxc .day { font-size: 11px; color: #b45309; }
-td.mxc .per { font-size: 9px; color: #999; }
-td.mxc .l-ng { color: #dc2626; font-weight: 700; }
+td.mxc .adv { font-size: 11px; color: #16a34a; line-height: 1.25; }
+td.mxc .day { font-size: 11px; color: #b45309; line-height: 1.25; }
+td.mxc .lbl { font-size: 9px; font-weight: 400; color: #78716c; margin-right: 2px; }
+td.mxc .val { font-weight: 700; }
+td.mxc .per { font-size: 9px; margin-top: 1px; }
+td.mxc .per-diff { display: inline-block; font-size: 8.5px; font-weight: 600; color: #c2410c; background: #ffedd5; border: 1px solid #fed7aa; border-radius: 3px; padding: 0 3px; line-height: 1.25; }
+td.mxc .l-ng { color: #dc2626; }
+td.mxc .l-ng .lbl { color: #dc2626; }
+td.mxc .l-ng .val { color: #dc2626; font-weight: 800; }
 td.mxc .rsn { font-size: 9px; color: #dc2626; font-weight: 700; margin-top: 1px; }
 .catb { display: inline-block; font-size: 8.5px; font-weight: 700; padding: 0 4px; border-radius: 6px; margin-left: 3px; vertical-align: middle; line-height: 1.5; }
 .cat-r { background: #dbeafe; color: #1d4ed8; }
@@ -12973,6 +13197,7 @@ td.mxc .rsn { font-size: 9px; color: #dc2626; font-weight: 700; margin-top: 1px;
 td.mxc.mx-ng { background: #fde8e8; }
 td.mxc.mx-na { background: #f5f5f5; }
 td.mxc.mx-na .adv, td.mxc.mx-na .day { color: #9ca3af; }
+td.mxc.mx-na .lbl, td.mxc.mx-na .val { color: #9ca3af; }
 td.mxc.marked { box-shadow: inset 0 0 0 3px var(--mk); }
 td.mxc.marked::after { content: "✓"; position: absolute; top: 1px; right: 3px; font-size: 10px; color: #16a34a; font-weight: 700; }
 .sub { font-size: 10px; color: #888; font-weight: 400; }

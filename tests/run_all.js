@@ -9,7 +9,7 @@
 const path = require("path");
 const { spawnSync } = require("child_process");
 
-const SUITES = ["price_rules", "ug_validator", "ug_bridge", "excel_import", "hp_check"];
+const SUITES = ["price_rules", "ug_validator", "ug_bridge", "excel_import", "hp_check", "day_cutoff"];
 let failed = 0;
 
 for (const name of SUITES) {
