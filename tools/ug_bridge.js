@@ -56,7 +56,7 @@ try {
 }
 const m = html.match(/===PRICE_RULES_CORE_START===[^\n]*\n([\s\S]*?)\n[^\n]*===UG_VALIDATOR_CORE_END===/);
 if (!m) die("index.html に PRICE_RULES_CORE〜UG_VALIDATOR_CORE のマーカーブロックが見つかりません");
-const core = new Function(m[1] + "\nreturn { buildUgValidator, ugExpectedCharge, ugIsDummyPrice };")();
+const core = new Function(m[1] + "\nreturn { buildUgValidator, ugExpectedCharge, ugIsDummyPrice, ugIsAdultCategory, ugIsYouthCategory, ugIsU23Category, ugAdultToYouthDowngradeReason };")();
 
 // --- 入力の読み込み ---
 let raw;
@@ -137,6 +137,13 @@ const seatMeta = (code, seat) => {
   if (/BOX|ボックス/i.test(cat)) return { found: true, box: true };
   if (/駐車/.test(cat)) return { found: true, cat: "駐車券" };
   if (/その他/.test(cat)) return { found: true, cat: "その他" };
+  // 2026-09-20: VBA seatCat が大分類「エリア席」をエリア確定に使うようになったので、
+  // ブリッジも同じ根拠を渡す。ここが無いと found:false で席種名フォールバックに落ち、
+  // 席種名に 自由席/エリア/木曜日券/金曜日券/Paddock Club/同伴 のいずれも含まない
+  // 数在庫席種（Ferris Wheel Lounge を大分類=エリア席へ直した後がまさにこれ）で
+  // VBA=エリア（自己UGを作らない）／JS=指定席（自己UGを可）に割れる。
+  // 大分類「指定席」は正本§10.1 のとおり確定根拠にしないので、ここでも渡さない。
+  if (/エリア/.test(cat)) return { found: true, cat: "エリア" };
   return { found: false };
 };
 const validate = core.buildUgValidator(rows, c, v, seatMeta, null);
