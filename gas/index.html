@@ -11866,7 +11866,7 @@
         return rows;
       }
 
-      
+
       function loadPriceMasterFile(file, _encoding, onDone) {
         if (typeof _encoding === 'function') {
           onDone = _encoding;
@@ -11889,13 +11889,13 @@
           const routeIdx = headers.findIndex(h => h === "販売経路区分");
           const dayIdx = headers.findIndex(h => h === "当日価格");
           const advIdx = headers.findIndex(h => h === "前売価格");
-          
+
           if (codeIdx === -1 || (dayIdx === -1 && advIdx === -1)) {
             alert("「席種エリアコード」および価格の列が見つかりません。\n価格経路スケジュールマスタ(BO-F-21030)を選択してください。");
             setStatus("⚠ 価格経路スケジュールの列が不足しています");
             return;
           }
-          
+
           const maxPrices = {};
           // リセール上限はチケットアカウントの「前売価格」の上限と一致すべき（当日価格は対象外）。
           // 桁区切りカンマを除いて数値化。0/空欄や売止めダミー(999999等)は「最高額」の対象外にする
@@ -11925,7 +11925,7 @@
         };
         r.readAsText(file, _encoding || "utf-8");
       }
-      
+
       function _openPriceMasterPicker(onDone) {
         pickFileWithFallback(
           [".tsv", ".csv", ".txt"],
@@ -13784,7 +13784,7 @@ html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         const findings = []; // {rowNo, code, name, check, sev, msg}
         let okRows = 0, ngSeats = 0, warnSeats = 0;
         const CHK_KEYS = ["席種名", "指定席整合", "初期値9", "リセール下限", "リセール上限", "購入限定/複数", "単体販売", "マスタ未登録"];
-        
+
         const limSeatCodes = new Set();
         for (const r of state.data) {
           if (!r) continue;
@@ -13862,14 +13862,14 @@ html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
               add("購入限定/複数", "NG", `購入限定席種にP(駐車)と他種が混在[${named}]のに購入限定区分=「${kubun}」。単数だと駐車券は選べても追加券が選べません→複数購入可にすべき`);
             }
           }
-          
+
           if (limSeatCodes.has(code)) {
             const solo = g(row, c.solo);
             if (!solo.includes("不可")) {
               add("単体販売", "NG", `購入限定席種として他席から指定されているため、単体販売不可にする必要があります`);
             }
           }
-          
+
           if (state.priceMaster && g(row, c.resale) === "可能") {
              const maxPrice = state.priceMaster.maxPrices[code];
              if (maxPrice !== undefined) {

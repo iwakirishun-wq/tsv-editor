@@ -1,11 +1,11 @@
 /**
  * HP料金ナレッジ突合チェック & Gemini連携 サーバー側処理
- * 
+ *
  * 公開関数:
  *  - listHpEvents(): Drive上のナレッジからイベント一覧を取得
  *  - getHpKnowledge(eventKey): 指定イベントのナレッジを取得（イベント単位で絞り込み）
  *  - askGemini(payload): 差分行データについてGemini APIに問い合わせ
- * 
+ *
  * 注意:
  *  - 文字列リテラル内に "//" を含めないこと（GAS配信バグ対策）
  *  - 認証情報・APIキーはスクリプトプロパティで管理し、コードやログに出さないこと
@@ -494,4 +494,3 @@ function getHpKnowledgeStatus() {
     events: events
   };
 }
-
