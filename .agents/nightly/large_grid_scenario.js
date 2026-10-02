@@ -86,7 +86,9 @@ function inPageCheck({ ROWS, COLS }) {
   }
 
   // 総スクロール高が行数ぶんあるか（スペーサ高さの計算ミス検出）
-  const expectH = state.data.length * 22;
+  // 行高は index.html の ROW_H を読む。22px固定で書いていたため、2026-09-23に既定が26pxへ
+  // 変わってから毎晩「ずれている」と誤検出していた。
+  const expectH = state.data.length * ROW_H;
   const actualH = els.container.scrollHeight - els.thead.offsetHeight;
   if (Math.abs(actualH - expectH) > 40) {
     out.anomalies.push("スクロール可能高が想定とずれている: 実測" + actualH + "px / 想定" + expectH + "px");
@@ -123,18 +125,27 @@ function inPageCheck({ ROWS, COLS }) {
   // --- 3) 選択範囲の外周にだけ枠線クラスが付くか（Excel風の太枠表示） ---
   state.selected = { row: 108, col: 2 };
   state.range = { r1: 102, c1: 1, r2: 130, c2: 6 };
+  // 範囲の先頭行を画面上端に置く。固定のscrollTopだと行高が変わったときに右下セルが
+  // 描画範囲の外に出て、枠線の不具合と区別できなくなる。
+  els.container.scrollTop = 102 * ROW_H;
   state.forceRender = true;
   renderBody();
+  const cellAt = (row, col) =>
+    els.tbody.querySelector('tr[data-row="' + row + '"] td[data-col="' + col + '"]');
   const hasCls = (row, col, cls) => {
-    const td = els.tbody.querySelector('tr[data-row="' + row + '"] td[data-col="' + col + '"]');
+    const td = cellAt(row, col);
     return !!td && td.classList.contains(cls);
   };
-  if (!hasCls(102, 1, "rng-t") || !hasCls(102, 1, "rng-l"))
-    out.anomalies.push("選択範囲の左上セルに上/左の枠線クラスが付いていない");
-  if (!hasCls(130, 6, "rng-b") || !hasCls(130, 6, "rng-r"))
-    out.anomalies.push("選択範囲の右下セルに下/右の枠線クラスが付いていない");
-  if (hasCls(110, 3, "rng-t") || hasCls(110, 3, "rng-l"))
-    out.anomalies.push("選択範囲の内側セルに枠線クラスが付いてしまっている");
+  if (!cellAt(102, 1) || !cellAt(130, 6)) {
+    out.anomalies.push("選択範囲の角のセルが描画されていない（枠線を検査できない）");
+  } else {
+    if (!hasCls(102, 1, "rng-t") || !hasCls(102, 1, "rng-l"))
+      out.anomalies.push("選択範囲の左上セルに上/左の枠線クラスが付いていない");
+    if (!hasCls(130, 6, "rng-b") || !hasCls(130, 6, "rng-r"))
+      out.anomalies.push("選択範囲の右下セルに下/右の枠線クラスが付いていない");
+    if (hasCls(110, 3, "rng-t") || hasCls(110, 3, "rng-l"))
+      out.anomalies.push("選択範囲の内側セルに枠線クラスが付いてしまっている");
+  }
 
   // --- 4) 操作レイテンシ ---
   const measure = (n, fn) => {

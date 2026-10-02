@@ -87,7 +87,13 @@ async function withPage(browser, fn) {
     delete window.showSaveFilePicker;
   });
   const consoleErrors = [], pageErrors = [];
-  page.on("console", (msg) => { if (msg.type() === "error") consoleErrors.push(msg.text()); });
+  // "Failed to load resource" は本文にURLが無く、何が欠けたか分からないまま2026-09-15から18日間ngが続いた
+  // （icon.svg の削除）。発生元URLを添えて記録する。
+  page.on("console", (msg) => {
+    if (msg.type() !== "error") return;
+    const src = msg.location() && msg.location().url;
+    consoleErrors.push(src ? `${msg.text()} (${decodeURI(src)})` : msg.text());
+  });
   page.on("pageerror", (err) => pageErrors.push(String(err)));
   page.on("dialog", async (d) => { await d.accept(); });
   try {
@@ -149,6 +155,11 @@ async function runPriceScheduleScenario(browser, today) {
     const actualInvalid = invalidMatch ? Number(invalidMatch[1]) : 0;
     const expectedNgCount = 2; // S席→A席(0円登録/期待2000)、S席→Z席(当日23000登録/期待22500)
     const expectedInvalidCount = 4; // エリア同席種、UG期間超過、年齢降格、大人ダウングレード(VC-2→A席)
+    // 件数だけでは「UGルール変更で増えたのか回帰なのか」が判断できないため、NG行の中身も控える
+    const ugNgRows = await popup.locator("tr.ng-row").evaluateAll((trs) => trs.map((tr) => {
+      const [, from, to, fromAge, toAge] = decodeURIComponent(tr.getAttribute("data-mid") || "").split("|");
+      return `${from}(${fromAge})→${to}(${toAge}): ${tr.getAttribute("data-fcmt") || ""}`;
+    }));
     if (actualNg !== expectedNgCount) anomalies.push(`差額NG件数が期待と不一致: 期待${expectedNgCount} 実際${actualNg}`);
     if (actualInvalid !== expectedInvalidCount) anomalies.push(`設定不可件数が期待と不一致: 期待${expectedInvalidCount} 実際${actualInvalid}`);
 
@@ -190,6 +201,7 @@ async function runPriceScheduleScenario(browser, today) {
       anomalies: anomalies.concat(popupErrors.map((e) => "[popup] " + e)),
       ngBadges: { ug: ugBadges, matrix: matrixBadges },
       counts: { actualNg, actualInvalid, missingCount: missingCells.length },
+      ugNgRows,
       htmlSaveSizeBytes,
     };
   });
@@ -381,8 +393,13 @@ async function main() {
   for (const sc of scenarios) {
     lines.push("", `## ${sc.name}`);
     lines.push(`- コンソールエラー: ${(sc.consoleErrors || []).length}件 / ページエラー: ${(sc.pageErrors || []).length}件`);
+    for (const e of [...(sc.consoleErrors || []), ...(sc.pageErrors || [])]) lines.push(`  - ${e}`);
     lines.push(`- 異常検出: ${sc.anomalies && sc.anomalies.length ? sc.anomalies.join(" / ") : "なし"}`);
     if (sc.counts) lines.push(`- 件数: 差額NG=${sc.counts.actualNg} / 登録漏れ?候補=${sc.counts.missingCount} / 設定不可=${sc.counts.actualInvalid}`);
+    if (sc.ugNgRows && sc.ugNgRows.length) {
+      lines.push("- UG一覧のNG行:");
+      for (const r of sc.ugNgRows) lines.push(`  - ${r}`);
+    }
     if (sc.ngCellCount != null) lines.push(`- NGセル数: ${sc.ngCellCount}`);
     if (sc.okCellCount != null) lines.push(`- OKセル数: ${sc.okCellCount}`);
     if (sc.warnCellCount != null) lines.push(`- 警告セル数: ${sc.warnCellCount}`);
