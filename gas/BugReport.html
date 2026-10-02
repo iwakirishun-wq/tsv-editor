@@ -1,0 +1,533 @@
+<style>
+  #_br-ov { position: fixed; inset: 0; z-index: 2147483000; background: rgba(0,0,0,0.45); display: none; align-items: center; justify-content: center; font-family: var(--font-ui, sans-serif); }
+  #_br-ov.open { display: flex; }
+  #_br-box { background: var(--surface, #fff); color: var(--text, #171717); width: min(640px, 94vw); max-height: 92vh; overflow: auto; border-radius: 8px; box-shadow: 0 12px 40px rgba(0,0,0,0.35); padding: 16px 18px; font-size: 13px; }
+  #_br-box h2 { margin: 0 0 10px; font-size: 16px; }
+  #_br-box label { display: block; margin: 10px 0 4px; font-weight: 600; }
+  #_br-box select, #_br-box textarea { width: 100%; box-sizing: border-box; font: inherit; color: inherit; background: var(--surface2, #fafafa); border: 1px solid var(--border, #d0d0d0); border-radius: 4px; padding: 6px 8px; }
+  #_br-box textarea { min-height: 110px; resize: vertical; }
+  #_br-shot { margin-top: 6px; border: 1px solid var(--border, #d0d0d0); border-radius: 4px; padding: 6px; background: var(--surface2, #fafafa); }
+  #_br-shot img { display: block; max-width: 100%; max-height: 200px; margin-top: 6px; }
+  #_br-box ._br-note { color: var(--text-dim, #737373); font-size: 12px; margin-top: 4px; }
+  #_br-box ._br-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+  #_br-box ._br-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; flex-wrap: wrap; }
+  #_br-box button { font: inherit; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--border, #d0d0d0); background: var(--surface2, #fafafa); color: inherit; cursor: pointer; }
+  #_br-box button._br-primary { background: var(--accent, #404040); color: #fff; border-color: var(--accent, #404040); }
+  #_br-box button:disabled { opacity: 0.5; cursor: default; }
+  #_br-msg { margin-top: 10px; white-space: pre-wrap; word-break: break-all; }
+  #_br-msg.err { color: #b91c1c; }
+  #_br-msg.ok { color: #166534; }
+  #_br-float { position: fixed; right: 10px; bottom: 10px; z-index: 100000; }
+</style>
+<script>
+(function () {
+  'use strict';
+  /* 不具合レポート（GAS版だけ）。Code.gs の doGet が <body> 直後へ注入する。
+     注意: GAS配信バグ対策として、このファイルの文字列リテラルとコメントに連続スラッシュを書かない。 */
+  var PAGE_MD5 = '__PAGE_MD5__';
+  var SCHEMA = 'tsv_editor_bug_report/1';
+  var MAX_LOG = 200;
+  var logs = [];
+  var errors = [];
+  var events = [];
+  var h2cPromise = null;
+  var current = null; /* 開いているレポートの下書き */
+
+  function nowIso() { return new Date().toISOString(); }
+  function push(arr, item) { arr.push(item); if (arr.length > MAX_LOG) arr.shift(); }
+  function cut(s, n) { s = String(s); return s.length > n ? s.slice(0, n) + '...(+' + (s.length - n) + ')' : s; }
+  function toText(v, n) {
+    var s;
+    try {
+      if (typeof v === 'string') s = v;
+      else if (v instanceof Error) s = v.stack || v.message || String(v);
+      else s = JSON.stringify(v);
+      if (s === undefined) s = String(v);
+    } catch (e) { s = String(v); }
+    return cut(s, n || 500);
+  }
+
+  /* ---- 早期ログ収集（ここから後の挙動だけを記録する） ---- */
+  ['log', 'info', 'warn', 'error', 'debug'].forEach(function (level) {
+    var orig = console[level];
+    if (typeof orig !== 'function') return;
+    console[level] = function () {
+      try {
+        var parts = [];
+        for (var i = 0; i < arguments.length; i++) parts.push(toText(arguments[i], 400));
+        push(logs, { t: nowIso(), level: level, msg: cut(parts.join(' '), 800) });
+      } catch (e) { /* 記録失敗は無視 */ }
+      return orig.apply(console, arguments);
+    };
+  });
+  window.addEventListener('error', function (e) {
+    if (!e || (e.target && e.target !== window)) return;
+    push(errors, { t: nowIso(), message: cut(e.message || '', 500), source: cut(e.filename || '', 120), line: e.lineno || 0, col: e.colno || 0, stack: e.error && e.error.stack ? cut(e.error.stack, 1500) : '' });
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e && e.reason;
+    push(errors, { t: nowIso(), message: 'unhandledrejection: ' + toText(r, 500), source: '', line: 0, col: 0, stack: r && r.stack ? cut(r.stack, 1500) : '' });
+  });
+
+  function describe(el) {
+    if (!el || !el.tagName) return '';
+    var d = el.tagName.toLowerCase();
+    if (el.id) d += '#' + el.id;
+    if (typeof el.className === 'string' && el.className) d += '.' + el.className.trim().split(/\s+/).slice(0, 3).join('.');
+    var cell = el.closest ? el.closest('td,th') : null;
+    if (cell) {
+      var tr = cell.parentElement;
+      d += ' [cell r' + (tr && tr.rowIndex) + ' c' + cell.cellIndex + ']';
+    } else if (el.tagName === 'BUTTON' || el.getAttribute('role') === 'button') {
+      d += ' "' + cut((el.textContent || '').trim(), 30) + '"';
+    }
+    return d;
+  }
+  document.addEventListener('click', function (e) { push(events, { t: nowIso(), type: 'click', target: describe(e.target) }); }, true);
+  document.addEventListener('dblclick', function (e) { push(events, { t: nowIso(), type: 'dblclick', target: describe(e.target) }); }, true);
+  document.addEventListener('contextmenu', function (e) { push(events, { t: nowIso(), type: 'contextmenu', target: describe(e.target) }); }, true);
+  document.addEventListener('keydown', function (e) {
+    /* 入力した文字そのものは残さない。修飾キー付きと特殊キーだけ */
+    var mod = (e.ctrlKey ? 'Ctrl+' : '') + (e.altKey ? 'Alt+' : '') + (e.shiftKey ? 'Shift+' : '') + (e.metaKey ? 'Meta+' : '');
+    if (e.key && (e.key.length > 1 || mod.replace('Shift+', ''))) push(events, { t: nowIso(), type: 'key', target: mod + e.key });
+  }, true);
+  ['copy', 'cut', 'paste'].forEach(function (t) {
+    document.addEventListener(t, function (e) { push(events, { t: nowIso(), type: t, target: describe(e.target) }); }, true);
+  });
+
+  /* ---- 状態の採取 ---- */
+  var SKIP_KEYS = { data: 1, undoStack: 1, redoStack: 1, clipboard: 1, copiedRows: 1, tabs: 1 };
+
+  function ser(v, depth, seen, budget) {
+    if (budget.n-- <= 0) return '[budget]';
+    var t = typeof v;
+    if (v === null || v === undefined) return null;
+    if (t === 'boolean') return v;
+    if (t === 'number') return isFinite(v) ? v : String(v);
+    if (t === 'string') return cut(v, 300);
+    if (t === 'bigint') return String(v);
+    if (t === 'function' || t === 'symbol') return '[' + t + ']';
+    if (typeof Node !== 'undefined' && v instanceof Node) return '[Node ' + (v.nodeName || '') + (v.id ? '#' + v.id : '') + ']';
+    if (v === window) return '[window]';
+    if (seen.indexOf(v) >= 0) return '[circular]';
+    if (depth <= 0) return '[depth]';
+    seen.push(v);
+    var out;
+    try {
+      if (v instanceof Date) out = v.toISOString();
+      else if (v instanceof Set) {
+        var items = [];
+        v.forEach(function (x) { if (items.length < 100) items.push(ser(x, depth - 1, seen, budget)); });
+        out = { '$set': v.size, items: items };
+      } else if (v instanceof Map) {
+        var ents = [];
+        v.forEach(function (val, key) { if (ents.length < 100) ents.push([ser(key, depth - 1, seen, budget), ser(val, depth - 1, seen, budget)]); });
+        out = { '$map': v.size, entries: ents };
+      } else if (Array.isArray(v)) {
+        var head = [];
+        for (var i = 0; i < v.length && i < 50; i++) head.push(ser(v[i], depth - 1, seen, budget));
+        out = v.length > 50 ? { '$len': v.length, head: head } : head;
+      } else {
+        var keys = Object.keys(v);
+        var o = {};
+        for (var k = 0; k < keys.length && k < 100; k++) o[keys[k]] = ser(v[keys[k]], depth - 1, seen, budget);
+        if (keys.length > 100) o['$keys_total'] = keys.length;
+        out = o;
+      }
+    } catch (e) { out = '[unserializable]'; }
+    seen.pop();
+    return out;
+  }
+
+  function serState() {
+    var s = (typeof state !== 'undefined') ? state : null;
+    if (!s) return { error: 'state が見つかりません' };
+    var out = {};
+    var budget = { n: 4000 };
+    Object.keys(s).forEach(function (k) {
+      if (SKIP_KEYS[k]) return;
+      out[k] = ser(s[k], 4, [], budget);
+    });
+    out['$summary'] = {
+      data_rows: s.data ? s.data.length : null,
+      undo_depth: s.undoStack ? s.undoStack.length : null,
+      redo_depth: s.redoStack ? s.redoStack.length : null,
+      tabs: Array.isArray(s.tabs) ? s.tabs.map(function (t) {
+        return { name: t && (t.fileName || t.name) || null, rows: t && t.data ? t.data.length : null, cols: t && t.headers ? t.headers.length : null };
+      }).slice(0, 30) : null
+    };
+    return out;
+  }
+
+  function cellCut(v) { return cut(v === null || v === undefined ? '' : v, 200); }
+
+  function tableInfo() {
+    var s = (typeof state !== 'undefined') ? state : null;
+    if (!s || !Array.isArray(s.data)) return { rows: null, cols: null };
+    var cols = Array.isArray(s.headers) ? s.headers.length : (s.data[0] ? s.data[0].length : 0);
+    return {
+      fileName: s.fileName || null, delimiter: s.delimiter === '\t' ? 'TAB' : (s.delimiter || null),
+      encoding: s.encoding || null, newline: s.newline || null,
+      rows: s.data.length, cols: cols,
+      headers: Array.isArray(s.headers) ? s.headers.slice(0, 300).map(function (h) { return cut(h, 80); }) : null
+    };
+  }
+
+  function nearSelection() {
+    var s = (typeof state !== 'undefined') ? state : null;
+    if (!s || !Array.isArray(s.data) || !s.selected || typeof s.selected.row !== 'number') return null;
+    var from = Math.max(0, s.selected.row - 15);
+    var to = Math.min(s.data.length, s.selected.row + 16);
+    var rows = [];
+    for (var r = from; r < to; r++) rows.push((s.data[r] || []).slice(0, 80).map(cellCut));
+    return { row_start: from, selected: { row: s.selected.row, col: s.selected.col }, rows: rows };
+  }
+
+  function visible(el) { return !!(el && (el.offsetWidth || el.offsetHeight || (el.getClientRects && el.getClientRects().length))); }
+
+  function viewInfo() {
+    var v = { scroll: { x: window.scrollX, y: window.scrollY } };
+    try {
+      if (typeof els !== 'undefined' && els && els.container) v.grid_scroll = { top: els.container.scrollTop, left: els.container.scrollLeft };
+      if (typeof els !== 'undefined' && els && els.status) v.status_text = cut(els.status.textContent, 200);
+      v.rendered_rows = document.querySelectorAll('tbody tr').length;
+      v.body_classes = document.body ? cut(document.body.className, 300) : '';
+      var ae = document.activeElement;
+      v.active_element = ae ? describe(ae) : '';
+      var dlg = [];
+      document.querySelectorAll('[role="dialog"], dialog[open], [class*="-ov"], [class*="modal"]').forEach(function (el) {
+        if (el.id !== '_br-ov' && visible(el) && dlg.length < 10) dlg.push(describe(el));
+      });
+      v.open_dialogs = dlg;
+      var tab = document.querySelector('.rb-tab-active');
+      v.active_ribbon_tab = tab ? tab.getAttribute('data-tab') : null;
+    } catch (e) { v.error = String(e); }
+    return v;
+  }
+
+  function envInfo() {
+    var e = {
+      userAgent: navigator.userAgent, language: navigator.language, platform: navigator.platform,
+      viewport: { w: window.innerWidth, h: window.innerHeight }, screen: { w: screen.width, h: screen.height },
+      dpr: window.devicePixelRatio, online: navigator.onLine,
+      darkMode: !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches),
+      hardwareConcurrency: navigator.hardwareConcurrency || null, deviceMemory: navigator.deviceMemory || null,
+      tz_offset_min: new Date().getTimezoneOffset()
+    };
+    try { if (performance && performance.memory) e.js_heap_mb = Math.round(performance.memory.usedJSHeapSize / 1048576); } catch (x) { /* 無視 */ }
+    return e;
+  }
+
+  function quoteCell(v, delim) {
+    var s = v === null || v === undefined ? '' : String(v);
+    return (s.indexOf(delim) >= 0 || s.indexOf('"') >= 0 || s.indexOf('\n') >= 0 || s.indexOf('\r') >= 0) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  function tableTsv(limit) {
+    var s = (typeof state !== 'undefined') ? state : null;
+    if (!s || !Array.isArray(s.data)) return { text: null, truncated: false };
+    var delim = s.delimiter || '\t';
+    var lines = [];
+    var size = 0;
+    var head = Array.isArray(s.headers) ? s.headers : null;
+    var truncated = false;
+    if (head) { var hl = head.map(function (c) { return quoteCell(c, delim); }).join(delim); lines.push(hl); size += hl.length + 1; }
+    for (var r = 0; r < s.data.length; r++) {
+      var line = (s.data[r] || []).map(function (c) { return quoteCell(cut(c === null || c === undefined ? '' : c, 5000), delim); }).join(delim);
+      size += line.length + 1;
+      if (size > limit) { truncated = true; break; }
+      lines.push(line);
+    }
+    return { text: lines.join('\n'), truncated: truncated };
+  }
+
+  function collect(kind, comment) {
+    return {
+      schema: SCHEMA, kind: kind, comment: comment,
+      created_client: nowIso(),
+      env: envInfo(),
+      app: {
+        page_md5: PAGE_MD5, document_title: document.title,
+        table: tableInfo(), near_selection: nearSelection(),
+        state: serState(), view: viewInfo()
+      },
+      logs: logs.slice(), errors: errors.slice(), events: events.slice(),
+      attachments: {}
+    };
+  }
+
+  /* ---- スクリーンショット ---- */
+  function loadH2C() {
+    if (window.html2canvas) return Promise.resolve();
+    if (h2cPromise) return h2cPromise;
+    h2cPromise = new Promise(function (resolve, reject) {
+      if (!(window.google && google.script && google.script.run)) { reject(new Error('google.script.run がありません')); return; }
+      google.script.run.withSuccessHandler(function (b64) {
+        try {
+          var bin = atob(b64);
+          var bytes = new Uint8Array(bin.length);
+          for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          var text = new TextDecoder('utf-8').decode(bytes);
+          var sc = document.createElement('script');
+          sc.textContent = text;
+          document.head.appendChild(sc);
+          if (window.html2canvas) resolve(); else reject(new Error('html2canvas を読み込めませんでした'));
+        } catch (e) { reject(e); }
+      }).withFailureHandler(function (err) { reject(new Error((err && err.message) || String(err))); }).getHtml2canvasSource();
+    });
+    h2cPromise.catch(function () { h2cPromise = null; });
+    return h2cPromise;
+  }
+
+  function withTimeout(p, ms, label) {
+    return new Promise(function (resolve, reject) {
+      var t = setTimeout(function () { reject(new Error(label + ' がタイムアウトしました')); }, ms);
+      p.then(function (v) { clearTimeout(t); resolve(v); }, function (e) { clearTimeout(t); reject(e); });
+    });
+  }
+
+  function dataUrlToShot(url) {
+    var m = /^data:(image\/(?:png|jpeg));base64,(.*)$/.exec(url);
+    return m ? { mime: m[1], b64: m[2] } : null;
+  }
+
+  function captureShot() {
+    return withTimeout(loadH2C(), 20000, 'ライブラリ取得').then(function () {
+      return withTimeout(window.html2canvas(document.body, {
+        logging: false, scale: 1, useCORS: false, backgroundColor: '#ffffff',
+        width: window.innerWidth, height: window.innerHeight, windowWidth: window.innerWidth, windowHeight: window.innerHeight,
+        x: window.scrollX, y: window.scrollY
+      }), 20000, '画面キャプチャ');
+    }).then(function (canvas) {
+      var png = canvas.toDataURL('image/png');
+      if (png.length > 7 * 1024 * 1024) png = canvas.toDataURL('image/jpeg', 0.8);
+      var shot = dataUrlToShot(png);
+      if (!shot || shot.b64.length > 8 * 1024 * 1024) throw new Error('スクリーンショットが大きすぎます');
+      return shot;
+    });
+  }
+
+  function imageFileToShot(file) {
+    return new Promise(function (resolve, reject) {
+      var fr = new FileReader();
+      fr.onerror = function () { reject(new Error('画像を読めませんでした')); };
+      fr.onload = function () {
+        var img = new Image();
+        img.onerror = function () { reject(new Error('画像を解釈できませんでした')); };
+        img.onload = function () {
+          var c = document.createElement('canvas');
+          c.width = img.naturalWidth; c.height = img.naturalHeight;
+          c.getContext('2d').drawImage(img, 0, 0);
+          var url = c.toDataURL('image/png');
+          if (url.length > 7 * 1024 * 1024) url = c.toDataURL('image/jpeg', 0.8);
+          var shot = dataUrlToShot(url);
+          if (!shot || shot.b64.length > 8 * 1024 * 1024) reject(new Error('画像が大きすぎます')); else resolve(shot);
+        };
+        img.src = fr.result;
+      };
+      fr.readAsDataURL(file);
+    });
+  }
+
+  /* ---- UI ---- */
+  var ov = null;
+  function $b(id) { return document.getElementById(id); }
+
+  function buildModal() {
+    if (ov) return;
+    ov = document.createElement('div');
+    ov.id = '_br-ov';
+    ov.setAttribute('role', 'dialog');
+    ov.setAttribute('aria-modal', 'true');
+    ov.setAttribute('aria-label', '不具合を報告');
+    ov.innerHTML =
+      '<div id="_br-box">' +
+      '<h2>不具合を報告</h2>' +
+      '<div class="_br-note">画面・アプリの内部状態・直前の操作ログを、あなたのDriveに保存します（解析用）。通常版には保存されません。</div>' +
+      '<label for="_br-kind">種類</label>' +
+      '<select id="_br-kind"><option value="bug">不具合</option><option value="display">表示崩れ</option><option value="data">データ破損の疑い</option><option value="request">要望</option></select>' +
+      '<label for="_br-comment">何をしたら、何が起きましたか（期待していた動作も）</label>' +
+      '<textarea id="_br-comment" maxlength="20000" placeholder="例: 絞り込み中にF4で一括入力したら、非表示の行まで書き換わった"></textarea>' +
+      '<label>スクリーンショット</label>' +
+      '<div id="_br-shot"><div id="_br-shot-status">取得中...</div><img id="_br-shot-img" alt="" style="display:none"></div>' +
+      '<div class="_br-note">取得できない・違う画面にしたい場合は、画像をコピーしてこの画面でCtrl+Vすると差し替えできます。</div>' +
+      '<div class="_br-row"><label style="margin:0;font-weight:400"><input type="checkbox" id="_br-use-shot" checked> スクリーンショットを保存する</label></div>' +
+      '<div class="_br-row"><label style="margin:0;font-weight:400"><input type="checkbox" id="_br-use-table" checked> 表のデータも保存する（data.tsv と選択セル周辺の行）</label></div>' +
+      '<div class="_br-note" id="_br-summary"></div>' +
+      '<div id="_br-msg" role="status"></div>' +
+      '<div class="_br-actions">' +
+      '<button type="button" id="_br-dl" style="display:none">JSONをダウンロード</button>' +
+      '<button type="button" id="_br-cancel">閉じる</button>' +
+      '<button type="button" id="_br-send" class="_br-primary">保存する</button>' +
+      '</div></div>';
+    document.body.appendChild(ov);
+
+    /* 入力中のキーや貼り付けをアプリ本体のショートカットへ渡さない */
+    ['keydown', 'keyup', 'keypress', 'paste', 'copy', 'cut', 'mousedown', 'dblclick', 'contextmenu'].forEach(function (t) {
+      ov.addEventListener(t, function (e) { e.stopPropagation(); });
+    });
+    ov.addEventListener('paste', function (e) {
+      var items = (e.clipboardData && e.clipboardData.items) || [];
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].type && items[i].type.indexOf('image/') === 0) {
+          var f = items[i].getAsFile();
+          if (!f) continue;
+          e.preventDefault();
+          imageFileToShot(f).then(function (shot) { setShot(shot, '貼り付けた画像'); }).catch(function (err) { setMsg('画像の貼り付けに失敗: ' + err.message, 'err'); });
+          return;
+        }
+      }
+    });
+    $b('_br-cancel').onclick = closeModal;
+    $b('_br-send').onclick = send;
+    $b('_br-dl').onclick = downloadJson;
+  }
+
+  function setMsg(text, cls) { var m = $b('_br-msg'); m.textContent = text || ''; m.className = cls || ''; }
+
+  function setShot(shot, label) {
+    current.shot = shot;
+    var st = $b('_br-shot-status');
+    var img = $b('_br-shot-img');
+    if (shot) {
+      st.textContent = label + '（約' + Math.round(shot.b64.length * 0.75 / 1024) + 'KB）';
+      img.src = 'data:' + shot.mime + ';base64,' + shot.b64;
+      img.style.display = '';
+    } else {
+      img.style.display = 'none';
+    }
+  }
+
+  function closeModal() { if (ov) ov.classList.remove('open'); current = null; }
+
+  function summaryText() {
+    var t = current.report.app.table;
+    return '収集済み: コンソール' + current.report.logs.length + '件 / エラー' + current.report.errors.length + '件 / 操作' + current.report.events.length + '件 / 表 ' + t.rows + '行 x ' + t.cols + '列';
+  }
+
+  function buildPayload() {
+    var report = current.report;
+    report.kind = $b('_br-kind').value;
+    report.comment = $b('_br-comment').value;
+    report.attachments = {};
+    /* 表の内容を含む項目は、チェックを外したら一切送らない */
+    if (!$b('_br-use-table').checked) report.app.near_selection = null;
+    var payload = { report: report, screenshot: null, tsv: null };
+    if ($b('_br-use-shot').checked && current.shot) payload.screenshot = current.shot;
+    if (!current.shot && current.shotError) report.attachments.screenshot_error = current.shotError;
+    if ($b('_br-use-table').checked) {
+      var t = tableTsv(3 * 1024 * 1024);
+      if (t.text !== null) { payload.tsv = t.text; report.attachments.table_truncated = t.truncated; }
+    }
+    report.attachments.screenshot_included = !!payload.screenshot;
+    report.attachments.table_included = payload.tsv !== null;
+    return payload;
+  }
+
+  function downloadJson() {
+    try {
+      var payload = buildPayload();
+      var blob = new Blob([JSON.stringify(payload.report, null, 1)], { type: 'application/json' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'bugreport_' + nowIso().replace(/[:.]/g, '-') + '.json';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    } catch (e) { setMsg('ダウンロードに失敗: ' + e.message, 'err'); }
+  }
+
+  function send() {
+    if (!current) return;
+    if (!(window.google && google.script && google.script.run)) { setMsg('サーバーに接続できません（GAS版でのみ保存できます）', 'err'); $b('_br-dl').style.display = ''; return; }
+    var payload;
+    try { payload = buildPayload(); } catch (e) { setMsg('レポートの作成に失敗: ' + e.message, 'err'); return; }
+    $b('_br-send').disabled = true;
+    setMsg('保存中...');
+    google.script.run.withSuccessHandler(function (res) {
+      $b('_br-send').disabled = false;
+      var m = $b('_br-msg');
+      m.className = 'ok';
+      m.textContent = '保存しました: ' + (res && res.folderName ? res.folderName : '') + '  ';
+      if (res && res.folderUrl) {
+        var a = document.createElement('a');
+        a.href = res.folderUrl; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'Driveで開く';
+        m.appendChild(a);
+      }
+      $b('_br-send').style.display = 'none';
+      $b('_br-cancel').textContent = '閉じる';
+    }).withFailureHandler(function (err) {
+      $b('_br-send').disabled = false;
+      setMsg('保存に失敗しました: ' + ((err && err.message) || String(err)) + '\n下のボタンでJSONを手元に保存できます。', 'err');
+      $b('_br-dl').style.display = '';
+    }).saveBugReport(payload);
+  }
+
+  var busy = false;
+  function openReport() {
+    if (busy || (ov && ov.classList.contains('open'))) return;
+    busy = true;
+    /* 先に状態を採取する。モーダルは画面キャプチャの後に出すので写り込まない */
+    var report;
+    try { report = collect('bug', ''); } catch (e) { report = { schema: SCHEMA, kind: 'bug', comment: '', env: envInfo(), app: { error: 'collect failed: ' + String(e), table: { rows: null, cols: null } }, logs: logs.slice(), errors: errors.slice(), events: events.slice(), attachments: {} }; }
+    current = { report: report, shot: null, shotError: null };
+    var started = captureShot();
+    started.then(function (shot) { return { shot: shot }; }, function (err) { return { error: err }; }).then(function (r) {
+      busy = false;
+      if (!current) current = { report: report, shot: null, shotError: null };
+      buildModal();
+      setMsg('');
+      $b('_br-comment').value = '';
+      $b('_br-kind').value = 'bug';
+      $b('_br-send').style.display = '';
+      $b('_br-send').disabled = false;
+      $b('_br-dl').style.display = 'none';
+      $b('_br-summary').textContent = summaryText();
+      if (r.shot) setShot(r.shot, 'スクリーンショット取得済み');
+      else {
+        current.shotError = cut((r.error && r.error.message) || String(r.error), 300);
+        setShot(null);
+        $b('_br-shot-status').textContent = '自動取得できませんでした: ' + current.shotError + '（Ctrl+Vで画像を貼り付けできます）';
+      }
+      ov.classList.add('open');
+      $b('_br-comment').focus();
+    });
+  }
+
+  function mountButton() {
+    if ($b('btn-bugreport')) return;
+    var btn = document.createElement('button');
+    btn.id = 'btn-bugreport';
+    btn.type = 'button';
+    btn.title = '不具合を報告（画面・内部状態・操作ログをDriveへ保存）\nショートカット: Ctrl+Alt+B';
+    btn.setAttribute('aria-label', '不具合を報告');
+    btn.textContent = '不具合報告';
+    var help = $b('btn-manual');
+    if (help && help.parentNode) {
+      btn.className = 'rb-tab';
+      help.parentNode.insertBefore(btn, help);
+    } else {
+      btn.id = 'btn-bugreport';
+      btn.style.cssText = 'padding:4px 10px;font-size:12px;';
+      var wrap = document.createElement('div');
+      wrap.id = '_br-float';
+      wrap.appendChild(btn);
+      document.body.appendChild(wrap);
+    }
+    btn.addEventListener('click', openReport);
+    btn.addEventListener('mouseenter', function () { loadH2C().catch(function () { /* 押下時に再試行 */ }); });
+    btn.addEventListener('focus', function () { loadH2C().catch(function () { /* 押下時に再試行 */ }); });
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && ov && ov.classList.contains('open')) { e.preventDefault(); e.stopPropagation(); closeModal(); return; }
+    if (e.ctrlKey && e.altKey && !e.shiftKey && !e.metaKey && (e.key === 'b' || e.key === 'B')) { e.preventDefault(); openReport(); }
+  }, true);
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountButton);
+  else mountButton();
+
+  /* テスト用フック（読み取りのみ） */
+  window.__bugReport = { collect: collect, tableTsv: tableTsv, ser: function (v) { return ser(v, 4, [], { n: 4000 }); }, open: openReport };
+})();
+</script>

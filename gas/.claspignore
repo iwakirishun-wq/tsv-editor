@@ -4,3 +4,6 @@
 !appsscript.json
 !index.html
 !HpCheck.gs
+!BugReport.gs
+!BugReport.html
+!Html2canvasB64.html
