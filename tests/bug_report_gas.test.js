@@ -140,7 +140,7 @@ const fails = (fn, re) => assert.throws(fn, re);
 {
   let content = '<html><head></head><body class="x"><div>a</div><script>var s="<body>";</script></body></html>';
   const out = { getContent: () => content, setContent: (c) => { content = c; return out; } };
-  const files = { index: 'RAW', BugReport: '<script>/*__PAGE_MD5__*/</script>' };
+  const files = { index: 'RAW', BugReportUi: '<script>/*__PAGE_MD5__*/</script>' };
   const { sandbox } = makeEnv({ html: { createHtmlOutputFromFile: (n) => ({ getContent: () => files[n] }) } });
   sandbox.injectBugReport_(out);
   const md5 = crypto.createHash('md5').update('RAW').digest('hex');
@@ -156,11 +156,11 @@ const fails = (fn, re) => assert.throws(fn, re);
 
 /* 8. 静的検査 */
 {
-  const html = read('BugReport.html');
-  assert.ok(!html.includes('//'), 'BugReport.html に連続スラッシュがある（GAS配信バグ対策）');
+  const html = read('BugReportUi.html');
+  assert.ok(!html.includes('//'), 'BugReportUi.html に連続スラッシュがある（GAS配信バグ対策）');
   assert.ok(!html.includes('</script>', html.indexOf('</script>') + 1), 'script が複数ある');
   const ignore = read('.claspignore');
-  for (const f of ['BugReport.gs', 'BugReport.html', 'Html2canvasB64.html']) assert.ok(ignore.includes('!' + f), f + ' が .claspignore にない');
+  for (const f of ['BugReport.gs', 'BugReportUi.html', 'Html2canvasB64.html']) assert.ok(ignore.includes('!' + f), f + ' が .claspignore にない');
   /* GAS専用機能が通常版・index.html へ漏れていない */
   for (const f of [path.join(GAS, 'index.html'), path.join(__dirname, '..', 'index.html')]) {
     const t = fs.readFileSync(f, 'utf8');
@@ -174,3 +174,9 @@ const fails = (fn, re) => assert.throws(fn, re);
 }
 
 console.log('bug_report_gas: 保存・検証・権限・レート制限・注入・静的検査 すべて成功');
+
+/* GASは拡張子違いでも同名ファイルを置けない（clasp push が "already exists" で失敗する） */
+{
+  const names = fs.readdirSync(GAS).filter((f) => /\.(gs|html)$/.test(f)).map((f) => f.replace(/\.(gs|html)$/, ''));
+  assert.strictEqual(new Set(names).size, names.length, 'gas/ に .gs と .html の同名ファイルがある');
+}

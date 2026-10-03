@@ -1,7 +1,7 @@
 /**
  * 不具合レポート（GAS版だけの機能）サーバー側処理
  *
- * 画面側は BugReport.html（Code.gs の doGet が配信時に注入する）。
+ * 画面側は BugReportUi.html（Code.gs の doGet が配信時に注入する）。
  * 通常版（ルートの index.html）にはDriveへ書く経路を作らないため、この機能はGAS版にしか存在しない。
  *
  * 公開関数（google.script.run から呼ばれる）:

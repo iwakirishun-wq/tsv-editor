@@ -15,8 +15,8 @@
 
 | ファイル | 役割 |
 |---|---|
-| `Code.gs` | `doGet` で index を評価したあと、最初の `<body>` 直後へ `BugReport.html` を注入する |
-| `BugReport.html` | クライアント側一式（ログ収集・ボタン・モーダル・状態採取・スクショ） |
+| `Code.gs` | `doGet` で index を評価したあと、最初の `<body>` 直後へ `BugReportUi.html` を注入する |
+| `BugReportUi.html` | クライアント側一式（ログ収集・ボタン・モーダル・状態採取・スクショ） |
 | `BugReport.gs` | サーバー側 `saveBugReport` / 診断 / フォルダ設定 / html2canvas配信 |
 | `Html2canvasB64.html` | html2canvas 1.4.1 min.js のbase64（初回押下時にだけ遅延ロード） |
 | `.claspignore` | 上記3ファイルを許可リストへ追加（許可リスト方式なので追加しないとpushされない） |
@@ -74,7 +74,7 @@
 ## リスクと対策
 | リスク | 対策 |
 |---|---|
-| GAS配信で JS 文字列内の `//` が消える（既知） | BugReport.html は文字列内に `//` を書かない。lintテストで検査。ライブラリはbase64で渡す |
+| GAS配信で JS 文字列内の `//` が消える（既知） | BugReportUi.html は文字列内に `//` を書かない。lintテストで検査。ライブラリはbase64で渡す |
 | スクショ失敗 / 巨大化 | try/catch、JPEG 0.8へフォールバック、上限超過は省略して理由を記録 |
 | 状態採取が重い/循環参照 | 深さ・件数・文字数の上限、WeakSetで循環検出、失敗項目は `"[unserializable]"` |
 | 機密（TSV）が入る | 保存先は本人のDriveのみ。チェックで除外可。AIへ渡す時のデータ区分はユーザー判断 |

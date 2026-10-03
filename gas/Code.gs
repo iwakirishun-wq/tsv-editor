@@ -20,7 +20,7 @@ function doGet() {
 }
 
 /**
- * GAS版だけの「不具合レポート」(BugReport.html) を、配信するHTMLの最初の <body> 直後へ注入する。
+ * GAS版だけの「不具合レポート」(BugReportUi.html) を、配信するHTMLの最初の <body> 直後へ注入する。
  * index.html は通常版（ルートの index.html）と同一内容のコピーなので、GAS専用コードは混ぜずにここで足す。
  * 失敗してもエディタ本体は配信する（不具合報告が壊れてもアプリを使えなくしない）。
  * @param {GoogleAppsScript.HTML.HtmlOutput} output
@@ -34,7 +34,7 @@ function injectBugReport_(output) {
     var raw = HtmlService.createHtmlOutputFromFile('index').getContent();
     var md5 = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, raw, Utilities.Charset.UTF_8)
       .map(function (b) { return ('0' + (b & 0xff).toString(16)).slice(-2); }).join('');
-    var inject = HtmlService.createHtmlOutputFromFile('BugReport').getContent().replace('__PAGE_MD5__', md5);
+    var inject = HtmlService.createHtmlOutputFromFile('BugReportUi').getContent().replace('__PAGE_MD5__', md5);
     var at = m.index + m[0].length;
     output.setContent(html.slice(0, at) + inject + html.slice(at));
   } catch (e) {

@@ -7,7 +7,7 @@ from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
 html = (ROOT / "gas" / "index.html").read_text(encoding="utf-8")
-inject = (ROOT / "gas" / "BugReport.html").read_text(encoding="utf-8").replace("__PAGE_MD5__", "testmd5")
+inject = (ROOT / "gas" / "BugReportUi.html").read_text(encoding="utf-8").replace("__PAGE_MD5__", "testmd5")
 m = re.search(r"<body[^>]*>", html, re.I)
 page_html = html[: m.end()] + inject + html[m.end():]
 lib_b64 = re.sub(r"\s+", "", (ROOT / "gas" / "Html2canvasB64.html").read_text(encoding="utf-8"))
