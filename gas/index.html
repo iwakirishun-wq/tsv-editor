@@ -2782,22 +2782,22 @@
       }
 
       // ===== UG差額の自動検算 =====
-      // 検算ルール（2026-06-13 ナレッジ突合で確定、2026-06-21 車椅子・大人料金ダウングレード・子供例外を追加）:
+      // 検算ルール（2026-09-30: UI/TSV実機確認に合わせ、券種単位の値下がりもUG不可）:
       //  可否（これに反したら invalid）:
       //   ・一般販売（販売区分に「会員」を含まない）のUG行は不可
       //   ・年齢降格（先の年齢ランク < 元の年齢ランク）は不可
       //   ・自由席/エリアの同席種・同券種UGは不可
       //   ・車椅子は他席種との相互UG不可。車椅子内では「同年齢・指定席内の席変更」または「大人へのランクアップ」のみ可
-      //   ・大人料金が先<元（実質ダウングレード）のUGは不可。ただし大人以外の年齢区分は、
-      //     その年齢自身の差額が500円以内（先が安い側）なら0円として許可する例外がある
+      //   ・席種最高額または対象券種の実価格が先<元のUGは不可（年齢区分・共通券種を問わない）
+      //     前売/当日のどちらかが値下がりなら不可。空欄・売止めダミーは比較対象外
       //  期待差額（前売・当日それぞれ・同年齢どうしで算出）:
       //   ・同席種・同年齢区分UG（指定席）→ 一律500円
       //   ・異席種だが同年齢区分どうしのUG（diff = 先価格 − 元価格）:
       //     - diff===0（差額0円）→ 全区分とも席変更手数料500円
-      //     - 大人（diff≠0）→ 1〜500→500円 / 500超→実差額 / マイナス→0円
-      //     - U23・子供・幼児（diff≠0）→ 500円に切り上げず実差額 / マイナス→0円
-      //   ・異年齢区分間のUG（子供→U23等）→ diff = 先価格 − 元価格 で、 diff<=0→0円 / 1〜500→500円 / 500超→実差額（従来どおり）
-      //  売止めダミー: 価格が 800,000 以上、または全桁が9（99999等）は売止め扱い（検算対象外）
+      //     - 大人（diff>0）→ 1〜500→500円 / 500超→実差額
+      //     - U23・子供・幼児（diff>0）→ 500円に切り上げず実差額
+      //   ・異年齢区分間のUG→ diff = 先価格 − 元価格 で、diff<0→不可 / diff=0→500円 / 1〜500→500円 / 500超→実差額
+      //  売止めダミー: 全桁が9（99999等）は売止め扱い（検算対象外）。高額実価格は除外しない
       // ===PRICE_RULES_CORE_START=== UI/stateに依存しない純粋ロジック（tests/price_rules.test.js が抽出して検証する）
       // 料金・検算ルールの定数（イベントや運用で変わりうる値を1か所に集約）
       const PRICE_RULES = {
@@ -2842,6 +2842,7 @@
       //  ・元または先が範囲券種: 相手の年齢が範囲内に収まるか（範囲外の上=up_out／下=down）
       //  ・単一どうし: 従来ルール（同ランク可 / 昇格は大人へのみ可=mid_up / 降格不可=down）
       function ugAgeSpanReason(srcAge, dstAge) {
+        if (ugAdultToYouthDowngradeReason(srcAge, dstAge)) return "down";
         const s = ugAgeSpan(srcAge), d = ugAgeSpan(dstAge);
         if (s.common || d.common) return null;
         if (s.min === 0 || d.min === 0) return null;
@@ -2866,6 +2867,73 @@
         if (reason === "up_out") return "範囲券種の範囲外(上)へのUG不可(" + srcAge + "→" + dstAge + ")";
         return "年齢降格(" + srcAge + "→" + dstAge + ")";
       }
+      // 共通券を大人扱いに揃えるため、既存の大人→U23不可と同じ境界を適用する。
+      const UG_BLOCK_ADULT_TO_U23 = true;
+
+      // 未確定の複合券種（KEN314=高校生以上＋中学生以下 等）
+      // 単純な「以上」だけで大人へ分類せず、未確定複合券種として既存扱いを維持
+      function ugIsCompositeAgeTicket(a) {
+        a = String(a || "").normalize("NFKC").trim();
+        if (/(\+|＋)/.test(a) && /高校生以上|中学生以上|小学生以上|大人|共通/.test(a) && /中学生以下|小学生以下|子ども|子供|こども|幼児/.test(a)) return true;
+        return false;
+      }
+
+      // 大人券扱い（Adult Equivalent / 大人区分）
+      // KEN211/KEN305/KEN901=3歳以上共通, KEN205=中学生以上共通, KEN212=8歳以上共通, KEN213=小学生以上共通,
+      // KEN201/KEN311=大人(24歳以上), KEN204=大人(高校生以上), KEN202=大人(中学生以上),
+      // KEN301=高校生以上, KEN302=中学生以上, KEN309=小学生以上, KEN310=大人(ﾊﾟｰｸﾊﾟｽﾎﾟｰﾄ付)
+      // ※知らないラベルを大人と決めつけない
+      function ugIsAdultCategory(a) {
+        a = String(a || "").normalize("NFKC").trim();
+        if (!a || ugIsCompositeAgeTicket(a)) return false;
+        if (/大人|ADULT/i.test(a)) return true;
+        if (/共通|全年齢/.test(a)) return true;
+        if (/高校生以上|高校以上/.test(a)) return true;
+        if (/中学生以上|中学以上/.test(a)) return true;
+        if (/小学生以上|小学以上/.test(a)) return true;
+        if (/[0-9０-９]+歳以上/.test(a)) return true;
+        return false;
+      }
+
+      // 子ども・若年限定券種（Child/Youth Limited / 若年限定）
+      // KEN313=高校生, KEN315=中学生, KEN206=子ども(小学生・中学生), KEN207=子ども(小学生),
+      // KEN208/KEN318=3歳～中学生, KEN214/KEN316=3歳～小学生, KEN209/KEN317=3歳～未就学児, KEN210=幼児(0歳～2歳)
+      // ※高校生単独は若年限定、高校生以上は大人扱いで厳格に区別
+      function ugIsYouthCategory(a) {
+        a = String(a || "").normalize("NFKC").trim();
+        if (!a || ugIsCompositeAgeTicket(a)) return false;
+        if (ugIsAdultCategory(a)) return false;
+        if (ugIsU23Category(a)) return false;
+        if (/幼児|未就学|INFANT/i.test(a)) return true;
+        if (/子供|こども|子ども|小中|小・中|小学|CHILD/i.test(a)) return true;
+        if (/中学生|中学/i.test(a)) return true;
+        if (/高校生|高校/i.test(a)) return true;
+        if (/(^|[^0-9０-９])[3-6３-６][\s　]*歳/.test(a)) return true;
+        if (/[0-9０-９]+歳～[0-9０-９]+歳/.test(a)) return true;
+        return false;
+      }
+
+      // U23区分
+      // KEN203/KEN312=U23(高校生～23歳)
+      function ugIsU23Category(a) {
+        a = String(a || "").normalize("NFKC").trim();
+        if (!a || ugIsCompositeAgeTicket(a)) return false;
+        if (ugIsAdultCategory(a)) return false;
+        return /U23|アンダー|U\-23/i.test(a);
+      }
+
+      // 大人・共通券種から子ども・若年限定券種への変更禁止理由
+      function ugAdultToYouthDowngradeReason(srcAge, dstAge) {
+        if (!srcAge || !dstAge) return null;
+        if (!ugIsAdultCategory(srcAge)) return null;
+        const isYouth = ugIsYouthCategory(dstAge);
+        const isU23 = UG_BLOCK_ADULT_TO_U23 && ugIsU23Category(dstAge);
+        if (isYouth || isU23) {
+          return "大人・共通券種から子ども・若年限定券種への変更不可(" + srcAge + "→" + dstAge + ")";
+        }
+        return null;
+      }
+
       // 売止め等のダミー価格（検算対象外）か。売止めの記号は全桁9（999999等）のみ。
       // 2026-08-24: 旧「80万円以上はダミー」条件を撤廃（VBA側は2026-08-19に撤廃済みで未追随だった）。
       // 27F1はPaddock Club 1,200,000 / S-BOX 1,250,000 / GRAN VIEW 1,500,000 / R-BOX 1,600,000 /
@@ -2875,19 +2943,24 @@
       }
       // 異席種UGの期待差額（diff = 先価格 − 元価格）。同席種同区分(sameSeat)は呼び出し側で別扱い。
       //  ・差額0円は年齢区分の組合せに関わらず手数料(500)（2026-07-03確定: 異区分間も500円）
-      //  ・同年齢区分: 大人は1〜500→500・500超→実差額／U23以下は実差額(マイナス→0)
-      //  ・異年齢区分: マイナス→0 ／ 1〜500→500 ／ 500超→実差額
+      //  ・差額が負ならnull（UG不可）。0円への丸めは行わない
+      //  ・大人・共通券種から子ども・若年限定券種への変更は同額以上でもnull（UG不可。2026-10-01確定）
+      //  ・同年齢区分: 大人は1〜500→500・500超→実差額／U23以下は正の実差額
+      //  ・異年齢区分: 1〜500→500 ／ 500超→実差額
       function ugExpectedCharge(srcAge, dstAge, srcPrice, dstPrice) {
         const fee = PRICE_RULES.SEAT_CHANGE_FEE;
         const diff = dstPrice - srcPrice;
+        if (diff < 0) return null; // 値下がりはUG不可。0円UGとして許可しない
+        // 2026-10-01: 大人・共通券種から子ども・若年限定券種への変更は同額以上でも不可
+        if (ugAdultToYouthDowngradeReason(srcAge, dstAge)) return null;
         if (diff === 0) return fee; // 差額0円は全組合せで席変更手数料500円
         // 年齢区分の同一判定はランク基準（席種ごとにラベル表記が違っても同じ区分として扱う）。
         // 「3歳以上共通」等のランク判定不能(rank=0)なラベルは、文字列完全一致なら同区分とみなす
         // （ランクのみで判定するとrank=0同士は常に「異区分」になってしまい、本当の同一ラベルの再発行を誤NGにする）
         const sr = ugAgeRank(srcAge), dr = ugAgeRank(dstAge);
         const sameAgeCat = (sr !== 0 && sr === dr) || srcAge === dstAge;
-        if (sameAgeCat && sr !== 4) return diff < 0 ? 0 : diff;
-        return diff < 0 ? 0 : (diff <= fee ? fee : diff);
+        if (sameAgeCat && sr !== 4) return diff;
+        return diff <= fee ? fee : diff;
       }
       // ===PRICE_RULES_CORE_END===
       // ===UG_VALIDATOR_CORE_START=== UI/stateに依存しない純粋ロジック（tests/ug_validator.test.js が抽出して検証する）
@@ -2959,6 +3032,11 @@
         };
         // 0円商品はUGの元にも先にもできない（前売・当日いずれかが0円ならブロック）。VBA CheckUpgrade 準拠
         const hasZeroPrice = (rec) => !!rec && (rec.adv === 0 || rec.day === 0);
+        // 2026-09-30: 席種が上位でも、その対象券種が安くなるUGはUI/TSVとも登録不可。
+        // 共通→子ども/幼児/U23も同じ基準で除外。空欄・売止めダミーは値下がり比較に使わない。
+        // 既存マクロと同様、前売/当日のどちらか一方でも実価格が値下がりなら不可。
+        const ticketDowngradeWindows = (src, dst) => !src || !dst ? [] : ["adv", "day"].filter((w) =>
+          src[w] != null && dst[w] != null && !ugIsDummyPrice(src[w]) && !ugIsDummyPrice(dst[w]) && dst[w] < src[w]);
         // 席種カテゴリ: 指定席 / エリア / その他 / 駐車券
         //  判定はマスタ・コードを正とする（席種名での決め打ちはしない）:
         //   コード6桁目 O=その他（パドック/パス等・UG例外的に可）/ P=駐車券
@@ -3046,11 +3124,15 @@
         // UG行が実在しなくても「この席種×券種の組み合わせは構造的にUG可能か」を判定する。
         // 実在する行のkbn/rank/条件には依存しない（条件キーがないので最高額は"any"索引のみ参照）。
         // マトリクスの「—」セル（登録なし）が、本来UGが成立しうるのに登録漏れなのか、
-        // そもそも対象外（車椅子/エリア/年齢降格/大人ダウングレード）なのかを区別するために使う。
+        // そもそも対象外（車椅子/エリア/年齢降格/席種・券種ダウングレード）なのかを区別するために使う。
         function canUpgrade(srcSeat, srcCode, srcAge, dstSeat, dstCode, dstAge) {
           const sr = ageRank(srcAge), dr = ageRank(dstAge);
           // 年齢降格/範囲外/中間昇格をまとめて判定（範囲券種対応・両方向。2026-07-07）
           if (ugAgeSpanReason(srcAge, dstAge)) return false;
+          // 2026-10-01: 大人・共通券種から子ども・若年限定券種への変更は同額以上でも不可
+          if (ugAdultToYouthDowngradeReason(srcAge, dstAge)) return false;
+          // 早期許可（パス/木曜日券/車椅子）より先に個別券種の値下がりを確認する。
+          if (ticketDowngradeWindows(any.get(srcSeat + "|" + srcAge), any.get(dstSeat + "|" + dstAge)).length) return false;
           // 公式HPでUG対象外と明示された席種（2026-08-18ルール。VBA側から2026-08-24に移植）
           if (isUgExcludedSeat(srcSeat) || isUgExcludedSeat(dstSeat)) return false;
           const sameAgeCatPre = (sr !== 0 && sr === dr) || srcAge === dstAge;
@@ -3111,10 +3193,12 @@
           // --- 可否チェック ---
           if (!/会員/.test(kbn) && !/会員/.test(rank)) problems.push("一般販売にUG不可");
           // 年齢区分の可否（降格/範囲外/中間昇格）を範囲券種対応でまとめて判定（両方向・2026-07-07）。
-          // 例: 幼児〜中学生→大人=範囲外で不可 / 幼児〜中学生→幼児=範囲内で可 / 高校生以上→U23=範囲内で可
+          // 大人扱いの共通券から若年限定への変更は、価格や年齢範囲に関係なく不可。
           {
+            const adultYouthReason = ugAdultToYouthDowngradeReason(srcAge, dstAge);
             const ageReason = ugAgeSpanReason(srcAge, dstAge);
-            if (ageReason) problems.push(ugAgeReasonMsg(ageReason, srcAge, dstAge));
+            if (adultYouthReason) problems.push(adultYouthReason);
+            else if (ageReason) problems.push(ugAgeReasonMsg(ageReason, srcAge, dstAge));
           }
           // 公式HPでUG対象外と明示された席種（2026-08-18ルール。VBA側から2026-08-24に移植）
           if (isUgExcludedSeat(srcSeat) || isUgExcludedSeat(dstSeat)) problems.push("公式HPでUG対象外の席種");
@@ -3148,6 +3232,13 @@
             if (hasZeroPrice(lookup(ck0, srcSeat, srcAge)) || hasZeroPrice(lookup(ck0, dstSeat, dstAge))) {
               problems.push("0円商品はUG不可");
             }
+          }
+          // 席種の最高額が上がっても、実際の元/先券種の価格が下がるUGは不可。
+          // 0円に丸めて登録する旧例外は廃止し、正規に除外される券種を登録漏れ候補にも含めない。
+          {
+            const ck = condKey(row);
+            const windows = ticketDowngradeWindows(lookup(ck, srcSeat, srcAge), lookup(ck, dstSeat, dstAge));
+            if (windows.length) problems.push("対象券種の" + windows.map((w) => w === "adv" ? "前売" : "当日").join("・") + "価格が先<元のためUG不可（0円への丸め不可）");
           }
           // 席種ごとの最高額（前売/当日それぞれ・ダミー除外）を比較した実質ダウングレードは不可。
           // 2026-08-25: 旧「大人料金が先<元、かつ元が大人のときだけ不可」から基準を変更（正本§2-7改訂）。
@@ -3241,10 +3332,13 @@
               return { exp: null, note, dummy: true, dummyError: bothOverlap, srcPrice: sp, dstPrice: dp };
             }
             const diff = dp - sp;
-            // 期待差額の写像は純粋関数 ugExpectedCharge に集約（同年齢: 差額0は全区分500・大人は1〜500→500/超→実差額・
-            // U23以下は実差額/マイナス0／異年齢: マイナス→0・0円→500・1〜500→500・500超→実差額）
+            const adultYouthReason = ugAdultToYouthDowngradeReason(srcAge, dstAge);
+            // 期待差額の写像は純粋関数 ugExpectedCharge に集約（負差額や子どもへのダウングレードはUG不可、同額は500、
+            // 大人/異年齢の正差額1〜500は500、同年齢U23以下の正差額は実差額）
             const exp = ugExpectedCharge(srcAge, dstAge, sp, dp);
-            const note = (ageRank(srcAge) !== 0 && ageRank(srcAge) === ageRank(dstAge) && diff === 0) ? "同年齢区分どうしで差額0円→席変更手数料500円" : "";
+            const note = adultYouthReason ? adultYouthReason
+              : diff < 0 ? "対象券種の価格が先<元のためUG不可（0円への丸め不可）"
+              : (ageRank(srcAge) !== 0 && ageRank(srcAge) === ageRank(dstAge) && diff === 0) ? "同年齢区分どうしで差額0円→席変更手数料500円" : "";
             return { exp, note, dummy: false, srcPrice: sp, dstPrice: dp, rawDiff: diff };
           };
           const adv = calc("adv"), day = calc("day");
@@ -3283,7 +3377,7 @@
             srcPrice: adv.srcPrice, dstPrice: adv.dstPrice,
             srcAdv: adv.srcPrice, dstAdv: adv.dstPrice, srcDay: day.srcPrice, dstDay: day.dstPrice,
             sameSeat,
-            isDown: !sameSeat && adv.rawDiff != null && adv.rawDiff < 0,
+            isDown: !sameSeat && [adv, day].some((win) => win.rawDiff != null && win.rawDiff < 0),
             advActual, dayActual, notes, advNg, dayNg,
             note: [problems.join(" / "), notes.join(" / "), problems.length ? "" : (adv.note || "")].filter(Boolean).join(" / "),
           };
@@ -3441,11 +3535,15 @@
         const out = [];
         const groups = hpCollapse(
           rowsIn.filter((r) => !hpIsUgRow(r)),
-          ["席種エリアコード", "席種エリア名", "券種名", "前売価格", "当日価格"]
+          ["席種エリアコード", "席種エリア名", "券種名", "前売価格", "当日価格", "会員ランク名", "販売経路名", "販売経路区分", "販売価格区分"]
         );
         for (const g of groups) {
           const row = g.row;
           row._count = g.count;
+          if (hpSpecialSaleRow(row)) {
+            out.push({ level: "warn", kind: "別経路料金・要確認", row, detail: "先行販売・限定販売・別販売経路の料金は一般販売HPと比較せず、その経路の根拠を確認してください" });
+            continue;
+          }
           const { items, via } = hpLookup(idx, row);
           if (!items.length) {
             out.push({ level: "info", kind: "HPに無い", row, detail: "HPナレッジに該当する席種×券種がありません" });
@@ -3508,8 +3606,23 @@
 
       // --- 2. 販売期間 ---
       // scope（「指定席・観戦券」等）と席種名のキーワード一致で、その行に効くルールを決める。
+      // 一般HPの比較に別販売経路の日時を使わない。経路を持たない旧F1ナレッジは要確認。
+      function hpGeneralSale(hp) {
+        const sale = (hp && hp.sale) || {};
+        if (sale.channels) return sale.channels.general || {};
+        if (sale.channel && sale.channel !== "general") return {};
+        const f1 = /F1/i.test([hp && hp.event_id, hp && hp.event_key, hp && hp.label].join(" "));
+        if (f1 && sale.channel !== "general" && sale.channel_policy !== "general_only/1") return {};
+        return sale;
+      }
+
+      function hpSpecialSaleRow(row) {
+        const text = [row.会員ランク名, row.販売経路名, row.販売経路区分, row.販売価格区分].join(" ").normalize("NFKC");
+        return /AMEX|アメックス|アメリカン[・\s]?エキスプレス|プラチナ|PLATINUM|先行|抽選|アソビュ[ー―-]|ASOVIEW|会員限定/i.test(text);
+      }
+
       function hpRulesForRow(hp, row) {
-        const rules = (hp && hp.sale && hp.sale.rules) || [];
+        const rules = (hpGeneralSale(hp).rules || []).filter((r) => !r.channel || r.channel === "general");
         const name = hpNormName(row.席種エリア名);
         const hits = rules.filter((r) =>
           String(r.scope || "").split(/[・/、,]/).some((w) => {
@@ -3524,20 +3637,25 @@
 
       function hpCheckSalePeriod(rowsIn, hp) {
         const out = [];
-        const startHp = hpParseDateTime(hp && hp.sale && hp.sale.start);
+        const sale = hpGeneralSale(hp);
+        const startHp = hpParseDateTime(sale.start);
         // 料金と同じ理由でまとめる。販売期間は席種と日時だけで決まるので券種は見ない
-        const groups = hpCollapse(rowsIn, ["席種エリア名", "販売開始日時", "販売終了日時"]);
+        const groups = hpCollapse(rowsIn, ["席種エリア名", "販売開始日時", "販売終了日時", "会員ランク名", "販売経路名", "販売経路区分", "販売価格区分"]);
         for (const g of groups) {
           const row = g.row;
           row._count = g.count;
+          if (hpSpecialSaleRow(row)) {
+            out.push({ level: "warn", kind: "別経路販売・要確認", row, detail: "先行販売・限定販売・別販売経路の行です。一般販売HPとの期間比較をせず、その経路の根拠を確認してください" });
+            continue;
+          }
           const s = hpParseDateTime(row.販売開始日時);
           if (startHp === null) {
-            out.push({ level: "warn", kind: "HP販売開始未確定", row, detail: "HPの開始日時が未取得または競合しています。目視で確認してください" });
+            out.push({ level: "warn", kind: "HP販売開始未確定", row, detail: "一般販売の開始日時が未取得・競合、または販売経路が未識別です。一般販売の根拠を確認してください" });
           } else if (s === null) {
-            out.push({ level: "error", kind: "販売開始が空・不正", row, detail: "HP " + hp.sale.start + " / TSVの開始日時を確認してください" });
+            out.push({ level: "error", kind: "販売開始が空・不正", row, detail: "HP " + sale.start + " / TSVの開始日時を確認してください" });
           }
           if (startHp !== null && s !== null && s !== startHp) {
-            out.push({ level: "error", kind: "販売開始が違う", row, detail: "TSV " + row.販売開始日時 + " / HP " + hp.sale.start });
+            out.push({ level: "error", kind: "販売開始が違う", row, detail: "TSV " + row.販売開始日時 + " / HP " + sale.start });
           }
           const rules = hpRulesForRow(hp, row);
           if (!rules.length) {
@@ -3966,7 +4084,7 @@
         const at = (name) => h.indexOf(name);
         const pick = {
           price_schedule: ["席種エリアコード", "席種エリア名", "券種名", "前売価格", "当日価格", "販売開始日時", "販売終了日時",
-                           "アップグレード該当フラグ", "アップグレード元席種エリアコード"],
+                           "アップグレード該当フラグ", "アップグレード元席種エリアコード", "会員ランク名", "販売経路名", "販売経路区分", "販売価格区分"],
           seat_master: ["seat_type_area_cd", "seat_type_area_control_nm", "seat_type_area_disp_nm", "nte", "grp_nm",
                         "rsve_unrsve_kbn", "seattype_stock_control_typ", "box_seat_flg", "seat_cnt", "single_day_admission_flg", "parking_ticket_flg"],
           sej: ["seat_type_area_cd", "word1", "word2", "word3"],
@@ -4024,7 +4142,7 @@
         const key = keys.length === 1 ? keys[0] : await hpPickEvent(keys.map((k) => ({ key: k, label: (data.events[k] || {}).label || k })));
         if (!key) return null;
         const ev = data.events[key] || {};
-        return { schema: data.schema, built_at: data.built_at || null, event_key: key, label: ev.label || key, sale: ev.sale || null, items: ev.items || [],
+        return { schema: data.schema, built_at: data.built_at || null, event_key: key, event_id: ev.event_id || key, reference_channel: ev.reference_channel || null, label: ev.label || key, sale: ev.sale || null, items: ev.items || [],
           page_notes: ev.page_notes || {}, common_pages: ev.common_pages || [], group_aliases: ev.group_aliases || [] };
       }
 
@@ -5334,7 +5452,14 @@
           if (!e.target.closest("#context-menu"))
             els.ctxMenu.style.display = "none";
         };
-        els.container.onscroll = () => requestAnimationFrame(renderBody);
+        els.container.onscroll = () => {
+          requestAnimationFrame(renderBody);
+          scheduleRowHSettle();
+        };
+        // スクロールバーのドラッグ中は行高見積りの更新（scrollTop補正）を待たせる
+        els.container.addEventListener("pointerdown", () => { _gridPointerDown = true; });
+        document.addEventListener("pointerup", () => { _gridPointerDown = false; });
+        document.addEventListener("pointercancel", () => { _gridPointerDown = false; });
 
         // Alt+ホイールでズーム（CSS zoom を使用 — sticky/scrollと互換性あり）
         // Shift+ホイールで横スクロール（列数の多いチケットTSVの横移動を楽にする。
@@ -7234,9 +7359,19 @@
       //
       // 測定で見積りが変わると start 行の上端位置(offsets[start])が動く＝画面が飛ぶため、
       // ずれた分だけ scrollTop を足して見えている行をその場に留める（アンカー補正）。
+      //
+      // 未測定行の見積り est はスクロール中は固定する。実測平均を毎回使うと、
+      // 背の高い行（備考の長いラウンジ/クラブ行など）を測るたびに画面より上の未測定行の
+      // 見積りが一斉に変わり、スクロール中に scrollTop の補正が何十回も入る。
+      // Chrome はホイールのスムーズスクロール中に scrollTop を書き換えられると
+      // アニメーションが打ち切られるので「引っかかる・戻される」になる。
+      // スクロール中に新しく測るのは描画ウィンドウ内（start 以降）だけなので、
+      // est を固定すれば offsets[start] は動かない。実測平均へ寄せるのは
+      // スクロールが止まってから（settleRowHEstimate）。
       const _rowH = {
         map: new Map(), // データ行index -> 実測高(px)
         sum: 0,         // 実測値の合計（未測定行の見積り平均に使う）
+        est: null,      // 未測定行の見積り高。リセット後の最初の実測で決め、スクロール停止時だけ更新
         sig: null,      // 未描画行の高さにも効く条件。変わったら実測値を全部捨てる
         offsets: null,  // 可視行の累積オフセット Float64Array(可視行数+1)
         offRows: null,  // offsets を作った時点の getVisibleRows() オブジェクト（同一性で判定）
@@ -7259,6 +7394,7 @@
       function resetRowHeights() {
         _rowH.map.clear();
         _rowH.sum = 0;
+        _rowH.est = null;
         _rowH.sig = null;
         _rowH.offsets = null;
         _rowH.offRows = null;
@@ -7281,7 +7417,10 @@
         if (_rowH.offsets && !_rowH.dirty && _rowH.offRows === rows)
           return _rowH.offsets;
         const n = rows.length;
-        const est = _rowHEstimate(fallbackH);
+        // 最初の実測が入った時点の平均で見積りを固定する（理由は _rowH の説明）
+        // 整数pxに丸める。端数があると停止後の補正で scrollTop（整数）との差が1pxずれて画面が動く
+        if (_rowH.est === null && _rowH.map.size) _rowH.est = Math.round(_rowHEstimate(fallbackH));
+        const est = _rowH.est !== null ? _rowH.est : fallbackH;
         const arr = new Float64Array(n + 1);
         const map = _rowH.map, idx = rows._indices;
         let acc = 0;
@@ -7321,7 +7460,12 @@
         return changed;
       }
       // スペーサ高を累積オフセットへ合わせる。測定で見積りがずれたぶんは scrollTop で吸収する。
-      function syncSpacerHeights(topEl, botEl, start, end, rows, rowH) {
+      // st0 は renderBody が DOM を触る前に読んだ scrollTop。
+      // スペーサを縮めた瞬間にブラウザが scrollTop を上限へ切り詰めることがあるので、
+      // 補正は「書き換え前の値＋delta」の絶対値で入れる（相対加算だと二重に戻る）。
+      // ここで scrollTop を読み直してはいけない: 差分描画で上の行を消した直後・上スペーサを
+      // 伸ばす前にレイアウトが走り、縮んだ高さで scrollTop が切り詰められる（末尾でホイールが効かなくなる）。
+      function syncSpacerHeights(topEl, botEl, start, end, rows, rowH, st0) {
         let off = rowOffsets(rows, rowH);
         topEl.style.height = off[start] + "px";
         botEl.style.height = Math.max(0, off[rows.length] - off[end]) + "px";
@@ -7334,7 +7478,60 @@
         // start より上の行の見積りが変わった → 同じ量だけスクロールして見え方を固定する。
         // scrollTop の変更は scroll イベントを起こすが、start/end が同じなら
         // renderBody は lastRenderKey で早期returnするので往復にはならない。
-        if (Math.abs(delta) >= 1) els.container.scrollTop += delta;
+        // est はスクロール中は固定なので、ここに来るのは start より上の描画済み行の高さが
+        // 変わったとき（行の中身が変わった等）だけ。
+        if (Math.abs(delta) >= 1) els.container.scrollTop = st0 + delta;
+      }
+
+      // スクロールが止まってから、未測定行の見積り est を実測平均へ寄せる。
+      // start 行の上端がずれた分だけ scrollTop を動かすので見た目は変わらない。
+      // スクロールバーをつかんでいる間（ポインタ押下中）は動かさない。
+      let _rowHSettleTimer = 0;
+      let _gridPointerDown = false;
+      function scheduleRowHSettle() {
+        clearTimeout(_rowHSettleTimer);
+        _rowHSettleTimer = setTimeout(settleRowHEstimate, 300);
+      }
+      function settleRowHEstimate() {
+        if (_gridPointerDown) { scheduleRowHSettle(); return; }
+        const domw = _domWindow;
+        if (!domw || !domw.topEl || domw.topEl.parentNode !== els.tbody || !_rowH.map.size) return;
+        const avg = Math.round(_rowHEstimate(_rowH.est || ROW_H));
+        if (avg === _rowH.est) return;
+        const rows = getVisibleRows();
+        const rowH = state.wrapCells ? 56 : ROW_H;
+        const start = Math.min(domw.start, rows.length);
+        const end = Math.min(domw.end, rows.length);
+        const st0 = els.container.scrollTop;
+        const before = rowOffsets(rows, rowH)[start];
+        _rowH.est = avg;
+        _rowH.dirty = true;
+        const off = rowOffsets(rows, rowH);
+        domw.topEl.style.height = off[start] + "px";
+        if (domw.botEl) domw.botEl.style.height = Math.max(0, off[rows.length] - off[end]) + "px";
+        const delta = off[start] - before;
+        if (Math.abs(delta) >= 1) els.container.scrollTop = st0 + delta;
+        renderBody();
+      }
+
+      // 描画した行が画面の下端まで届いていなければ、その場で描き直す。
+      // est が実際より大きいと「画面に入る行数」を少なく見積もり、次のスクロールまで
+      // 下に空白が残る。測り直したオフセットで窓を選び直せば埋まる（無限ループ防止で回数制限）。
+      // renderBody は rAF のコールバックにもなる（引数にタイムスタンプが来る）ので、深さは引数でなく変数で数える。
+      let _coverDepth = 0;
+      function ensureViewportCovered(rows, end) {
+        if (_coverDepth >= 4 || end >= rows.length || !_domWindow || !_domWindow.botEl) return;
+        const cRect = els.container.getBoundingClientRect();
+        const last = _domWindow.botEl.previousElementSibling;
+        if (!last || last === _domWindow.topEl) return;
+        if (last.getBoundingClientRect().bottom >= cRect.bottom) return;
+        _coverDepth++;
+        try {
+          lastRenderKey = null;
+          renderBody();
+        } finally {
+          _coverDepth--;
+        }
       }
 
       function renderBody() {
@@ -7840,10 +8037,11 @@
             for (let vi = domw.end; vi < end; vi++) frag += buildRow(vi);
             botEl.insertAdjacentHTML("beforebegin", frag);
           }
-          syncSpacerHeights(topEl, botEl, start, end, rows, rowH);
+          syncSpacerHeights(topEl, botEl, start, end, rows, rowH, scrollTop);
           domw.start = start;
           domw.end = end;
           placeFillHandle();
+          ensureViewportCovered(rows, end);
           return;
         }
 
@@ -7894,13 +8092,14 @@
           botEl: els.tbody.querySelector("tr.vspacer-bottom"),
         };
         if (_domWindow.topEl && _domWindow.botEl)
-          syncSpacerHeights(_domWindow.topEl, _domWindow.botEl, start, end, rows, rowH);
+          syncSpacerHeights(_domWindow.topEl, _domWindow.botEl, start, end, rows, rowH, scrollTop);
         placeFillHandle();
         _prevHighlight = {
           selected: state.selected ? { ...state.selected } : null,
           range: state.range ? { ...state.range } : null,
           selectedCol: state.selectedCol,
         };
+        ensureViewportCovered(rows, end);
       }
 
       function isRowInRange(r) {
@@ -11667,7 +11866,7 @@
         return rows;
       }
 
-      
+
       function loadPriceMasterFile(file, _encoding, onDone) {
         if (typeof _encoding === 'function') {
           onDone = _encoding;
@@ -11690,13 +11889,13 @@
           const routeIdx = headers.findIndex(h => h === "販売経路区分");
           const dayIdx = headers.findIndex(h => h === "当日価格");
           const advIdx = headers.findIndex(h => h === "前売価格");
-          
+
           if (codeIdx === -1 || (dayIdx === -1 && advIdx === -1)) {
             alert("「席種エリアコード」および価格の列が見つかりません。\n価格経路スケジュールマスタ(BO-F-21030)を選択してください。");
             setStatus("⚠ 価格経路スケジュールの列が不足しています");
             return;
           }
-          
+
           const maxPrices = {};
           // リセール上限はチケットアカウントの「前売価格」の上限と一致すべき（当日価格は対象外）。
           // 桁区切りカンマを除いて数値化。0/空欄や売止めダミー(999999等)は「最高額」の対象外にする
@@ -11726,7 +11925,7 @@
         };
         r.readAsText(file, _encoding || "utf-8");
       }
-      
+
       function _openPriceMasterPicker(onDone) {
         pickFileWithFallback(
           [".tsv", ".csv", ".txt"],
@@ -12772,7 +12971,7 @@ ${_sortableTable(labels, rowsHtml)}` };
           const period = periodOf; // 共通ヘルパーを使用
           // ツールチップ用: 前売/当日それぞれの「登録／期待／先−元=差額」を1行で説明する。
           // セルは略称（前売NG/当日NG）だけにし、なぜその期待値かはホバーで分かるようにするため
-          // （例: 子供で先<元のとき 期待0円 ＝ 差額がマイナスのため0 ということが読み取れる）。
+          // （値下がりUGは不可理由を表示し、正の差額と手数料の根拠を確認できる）。
           const _yen = (n) => n != null ? n.toLocaleString("ja-JP") + "円" : "?";
           const winTipLine = (label, src, dst, exp, actual, ng, note) => {
             // 期待値が出せない（価格不明 or ダミー価格）場合は、その理由（noteに「販売期間がかぶっているのに
@@ -12782,7 +12981,6 @@ ${_sortableTable(labels, rowsHtml)}` };
             if (src != null && dst != null) {
               const raw = dst - src;
               s += `（先${_yen(dst)} − 元${_yen(src)} = 差額${raw.toLocaleString("ja-JP")}円`;
-              if (exp === 0 && raw <= 0) s += " → マイナス/0のため期待0円";
               s += "）";
             }
             if (ng) s += "  ← 不一致";
@@ -12910,7 +13108,7 @@ ${_sortableTable(labels, rowsHtml)}` };
                   prevTsBody = ts;
                   const e = map.get(fs + "|" + fa + "=>" + ts + "|" + ta);
                   if (!e) {
-                    // UG登録が無いセル。同年齢区分どうしで先のほうが高く、車椅子/エリア/年齢降格/大人ダウングレード等の
+                    // UG登録が無いセル。同年齢区分どうしで先のほうが高く、車椅子/エリア/年齢降格/席種・券種ダウングレード等の
                     // 対象外ルールにも当たらない場合は「本来UGが成立しうるのに登録漏れの可能性」として目立たせる。
                     const sameRank = ugAgeRank(fa) !== 0 && ugAgeRank(fa) === ugAgeRank(ta);
                     let missing = false;
@@ -12940,7 +13138,7 @@ ${_sortableTable(labels, rowsHtml)}` };
                       : "通常価格が見つからず検算不能")
                     + `\n販売期間 ${v(row, c.start)} 〜 ${v(row, c.end)}`;
                   const cls = (chk.status === "ng" || chk.status === "invalid") ? " mx-ng" : chk.status === "unknown" ? " mx-na" : "";
-                  const dg = chk.isDown ? '<div class="dg">▼0</div>' : "";
+                  const dg = chk.isDown ? '<div class="dg">▼UG不可</div>' : "";
                   const mid = encodeURIComponent(["M", k, fs, fa, ts, ta].join("|"));
                   // セル本体は略称のみ（前売NG/当日NG）。何が期待値でなぜNGかの詳細はホバー(title)で見せる。
                   let reason = "";
@@ -12952,7 +13150,7 @@ ${_sortableTable(labels, rowsHtml)}` };
                     if (rs.length) reason = `<div class="rsn">${rs.join("・")}</div>`;
                   }
                   // 期待差額バッジ: 本来の差額（先−元）を表示する。先<元でマイナス等になり登録すべき額（期待）が
-                  // 本来差額と異なる場合は「本来差額→期待」を併記（例: 先<元で −200→0 = 実差額は−200だが登録は0円）。
+                  // 本来差額と異なる場合は「本来差額→期待」を併記（例: 大人の差額200→手数料500）。
                   const rawAdvDiff = (chk.dstAdv != null && chk.srcAdv != null) ? chk.dstAdv - chk.srcAdv : null;
                   const expBadge = (chk.status !== "invalid" && chk.expected != null)
                     ? `<div class="exp-badge">先－元 ${(!chk.sameSeat && rawAdvDiff != null && rawAdvDiff !== chk.expected)
@@ -12972,7 +13170,7 @@ ${_sortableTable(labels, rowsHtml)}` };
           const ngBadge = ngTotal ? `　<span class="badge-ng">NG ${ngTotal}件</span>` : `　<span class="badge-ok">検算OK</span>`;
           const missingBadge = missingTotal ? `　<span class="badge-ng" style="background:#b45309">登録漏れ?候補 ${missingTotal}件</span>` : "";
           sections.matrix = { title: "UGマトリクス", body: `<h2>🔢 アップグレードマトリクス（俯瞰）${ngBadge}${missingBadge}</h2>
-<p class="legend">行=元席種/券種、列=先席種/券種（大人の前売価格の安い順）。基本の販売期間は各ブロック見出しに表示。席種は表示略称＋区分（<span class="catb cat-r">指定席</span><span class="catb cat-a">数在庫</span><span class="catb cat-o">その他</span>）。各セル: 先－元=期待差額（緑） / 前売・当日=実際の金額（数字太字） / 橙ラベル=基本と異なる販売期間（差分のみ短縮表示、見出しの通常価格も同様）。<b>期待差額</b>は差額0円なら全組合せ500（手数料）・同区分の大人は1〜500も500・U23/子供/幼児は実差額(マイナス→0)、異区分間はマイナス→0・1〜500→500・500超→実差額。<b>不一致は文字が赤・セルが薄ピンク</b>。<b>「？」の橙セル</b>はUG登録が無いセルのうち、先のほうが価格が高く対象外ルールにも当たらないため登録漏れの可能性がある候補（推測なので必ず人が確認してください）。クリックでマーク</p>${mxBody}` };
+<p class="legend">行=元席種/券種、列=先席種/券種（大人の前売価格の安い順）。基本の販売期間は各ブロック見出しに表示。席種は表示略称＋区分（<span class="catb cat-r">指定席</span><span class="catb cat-a">数在庫</span><span class="catb cat-o">その他</span>）。各セル: 先－元=期待差額（緑） / 前売・当日=実際の金額（数字太字） / 橙ラベル=基本と異なる販売期間（差分のみ短縮表示、見出しの通常価格も同様）。<b>期待差額</b>は差額0円なら全組合せ500（手数料）・同区分の大人は1〜500も500・U23/子供/幼児は正の実差額、異区分間は1〜500→500・500超→実差額。前売/当日の対象券種価格が先&lt;元ならUG不可（0円に丸めない）。<b>不一致は文字が赤・セルが薄ピンク</b>。<b>「？」の橙セル</b>はUG登録が無いセルのうち、先のほうが価格が高く対象外ルールにも当たらないため登録漏れの可能性がある候補（推測なので必ず人が確認してください）。クリックでマーク</p>${mxBody}` };
         }
 
         // --- UG一覧（席種ペアでセル結合・元⇒先・金額対比・差異強調） ---
@@ -13017,7 +13215,7 @@ ${_sortableTable(labels, rowsHtml)}` };
               const expStr = (chk.expected != null || chk.expectedDay != null)
                 ? `前 ${chk.expected != null ? chk.expected.toLocaleString("ja-JP") : "?"} / 当 ${chk.expectedDay != null ? chk.expectedDay.toLocaleString("ja-JP") : "?"}`
                 : (chk.advNote || "—");
-              const dgNote = chk.isDown ? `<div class="dg-note">▼ダウングレード</div>` : "";
+              const dgNote = chk.isDown ? `<div class="dg-note">▼ダウングレード（UG不可）</div>` : "";
               const sep = i === 0 ? " seat-sep" : "";
               // 列ごとの絞り込み用に検索対象テキストを各行のデータ属性へ持たせる（区間セルはrowspanで
               // 全行に存在しないため、cells[index]ではなくデータ属性で照合する）
@@ -13029,7 +13227,7 @@ ${_sortableTable(labels, rowsHtml)}` };
               bodyRows += `<td class="kenpair">${escHtml(ageLabel(v(row, c.ugAge)))}<span class="arrow">⇒</span>${escHtml(ageLabel(v(row, c.age)))}</td>`
                 + `<td class="prices">${dual(money(chk.srcAdv != null ? chk.srcAdv : ""), money(chk.srcDay != null ? chk.srcDay : ""))}</td>`
                 + `<td class="prices">${dual(money(chk.dstAdv != null ? chk.dstAdv : ""), money(chk.dstDay != null ? chk.dstDay : ""))}</td>`
-                + `<td class="exp" title="先−元の期待差額（同席種同区分=一律500／差額0円は全組合せ500・大人は1〜500も500・U23/子供/幼児は実差額(マイナス→0)／異区分間はマイナス→0・1〜500→500・500超→実差額）">${escHtml(expStr)}${dgNote}</td>`
+                + `<td class="exp" title="先−元の期待差額（同席種同区分=一律500／差額0円は全組合せ500・大人は1〜500も500・U23/子供/幼児は正の実差額／異区分間は1〜500→500・500超→実差額／先&lt;元はUG不可）">${escHtml(expStr)}${dgNote}</td>`
                 + `<td class="prices reg">${dual(money(v(row, c.adv)), money(v(row, c.day)), chk.advNg, chk.dayNg, chk.advNg ? "期待 " + (chk.expected != null ? chk.expected.toLocaleString("ja-JP") : "?") : "", chk.dayNg ? "期待 " + (chk.expectedDay != null ? chk.expectedDay.toLocaleString("ja-JP") : "?") : "")}</td>`
                 + cell(condOf(row), condOf(row))
                 + cell(periodOf(row), v(row, c.start), "dt")
@@ -13050,7 +13248,7 @@ ${_sortableTable(labels, rowsHtml)}` };
             + (inv ? `　<span class="badge-ng">設定不可 ${inv}件</span>` : "")
             + (na ? `　<span class="badge-na">価格不明 ${na}件</span>` : "");
           sections.ug = { title: "UG一覧", body: `<h2>🔀 アップグレード一覧（${ugs.length}件）${badges}</h2>
-<p class="legend">見出し下の入力欄で区間・券種・販売条件・販売期間・コメントを絞り込み。区間=元席種⇒先席種（セル結合）。期待差額=先−元（前売・当日とも）。同席種・同年齢区分は一律500。<b>異席種でも同年齢区分どうし</b>は、差額0円なら全区分とも500円（席変更手数料）、差額ありは大人が1〜500→500・500超→実差額、U23・子供・幼児は実差額のまま（マイナス→0）。<b>異年齢区分間</b>はマイナス→0・0円→500・1〜500→500・500超→実差額。車椅子は他席種との相互UG不可、大人料金が先&lt;元のUGも原則不可。登録差額が期待と違う項目は文字が赤、コメント欄に理由。${seatMeta ? "席種は表示略称・" : ""}券種は略称</p>
+<p class="legend">見出し下の入力欄で区間・券種・販売条件・販売期間・コメントを絞り込み。区間=元席種⇒先席種（セル結合）。期待差額=先−元（前売・当日とも）。同席種・同年齢区分は一律500。<b>異席種でも同年齢区分どうし</b>は、差額0円なら全区分とも500円（席変更手数料）、差額ありは大人が1〜500→500・500超→実差額、U23・子供・幼児は正の実差額のまま。<b>異年齢区分間</b>は0円→500・1〜500→500・500超→実差額。<b>前売/当日いずれかの対象券種価格が先&lt;元なら、共通・子供・幼児・U23を含めUG不可（0円への丸め不可）</b>。車椅子は他席種との相互UG不可、席種最高額が先&lt;元のUGも不可。登録差額が期待と違う項目は文字が赤、コメント欄に理由。${seatMeta ? "席種は表示略称・" : ""}券種は略称</p>
 <div class="scroll uglistscroll"><table class="uglist">${head}${bodyRows}</table></div>` };
         }
 
@@ -13586,7 +13784,7 @@ html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         const findings = []; // {rowNo, code, name, check, sev, msg}
         let okRows = 0, ngSeats = 0, warnSeats = 0;
         const CHK_KEYS = ["席種名", "指定席整合", "初期値9", "リセール下限", "リセール上限", "購入限定/複数", "単体販売", "マスタ未登録"];
-        
+
         const limSeatCodes = new Set();
         for (const r of state.data) {
           if (!r) continue;
@@ -13664,14 +13862,14 @@ html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
               add("購入限定/複数", "NG", `購入限定席種にP(駐車)と他種が混在[${named}]のに購入限定区分=「${kubun}」。単数だと駐車券は選べても追加券が選べません→複数購入可にすべき`);
             }
           }
-          
+
           if (limSeatCodes.has(code)) {
             const solo = g(row, c.solo);
             if (!solo.includes("不可")) {
               add("単体販売", "NG", `購入限定席種として他席から指定されているため、単体販売不可にする必要があります`);
             }
           }
-          
+
           if (state.priceMaster && g(row, c.resale) === "可能") {
              const maxPrice = state.priceMaster.maxPrices[code];
              if (maxPrice !== undefined) {

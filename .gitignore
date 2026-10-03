@@ -13,6 +13,7 @@ tools/diagnose_test.js
 .agents/nightly/node_modules/
 .agents/nightly/log/
 .agents/nightly/package-lock.json
+.agents/bug_autofix_runtime/
 
 # エージェントセッション作業ディレクトリ・レビュー
 .agents/explorer_m1/

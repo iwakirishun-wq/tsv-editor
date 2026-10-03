@@ -65,6 +65,7 @@ eq(H.hpParseDateTime(""), null, "空はnull");
 const HP = {
   label: "2027 F1日本グランプリ",
   sale: {
+    channel: "general",
     start: "2026/11/01 11:00",
     rules: [
       { scope: "指定席", end: "2027/04/25 23:59", machine_checkable: true },
@@ -414,6 +415,41 @@ eq(H.hpTicketKey("なし"), "", "駐車券の券種なしは空");
   eq(kinds({ 席種エリアコード: "SMJRR1O001", 席種エリア名: "MJRR1_[要引換]パドックパス", 備考: "※8/29(土)~30(日)有効" }).includes("単日入場フラグ"), true, "複数日有効の引換券は従来どおり1が必要");
   eq(kinds({ 席種エリアコード: "SF1GPP27071", 席種エリア名: "F1_[要引換]P7駐車場", 備考: "※4/9(金)~11(日)有効" }).filter((k) => k === "単日入場フラグ").length, 1, "駐車券かつ引換は二重に出さない");
 }
+
+// --- 一般販売と先行販売・別経路を混同しない（2026-09-30） ---
+const channelHp = {
+  label: "2027 F1", event_id: "F1_27",
+  sale: {
+    start: "2026/10/01 10:00", rules: [{scope: "指定席", end: "2026/10/05 23:59"}],
+    channels: {
+      general: {start: "2026/11/01 11:00", rules: [{scope: "指定席", end: "2027/04/25 23:59", channel: "general"}]},
+      amex: {start: "2026/10/01 10:00", rules: [{scope: "指定席", end: "2026/10/05 23:59", channel: "amex"}]}
+    }
+  }
+};
+f = H.hpCheckSalePeriod([row({席種エリア名: "A1指定席"})], channelHp);
+eq(f.length, 0, "互換フィールドに先行値があっても一般経路を選択");
+f = H.hpCheckSalePeriod([row({席種エリア名: "A1指定席"})], {label:"2027 F1", sale: {start:"2026/10/01 10:00", rules:[], channels:{amex: channelHp.sale.channels.amex}}});
+has(f, "HP販売開始未確定", "AMEXだけの根拠は一般開始未確定");
+hasNot(f, "販売開始が違う", "AMEXしかないHPで一般開始を誤不一致にしない");
+f = H.hpCheckSalePeriod([row({席種エリア名: "A1指定席"})], {label:"2027 F1", sale:{start:"2026/10/01 10:00", rules:[{scope:"指定席",end:"2026/10/05 23:59"}]}});
+has(f, "HP販売開始未確定", "旧F1ナレッジは経路未識別として要確認");
+hasNot(f, "販売開始が違う", "経路不明の旧F1開始を正解にしない");
+hasNot(f, "販売終了が違う", "経路不明の旧F1終了を正解にしない");
+f = H.hpCheckSalePeriod([row({席種エリア名: "A1指定席",会員ランク名:"AMEX先行",販売開始日時:"2026/10/01 10:00"}), row({席種エリア名:"A1指定席",会員ランク名:"通常会員"})], channelHp);
+has(f, "別経路販売・要確認", "TSVの明確な先行経路は一般期間と比較しない");
+hasNot(f, "販売開始が違う", "先行と通常のTSV期間を一般期間へ混ぜない");
+f = H.hpCheckSalePeriod([row({席種エリア名:"A1指定席",販売経路区分:"アソビュー！",販売開始日時:"2026/11/02 11:00"})], channelHp);
+has(f, "別経路販売・要確認", "アソビューは別経路として要確認");
+hasNot(f, "販売開始が違う", "アソビュー販売開始を一般と誤比較しない");
+f = H.hpCheckSalePeriod([row({席種エリア名:"A1指定席"})], {label:"JRR26",sale:{start:"2026/11/01 11:00",rules:[{scope:"指定席",end:"2027/04/25 23:59"}]}});
+eq(f.length, 0, "非F1の旧形式通常販売を維持");
+f = H.hpCheckSalePeriod([row({席種エリア名:"A1指定席"})], {label:"2027 F1",sale:{channel:"general",start:"2026/11/01 11:00",rules:[{scope:"指定席",end:"2026/10/05 23:59",channel:"amex"}]}});
+hasNot(f, "販売終了が違う", "明確なAMEX終了ルールは一般へ適用しない");
+
+f = H.hpCheckPrices([row({席種エリアコード:"SF1GPE27011",前売価格:"35000",会員ランク名:"AMEX先行"})], HP);
+has(f, "別経路料金・要確認", "先行経路の料金は一般価格と混ぜない");
+hasNot(f, "前売が違う", "先行価格を一般価格と誤比較しない");
 
 console.log(fail ? `hp_check: ${pass} passed, ${fail} failed` : `hp_check: ${pass} passed, 0 failed`);
 process.exit(fail ? 1 : 0);

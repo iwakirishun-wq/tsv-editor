@@ -56,7 +56,7 @@ try {
 }
 const m = html.match(/===PRICE_RULES_CORE_START===[^\n]*\n([\s\S]*?)\n[^\n]*===UG_VALIDATOR_CORE_END===/);
 if (!m) die("index.html に PRICE_RULES_CORE〜UG_VALIDATOR_CORE のマーカーブロックが見つかりません");
-const core = new Function(m[1] + "\nreturn { buildUgValidator, ugExpectedCharge, ugIsDummyPrice };")();
+const core = new Function(m[1] + "\nreturn { buildUgValidator, ugExpectedCharge, ugIsDummyPrice, ugIsAdultCategory, ugIsYouthCategory, ugIsU23Category, ugAdultToYouthDowngradeReason };")();
 
 // --- 入力の読み込み ---
 let raw;

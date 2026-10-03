@@ -38,6 +38,9 @@ def _find_main_root() -> Path:
 MAIN_ROOT = _find_main_root()
 PRICE_CHECK_DIR = MAIN_ROOT / "30_WORK" / "01_開発プロジェクト" / "price_crosscheck"
 REPOS_DIR = MAIN_ROOT / "30_WORK" / "01_開発プロジェクト" / "repos" / "tsv-editor"
+if not PRICE_CHECK_DIR.exists():
+    PRICE_CHECK_DIR = Path(__file__).resolve().parents[1]
+    REPOS_DIR = PRICE_CHECK_DIR
 sys.path.insert(0, str(PRICE_CHECK_DIR))
 
 import hp_knowledge
@@ -54,7 +57,7 @@ class TestHpKnowledgeSynthetic(unittest.TestCase):
             "fetched_at": "2026-09-25T10:00:00+09:00",
             "title": "合成テスト V1席",
             "text": (
-                "鈴鹿サーキット チケット情報\n"
+                "鈴鹿サーキット チケット情報\n一般販売\n"
                 "2026年11月15日（日）11：00～ 発売\n"
                 "V1席\n"
                 "※3歳以上有料\n"
@@ -466,7 +469,7 @@ console.log('INTEGRATION_SUCCESS');
 
 class TestReviewRegressions(unittest.TestCase):
     def test_unknown_year_is_manual(self):
-        result = hp_knowledge.extract_sale_info([{"text": "・V1指定席…10月1日23:59まで"}], "F1_27")
+        result = hp_knowledge.extract_sale_info([{"text": "一般販売\n・V1指定席…10月1日23:59まで"}], "F1_27")
         self.assertIsNone(result["rules"][0]["end"])
         self.assertFalse(result["rules"][0]["machine_checkable"])
 
@@ -475,7 +478,7 @@ class TestReviewRegressions(unittest.TestCase):
             self.assertNotEqual(hp_knowledge.extract_seat_core_id(a), hp_knowledge.extract_seat_core_id(b))
 
     def test_conflicting_start_dates(self):
-        result = hp_knowledge.extract_sale_info([{"text": "2026年11月15日11:00 発売\n2026年11月16日11:00 発売"}], "F1_27")
+        result = hp_knowledge.extract_sale_info([{"text": "一般販売\n2026年11月15日11:00 発売\n2026年11月16日11:00 発売"}], "F1_27")
         self.assertIsNone(result["start"])
         self.assertEqual(len(result["start_candidates"]), 2)
 
@@ -551,6 +554,7 @@ class TestPageNotes20260925(unittest.TestCase):
         self.assertEqual(ev["common_pages"], ["p_guide"])
 
 
+@unittest.skipUnless((_find_main_root() / "50_OUTPUTS" / "02_業務成果物" / "チケット対応コックピット" / "HP料金ナレッジ.json").exists(), "実生成ファイル未配置・合成テストのみ")
 class TestRealHpKnowledgeGenerated(unittest.TestCase):
     """14. 実生成ファイル (HP料金ナレッジ.json) の整合性テスト"""
 
@@ -578,7 +582,22 @@ class TestRealHpKnowledgeGenerated(unittest.TestCase):
 
         self.assertIn("2027", f1["label"])
         self.assertIn("F1", f1["label"])
-        self.assertEqual(f1["sale"]["start"], "2026/11/15 11:00")
+        # General dates must come from the general channel with an explicit
+        # year; the race year and another channel cannot supply that year.
+        sale = f1["sale"]
+        self.assertEqual(f1["reference_channel"], "general")
+        self.assertEqual(sale["channel_policy"], "general_only/1")
+        general = sale["channels"]["general"]
+        self.assertEqual(general["channel"], "general")
+        self.assertIn(general["start_confidence"], ("exact", "conflict", "missing"))
+        self.assertEqual(sale["start"], general["start"])
+        self.assertEqual(sale["rules"], general["rules"])
+        if general["start_confidence"] == "exact":
+            self.assertIsNotNone(general["start"])
+            self.assertIn(general["start"], general["start_candidates"])
+            self.assertTrue(general["start_source_url"])
+        else:
+            self.assertIsNone(general["start"], "未確認の一般販売年を他経路から補完しない")
         self.assertTrue(len(f1["items"]) >= 100)
 
         # 項目検査: missing アイテムの note は空で diagnostic に理由が入っていること

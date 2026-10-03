@@ -177,12 +177,11 @@ const SCENARIOS = [
     expectStatus: "invalid",
   },
   {
-    // 席種最高額が上がる（10000→12000）ので不可にはならず、子供の実差額 5500−6000=−500 → 期待0円（返金なし）。
-    // 「非大人の同区分でマイナス差額→0円」という §3 の計算経路が、ルール変更後も生きていることの回帰
-    name: "席種アップグレードだが子供差額はマイナス（−500→期待0円） → OK",
+    // 席種最高額が上がっても、対象の子供券種は実差額 5500−6000=−500 なので不可。
+    name: "席種アップグレードだが子供券種の値下がり → invalid",
     row: ugRow(SEAT_HI.name, SEAT_HI.cd, "子供", SEAT_UP.name, SEAT_UP.cd, "子供", 0, 0),
-    expectStatus: "ok",
-    expectExpected: 0,
+    expectStatus: "invalid",
+    expectExpected: null,
   },
   {
     name: "元価格が売止めダミー(999999) → 検算対象外。登録差額もダミー値なら OK（0円表示バグの再発防止）",
@@ -277,11 +276,11 @@ const SCENARIOS = [
     expectStatus: "invalid",
   },
   {
-    name: "範囲: 「高校生以上」→U23(別席種・範囲内) → OK（実差額 前売1000/当日700）",
-    // 元(H席・高校生以上)=6000/6300、先(U席・U23)=7000/7000 → 範囲内。異区分diff>500→実差額
+    name: "大人扱いの「高校生以上」→U23は高額でも不可",
+    // 年齢表示の範囲とは別に、大人扱いから若年限定への業務上の制限を適用する。
     row: ugRow(SEAT_HS.name, SEAT_HS.cd, "高校生以上", SEAT_U.name, SEAT_U.cd, "U23", 1000, 700),
-    expectStatus: "ok",
-    expectExpected: 1000,
+    expectStatus: "invalid",
+    expectExpected: null,
   },
   // --- 範囲券種の双方向確認（元⇄先どちらの向きでもOK・2026-07-10 ユーザー確認）---
   {
@@ -444,7 +443,7 @@ eqSpan("3歳以上共通", 1, 4, true, "3歳以上共通=全年齢common");
 // --- canUpgrade: 範囲券種の両方向レンジ判定（2026-07-07）---
 eqCU(validate.canUpgrade("RC席", "RESV43", "幼児〜中学生", "子供席", "RESV60", "幼児"), true, "範囲元→範囲内(幼児)は可");
 eqCU(validate.canUpgrade("RC席", "RESV43", "幼児〜中学生", "大人席", "RESV61", "大人"), true, "範囲元→大人は可（範囲券種でも大人化は許可）");
-eqCU(validate.canUpgrade("H席", "RESV41", "高校生以上", "U23席", "RESV62", "U23"), true, "高校生以上→U23(範囲内)は可");
+eqCU(validate.canUpgrade("H席", "RESV41", "高校生以上", "U23席", "RESV62", "U23"), false, "高校生以上→U23は大人から若年限定への変更で不可");
 eqCU(validate.canUpgrade("H席", "RESV41", "高校生以上", "大人席", "RESV63", "大人"), true, "高校生以上→大人(範囲内)は可");
 eqCU(validate.canUpgrade("H席", "RESV41", "高校生以上", "小中席", "RESV64", "子供"), false, "高校生以上→小中(降格)は不可");
 eqCU(validate.canUpgrade("幼児席", "RESV65", "幼児", "範囲先席", "RESV66", "3歳〜中学生"), true, "単一(幼児)→範囲先(3歳〜中学生)は範囲内で可");
@@ -640,11 +639,9 @@ for (const s of CUTOFF_SCENARIOS) {
 }
 
 // =============================================================
-// 共通券種 → 上位席の年齢別券種（2026-09-25 SHUN確認・正本§11）
-// 27F1実データ: Q1-2(仮設)は「3歳以上共通」75,000のみ、B1は大人75,400〜幼児4,200。
-// 席種の最高額が上がる（75,000→75,400）のでUGは成立し、先の券種が安い場合は
-// 「システム上返金はないのでマイナスは0円で正解」。値下がりを理由に不可にしてはいけない
-// （一度不可にして撤回した経緯あり）。8歳以上共通・中学生以上共通も同じ扱い。
+// 共通券種 → 上位席の年齢別券種（2026-09-30 UI/TSV実機確認により旧例外を廃止）
+// 27F1実データ: Q1-2(仮設)共通75,000→B1大人75,400は可、子供/幼児/U23は値下がりで不可。
+// 8歳以上共通・中学生以上共通も同じ価格基準。
 // =============================================================
 {
   const Q12 = { name: "F1_Q1-2(仮設)観戦券[T18]", cd: "SF1GPE27191" };
@@ -660,9 +657,94 @@ for (const s of CUTOFF_SCENARIOS) {
   for (const [age, adv, day] of [["鈴鹿_大人（24歳以上）", 500, 600], ["鈴鹿_U23（高校生～23歳）", 0, 0], ["鈴鹿_子ども（小学生・中学生）", 0, 0], ["鈴鹿_幼児（3歳～未就学児）", 0, 0]]) {
     const ok = val.canUpgrade(Q12.name, Q12.cd, "鈴鹿_3歳以上共通", B1.name, B1.cd, age);
     const chk = val(ugRow(Q12.name, Q12.cd, "鈴鹿_3歳以上共通", B1.name, B1.cd, age, adv, day));
-    if (ok && chk.status === "ok") pass++;
-    else { fail++; console.error(`NG [3歳以上共通→B1 ${age} は可・${adv}/${day}円のはず]: canUpgrade=${ok} status=${chk.status} ${JSON.stringify(chk.problems)}`); }
+    const adult = age.includes("大人");
+    if (ok === adult && chk.status === (adult ? "ok" : "invalid") && (adult || chk.expected === null)) pass++;
+    else { fail++; console.error(`NG [3歳以上共通→B1 ${age} は大人だけ可]: canUpgrade=${ok} status=${chk.status} ${JSON.stringify(chk.problems)}`); }
   }
+}
+
+// 前売だけ/当日だけの値下がり、ダミー/空欄保護、真の同額500の境界テスト。
+{
+  const cases = [
+    ["前売だけ値下がり", 4900, 7000, false],
+    ["当日だけ値下がり", 6000, 5900, false],
+    ["真の同額", 5000, 6000, true],
+    ["当日が未設定", 6000, "", true],
+    ["当日がダミー", 6000, 999999, true],
+  ];
+  for (const [name, adv, day, allowed] of cases) {
+    const rows = [priceRow("元", "RESV88", "子供", 5000, 6000), priceRow("先", "RESV89", "子供", adv, day),
+      priceRow("元", "RESV88", "大人", 10000, 12000), priceRow("先", "RESV89", "大人", 15000, 18000)];
+    const val = buildUgValidator(rows, c, v, null);
+    eqCU(val.canUpgrade("元", "RESV88", "子供", "先", "RESV89", "子供"), allowed, name + "で登録漏れ候補の可否");
+    const chk = val(ugRow("元", "RESV88", "子供", "先", "RESV89", "子供", adv === 5000 ? 500 : Math.max(0, adv - 5000), day === 6000 ? 500 : day === 999999 ? 999999 : Math.max(0, Number(day) - 6000)));
+    eqCU(chk.status, allowed ? "ok" : "invalid", name + "の登録行検算");
+    if (!allowed) eqCU(chk.problems.some((p) => p.includes("対象券種")), true, name + "は対象券種の値下がりを明示");
+  }
+  // 同席種限定の早期許可も価格値下がりを素通りしない。
+  const rows = [priceRow("木曜日券", "RESV71", "3歳以上共通", 5000, 5000), priceRow("木曜日券", "RESV71", "大人", 4000, 4000)];
+  const val = buildUgValidator(rows, c, v, null);
+  eqCU(val.canUpgrade("木曜日券", "RESV71", "3歳以上共通", "木曜日券", "RESV71", "大人"), false, "早期許可より券種価格ガードが優先");
+}
+
+// =============================================================
+// 2026-10-01 最新人指示: 共通券種・大人券種から子ども・若年限定券への変更不可
+// 価格が同額以上・高くても子どもへのダウングレードを拒否
+// 大人間の正当なUGは維持
+// =============================================================
+{
+  const S_SRC = { name: "SRC_指定席A", cd: "SF1SRC001" };
+  const S_DST = { name: "DST_指定席B", cd: "SF1DST002" };
+  const ROWS = [
+    priceRow(S_SRC.name, S_SRC.cd, "3歳以上共通", 30000, 32000),
+    priceRow(S_SRC.name, S_SRC.cd, "大人", 30000, 32000),
+    priceRow(S_SRC.name, S_SRC.cd, "高校生以上", 30000, 32000),
+    priceRow(S_SRC.name, S_SRC.cd, "中学生以上共通", 30000, 32000),
+    // 変更先: 大人は高額・同額
+    priceRow(S_DST.name, S_DST.cd, "大人", 50000, 52000),
+    priceRow(S_DST.name, S_DST.cd, "大人（高校生以上）", 50000, 52000),
+    priceRow(S_DST.name, S_DST.cd, "高校生以上", 50000, 52000),
+    // 変更先: 子ども/幼児/高校生単独で「高額」のケース（修正前は誤許可されていた）
+    priceRow(S_DST.name, S_DST.cd, "子ども（小学生・中学生）", 35000, 37000),
+    priceRow(S_DST.name, S_DST.cd, "幼児（3歳～未就学児）", 35000, 37000),
+    priceRow(S_DST.name, S_DST.cd, "高校生", 35000, 37000),
+    // 変更先: 子どもで「真の同額」のケース（修正前は500円手数料で誤許可されていた）
+    priceRow(S_DST.name, S_DST.cd, "子ども_同額", 30000, 32000),
+  ];
+  const val = buildUgValidator(ROWS, c, v, null);
+
+  // 1. 高額・同額の子ども券へのダウングレード拒否（3歳以上共通、大人、高校生以上、中学生以上共通から）
+  for (const srcAge of ["3歳以上共通", "大人", "高校生以上", "中学生以上共通"]) {
+    for (const [dstAge, advExp, dayExp] of [
+      ["子ども（小学生・中学生）", 5000, 5000],
+      ["幼児（3歳～未就学児）", 5000, 5000],
+      ["高校生", 5000, 5000],
+      ["子ども_同額", 500, 500],
+    ]) {
+      const ok = val.canUpgrade(S_SRC.name, S_SRC.cd, srcAge, S_DST.name, S_DST.cd, dstAge);
+      eqCU(ok, false, `canUpgrade [${srcAge} → ${dstAge}] は高額/同額でも不可`);
+
+      const chk = val(ugRow(S_SRC.name, S_SRC.cd, srcAge, S_DST.name, S_DST.cd, dstAge, advExp, dayExp));
+      eqCU(chk.status, "invalid", `validate [${srcAge} → ${dstAge}] はinvalid`);
+      eqCU(chk.problems.some((p) => p.includes("大人・共通券種から子ども・若年限定券種への変更不可")), true,
+        `validate [${srcAge} → ${dstAge}] の不可理由は業務文言一致`);
+      eqCU(chk.expected, null, `expected [${srcAge} → ${dstAge}] はnull`);
+    }
+
+    // 2. 大人扱い同士の正当なUGは成立（高額は実差額20000、同額なら手数料500）
+    for (const dstAdultAge of ["大人", "大人（高校生以上）", "高校生以上"]) {
+      const ok = val.canUpgrade(S_SRC.name, S_SRC.cd, srcAge, S_DST.name, S_DST.cd, dstAdultAge);
+      eqCU(ok, true, `canUpgrade [${srcAge} → ${dstAdultAge}] 大人間は可`);
+
+      const chk = val(ugRow(S_SRC.name, S_SRC.cd, srcAge, S_DST.name, S_DST.cd, dstAdultAge, 20000, 20000));
+      eqCU(chk.status, "ok", `validate [${srcAge} → ${dstAdultAge}] はok`);
+      eqCU(chk.expected, 20000, `expected [${srcAge} → ${dstAdultAge}] は20000`);
+    }
+  }
+
+  // 3. 高校生単独（若年限定）と高校生以上（大人扱い）の区別の確認
+  eqCU(val.canUpgrade(S_SRC.name, S_SRC.cd, "3歳以上共通", S_DST.name, S_DST.cd, "高校生"), false, "高校生単独は若年限定のため不可");
+  eqCU(val.canUpgrade(S_SRC.name, S_SRC.cd, "3歳以上共通", S_DST.name, S_DST.cd, "高校生以上"), true, "高校生以上は大人扱いのため可");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

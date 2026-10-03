@@ -16,8 +16,20 @@
 # =============================================================
 param(
     [switch]$New,
-    [switch]$PushOnly
+    [switch]$PushOnly,
+    [switch]$NonInteractive,
+    [string]$Description
 )
+
+if ($NonInteractive -and $New) {
+    Write-Host "[エラー] 非対話モードでは新規URLを発行できません。" -ForegroundColor Red
+    exit 1
+}
+if (-not [string]::IsNullOrWhiteSpace($Description) -and
+    $Description -notmatch '^tsv-autofix-[0-9a-f]{16}-[0-9a-f]{40}$') {
+    Write-Host "[エラー] デプロイ説明の形式が不正です。" -ForegroundColor Red
+    exit 1
+}
 
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
@@ -38,6 +50,10 @@ if (-not (Test-Path ".clasp.json")) {
 }
 
 if (-not (Test-Path "$env:USERPROFILE\.clasprc.json")) {
+    if ($NonInteractive) {
+        Write-Host "[エラー] clasp の既存認証がありません。非対話モードでは停止します。" -ForegroundColor Red
+        exit 1
+    }
     Write-Host "[!] clasp が未ログインです。ログインを開始します..." -ForegroundColor Yellow
     Write-Host "    ブラウザが開いたら、対象のGoogleアカウントで許可してください。" -ForegroundColor Yellow
     cmd.exe /c "clasp login"
@@ -102,7 +118,13 @@ if (Test-Path $rootIndex) {
         Write-Host "0. エディタ本体は最新です" -ForegroundColor DarkGray
     }
 } else {
-    Write-Warning "ルートの index.html が見つかりません。gas/index.html をそのまま使います。"
+    Write-Host "[エラー] 正本のルート index.html が見つかりません。" -ForegroundColor Red
+    exit 1
+}
+if ((Get-FileHash $rootIndex -Algorithm SHA256).Hash -ne
+    (Get-FileHash $gasIndex -Algorithm SHA256).Hash) {
+    Write-Host "[エラー] ルートとGAS用の index.html が一致しません。" -ForegroundColor Red
+    exit 1
 }
 
 Write-Host "1. GAS へコードをプッシュ中 (clasp push -f)..." -ForegroundColor Yellow
@@ -124,6 +146,9 @@ if ($PushOnly) {
 # --- 3. デプロイ -----------------------------------------------------------
 
 $tag = "v_" + (Get-Date -Format "yyyyMMdd_HHmmss")
+if (-not [string]::IsNullOrWhiteSpace($Description)) {
+    $tag = $Description
+}
 
 if ($New) {
     Write-Host ""

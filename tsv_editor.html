@@ -42,8 +42,6 @@
         --shadow-lg: 0 8px 16px rgba(0,0,0,0.08);
         --radius: 4px;
         --font-mono: "Menlo", "Consolas", "Monaco", "Courier New", monospace;
-        /* セルの文字サイズ。列幅の実測(cellMeasureFont)もここを見るので、変えるならここだけ変える */
-        --cell-fs: 13px;
         --font-ui: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic UI", "Segoe UI", sans-serif;
       }
       /* キーボード操作時のみフォーカスリングを表示（マウス操作時は非表示） */
@@ -78,14 +76,11 @@
         font-family: var(--font-ui);
         background: var(--bg);
         color: var(--text);
-        /* 表示倍率(--ui-zoom)はアプリ全体にかける。zoom を使うと 100vh が「拡大前の高さ」に
-           なってしまい、1.25倍なら実質125vh＝画面からはみ出すので、倍率で割って打ち消す。 */
-        zoom: var(--ui-zoom, 1);
-        height: calc(100vh / var(--ui-zoom, 1));
+        height: 100vh;
         display: flex;
         flex-direction: column;
         overflow: hidden;
-        font-size: 13px;
+        font-size: 12px;
       }
 
       ::-webkit-scrollbar {
@@ -548,7 +543,6 @@
       #table-container {
         flex: 1;
         overflow: auto;
-        overflow-anchor: none;
         position: relative;
         display: none;
         /* データ末尾より右・下の余白にもExcelの方眼紙のような薄いグリッド線を敷く。
@@ -685,7 +679,7 @@
 
       /* ===ボディ=== */
       tbody tr {
-        height: var(--row-h, 26px);
+        height: var(--row-h, 22px);
         background: #fff;
       }
       /* ゼブラストライプ: Excelの交互行色に相当。ハイライト系はすべて!importantで上書きされる。
@@ -717,8 +711,8 @@
         text-overflow: ellipsis;
         cursor: cell;
         color: var(--text);
-        font-size: var(--cell-fs, 13px);
-        height: var(--row-h, 26px);
+        font-size: 12px;
+        height: var(--row-h, 22px);
       }
 
 
@@ -1075,7 +1069,7 @@
           padding-bottom: 8px;
         }
         .rb-group { flex-shrink: 0; }
-        .rb-btn { width: 56px; height: 64px; font-size: 11px; }
+        .rb-btn { width: 56px; height: 64px; font-size: 10px; }
       }
       .ctx-tag {
         font-size: 10px;
@@ -1841,11 +1835,7 @@
         </div>
         <div class="rb-group">
           <div class="rb-buttons">
-            <button class="rb-btn" id="btn-ui-zoom" title="アプリ全体の表示倍率を切り替え&#10;（90% → 100% → 110% → 125% → 150% → 90%）&#10;文字・ボタン・表のすべてが拡大されます&#10;次に開いたときも同じ倍率で表示します" aria-label="表示倍率を変更">
-              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"></circle><line x1="16" y1="16" x2="21" y2="21"></line><line x1="8" y1="11" x2="14" y2="11"></line><line x1="11" y1="8" x2="11" y2="14"></line></svg></span>
-              <span>表示倍率</span>
-            </button>
-            <button class="rb-btn" id="btn-row-height" title="行の高さを順番に切り替え&#10;（26px → 32px → 40px → 22px → 26px）" aria-label="行の高さを変更">
+            <button class="rb-btn" id="btn-row-height" title="行の高さを順番に切り替え&#10;（22px → 30px → 40px → 22px）" aria-label="行の高さを変更">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="5" y1="6" x2="19" y2="6"></line><line x1="5" y1="12" x2="19" y2="12"></line><line x1="5" y1="18" x2="19" y2="18"></line><polyline points="2 3 2 21"></polyline><polyline points="22 3 22 21"></polyline></svg></span>
               <span>行高さ</span>
             </button>
@@ -1914,7 +1904,6 @@
                 <label><input type="checkbox" data-flag="colorView"> カラー表示</label>
                 <label><input type="checkbox" data-flag="gateView"> ゲート表示</label>
                 <label><input type="checkbox" data-flag="parkingCheck"> 駐車券検査</label>
-                <label><input type="checkbox" data-flag="singleDayCheck"> 単日入場検査</label>
                 <label><input type="checkbox" data-flag="boxCheck"> 区画席検査</label>
                 <label><input type="checkbox" data-flag="kanaCheck"> カナ検査</label>
                 <label><input type="checkbox" data-flag="bikoHtmlCheck"> 備考HTML変換</label>
@@ -1957,16 +1946,6 @@
             </button>
           </div>
           <span class="rb-group-label">HTML出力</span>
-        </div>
-        <!-- Group: HP突合 -->
-        <div class="rb-group">
-          <div class="rb-buttons">
-            <button class="rb-btn" id="btn-hp-check" title="HPナレッジと突き合わせて、料金・販売期間・備考の抜けを検出&#10;・経路価格スケジュール → 料金と販売期間&#10;・席種エリアマスタ / SEJ → 備考の抜け&#10;GAS版ではDrive上のHP料金ナレッジを自動で読み、ローカルではJSONを選んで読み込みます" aria-label="HPナレッジと突合">
-              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 5h8v14H3z"></path><path d="M13 5h8v14h-8z"></path><path d="M6 9h2M6 12h2M16 9h2M16 12h2"></path><circle cx="12" cy="17" r="3"></circle><path d="M12 15.5V17l1 .8"></path></svg></span>
-              <span>HP突合</span>
-            </button>
-          </div>
-          <span class="rb-group-label">HP突合</span>
         </div>
       </div>
 
@@ -2237,24 +2216,21 @@
 
         <h2>🎫 チケットタブ</h2>
         <div class="man-btn-section">
-          <div class="man-btn-row"><span class="man-btn-label">席種エリアマスタ連携</span><span class="man-btn-desc">席種エリアマスタTSV（英語ヘッダー版／<b>日本語ヘッダー版「NEW席種エリアマスタ一覧」</b>どちらも可）を連携。<b>SEJ設定・価格経路スケジュールのチェック/HTML出力に必須</b>（指定席/エリア/その他の判定・表示略称に使用）。席種コード列に席種名を併記し「グループ名」列を仮想追加、SEJデータには備考差分も表示。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">席種エリアマスタ連携</span><span class="man-btn-desc">席種エリアマスタTSVを連携。<b>SEJ設定・価格経路スケジュールのチェック/HTML出力に必須</b>（指定席/エリア/その他の判定・表示略称に使用）。席種コード列に席種名を併記し「グループ名」列を仮想追加、SEJデータには備考差分も表示。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">辞書編集</span><span class="man-btn-desc">列名の日本語変換に使う辞書とヘッダーメモを編集。ヘッダーは開いた時点で辞書により自動的に日本語表示になり、保存時は元の英語に戻ります（手動での切替操作は不要）。今開いているファイルの列が一覧の先頭に出ます。新しい列名の追加も可能。ブラウザに保存されるため、オフラインHTML運用でもそのまま使えます。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">HTML出力</span><span class="man-btn-desc">確認用HTMLを新しいタブに出力。開いているファイルに応じて自動切替: 席種エリアマスタ→検証付き一覧 / SEJデータ→マスタ照合カード / <b>経路価格スケジュール→価格マトリクス</b>（通常価格表とUG差額マトリクスを販売条件ごとに表示。セルにマウスで販売期間）/ <b>席種一括設定→チェックレポート</b>（席種名差分・指定席整合・購入上限数9(初期値)の整合・リセール下限1321・購入限定席種のP混在×複数購入可、を一覧。席種エリアマスタ連携が必須。購入限定席種コードはグリッド上に席種名をゴースト併記）。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">価格チェック表</span><span class="man-btn-desc">経路価格スケジュール（BO-F-21030）を開いた状態で押すと、販売期間・席種・年齢区分・金額・UG元/差額を一覧化した参照シートを別タブに生成。会員ランクや販売区分はフィルターで絞り込み。元データはそのまま残ります。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">カラー表示</span><span class="man-btn-desc">表示カラーコード列の色をセル背景でプレビュー（切替）。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">ゲート表示</span><span class="man-btn-desc">ゲート用公演種別の番号にゲート名を併記。対応表は列ヘッダーのコメントから読み取り（切替）。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">駐車券検査</span><span class="man-btn-desc">エリアコード6桁目P ⇔ 駐車券フラグ1 を検査。✓OK / ✗NG どちらも表示（切替）。</span></div>
-          <div class="man-btn-row"><span class="man-btn-label">単日入場検査</span><span class="man-btn-desc">駐車券（6桁目P）と引換・オプション券の単日入場フラグを検査。備考の「…有効」の行の曜日から有効日数を数え、<b>2日以上有効なら1が必要</b>、<b>1日だけ有効（[日曜のみ]など）なら2日目の入場が無いので不要</b>。日数が読めない場合は要確認（切替）。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">カナ検査</span><span class="man-btn-desc">全角カタカナが残っているセルをオレンジ表示。システム取込は半角ｶﾅ必須のため（切替）。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">区画席検査</span><span class="man-btn-desc">席種名に「（〇名）」がある行は、6桁目E/P・BOX席フラグ1・席数2以上が揃っているか検査。✓OK / ✗不足項目を表示（切替）。</span></div>
-          <div class="man-btn-row"><span class="man-btn-label">HP突合</span><span class="man-btn-desc">HPナレッジ（<b>HP料金ナレッジ.json</b>／スキーマ <code>hp_price_knowledge/1</code>）と突き合わせ、<b>料金・販売期間・備考の抜け</b>を検出します。<br>・<b>経路価格スケジュール</b> → 前売/当日価格と販売開始/終了日時。アップグレード行は差額であって席種の値段ではないので対象外。同じ席種×券種×金額は販売経路・会員ランクのぶん重複するのでまとめて1件（×N行で件数表示）<br>・<b>席種エリアマスタ / SEJ</b> → 備考の抜け。「同じグループの他の席種には備考があるのにこの行だけ空」と「HPに記載があるのにTSVが空」の2通り<br>HPのページ間で金額が食い違う項目は<b>どちらかを正と決めず</b>「HP側が食い違い」として別枠に出します。「決勝レース終了まで」のように日時に落とせない販売期間は判定せず<b>要目視</b>に回します。<br>ナレッジの作成日と経過日数を必ず表示します（2週間以上前なら赤字で警告）。GAS版ではDrive上のナレッジを自動で読み、ローカルではJSONを選んで読み込みます。<br><b>AIに説明させる</b>を押すと、差分になった行だけをGeminiへ送って「表記違いだけのもの」と「本当に直すべきもの」を分けさせられます（GAS版のみ。TSV全体は送りません）。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">一括設定検査</span><span class="man-btn-desc">席種一括設定TSV(23列)の設定整合をインライン表示（切替）。マスタ未登録・席種名不一致・指定席整合・リセール下限1321（券面価格固定の場合は対象外）・購入限定P混在×複数購入可・<b>他席から購入限定席種として指定されているのに単体販売可になっている場合はNG</b>を検査。複数日入場の開始日・終了日には曜日も併記。席種エリアマスタ連携が必要。</span></div>
         </div>
 
         <h2>👁 表示タブ</h2>
         <div class="man-btn-section">
-          <div class="man-btn-row"><span class="man-btn-label">表示倍率</span><span class="man-btn-desc">押すたびに <b>90% → 100% → 110% → 125% → 150%</b> と切り替わります。文字・ボタン・表の<b>すべて</b>が拡大され、次にこのツールを開いたときも同じ倍率で表示します。表だけを拡大したいときは、表の上で <b>Alt＋ホイール</b>（こちらは保存されません）。</span></div>
-          <div class="man-btn-row"><span class="man-btn-label">行高さ / 折り返し / 列自動</span><span class="man-btn-desc">行の高さ切替（26 → 32 → 40 → 22px）、セル内折り返し、全列幅の自動調整。<b>列幅の自動調整は全行を見て決めます</b>（途中の行から値が入り始める列も潰れません）。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">行高さ / 折り返し / 列自動</span><span class="man-btn-desc">行の高さ切替、セル内折り返し、全列幅の自動調整。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">縦ヘッダー</span><span class="man-btn-desc">列名を縦書きにして列幅を節約。コード系の細い列が多いときに（切替）。隣の「行高(px)」でヘッダー行の高さを手動調整できます（文字が見切れる場合に広げてください）。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">ヘッダー</span><span class="man-btn-desc">「1行目」モード（通常）と「連番」モードの切替。連番中は日本語変換・HTML出力・検品が使えません。</span></div>
         </div>
@@ -2321,7 +2297,6 @@
           <div class="man-row"><span>行全体を選択</span><span class="man-key">行番号クリック / ドラッグ</span></div>
           <div class="man-row"><span>列全体を選択</span><span class="man-key">列ヘッダークリック</span></div>
           <div class="man-row"><span>複数列を選択</span><span class="man-key">列ヘッダーをShift+クリック / ドラッグ</span></div>
-          <div class="man-row"><span>飛び飛びに選択（行・列・セル）</span><span class="man-key">Ctrl+クリック で追加 / Ctrl+Shift+クリック で範囲ごと追加（通常クリックで解除）</span></div>
           <div class="man-row"><span>列ソート</span><span class="man-key">列ヘッダーの⇅</span></div>
           <div class="man-row"><span>複数列ソート</span><span class="man-key">Shift+⇅クリック</span></div>
           <div class="man-row"><span>列幅を調整</span><span class="man-key">列境界線をドラッグ</span></div>
@@ -2411,12 +2386,9 @@
         // SEJ連携用: 席種エリアマスタ
         sejMaster: null, priceMaster: null, // { byCode: { "MMTGPE25021": { disp_nm, control_nm, nte, ... } }, fileName }
         sejVirtualCols: null, // { indices: [i1, i2, ...], keys: ["grp_nm", ...] } 保存時除外する仮想列
-        extraRanges: [],     // Ctrl+クリック/Ctrl+Shiftで追加した飛び飛びの選択範囲 [{r1,c1,r2,c2}]（現在の state.range とは別）
-        _extraVer: 0,        // extraRanges の変更検知用
         colorView: false,    // disp_color_cd をセル背景色で表示
         gateView: false,     // gate_stage_typ1 にゲート名を併記
         parkingCheck: false, // 席種エリアコード6桁目P ⇔ 駐車券フラグ1 の検査
-        singleDayCheck: false, // 単日入場フラグ（複数日有効の駐車券・引換券は1、1日だけ有効なら不要）
         kanaCheck: false,    // 全角カタカナ検出（半角カナ必須フィールド用）
         boxCheck: false,     // 区画席（（〇名）席種）の設定検査
         ikkatsuCheck: false, // 席種一括設定チェック（23列）のインライン検品
@@ -2496,77 +2468,29 @@
 
       // 検品トグル各項目のラベルと、統合ボタンが束ねている項目一覧（ドロップダウンUIと共有）
       const INSPECT_FLAG_LABELS = {
-        colorView: "カラー表示", gateView: "ゲート表示", parkingCheck: "駐車券検査", singleDayCheck: "単日入場検査",
+        colorView: "カラー表示", gateView: "ゲート表示", parkingCheck: "駐車券検査",
         boxCheck: "区画席検査", kanaCheck: "カナ検査", bikoHtmlCheck: "備考HTML変換",
         sejWordLenCheck: "Word文字数チェック(50字超)",
       };
       const INSPECT_GROUPS = {
-        "btn-seatmaster-check": ["colorView", "gateView", "parkingCheck", "singleDayCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck"],
+        "btn-seatmaster-check": ["colorView", "gateView", "parkingCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck"],
         "btn-sej-check": ["kanaCheck", "sejWordLenCheck"],
       };
       // タブごとに保存・復元する検品トグル（タブ切り替えで勝手にOFFにならないようにする）。
       // spaceCheckはマスタ非依存・全列対象でデータ構造に紐づかないため全タブ共通のまま（ここには含めない）。
-      const INSPECT_TAB_FLAGS = ["colorView", "gateView", "parkingCheck", "singleDayCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck", "sejWordLenCheck", "ikkatsuCheck"];
-      // ===== 席種エリアマスタ「日本語ヘッダー版」(NEW席種エリアマスタ一覧_*.tsv) 対応 =====
-      // 従来マスタは英語ヘッダー(seat_type_area_cd, nte …)・値は 1/0。新形式は日本語ヘッダー
-      // (席種エリアコード, 備考 …)・値は「入場可能」「対象外」等の語で、先頭に「追加更新」列が付く。
-      // 検品ロジックは英語キーで書かれているため、ここで「ヘッダー名→英語キー」「語→1/0/2」を
-      // 一箇所に集約して吸収する。保存時はヘッダー・値とも元のまま（書き換えない）。
-      const JP_MASTER_REQUIRED = ["席種エリアコード", "席種エリア管理名", "席種エリア表示名", "入場可能フラグ"];
-      const _normHdr = (h) => String(h ?? "").replace(/^﻿/, "").trim();
-      let _jpAliasMap = null;
-      function _jpAlias() {
-        if (!_jpAliasMap) {
-          _jpAliasMap = {};
-          for (const [en, jp] of Object.entries(DEFAULT_HEADER_DICT)) _jpAliasMap[jp] = en;
-        }
-        return _jpAliasMap;
-      }
-      // 席種一括設定(座席指定不可フラグ列あり)・価格経路スケジュール(販売開始日時列あり)は別物なので除外する
-      function isJpSeatMasterHeaders(hs) {
-        const s = new Set(hs.map(_normHdr));
-        return JP_MASTER_REQUIRED.every((n) => s.has(n)) && !s.has("座席指定不可フラグ") && !s.has("販売開始日時");
-      }
-      let _jpMasterCache = { key: null, val: false };
-      function isJpSeatMasterOpen() {
-        const key = state.headers.join("\t");
-        if (_jpMasterCache.key !== key) _jpMasterCache = { key, val: isJpSeatMasterHeaders(state.headers) };
-        return _jpMasterCache.val;
-      }
-      // ヘッダー名 → 英語キー。日本語マスタを開いているときだけ別名解決する（他種TSVの「備考」等を巻き込まない）
-      function hdrKey(h) {
-        const t = _normHdr(h);
-        return isJpSeatMasterOpen() && _jpAlias()[t] || t;
-      }
-      const stateHeaderIdx = (name) => state.headers.findIndex((h) => hdrKey(h) === name);
-      // 日本語マスタの値 → 従来の 1/0/2。該当しない値はそのまま返すので、従来マスタには影響しない
-      const JP_MASTER_VALUE_MAP = {
-        rsve_unrsve_kbn: { "指定席": "1", "自由席": "2" },
-        seattype_stock_control_typ: { "座席在庫": "1", "数在庫": "2" },
-        enter_possible_flg: { "入場可能": "1", "入場不可": "0" },
-        box_seat_flg: { "ボックス席": "1", "ボックス席以外": "0" },
-        parking_ticket_flg: { "駐車券": "1", "駐車券以外": "0" },
-        single_day_admission_flg: { "対象": "1", "対象外": "0" },
-        presence_flg: { "有効": "1", "無効": "0" },
-        front_pay_disp_flg: { "表示": "1", "非表示": "0" },
-      };
-      function masterVal(enKey, v) {
-        const t = String(v ?? "").trim();
-        const m = JP_MASTER_VALUE_MAP[enKey];
-        return m && Object.prototype.hasOwnProperty.call(m, t) ? m[t] : t;
-      }
+      const INSPECT_TAB_FLAGS = ["colorView", "gateView", "parkingCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck", "sejWordLenCheck", "ikkatsuCheck"];
       // カナ検査の対象列（半角カナ必須の略称/備考系のみ。席種名・試合名等のフルネーム列は全角カナが正しいため対象外）。
       // 前提条件チェックと描画ロジックで共用する。
       const KANA_TEXT_COLS = new Set([
         "disp_abb", "seat_type_grp_nm1", "seat_type_grp_nm2", "nte",
       ]);
       const isKanaTargetHeader = (h) => {
-        const ht = hdrKey(h);
+        const ht = String(h).trim();
         return KANA_TEXT_COLS.has(ht) || /^word[1-9]$/.test(ht);
       };
       // 個別項目をONにする前の前提条件チェック。問題なければnull、問題があれば理由（原因のみ）を返す。
       // 返す文字列にラベル名は含めない（呼び出し側でラベルを付ける。重複表示を避けるため）。
-      const _hasHeader = (name) => state.headers.some((h) => hdrKey(h) === name);
+      const _hasHeader = (name) => state.headers.some((h) => h.trim() === name);
       function _inspectFlagPrecondition(key) {
         if (key === "kanaCheck") {
           // 対象列が1つも無いままONにしても何も検査されず「動いていない」ように見えるため、理由付きでブロックする
@@ -2583,11 +2507,6 @@
         if (key === "parkingCheck") {
           if (!_hasHeader("seat_type_area_cd") || !_hasHeader("parking_ticket_flg")) {
             return "対象列(席種エリアコード/駐車券フラグ)がありません";
-          }
-        }
-        if (key === "singleDayCheck") {
-          if (!_hasHeader("single_day_admission_flg") || !_hasHeader("nte")) {
-            return "対象列(単日入場フラグ/備考)がありません";
           }
         }
         if (key === "boxCheck") {
@@ -2819,36 +2738,23 @@
         return list;
       }
 
-      // ゴースト行の実測高。renderBody が「画面に入るぶんだけ」描くために、
-      // 未描画ぶんの高さをスペーサ行で埋める必要があるので、1行ぶんと見出し1行ぶんを覚えておく。
-      // 初期値はCSSから見た概算。実際に描いた直後に測って上書きする（uniform な行なので1回測れば足りる）。
-      // row は 0 のあいだ現在の行高(rowH)を使う。行高を変えても測り直すまで狂わないようにするため。
-      const _ghostH = { row: 0, sep: 26 };
-      // renderBody 用の薄いラッパ。席種エリアコード列の解決までここで面倒を見る。
-      function ghostListFor(rows) {
-        if (!state.sejMaster) return [];
-        const idx = stateHeaderIdx("seat_type_area_cd");
-        if (idx === -1) return [];
-        return getSejGhostList(idx, rows);
-      }
-
       // ===== UG差額の自動検算 =====
-      // 検算ルール（2026-09-30: UI/TSV実機確認に合わせ、券種単位の値下がりもUG不可）:
+      // 検算ルール（2026-06-13 ナレッジ突合で確定、2026-06-21 車椅子・大人料金ダウングレード・子供例外を追加）:
       //  可否（これに反したら invalid）:
       //   ・一般販売（販売区分に「会員」を含まない）のUG行は不可
       //   ・年齢降格（先の年齢ランク < 元の年齢ランク）は不可
       //   ・自由席/エリアの同席種・同券種UGは不可
       //   ・車椅子は他席種との相互UG不可。車椅子内では「同年齢・指定席内の席変更」または「大人へのランクアップ」のみ可
-      //   ・席種最高額または対象券種の実価格が先<元のUGは不可（年齢区分・共通券種を問わない）
-      //     前売/当日のどちらかが値下がりなら不可。空欄・売止めダミーは比較対象外
+      //   ・大人料金が先<元（実質ダウングレード）のUGは不可。ただし大人以外の年齢区分は、
+      //     その年齢自身の差額が500円以内（先が安い側）なら0円として許可する例外がある
       //  期待差額（前売・当日それぞれ・同年齢どうしで算出）:
       //   ・同席種・同年齢区分UG（指定席）→ 一律500円
       //   ・異席種だが同年齢区分どうしのUG（diff = 先価格 − 元価格）:
       //     - diff===0（差額0円）→ 全区分とも席変更手数料500円
-      //     - 大人（diff>0）→ 1〜500→500円 / 500超→実差額
-      //     - U23・子供・幼児（diff>0）→ 500円に切り上げず実差額
-      //   ・異年齢区分間のUG→ diff = 先価格 − 元価格 で、diff<0→不可 / diff=0→500円 / 1〜500→500円 / 500超→実差額
-      //  売止めダミー: 全桁が9（99999等）は売止め扱い（検算対象外）。高額実価格は除外しない
+      //     - 大人（diff≠0）→ 1〜500→500円 / 500超→実差額 / マイナス→0円
+      //     - U23・子供・幼児（diff≠0）→ 500円に切り上げず実差額 / マイナス→0円
+      //   ・異年齢区分間のUG（子供→U23等）→ diff = 先価格 − 元価格 で、 diff<=0→0円 / 1〜500→500円 / 500超→実差額（従来どおり）
+      //  売止めダミー: 価格が 800,000 以上、または全桁が9（99999等）は売止め扱い（検算対象外）
       // ===PRICE_RULES_CORE_START=== UI/stateに依存しない純粋ロジック（tests/price_rules.test.js が抽出して検証する）
       // 料金・検算ルールの定数（イベントや運用で変わりうる値を1か所に集約）
       const PRICE_RULES = {
@@ -2893,7 +2799,6 @@
       //  ・元または先が範囲券種: 相手の年齢が範囲内に収まるか（範囲外の上=up_out／下=down）
       //  ・単一どうし: 従来ルール（同ランク可 / 昇格は大人へのみ可=mid_up / 降格不可=down）
       function ugAgeSpanReason(srcAge, dstAge) {
-        if (ugAdultToYouthDowngradeReason(srcAge, dstAge)) return "down";
         const s = ugAgeSpan(srcAge), d = ugAgeSpan(dstAge);
         if (s.common || d.common) return null;
         if (s.min === 0 || d.min === 0) return null;
@@ -2918,73 +2823,6 @@
         if (reason === "up_out") return "範囲券種の範囲外(上)へのUG不可(" + srcAge + "→" + dstAge + ")";
         return "年齢降格(" + srcAge + "→" + dstAge + ")";
       }
-      // 共通券を大人扱いに揃えるため、既存の大人→U23不可と同じ境界を適用する。
-      const UG_BLOCK_ADULT_TO_U23 = true;
-
-      // 未確定の複合券種（KEN314=高校生以上＋中学生以下 等）
-      // 単純な「以上」だけで大人へ分類せず、未確定複合券種として既存扱いを維持
-      function ugIsCompositeAgeTicket(a) {
-        a = String(a || "").normalize("NFKC").trim();
-        if (/(\+|＋)/.test(a) && /高校生以上|中学生以上|小学生以上|大人|共通/.test(a) && /中学生以下|小学生以下|子ども|子供|こども|幼児/.test(a)) return true;
-        return false;
-      }
-
-      // 大人券扱い（Adult Equivalent / 大人区分）
-      // KEN211/KEN305/KEN901=3歳以上共通, KEN205=中学生以上共通, KEN212=8歳以上共通, KEN213=小学生以上共通,
-      // KEN201/KEN311=大人(24歳以上), KEN204=大人(高校生以上), KEN202=大人(中学生以上),
-      // KEN301=高校生以上, KEN302=中学生以上, KEN309=小学生以上, KEN310=大人(ﾊﾟｰｸﾊﾟｽﾎﾟｰﾄ付)
-      // ※知らないラベルを大人と決めつけない
-      function ugIsAdultCategory(a) {
-        a = String(a || "").normalize("NFKC").trim();
-        if (!a || ugIsCompositeAgeTicket(a)) return false;
-        if (/大人|ADULT/i.test(a)) return true;
-        if (/共通|全年齢/.test(a)) return true;
-        if (/高校生以上|高校以上/.test(a)) return true;
-        if (/中学生以上|中学以上/.test(a)) return true;
-        if (/小学生以上|小学以上/.test(a)) return true;
-        if (/[0-9０-９]+歳以上/.test(a)) return true;
-        return false;
-      }
-
-      // 子ども・若年限定券種（Child/Youth Limited / 若年限定）
-      // KEN313=高校生, KEN315=中学生, KEN206=子ども(小学生・中学生), KEN207=子ども(小学生),
-      // KEN208/KEN318=3歳～中学生, KEN214/KEN316=3歳～小学生, KEN209/KEN317=3歳～未就学児, KEN210=幼児(0歳～2歳)
-      // ※高校生単独は若年限定、高校生以上は大人扱いで厳格に区別
-      function ugIsYouthCategory(a) {
-        a = String(a || "").normalize("NFKC").trim();
-        if (!a || ugIsCompositeAgeTicket(a)) return false;
-        if (ugIsAdultCategory(a)) return false;
-        if (ugIsU23Category(a)) return false;
-        if (/幼児|未就学|INFANT/i.test(a)) return true;
-        if (/子供|こども|子ども|小中|小・中|小学|CHILD/i.test(a)) return true;
-        if (/中学生|中学/i.test(a)) return true;
-        if (/高校生|高校/i.test(a)) return true;
-        if (/(^|[^0-9０-９])[3-6３-６][\s　]*歳/.test(a)) return true;
-        if (/[0-9０-９]+歳～[0-9０-９]+歳/.test(a)) return true;
-        return false;
-      }
-
-      // U23区分
-      // KEN203/KEN312=U23(高校生～23歳)
-      function ugIsU23Category(a) {
-        a = String(a || "").normalize("NFKC").trim();
-        if (!a || ugIsCompositeAgeTicket(a)) return false;
-        if (ugIsAdultCategory(a)) return false;
-        return /U23|アンダー|U\-23/i.test(a);
-      }
-
-      // 大人・共通券種から子ども・若年限定券種への変更禁止理由
-      function ugAdultToYouthDowngradeReason(srcAge, dstAge) {
-        if (!srcAge || !dstAge) return null;
-        if (!ugIsAdultCategory(srcAge)) return null;
-        const isYouth = ugIsYouthCategory(dstAge);
-        const isU23 = UG_BLOCK_ADULT_TO_U23 && ugIsU23Category(dstAge);
-        if (isYouth || isU23) {
-          return "大人・共通券種から子ども・若年限定券種への変更不可(" + srcAge + "→" + dstAge + ")";
-        }
-        return null;
-      }
-
       // 売止め等のダミー価格（検算対象外）か。売止めの記号は全桁9（999999等）のみ。
       // 2026-08-24: 旧「80万円以上はダミー」条件を撤廃（VBA側は2026-08-19に撤廃済みで未追随だった）。
       // 27F1はPaddock Club 1,200,000 / S-BOX 1,250,000 / GRAN VIEW 1,500,000 / R-BOX 1,600,000 /
@@ -2994,24 +2832,19 @@
       }
       // 異席種UGの期待差額（diff = 先価格 − 元価格）。同席種同区分(sameSeat)は呼び出し側で別扱い。
       //  ・差額0円は年齢区分の組合せに関わらず手数料(500)（2026-07-03確定: 異区分間も500円）
-      //  ・差額が負ならnull（UG不可）。0円への丸めは行わない
-      //  ・大人・共通券種から子ども・若年限定券種への変更は同額以上でもnull（UG不可。2026-10-01確定）
-      //  ・同年齢区分: 大人は1〜500→500・500超→実差額／U23以下は正の実差額
-      //  ・異年齢区分: 1〜500→500 ／ 500超→実差額
+      //  ・同年齢区分: 大人は1〜500→500・500超→実差額／U23以下は実差額(マイナス→0)
+      //  ・異年齢区分: マイナス→0 ／ 1〜500→500 ／ 500超→実差額
       function ugExpectedCharge(srcAge, dstAge, srcPrice, dstPrice) {
         const fee = PRICE_RULES.SEAT_CHANGE_FEE;
         const diff = dstPrice - srcPrice;
-        if (diff < 0) return null; // 値下がりはUG不可。0円UGとして許可しない
-        // 2026-10-01: 大人・共通券種から子ども・若年限定券種への変更は同額以上でも不可
-        if (ugAdultToYouthDowngradeReason(srcAge, dstAge)) return null;
         if (diff === 0) return fee; // 差額0円は全組合せで席変更手数料500円
         // 年齢区分の同一判定はランク基準（席種ごとにラベル表記が違っても同じ区分として扱う）。
         // 「3歳以上共通」等のランク判定不能(rank=0)なラベルは、文字列完全一致なら同区分とみなす
         // （ランクのみで判定するとrank=0同士は常に「異区分」になってしまい、本当の同一ラベルの再発行を誤NGにする）
         const sr = ugAgeRank(srcAge), dr = ugAgeRank(dstAge);
         const sameAgeCat = (sr !== 0 && sr === dr) || srcAge === dstAge;
-        if (sameAgeCat && sr !== 4) return diff;
-        return diff <= fee ? fee : diff;
+        if (sameAgeCat && sr !== 4) return diff < 0 ? 0 : diff;
+        return diff < 0 ? 0 : (diff <= fee ? fee : diff);
       }
       // ===PRICE_RULES_CORE_END===
       // ===UG_VALIDATOR_CORE_START=== UI/stateに依存しない純粋ロジック（tests/ug_validator.test.js が抽出して検証する）
@@ -3083,11 +2916,6 @@
         };
         // 0円商品はUGの元にも先にもできない（前売・当日いずれかが0円ならブロック）。VBA CheckUpgrade 準拠
         const hasZeroPrice = (rec) => !!rec && (rec.adv === 0 || rec.day === 0);
-        // 2026-09-30: 席種が上位でも、その対象券種が安くなるUGはUI/TSVとも登録不可。
-        // 共通→子ども/幼児/U23も同じ基準で除外。空欄・売止めダミーは値下がり比較に使わない。
-        // 既存マクロと同様、前売/当日のどちらか一方でも実価格が値下がりなら不可。
-        const ticketDowngradeWindows = (src, dst) => !src || !dst ? [] : ["adv", "day"].filter((w) =>
-          src[w] != null && dst[w] != null && !ugIsDummyPrice(src[w]) && !ugIsDummyPrice(dst[w]) && dst[w] < src[w]);
         // 席種カテゴリ: 指定席 / エリア / その他 / 駐車券
         //  判定はマスタ・コードを正とする（席種名での決め打ちはしない）:
         //   コード6桁目 O=その他（パドック/パス等・UG例外的に可）/ P=駐車券
@@ -3106,7 +2934,7 @@
               // 席種エリアマスタを持たない料金表マクロが、大分類（「駐車場」「その他」）から
               // 席種カテゴリを渡すための口。コード6桁目が未採番の駐車券が指定席と誤判定され、
               // 実データで231件の乖離が出ていた。
-              if (m.cat && m.cat !== "指定席") return m.cat;
+              if (m.cat) return m.cat;
               // 「本当に指定席」なのは 席種在庫管理種別=1（座席在庫）と 指定席自由席区分=1（指定席）が
               // そろっているときだけ。どちらか一方でも 2（数在庫／自由席）なら数在庫として扱う。
               // 2026-09-20: 従来は「1 または 指定席区分」のOR判定で、片方が1なら指定席に倒れていた。
@@ -3175,15 +3003,11 @@
         // UG行が実在しなくても「この席種×券種の組み合わせは構造的にUG可能か」を判定する。
         // 実在する行のkbn/rank/条件には依存しない（条件キーがないので最高額は"any"索引のみ参照）。
         // マトリクスの「—」セル（登録なし）が、本来UGが成立しうるのに登録漏れなのか、
-        // そもそも対象外（車椅子/エリア/年齢降格/席種・券種ダウングレード）なのかを区別するために使う。
+        // そもそも対象外（車椅子/エリア/年齢降格/大人ダウングレード）なのかを区別するために使う。
         function canUpgrade(srcSeat, srcCode, srcAge, dstSeat, dstCode, dstAge) {
           const sr = ageRank(srcAge), dr = ageRank(dstAge);
           // 年齢降格/範囲外/中間昇格をまとめて判定（範囲券種対応・両方向。2026-07-07）
           if (ugAgeSpanReason(srcAge, dstAge)) return false;
-          // 2026-10-01: 大人・共通券種から子ども・若年限定券種への変更は同額以上でも不可
-          if (ugAdultToYouthDowngradeReason(srcAge, dstAge)) return false;
-          // 早期許可（パス/木曜日券/車椅子）より先に個別券種の値下がりを確認する。
-          if (ticketDowngradeWindows(any.get(srcSeat + "|" + srcAge), any.get(dstSeat + "|" + dstAge)).length) return false;
           // 公式HPでUG対象外と明示された席種（2026-08-18ルール。VBA側から2026-08-24に移植）
           if (isUgExcludedSeat(srcSeat) || isUgExcludedSeat(dstSeat)) return false;
           const sameAgeCatPre = (sr !== 0 && sr === dr) || srcAge === dstAge;
@@ -3244,12 +3068,10 @@
           // --- 可否チェック ---
           if (!/会員/.test(kbn) && !/会員/.test(rank)) problems.push("一般販売にUG不可");
           // 年齢区分の可否（降格/範囲外/中間昇格）を範囲券種対応でまとめて判定（両方向・2026-07-07）。
-          // 大人扱いの共通券から若年限定への変更は、価格や年齢範囲に関係なく不可。
+          // 例: 幼児〜中学生→大人=範囲外で不可 / 幼児〜中学生→幼児=範囲内で可 / 高校生以上→U23=範囲内で可
           {
-            const adultYouthReason = ugAdultToYouthDowngradeReason(srcAge, dstAge);
             const ageReason = ugAgeSpanReason(srcAge, dstAge);
-            if (adultYouthReason) problems.push(adultYouthReason);
-            else if (ageReason) problems.push(ugAgeReasonMsg(ageReason, srcAge, dstAge));
+            if (ageReason) problems.push(ugAgeReasonMsg(ageReason, srcAge, dstAge));
           }
           // 公式HPでUG対象外と明示された席種（2026-08-18ルール。VBA側から2026-08-24に移植）
           if (isUgExcludedSeat(srcSeat) || isUgExcludedSeat(dstSeat)) problems.push("公式HPでUG対象外の席種");
@@ -3283,13 +3105,6 @@
             if (hasZeroPrice(lookup(ck0, srcSeat, srcAge)) || hasZeroPrice(lookup(ck0, dstSeat, dstAge))) {
               problems.push("0円商品はUG不可");
             }
-          }
-          // 席種の最高額が上がっても、実際の元/先券種の価格が下がるUGは不可。
-          // 0円に丸めて登録する旧例外は廃止し、正規に除外される券種を登録漏れ候補にも含めない。
-          {
-            const ck = condKey(row);
-            const windows = ticketDowngradeWindows(lookup(ck, srcSeat, srcAge), lookup(ck, dstSeat, dstAge));
-            if (windows.length) problems.push("対象券種の" + windows.map((w) => w === "adv" ? "前売" : "当日").join("・") + "価格が先<元のためUG不可（0円への丸め不可）");
           }
           // 席種ごとの最高額（前売/当日それぞれ・ダミー除外）を比較した実質ダウングレードは不可。
           // 2026-08-25: 旧「大人料金が先<元、かつ元が大人のときだけ不可」から基準を変更（正本§2-7改訂）。
@@ -3383,13 +3198,10 @@
               return { exp: null, note, dummy: true, dummyError: bothOverlap, srcPrice: sp, dstPrice: dp };
             }
             const diff = dp - sp;
-            const adultYouthReason = ugAdultToYouthDowngradeReason(srcAge, dstAge);
-            // 期待差額の写像は純粋関数 ugExpectedCharge に集約（負差額や子どもへのダウングレードはUG不可、同額は500、
-            // 大人/異年齢の正差額1〜500は500、同年齢U23以下の正差額は実差額）
+            // 期待差額の写像は純粋関数 ugExpectedCharge に集約（同年齢: 差額0は全区分500・大人は1〜500→500/超→実差額・
+            // U23以下は実差額/マイナス0／異年齢: マイナス→0・0円→500・1〜500→500・500超→実差額）
             const exp = ugExpectedCharge(srcAge, dstAge, sp, dp);
-            const note = adultYouthReason ? adultYouthReason
-              : diff < 0 ? "対象券種の価格が先<元のためUG不可（0円への丸め不可）"
-              : (ageRank(srcAge) !== 0 && ageRank(srcAge) === ageRank(dstAge) && diff === 0) ? "同年齢区分どうしで差額0円→席変更手数料500円" : "";
+            const note = (ageRank(srcAge) !== 0 && ageRank(srcAge) === ageRank(dstAge) && diff === 0) ? "同年齢区分どうしで差額0円→席変更手数料500円" : "";
             return { exp, note, dummy: false, srcPrice: sp, dstPrice: dp, rawDiff: diff };
           };
           const adv = calc("adv"), day = calc("day");
@@ -3428,1208 +3240,13 @@
             srcPrice: adv.srcPrice, dstPrice: adv.dstPrice,
             srcAdv: adv.srcPrice, dstAdv: adv.dstPrice, srcDay: day.srcPrice, dstDay: day.dstPrice,
             sameSeat,
-            isDown: !sameSeat && [adv, day].some((win) => win.rawDiff != null && win.rawDiff < 0),
+            isDown: !sameSeat && adv.rawDiff != null && adv.rawDiff < 0,
             advActual, dayActual, notes, advNg, dayNg,
             note: [problems.join(" / "), notes.join(" / "), problems.length ? "" : (adv.note || "")].filter(Boolean).join(" / "),
           };
         }, { canUpgrade });
       }
       // ===UG_VALIDATOR_CORE_END===
-      // ===HP_CHECK_CORE_START=== UI/stateに依存しない純粋ロジック（tests/hp_check.test.js が抽出して検証する）
-      //
-      // HPナレッジ（正本スキーマ hp_price_knowledge/1）と、いま開いているTSVを突き合わせる。
-      // 設計の根拠は gas/DESIGN_hp_check.md。要点だけ再掲する:
-      //  - 機械で白黒つくものはAIに投げない（毎回答えが変わるため）
-      //  - 席種の対応は「席種エリアコード → 正規化した席種名」の順。名前で当てた行は必ず「要確認」に出す
-      //  - HP側がページ間で食い違う項目(confidence:conflict)は、TSVの合否とは別枠で出す
-      //  - 日時に落とせない販売期間ルール(machine_checkable:false)は判定せず「要目視」に回す
-
-      // 売止めダミー価格。全桁9が標準で、F1_2026だけ8埋め（正本は広げず、この2種だけ見る）
-      function hpIsDummyPrice(v) {
-        const s = String(v == null ? "" : v).replace(/[,\s¥]/g, "");
-        if (!/^\d+$/.test(s) || s.length < 4) return false;
-        return /^9+$/.test(s) || /^8+$/.test(s);
-      }
-
-      function hpToNumber(v) {
-        const s = String(v == null ? "" : v).replace(/[,\s¥]/g, "");
-        if (!/^\d+$/.test(s)) return null;
-        return parseInt(s, 10);
-      }
-
-      // 席種名・券種名の正規化。全角半角・空白・括弧・接頭辞の揺れを吸収する。
-      // 「F1_A1-1観戦券[T0]」と「A1-1観戦券」を同じものとして扱えるようにするのが目的。
-      function hpNormName(s) {
-        let t = String(s == null ? "" : s);
-        // 全角英数記号→半角
-        t = t.replace(/[！-～]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
-        t = t.replace(/　/g, " ");
-        // 半角カナ→全角カナ相当の比較にしたいが、ここでは単純化して記号だけ揃える
-        t = t.replace(/[\[\]（）()【】]/g, "");
-        t = t.replace(/[･・]/g, "");
-        t = t.replace(/[-ー―‐−]/g, "-");
-        // 先頭のイベント接頭辞（F1_ / MJRR1_ / IGTC26_ など）を落とす
-        t = t.replace(/^[A-Za-z0-9]+_/, "");
-        // 末尾のゲート表記 T0 / T2-3 などを落とす
-        t = t.replace(/T\d+(-\d+)?$/, "");
-        return t.replace(/\s+/g, "").toLowerCase();
-      }
-
-      // 券種名を年齢区分のキーに揃える。TSVは「鈴鹿_大人（24歳以上）」「鈴鹿_子ども（小学生・中学生）」、
-      // HPは「大人(24歳以上)」「子ども(小・中学生)」「3歳～未就学児」と書き方が違い、hpNormName では
-      // 「鈴鹿_」も括弧の中身も残るため一致しない。2026-09-25、27F1の経路価格スケジュールで
-      // 370通りすべてが「HPに無い」（参考）に落ち、AIに1件も渡らなかった原因。
-      // 共通券種は「何歳以上か」まで区別する（3歳以上共通と8歳以上共通は別の券種）。
-      function hpTicketKey(s) {
-        let t = String(s == null ? "" : s).normalize("NFKC").replace(/\s+/g, "");
-        t = t.replace(/^[^_]{1,12}_/, ""); // 鈴鹿_ / もてぎ_ などの接頭辞
-        if (!t || t === "なし") return "";
-        const m = t.match(/(\d+歳以上|中学生以上|小学生以上|高校生以上)共通/);
-        if (m) return "共通:" + m[1];
-        if (/全年齢|共通/.test(t)) return "共通";
-        if (/未就学|幼児/.test(t)) return "幼児";
-        if (/U23|アンダー/i.test(t)) return "U23";
-        if (/子ども|子供|こども|小学|小・中|中学生/.test(t)) return "子ども";
-        if (/大人/.test(t)) return "大人";
-        return hpNormName(t);
-      }
-
-      // "2026/11/01 11:00" / "2026-11-01T11:00:00+09:00" の両方を受ける。
-      // 落とせなければ null（勝手に解釈しない）。
-      function hpParseDateTime(s) {
-        const t = String(s == null ? "" : s).trim();
-        if (!t) return null;
-        let m = t.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})[ T](\d{1,2}):(\d{2})/);
-        if (m) return Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4] - 9, +m[5]);
-        m = t.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/);
-        if (m) return Date.UTC(+m[1], +m[2] - 1, +m[3], -9, 0);
-        return null;
-      }
-
-      // HPナレッジの items を引くための索引。コード優先、名前はフォールバック。
-      function hpBuildIndex(hp) {
-        const byCode = new Map();
-        const byName = new Map();
-        // 備考は券種ではなく席種に対して付く（「小学生以上有料」は大人券にも子ども券にも同じ）。
-        // 券種込みのキーだけだと、券種列を持たない席種エリアマスタ/SEJから一生引けない。
-        const noteByCode = new Map();
-        const noteByName = new Map();
-        const items = (hp && hp.items) || [];
-        for (const it of items) {
-          const code = String(it.seat_code || "").trim();
-          const key = hpNormName(it.seat_name) + "|" + hpTicketKey(it.ticket_name);
-          if (code) {
-            const ck = code + "|" + hpTicketKey(it.ticket_name);
-            if (!byCode.has(ck)) byCode.set(ck, []);
-            byCode.get(ck).push(it);
-          }
-          if (!byName.has(key)) byName.set(key, []);
-          byName.get(key).push(it);
-          // 実際のHP備考のみをインデックス化。
-          // 診断文字列や未確定データ（missing/ambiguous）、空備考は除外する
-          if (it.confidence === "exact" && it.note && String(it.note).trim()) {
-            const note = String(it.note).trim();
-            if (code && !noteByCode.has(code)) noteByCode.set(code, note);
-            const nk = hpNormName(it.seat_name);
-            if (nk && !noteByName.has(nk)) noteByName.set(nk, note);
-          }
-        }
-        return { byCode, byName, noteByCode, noteByName };
-      }
-
-      // 席種だけで備考を引く。券種列が無いファイル（席種エリアマスタ・SEJ）でも効くようにする。
-      function hpNoteForSeat(idx, row) {
-        const code = String(row.席種エリアコード || "").trim();
-        if (code && idx.noteByCode.has(code)) return idx.noteByCode.get(code);
-        const nk = hpNormName(row.席種エリア名);
-        return nk && idx.noteByName.has(nk) ? idx.noteByName.get(nk) : "";
-      }
-
-      // 1行ぶんの対応付け。戻り値の via で「何で当てたか」が分かる。
-      function hpLookup(idx, row) {
-        const tk = hpTicketKey(row.券種名);
-        const code = String(row.席種エリアコード || "").trim();
-        if (code) {
-          const hit = idx.byCode.get(code + "|" + tk);
-          if (hit && hit.length) return { items: hit, via: "席種エリアコード" };
-        }
-        const hit2 = idx.byName.get(hpNormName(row.席種エリア名) + "|" + tk);
-        if (hit2 && hit2.length) return { items: hit2, via: "席種名" };
-        return { items: [], via: null };
-      }
-
-      // 経路価格スケジュールは「同じ席種×券種」が販売経路×会員ランクのぶんだけ何行も出る
-      // （実データで 25,319行 ÷ 396通り）。1行ずつ指摘すると同じ内容が数千件並んで読めないので、
-      // 判定に効く値が同じ行はまとめて1件として扱い、件数だけ添える。
-      //
-      // あわせて、アップグレード行は前売価格が「席種の値段」ではなく「差額」なので料金突合から外す。
-      // これを入れないと、UG行の差額をHPの席種価格と比べて全部不一致になる（実データで24,467件の誤検知）。
-      function hpIsUgRow(row) {
-        const f = String(row["アップグレード該当フラグ"] || "").trim();
-        if (f) return f !== "非該当";
-        return !!String(row["アップグレード元席種エリアコード"] || "").trim();
-      }
-
-      function hpCollapse(rows, keyFields) {
-        const map = new Map();
-        for (const row of rows) {
-          const k = keyFields.map((f) => String(row[f] == null ? "" : row[f]).trim()).join("");
-          if (!map.has(k)) map.set(k, { row, count: 0 });
-          map.get(k).count++;
-        }
-        return [...map.values()];
-      }
-
-      // --- 1. 料金 ---
-      function hpCheckPrices(rowsIn, hp) {
-        const idx = hpBuildIndex(hp);
-        const out = [];
-        const groups = hpCollapse(
-          rowsIn.filter((r) => !hpIsUgRow(r)),
-          ["席種エリアコード", "席種エリア名", "券種名", "前売価格", "当日価格", "会員ランク名", "販売経路名", "販売経路区分", "販売価格区分"]
-        );
-        for (const g of groups) {
-          const row = g.row;
-          row._count = g.count;
-          if (hpSpecialSaleRow(row)) {
-            out.push({ level: "warn", kind: "別経路料金・要確認", row, detail: "先行販売・限定販売・別販売経路の料金は一般販売HPと比較せず、その経路の根拠を確認してください" });
-            continue;
-          }
-          const { items, via } = hpLookup(idx, row);
-          if (!items.length) {
-            out.push({ level: "info", kind: "HPに無い", row, detail: "HPナレッジに該当する席種×券種がありません" });
-            continue;
-          }
-          // ページ間で食い違っている項目は、TSVの合否より先にHP側の不備として出す
-          if (items.some((i) => i.confidence === "conflict")) {
-            out.push({
-              level: "warn", kind: "HP側が食い違い", row, via,
-              detail: "HPのページ間で金額が違います: " + items.map((i) => (i.conflicting_prices ? i.conflicting_prices.join("/") : i.advance)).join(" / "),
-            });
-            continue;
-          }
-          // HP未掲載・不足データの場合（勝手にスキップして合格にしない）
-          if (items.every((i) => i.confidence === "missing")) {
-            const diag = items[0].diagnostic || "HP未掲載";
-            out.push({
-              level: "warn", kind: "HP未掲載・要確認", row, via,
-              detail: "HPに該当商品が掲載されていないか未確定です（" + diag + "）",
-            });
-            continue;
-          }
-          // 照合曖昧の場合（先頭一致で勝手に合格にしない）
-          if (items.some((i) => i.confidence === "ambiguous")) {
-            const diag = items[0].diagnostic || "照合曖昧";
-            out.push({
-              level: "warn", kind: "HP照合曖昧・要確認", row, via,
-              detail: "HP側の候補が複数または曖昧です（" + diag + "）",
-            });
-            continue;
-          }
-          const it = items[0];
-          // exact であっても前売価格が null の場合（売止めダミーを除く）
-          if (it.advance === null && !hpIsDummyPrice(row["前売価格"])) {
-            out.push({
-              level: "warn", kind: "HP価格未取得・要確認", row, via,
-              detail: "HPナレッジの前売価格が未取得です",
-            });
-            continue;
-          }
-          for (const [col, hpKey, label] of [["前売価格", "advance", "前売"], ["当日価格", "same_day", "当日"]]) {
-            const tsv = hpToNumber(row[col]);
-            const hpv = it[hpKey] == null ? null : hpToNumber(it[hpKey]);
-            if (hpIsDummyPrice(row[col])) continue;      // 売止めダミーは比較しない
-            if (tsv === null && hpv === null) continue;
-            if (hpv === null) continue;                   // HP側に記載が無い（当日券なし等）
-            if (tsv !== hpv) {
-              out.push({
-                level: "error", kind: label + "が違う", row, via,
-                detail: "TSV " + (tsv === null ? "(空)" : tsv) + " / HP " + hpv,
-              });
-            }
-          }
-          if (via === "席種名") {
-            out.push({ level: "warn", kind: "名前で対応付け", row, via, detail: "席種エリアコードで引けず席種名で当てました。対応が正しいか確認してください" });
-          }
-        }
-        return out;
-      }
-
-      // --- 2. 販売期間 ---
-      // scope（「指定席・観戦券」等）と席種名のキーワード一致で、その行に効くルールを決める。
-      // 一般HPの比較に別販売経路の日時を使わない。経路を持たない旧F1ナレッジは要確認。
-      function hpGeneralSale(hp) {
-        const sale = (hp && hp.sale) || {};
-        if (sale.channels) return sale.channels.general || {};
-        if (sale.channel && sale.channel !== "general") return {};
-        const f1 = /F1/i.test([hp && hp.event_id, hp && hp.event_key, hp && hp.label].join(" "));
-        if (f1 && sale.channel !== "general" && sale.channel_policy !== "general_only/1") return {};
-        return sale;
-      }
-
-      function hpSpecialSaleRow(row) {
-        const text = [row.会員ランク名, row.販売経路名, row.販売経路区分, row.販売価格区分].join(" ").normalize("NFKC");
-        return /AMEX|アメックス|アメリカン[・\s]?エキスプレス|プラチナ|PLATINUM|先行|抽選|アソビュ[ー―-]|ASOVIEW|会員限定/i.test(text);
-      }
-
-      function hpRulesForRow(hp, row) {
-        const rules = (hpGeneralSale(hp).rules || []).filter((r) => !r.channel || r.channel === "general");
-        const name = hpNormName(row.席種エリア名);
-        const hits = rules.filter((r) =>
-          String(r.scope || "").split(/[・/、,]/).some((w) => {
-            const k = hpNormName(w);
-            return k && name.indexOf(k) !== -1;
-          })
-        );
-        // どのscopeにも当たらない席種に全ルールを当てると、たまたま一致したルールで黙って合格にしたり、
-        // 逆に無関係なルールと比べて「要修正」にしてしまう。当たらないことを事実として返す。
-        return hits;
-      }
-
-      function hpCheckSalePeriod(rowsIn, hp) {
-        const out = [];
-        const sale = hpGeneralSale(hp);
-        const startHp = hpParseDateTime(sale.start);
-        // 料金と同じ理由でまとめる。販売期間は席種と日時だけで決まるので券種は見ない
-        const groups = hpCollapse(rowsIn, ["席種エリア名", "販売開始日時", "販売終了日時", "会員ランク名", "販売経路名", "販売経路区分", "販売価格区分"]);
-        for (const g of groups) {
-          const row = g.row;
-          row._count = g.count;
-          if (hpSpecialSaleRow(row)) {
-            out.push({ level: "warn", kind: "別経路販売・要確認", row, detail: "先行販売・限定販売・別販売経路の行です。一般販売HPとの期間比較をせず、その経路の根拠を確認してください" });
-            continue;
-          }
-          const s = hpParseDateTime(row.販売開始日時);
-          if (startHp === null) {
-            out.push({ level: "warn", kind: "HP販売開始未確定", row, detail: "一般販売の開始日時が未取得・競合、または販売経路が未識別です。一般販売の根拠を確認してください" });
-          } else if (s === null) {
-            out.push({ level: "error", kind: "販売開始が空・不正", row, detail: "HP " + sale.start + " / TSVの開始日時を確認してください" });
-          }
-          if (startHp !== null && s !== null && s !== startHp) {
-            out.push({ level: "error", kind: "販売開始が違う", row, detail: "TSV " + row.販売開始日時 + " / HP " + sale.start });
-          }
-          const rules = hpRulesForRow(hp, row);
-          if (!rules.length) {
-            out.push({ level: "info", kind: "scope未特定", row, detail: "この席種がHPのどの販売期間ルールに当たるか決められませんでした。目視で確認してください" });
-            continue;
-          }
-          const machine = rules.filter((r) => r.machine_checkable !== false && hpParseDateTime(r.end) !== null);
-          const manual = rules.filter((r) => r.machine_checkable === false || hpParseDateTime(r.end) === null);
-          const e = hpParseDateTime(row.販売終了日時);
-          if (machine.length && e === null) {
-            out.push({ level: "error", kind: "販売終了が空・不正", row, detail: "TSVの終了日時を確認してください" });
-          }
-          if (machine.length > 1 && new Set(machine.map((r) => hpParseDateTime(r.end))).size > 1) {
-            out.push({ level: "warn", kind: "HP販売終了未確定", row, detail: "複数の販売終了日時が該当します。適用条件を目視で確認してください" });
-            continue;
-          }
-          if (machine.length && e !== null) {
-            if (!machine.some((r) => hpParseDateTime(r.end) === e)) {
-              out.push({
-                level: "error", kind: "販売終了が違う", row,
-                detail: "TSV " + row.販売終了日時 + " / HP " + machine.map((r) => r.end).join(" または "),
-              });
-            }
-          } else if (manual.length) {
-            out.push({
-              level: "info", kind: "要目視", row,
-              detail: "HP側が日時になっていません: " + manual.map((r) => r.raw || r.end).join(" / "),
-            });
-          }
-        }
-        return out;
-      }
-
-      // --- 3. 備考の抜け ---
-      // (a) 構造的: 同じグループの他の席種には備考があるのに、この席種だけ空
-      // (b) HP突合: HPに備考があるのにTSV側が空
-      function hpCheckNotes(rows, hp, opts) {
-        const groupKey = (opts && opts.groupKey) || "配席ブロック管理名";
-        const noteKey = (opts && opts.noteKey) || "備考";
-        const out = [];
-        const byGroup = new Map();
-        for (const row of rows) {
-          const g = String(row[groupKey] || "").trim() || "(グループなし)";
-          if (!byGroup.has(g)) byGroup.set(g, []);
-          byGroup.get(g).push(row);
-        }
-        byGroup.forEach((list, g) => {
-          const filled = list.filter((r) => String(r[noteKey] || "").trim());
-          if (!filled.length || filled.length === list.length) return; // 全部空/全部あり は判定しない
-          for (const row of list) {
-            if (!String(row[noteKey] || "").trim()) {
-              out.push({
-                level: "warn", kind: "備考の抜け(同グループ)", row,
-                detail: "「" + g + "」の " + list.length + "件中 " + filled.length + "件には備考があるのに、この行は空です",
-              });
-            }
-          }
-        });
-        if (hp && hp.items) {
-          const idx = hpBuildIndex(hp);
-          for (const row of rows) {
-            // 席種単位で引く。券種込みで引くと、券種列を持たないファイルでは常に空振りして
-            // 「指摘はありません」と緑で出てしまう（見逃しとしては一番危ない）
-            const hpNote = hpNoteForSeat(idx, row);
-            const tsvNote = String(row[noteKey] || "").trim();
-            if (hpNote && !tsvNote) {
-              out.push({ level: "error", kind: "備考の抜け(HP)", row, detail: "HPには記載があります: " + hpNote });
-            } else if (hpNote && tsvNote && hpNormName(hpNote) !== hpNormName(tsvNote)) {
-              // 両方にあって文字列が違う。表記揺れか実質的な違いかは機械では決められないのでAIへ回す
-              out.push({ level: "warn", kind: "備考がHPと違う", row, detail: "TSV「" + tsvNote + "」/ HP「" + hpNote + "」", aiTarget: true });
-            }
-          }
-        }
-        // 備考の中身の照合はAIに任せる。上の2つだけだと、HPナレッジに席種ごとの備考がほぼ無いため
-        // （27F1で1件）125行の備考がHPと比べられないまま「指摘なし」になり、AIにも渡らなかった（2026-09-25）。
-        // 備考がある行は、その席種のHPページと共通ページ（チケット案内等）の記載を添えてAI照合の対象にする。
-        // 同じ備考×同じページは1件にまとめる（送る量を抑え、AIの回答も読みやすくする）。
-        if (hp && hp.page_notes) {
-          const pn = hp.page_notes;
-          const common = (hp.common_pages || []).filter((p) => pn[p]);
-          const pageByCode = new Map();
-          for (const it of hp.items || []) {
-            const c = String(it.seat_code || "").trim();
-            if (c && it.page && !pageByCode.has(c)) pageByCode.set(c, it.page);
-          }
-          const groups = new Map();
-          for (const row of rows) {
-            const tsvNote = String(row[noteKey] || "").trim();
-            if (!tsvNote) continue;
-            const page = pageByCode.get(String(row.席種エリアコード || "").trim()) || "";
-            const k = tsvNote + "\u0000" + page;
-            if (!groups.has(k)) groups.set(k, { row, page, note: tsvNote, count: 0, seats: [] });
-            const g = groups.get(k);
-            g.count++;
-            if (g.seats.length < 12) g.seats.push(String(row.表示名 || row.席種エリア名 || row.席種エリアコード || ""));
-          }
-          for (const g of groups.values()) {
-            const pages = (g.page && pn[g.page] ? [g.page] : []).concat(common);
-            out.push({
-              level: "ai", kind: "備考をHPと照合(AI)", row: Object.assign({}, g.row, { _count: g.count }),
-              aiTarget: true, hpPages: pages, seats: g.seats, note: g.note,
-              detail: "備考「" + (g.note.length > 70 ? g.note.slice(0, 70) + "…" : g.note) + "」（" + g.count + "行）→ "
-                + (g.page ? "HPページ " + g.page : "席種に対応するHPページなし") + (common.length ? "＋共通" + common.length + "ページ" : "") + " とAIで照合",
-            });
-          }
-        }
-        return out;
-      }
-
-
-      // --- 4. HPを使わない構造チェック ---
-      //
-      // HP突合は名寄せが要るぶん精度が出ない（実データの注入テストで、
-      // 「他の席種の金額と取り違え」の検出率が0%だった）。一方これらはTSVの中だけで完結するので、
-      // ナレッジの鮮度にも名寄せの精度にも左右されない。HP公開待ちの間も使える。
-      //
-      // きっかけは実データで見つかった本物の登録ミス:
-      //   もてぎJRR26 の MJRR1P26132「S2指定駐車券」が 2,000/3,000 になっていた。
-      //   HPとマスターはどちらも 3,500円。2,000/3,000 は同名の「S2指定駐車券(販促)」の価格。
-      //   販促コードはスケジュールに生成されておらず、通常コードに販促価格が入っていた。
-      //   価格起点のHP突合では、2,000円が駐車券ページに存在するため○と判定されていた。
-
-      // 券種の年齢ランク。大きいほど高いはず（大人 > U23 > 子ども > 幼児）
-      function hpAgeRank(ken) {
-        const s = hpNormName(ken);
-        if (/幼児|3歳～未就学|未就学/.test(s)) return 1;
-        if (/子ども|こども|小学生|中学生|3歳～中学生/.test(s)) return 2;
-        if (/u23|高校生/.test(s)) return 3;
-        if (/大人|24歳以上/.test(s)) return 4;
-        return 0;   // 判定できないものは順序の検査に使わない
-      }
-
-      // 「(販促)」「(団体)」など、同じ商品の別枠コード
-      function hpVariantSuffix(name) {
-        const m = String(name || "").match(/[(（](販促|団体|法人|招待)[)）]\s*$/);
-        return m ? m[1] : "";
-      }
-      function hpBaseName(name) {
-        return hpNormName(String(name || "").replace(/[(（](販促|団体|法人|招待)[)）]\s*$/, ""));
-      }
-
-      function hpCheckStructure(rowsIn) {
-        const out = [];
-        const rows = rowsIn.filter((r) => !hpIsUgRow(r));
-
-        // (a) 当日価格が前売価格より安い
-        for (const g of hpCollapse(rows, ["席種エリアコード", "券種名", "前売価格", "当日価格"])) {
-          const row = g.row;
-          const a = hpToNumber(row.前売価格), d = hpToNumber(row.当日価格);
-          if (a === null || d === null) continue;
-          if (hpIsDummyPrice(row.前売価格) || hpIsDummyPrice(row.当日価格)) continue;
-          if (d < a) {
-            row._count = g.count;
-            out.push({ level: "warn", kind: "当日が前売より安い", row, detail: "前売 " + a.toLocaleString() + " / 当日 " + d.toLocaleString() });
-          }
-        }
-
-        // (b) 同じ席種の中で 大人 < U23 < 子ども のような逆転
-        const bySeat = new Map();
-        for (const r of rows) {
-          const k = String(r.席種エリアコード || "").trim() || hpNormName(r.席種エリア名);
-          if (!k) continue;
-          const rank = hpAgeRank(r.券種名);
-          const p = hpToNumber(r.前売価格);
-          if (!rank || p === null || hpIsDummyPrice(r.前売価格)) continue;
-          if (!bySeat.has(k)) bySeat.set(k, new Map());
-          if (!bySeat.get(k).has(rank)) bySeat.get(k).set(rank, { p, row: r });
-        }
-        bySeat.forEach((m, k) => {
-          const ranks = [...m.keys()].sort((x, y) => x - y);
-          for (let i = 1; i < ranks.length; i++) {
-            const lo = m.get(ranks[i - 1]), hi = m.get(ranks[i]);
-            if (hi.p < lo.p) {
-              out.push({
-                level: "warn", kind: "年齢区分の価格が逆転", row: hi.row,
-                detail: lo.row.券種名 + " " + lo.p.toLocaleString() + " より " + hi.row.券種名 + " " + hi.p.toLocaleString() + " が安い",
-              });
-            }
-          }
-        });
-
-        // (c) 「(販促)」等の別枠コードが生成されていないのに、通常コードにその価格が入っている
-        //     実データのS2指定駐車券がこれ。別枠が消えて価格だけ残る形は気づきにくい。
-        const variants = new Map();   // baseName -> {suffix -> [row]}
-        for (const r of rows) {
-          const base = hpBaseName(r.席種エリア名);
-          if (!base) continue;
-          const suf = hpVariantSuffix(r.席種エリア名) || "__normal";
-          if (!variants.has(base)) variants.set(base, new Map());
-          const m = variants.get(base);
-          if (!m.has(suf)) m.set(suf, []);
-          m.get(suf).push(r);
-        }
-        variants.forEach((m, base) => {
-          const normals = m.get("__normal") || [];
-          const others = [...m.keys()].filter((k) => k !== "__normal");
-          if (!normals.length || others.length) return;   // 別枠も生成されているなら判定しない
-          // 別枠が1つも無い＝スケジュール未生成の可能性。ここでは検知できないので、
-          // 「同名の別枠が存在するかどうか」は呼び出し側がマスタを渡したときだけ見る。
-        });
-
-        return out;
-      }
-
-      // 料金表マスターの席種一覧を渡せるときだけできる判定。
-      // マスターに「○○(販促)」があるのに、スケジュールには通常コードしか無く、
-      // しかもその通常コードの価格が販促側と一致する＝取り違えの疑い。
-      function hpCheckVariantMixup(rowsIn, masterRows) {
-        if (!masterRows || !masterRows.length) return [];
-        const out = [];
-        const rows = rowsIn.filter((r) => !hpIsUgRow(r));
-        const masterByName = new Map();
-        for (const m of masterRows) {
-          const key = hpBaseName(m.席種エリア名) + "|" + (hpVariantSuffix(m.席種エリア名) || "__normal");
-          if (!masterByName.has(key)) masterByName.set(key, m);
-        }
-        const tsvNames = new Set(rows.map((r) => hpNormName(r.席種エリア名)));
-        for (const g of hpCollapse(rows, ["席種エリアコード", "席種エリア名", "前売価格", "当日価格"])) {
-          const row = g.row;
-          if (hpVariantSuffix(row.席種エリア名)) continue;      // 別枠そのものは対象外
-          const base = hpBaseName(row.席種エリア名);
-          const normal = masterByName.get(base + "|__normal");
-          if (!normal) continue;
-          for (const suf of ["販促", "団体", "法人", "招待"]) {
-            const v = masterByName.get(base + "|" + suf);
-            if (!v) continue;
-            if (tsvNames.has(hpNormName(v.席種エリア名))) continue;   // 別枠も生成されている
-            const tsvA = hpToNumber(row.前売価格);
-            const normA = hpToNumber(normal.前売価格);
-            const varA = hpToNumber(v.前売価格);
-            if (tsvA === null || varA === null) continue;
-            if (tsvA === varA && normA !== null && normA !== varA) {
-              row._count = g.count;
-              out.push({
-                level: "error", kind: "別枠の価格が通常コードに入っている", row,
-                detail: "マスターの「" + normal.席種エリア名 + "」は " + normA.toLocaleString()
-                  + " だが、TSVは「" + v.席種エリア名 + "」と同じ " + tsvA.toLocaleString()
-                  + "。" + suf + "のコードはスケジュールに生成されていない",
-              });
-            }
-          }
-        }
-        return out;
-      }
-
-      // --- 5. 席種エリアマスタのフラグ（HPを使わない機械判定・AIに送らない） ---
-      // ルールはSHUN確認済み（2026-09-26）:
-      //  ・指定席（指定席自由席区分=1 かつ 在庫種別=1）で名前に「○名」がある、またはBOXフラグ=1 の席種は
-      //    BOXフラグ=1・座席数=○ でなければNG。数在庫の「(○名定員)」（シマノの休憩スペース等）は対象外。
-      //    実データでSTAI26のR-BOX（8名なのに座席数6、6名なのに4）の3件を検出。
-      //  ・名前に 引換/オプション/交換 がある券は単日入場フラグ=1 が必要。
-      //  ・駐車券（コード6桁目P）は駐車券フラグ=1 が必要。
-      //    ※「駐車券は入場可フラグ=0」は実データ882件すべてが1で実態と合わないため入れていない。
-      //  ・単日入場フラグは「複数日有効で、期間中1回だけ認証する」券に要る。1日だけ有効な券
-      //    （[日曜のみ]の駐車券など）は2日目の入場が無いので不要（SHUN指示 2026-09-26）。
-      //    よって 1日だけ有効 → 引換券でも要求しない / 複数日有効の駐車券 → 1が必要。
-
-      // 有効日数の目安。備考の最初の「…有効」の行に出てくる曜日の種類数を返す（1=1日だけ、2以上=複数日。
-      //   「金~日」は曜日2種類なので2を返す＝実日数ではない。1か複数かの判定にだけ使う）。
-      //   「4/11(日)0:00~19:30有効」→1 /「4/9(金)0:00~11(日)23:59有効」→複数 /「3/28(土)0:00~19:30(日)有効」→複数
-      // 備考から読めなければ名前の [日曜のみ] 等で判断し、それでも分からなければ null（判定しない）。
-      function hpValidDayCount(row) {
-        const nk = (v) => String(v == null ? "" : v).normalize("NFKC");
-        const note = nk(row.備考 != null ? row.備考 : row.nte);
-        const line = note.split(/<br\s*\/?>|\n/i).find((s) => /有効/.test(s) && /\([月火水木金土日]\)/.test(s));
-        if (line) {
-          const days = new Set((line.split("有効")[0].match(/\(([月火水木金土日])\)/g) || []).map((s) => s.charAt(1)));
-          if (days.size) return days.size;
-        }
-        const name = nk(row.席種エリア名 || row.seat_type_area_control_nm || "");
-        if (/[月火水木金土日](曜日?)?(のみ|限定)/.test(name) && !/[月火水木金土日]\s*[・･]\s*[月火水木金土日]/.test(name)) return 1;
-        return null;
-      }
-
-      function hpCheckSeatFlags(rows) {
-        const out = [];
-        const nk = (v) => String(v == null ? "" : v).normalize("NFKC").trim();
-        for (const row of rows) {
-          const name = nk(row.席種エリア名);
-          const code = nk(row.席種エリアコード);
-          const reserved = nk(row.rsve_unrsve_kbn) === "1" && nk(row.seattype_stock_control_typ) === "1";
-          const box = nk(row.box_seat_flg), cnt = nk(row.seat_cnt);
-          const m = name.match(/(\d+)\s*名/);
-          if (reserved && (m || box === "1")) {
-            const want = m ? m[1] : null;
-            const probs = [];
-            if (box !== "1") probs.push("BOXフラグが " + (box || "空") + "（1が必要）");
-            if (!cnt || cnt === "0") probs.push("座席数が未設定");
-            else if (want && cnt !== want) probs.push("座席数が " + cnt + "（名前は" + want + "名）");
-            if (probs.length) out.push({ level: "error", kind: "BOXの座席数・フラグ", row, detail: probs.join(" / "), noAi: true });
-          }
-          const validDays = hpValidDayCount(row);
-          const isParking = code.length >= 6 && code.charAt(5).toUpperCase() === "P";
-          if (isParking && validDays != null && validDays >= 2 && nk(row.single_day_admission_flg) !== "1") {
-            out.push({ level: "error", kind: "単日入場フラグ", row,
-              detail: "複数日有効の駐車券なのに単日入場フラグが " + (nk(row.single_day_admission_flg) || "空") + "（1が必要）", noAi: true });
-          }
-          const parkingReported = isParking && validDays != null && validDays >= 2;
-          if (validDays !== 1 && !parkingReported && /引換|オプション|交換/.test(name) && nk(row.single_day_admission_flg) !== "1") {
-            // グッズ引換券は入場券ではないため、単日入場フラグが要るかは運用次第（SHUN指示で要確認扱い）
-            const goods = /グッズ/.test(name);
-            out.push({ level: goods ? "warn" : "error", kind: goods ? "単日入場フラグ(グッズ・要確認)" : "単日入場フラグ", row,
-              detail: (goods ? "グッズ引換の券で単日入場フラグが " : "引換・オプションの券なのに単日入場フラグが ") + (nk(row.single_day_admission_flg) || "空") + (goods ? "（入場券でなければ不要の場合あり）" : "（1が必要）"), noAi: true });
-          }
-          if (code.length >= 6 && code.charAt(5).toUpperCase() === "P" && nk(row.parking_ticket_flg) !== "1") {
-            out.push({ level: "error", kind: "駐車券フラグ", row, detail: "駐車券コード（6桁目P）なのに駐車券フラグが " + (nk(row.parking_ticket_flg) || "空") + "（1が必要）", noAi: true });
-          }
-        }
-        return out;
-      }
-
-      // まとめて走らせる。kind でどのチェックを回すか決める（備考は価格表には無い列なので分ける）。
-      function hpIsPublicSaleTarget(row) {
-        const norm = (v) => String(v ?? "").normalize("NFKC").trim();
-        const code = norm(row.席種エリアコード ?? row.seat_type_area_cd ?? row.seat_code);
-        if (code.charAt(5).toUpperCase() === "U") return false;
-        const names = [row.席種エリア名, row.seat_type_area_control_nm, row.seat_name,
-          row.word1, row.word2, row.word3].map(norm).join(" ");
-        return !/未確定|未定|販促|団体利用/.test(names);
-      }
-
-      function hpRunAllChecks(input) {
-        const rows = (input.rows || []).filter(hpIsPublicSaleTarget);
-        const hp = input.hp ? { ...input.hp, items: (input.hp.items || []).filter(hpIsPublicSaleTarget) } : null;
-        const kind = input.kind || "price_schedule";
-        const res = { price: [], period: [], note: [], structure: [], meta: { rows: rows.length, kind, hp: !!hp } };
-        if (kind === "price_schedule") {
-          // 構造チェックはHPナレッジが要らない。名寄せにも鮮度にも左右されないので常に回す
-          res.structure = hpCheckStructure(rows).concat(hpCheckVariantMixup(rows, (input.masterRows || []).filter(hpIsPublicSaleTarget)));
-          if (!hp) {
-            res.meta.error = res.structure.filter((f) => f.level === "error").length;
-            res.meta.warn = res.structure.filter((f) => f.level === "warn").length;
-            return res;
-          }
-          res.price = hpCheckPrices(rows, hp);
-          res.period = hpCheckSalePeriod(rows, hp);
-        } else {
-          // 備考の「同じグループで自分だけ空」はHPナレッジが無くても判定できる。
-          // HPの公開待ちで何も動かないより、使える判定だけでも回す。
-          res.note = hpCheckNotes(rows, hp, input.noteOpts);
-          if (kind === "seat_master") res.structure = hpCheckSeatFlags(rows);
-        }
-        const all = res.price.concat(res.period, res.note, res.structure);
-        res.meta.error = all.filter((f) => f.level === "error").length;
-        res.meta.warn = all.filter((f) => f.level === "warn").length;
-        return res;
-      }
-      // ===== 照合するグループの決定 =====
-      // 席種エリアマスタは全イベント分（実データで4,743行・数百グループ）が1ファイルに入っている。
-      // そのままHP突合するとAI照合に全グループが回り、コストも精度も悪くなる（2026-09-26 SHUN指摘）。
-      // HPナレッジのイベント（例「鈴鹿_27F1」）とグループ名の近さで候補を決め、確認してから絞り込む。
-      function hpGroupKey(s) {
-        return String(s || "").normalize("NFKC").replace(/[\s()（）\[\]【】_\-・･]/g, "").toUpperCase();
-      }
-      // 大きいほどイベントに近い。0 = 関係なし
-      function hpGroupScore(group, eventKey, eventLabel) {
-        const g = hpGroupKey(group);
-        if (!g) return 0;
-        let best = 0;
-        for (const ev of [eventKey, eventLabel]) {
-          const e = hpGroupKey(ev);
-          if (!e) continue;
-          if (g === e) return 100;
-          if (g.includes(e) || e.includes(g)) best = Math.max(best, 60);
-          // 「27F1」「SGT26」「MTGP26」のような英数字の塊と、会場名（鈴鹿/もてぎ）の一致で近さを測る
-          const tok = (x) => new Set((x.match(/[A-Z]*\d+[A-Z0-9]*|[A-Z]{2,}\d*/g) || []));
-          const gt = tok(g), et = tok(e);
-          let shared = 0;
-          et.forEach((t) => { if (gt.has(t)) shared++; });
-          const venue = ["鈴鹿", "もてぎ"].some((v) => g.includes(v) && e.includes(v)) ? 10 : 0;
-          if (shared) best = Math.max(best, Math.min(55, 30 * shared + venue));
-        }
-        return best;
-      }
-
-      // ===HP_CHECK_CORE_END===
-
-      // ===== HP突合チェック（UI側） =====
-      // 判定そのものは HP_CHECK_CORE の純粋関数が担当する。ここはデータの出し入れと表示だけ。
-      //
-      // ナレッジの取り方は2通り:
-      //   GAS版   … google.script.run で Drive上の HP料金ナレッジ.json を読む（イベント単位で絞って返る）
-      //   ローカル … その JSON をファイル選択で読ませる（GASが無くても検証・運用できるようにする）
-      state.hpKnowledge = null;
-
-      const hpIsGas = () => typeof google !== "undefined" && google.script && google.script.run;
-
-      function hpCallServer(fn, arg) {
-        return new Promise((resolve, reject) => {
-          const timer = setTimeout(() => reject(new Error("GASからの応答がありません。時間をおいて再実行してください。")), 30000);
-          google.script.run
-            .withSuccessHandler((value) => { clearTimeout(timer); resolve(value); })
-            .withFailureHandler((e) => { clearTimeout(timer); reject(new Error(e && e.message ? e.message : String(e))); })
-            [fn](arg);
-        });
-      }
-
-      function hpShowNotice(message) {
-        setStatus(message);
-        const ov = document.createElement("div");
-        ov.className = "modal-overlay _hp-notice-ov";
-        ov.innerHTML = `<div class="modal-dialog" role="alertdialog" aria-modal="true" aria-label="HP突合">
-          <div class="modal-title">HP突合</div>
-          <p style="white-space:pre-wrap;line-height:1.7"></p>
-          <div class="modal-btns"><button class="_hp-notice-close btn-primary">閉じる</button></div>
-        </div>`;
-        ov.querySelector("p").textContent = message;
-        document.body.appendChild(ov);
-        const close = ov.querySelector("._hp-notice-close");
-        close.onclick = () => ov.remove();
-        close.focus();
-      }
-
-      // いま開いているファイルの種別。判定の対象を切り替える
-      function hpDataKind() {
-        const h = state.headers.map((x) => hdrKey(x));
-        if (h.includes("販売開始日時") && h.includes("前売価格")) return "price_schedule";
-        if (h.includes("seat_type_area_cd") && h.includes("nte")) return "seat_master";
-        if (h.includes("seat_type_area_cd") && h.some((x) => /^word[1-9]$/.test(x))) return "sej";
-        return null;
-      }
-
-      // グリッドから判定に必要な列だけ抜く。列が無ければ空文字で埋める（無いことを欠損として扱わない）
-      function hpExtractRows(kind) {
-        const h = state.headers.map((x) => hdrKey(x));
-        const at = (name) => h.indexOf(name);
-        const pick = {
-          price_schedule: ["席種エリアコード", "席種エリア名", "券種名", "前売価格", "当日価格", "販売開始日時", "販売終了日時",
-                           "アップグレード該当フラグ", "アップグレード元席種エリアコード", "会員ランク名", "販売経路名", "販売経路区分", "販売価格区分"],
-          seat_master: ["seat_type_area_cd", "seat_type_area_control_nm", "seat_type_area_disp_nm", "nte", "grp_nm",
-                        "rsve_unrsve_kbn", "seattype_stock_control_typ", "box_seat_flg", "seat_cnt", "single_day_admission_flg", "parking_ticket_flg"],
-          sej: ["seat_type_area_cd", "word1", "word2", "word3"],
-        }[kind] || [];
-        const idx = pick.map(at);
-        const vr = getVisibleRows();
-        const out = [];
-        for (let vi = 0; vi < vr.length; vi++) {
-          const i = vr._direct ? vi : vr._indices[vi];
-          const row = state.data[i];
-          if (!row) continue;
-          const o = { _row: i };
-          pick.forEach((name, k) => { o[name] = idx[k] < 0 ? "" : masterVal(name, row[idx[k]]); });
-          if (kind === "seat_master") {
-            o.配席ブロック管理名 = o.grp_nm;
-            o.席種エリア名 = o.seat_type_area_control_nm;
-            o.表示名 = o.seat_type_area_disp_nm;
-            o.席種エリアコード = o.seat_type_area_cd;
-            o.備考 = o.nte;
-            o.券種名 = "";
-          }
-          out.push(o);
-        }
-        return out;
-      }
-
-      async function hpLoadKnowledge() {
-        if (hpIsGas()) {
-          const evs = await hpCallServer("listHpEvents");
-          if (evs && evs.error) throw new Error(evs.error);
-          if (!Array.isArray(evs) || !evs.length) throw new Error("HPナレッジにイベントが1件もありません");
-          const key = evs.length === 1 ? evs[0].key : await hpPickEvent(evs);
-          if (!key) return null;
-          const kn = await hpCallServer("getHpKnowledge", key);
-          if (kn && kn.error) throw new Error(kn.error);
-          return kn;
-        }
-        // ローカル: ファイルを選ばせる
-        const file = await new Promise((resolve) => {
-          const inp = document.createElement("input");
-          inp.type = "file";
-          inp.accept = ".json";
-          inp.style.display = "none";
-          document.body.appendChild(inp);
-          inp.onchange = () => { resolve(inp.files[0] || null); inp.remove(); };
-          inp.oncancel = () => { resolve(null); inp.remove(); };
-          inp.click();
-        });
-        if (!file) return null;
-        const text = await file.text();
-        const data = JSON.parse(text);
-        if (data.schema !== "hp_price_knowledge/1") throw new Error("未対応のスキーマです: " + (data.schema || "なし"));
-        const keys = Object.keys(data.events || {});
-        if (!keys.length) throw new Error("events が空です");
-        const key = keys.length === 1 ? keys[0] : await hpPickEvent(keys.map((k) => ({ key: k, label: (data.events[k] || {}).label || k })));
-        if (!key) return null;
-        const ev = data.events[key] || {};
-        return { schema: data.schema, built_at: data.built_at || null, event_key: key, event_id: ev.event_id || key, reference_channel: ev.reference_channel || null, label: ev.label || key, sale: ev.sale || null, items: ev.items || [],
-          page_notes: ev.page_notes || {}, common_pages: ev.common_pages || [], group_aliases: ev.group_aliases || [] };
-      }
-
-      function hpPickEvent(evs) {
-        return new Promise((resolve) => {
-          const ov = document.createElement("div");
-          ov.className = "modal-overlay _hp-pick-ov";
-          ov.innerHTML = `<div class="modal-dialog">
-            <div class="modal-title">どのイベントと突き合わせますか？</div>
-            <div style="margin:10px 0"><select class="_hp-ev" style="width:100%;height:30px">
-              ${evs.map((e) => `<option value="${escHtml(e.key)}">${escHtml(e.label || e.key)}${e.item_count != null ? `（${e.item_count}件）` : ""}</option>`).join("")}
-            </select></div>
-            <div class="modal-btns">
-              <button class="_hp-cancel btn-default">キャンセル</button>
-              <button class="_hp-ok btn-primary">この イベントで照合</button>
-            </div>
-          </div>`;
-          document.body.appendChild(ov);
-          const done = (v) => { ov.remove(); resolve(v); };
-          ov.querySelector("._hp-cancel").onclick = () => done(null);
-          ov.querySelector("._hp-ok").onclick = () => done(ov.querySelector("._hp-ev").value);
-        });
-      }
-
-      // ナレッジの鮮度。古いまま使う事故を防ぐため、日数を必ず画面に出す
-      function hpAgeDays(builtAt) {
-        const t = hpParseDateTime(builtAt) ?? Date.parse(builtAt || "");
-        if (!t || isNaN(t)) return null;
-        return Math.floor((Date.now() - t) / 86400000);
-      }
-
-      // 戻り値: { rows, groups } / null（中止）。グループ列が無い・1グループしか無いときはそのまま通す
-      function hpChooseGroups(rows, kind, kn) {
-        const key = kind === "seat_master" ? "配席ブロック管理名" : null;
-        if (!key) return Promise.resolve({ rows, groups: [] });
-        const counts = new Map();
-        for (const r of rows) {
-          const g = String(r[key] || "").trim() || "(グループなし)";
-          counts.set(g, (counts.get(g) || 0) + 1);
-        }
-        if (counts.size <= 1) return Promise.resolve({ rows, groups: [...counts.keys()] });
-        const evKey = kn && kn.event_key, evLabel = kn && kn.label;
-        // 席種エリアマスタでのグループ名がイベント名と違う場合（MotoGP26 → もてぎ_MTGP26）はナレッジの別名でも当てる
-        const aliases = (kn && kn.group_aliases) || [];
-        const scoreOf = (g) => Math.max(hpGroupScore(g, evKey, evLabel), ...aliases.map((a) => hpGroupScore(g, a, "")));
-        const list = [...counts.entries()].map(([g, n]) => ({ g, n, score: kn ? scoreOf(g) : 0 }))
-          .sort((a, b) => b.score - a.score || b.n - a.n || a.g.localeCompare(b.g, "ja"));
-        const top = list[0].score;
-        // 一番近いグループだけを既定で選ぶ（同点なら全部）。近いものが無ければ何も選ばない＝必ず人が選ぶ
-        const preset = new Set(top > 0 ? list.filter((x) => x.score === top).map((x) => x.g) : []);
-        return new Promise((resolve) => {
-          const ov = document.createElement("div");
-          ov.className = "modal-overlay _hp-grp-ov";
-          const shown = list.slice(0, 400);
-          ov.innerHTML = `<div class="modal-dialog" style="max-width:640px;width:92vw">
-            <div class="modal-title">照合するグループ</div>
-            <p style="font-size:12px;line-height:1.6;margin:6px 0">
-              ${kn ? `HPナレッジ「<b>${escHtml(evLabel || evKey || "")}</b>」に近いグループを選んでいます。` : "HPナレッジ無しで実行します。対象のグループを選んでください。"}
-              全${rows.length.toLocaleString()}行・${counts.size}グループのうち、選んだグループだけを照合・AI送信します。</p>
-            <input class="_hp-grp-q" placeholder="グループ名で絞り込み" style="width:100%;height:28px;margin-bottom:6px">
-            <div class="_hp-grp-list" style="max-height:46vh;overflow:auto;border:1px solid var(--border);padding:4px 6px;font-size:12px">
-              ${shown.map((x, i) => `<label style="display:flex;gap:6px;align-items:center;padding:2px 0" data-g="${escHtml(x.g)}">
-                <input type="checkbox" data-i="${i}"${preset.has(x.g) ? " checked" : ""}>
-                <span style="flex:1">${escHtml(x.g)}</span>
-                <span style="color:#6b7280">${x.n.toLocaleString()}行${x.score >= 60 ? '<b style="color:#2563eb;margin-left:6px">一致</b>' : x.score > 0 ? '<span style="color:#2563eb;margin-left:6px">近い</span>' : ""}</span></label>`).join("")}
-            </div>
-            <div class="_hp-grp-sum" style="font-size:12px;margin-top:6px"></div>
-            <div class="modal-btns">
-              <button class="_hp-cancel btn-default">キャンセル</button>
-              <button class="_hp-ok btn-primary">このグループで照合</button>
-            </div>
-          </div>`;
-          document.body.appendChild(ov);
-          const boxes = [...ov.querySelectorAll("input[type=checkbox]")];
-          const sum = ov.querySelector("._hp-grp-sum"), ok = ov.querySelector("._hp-ok");
-          const refresh = () => {
-            const sel = boxes.filter((b) => b.checked).map((b) => shown[+b.dataset.i]);
-            const n = sel.reduce((s, x) => s + x.n, 0);
-            sum.textContent = sel.length ? `選択: ${sel.length}グループ・${n.toLocaleString()}行` : "グループを選んでください";
-            ok.disabled = !sel.length;
-          };
-          boxes.forEach((b) => (b.onchange = refresh));
-          ov.querySelector("._hp-grp-q").oninput = (e) => {
-            const q = hpGroupKey(e.target.value);
-            ov.querySelectorAll("._hp-grp-list label").forEach((l) => { l.style.display = !q || hpGroupKey(l.dataset.g).includes(q) ? "" : "none"; });
-          };
-          refresh();
-          const done = (v) => { ov.remove(); resolve(v); };
-          ov.querySelector("._hp-cancel").onclick = () => done(null);
-          ok.onclick = () => {
-            const groups = new Set(boxes.filter((b) => b.checked).map((b) => shown[+b.dataset.i].g));
-            done({ rows: rows.filter((r) => groups.has(String(r[key] || "").trim() || "(グループなし)")), groups: [...groups] });
-          };
-        });
-      }
-
-      async function runHpCheck() {
-        const button = $("btn-hp-check");
-        if (button.disabled) return;
-        const kind = hpDataKind();
-        if (!kind) {
-          hpShowNotice("このファイルは突合の対象外です（経路価格スケジュール / 席種エリアマスタ / SEJ を開いてください）");
-          return;
-        }
-        if (!hpExtractRows(kind).some(hpIsPublicSaleTarget)) {
-          hpShowNotice("条件に一致するHP突合対象がありません。\nコードの6文字目がU、または名称に未確定・未定・販促・団体利用を含む行は対象外です。");
-          return;
-        }
-        const label = button.querySelector("span:not(.rb-icon)");
-        const originalLabel = label.textContent;
-        button.disabled = true;
-        label.textContent = "読み込み中…";
-        try {
-          if (!state.hpKnowledge) {
-            // 備考の構造チェック（同じグループで自分だけ空）はHPナレッジが無くても効く。
-            // HP公開待ちの間も使えるように、ナレッジ無しで進む道を用意しておく。
-            const canRunWithout = kind !== "price_schedule";
-            const msg = canRunWithout
-              ? "HPナレッジを読み込みますか？\n\nOK: HPと突き合わせる（料金・販売期間・備考）\nキャンセル: HP無しで「備考の抜け（同グループ）」だけ調べる"
-              : "HPナレッジを読み込みます。";
-            const wantHp = canRunWithout ? confirm(msg) : true;
-            if (wantHp) {
-              setStatus("HPナレッジを読み込み中...");
-              state.hpKnowledge = await hpLoadKnowledge();
-              if (!state.hpKnowledge && !canRunWithout) { setStatus("HP突合チェックを中止しました"); return; }
-            }
-          }
-          const scope = await hpChooseGroups(hpExtractRows(kind), kind, state.hpKnowledge);
-          if (!scope) { setStatus("HP突合チェックを中止しました"); return; }
-          const res = hpRunAllChecks({ kind, rows: scope.rows, hp: state.hpKnowledge });
-          res.meta.groups = scope.groups;
-          hpShowResult(res, kind);
-        } catch (e) {
-          hpShowNotice("HP突合チェックに失敗: " + e.message);
-        } finally {
-          button.disabled = false;
-          label.textContent = originalLabel;
-        }
-      }
-
-      // ===== AI照合の設定（モデル・単価）と使用料 =====
-      // モデルは入れ替わりが早い（2026-09-25に gemini-2.5-flash が新規提供終了）ので、画面で選べて手入力もできるようにする。
-      // 単価の既定値の出典: https://ai.google.dev/gemini-api/docs/pricing（2026-09-24更新、有料枠・テキスト、USD/100万トークン）。
-      // 「*」付きの 3.6〜3.8-flash は2026-12-31までの期間限定価格。値は画面で上書きでき、上書きはこのブラウザに保存する。
-      const HP_AI_DEFAULT_MODEL = "gemini-3.8-flash";
-      const HP_AI_PRICE_DEFAULTS = {
-        "gemini-3.8-flash": [0.75, 3.75], "gemini-3.7-flash": [0.75, 3.75], "gemini-3.6-flash": [0.75, 3.75],
-        "gemini-3.5-flash": [1.5, 9], "gemini-3.5-flash-lite": [0.3, 2.5], "gemini-3.1-flash-lite": [0.25, 1.5],
-        "gemini-3.1-pro-preview": [2, 12], "gemini-3-flash-preview": [0.5, 3],
-        "gemini-2.5-pro": [1.25, 10], "gemini-2.5-flash": [0.3, 2.5], "gemini-2.5-flash-lite": [0.1, 0.4],
-      };
-      const HP_AI_STORE = "tsvEditor.hpAi";
-      function hpAiLoad() {
-        let s = null;
-        try { s = JSON.parse(localStorage.getItem(HP_AI_STORE) || "null"); } catch (e) { s = null; }
-        s = s && typeof s === "object" ? s : {};
-        if (!s.model) s.model = HP_AI_DEFAULT_MODEL;
-        if (!s.prices || typeof s.prices !== "object") s.prices = {};
-        if (!(Number(s.jpy) > 0)) s.jpy = 150;
-        if (!(Number(s.limitYen) > 0)) s.limitYen = 10;
-        const ym = new Date().toISOString().slice(0, 7);
-        if (!s.month || s.month.ym !== ym) s.month = { ym, usd: 0, calls: 0 };
-        return s;
-      }
-      function hpAiSave(s) {
-        try { localStorage.setItem(HP_AI_STORE, JSON.stringify(s)); } catch (e) { /* 保存できない環境でも動作は続ける */ }
-      }
-      function hpAiPrice(s, model) {
-        return (s.prices && s.prices[model]) || HP_AI_PRICE_DEFAULTS[model] || null;
-      }
-      const hpUsd = (v) => "$" + (v < 0.01 ? v.toFixed(4) : v.toFixed(2));
-      const hpYen = (v, s) => "約" + Math.round(v * s.jpy).toLocaleString("ja-JP") + "円";
-
-      function hpAiEstimate(cfg, chars, items) {
-        const inTok = Math.ceil(chars * 1.0) + 600;
-        const outTok = items * 150 + 2000;
-        const pr = hpAiPrice(cfg.settings, cfg.model());
-        const yen = pr ? ((inTok * pr[0] + outTok * pr[1]) / 1e6) * cfg.settings.jpy : null;
-        return { inTok, outTok, yen };
-      }
-
-      function hpAiCfgHtml() {
-        return `<div class="_hp-ai-cfg" style="margin-top:12px;padding:8px 10px;border:1px solid var(--border);border-radius:4px;font-size:12px;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center">
-          <label>AIモデル <input class="_hp-ai-model" list="_hp-ai-models" style="width:230px;height:26px" placeholder="一覧から選ぶか手入力" spellcheck="false"></label>
-          <datalist id="_hp-ai-models"></datalist>
-          <label>単価（USD/100万トークン） 入力 <input class="_hp-ai-pin" type="number" min="0" step="0.01" style="width:70px;height:26px"></label>
-          <label>出力 <input class="_hp-ai-pout" type="number" min="0" step="0.01" style="width:70px;height:26px"></label>
-          <label>円換算 <input class="_hp-ai-jpy" type="number" min="1" step="1" style="width:64px;height:26px"> 円/ドル</label>
-          <label>1回の上限 <input class="_hp-ai-limit" type="number" min="1" step="1" style="width:56px;height:26px"> 円</label>
-          <span class="_hp-ai-month" style="color:#6b7280"></span>
-        </div>`;
-      }
-
-      // 設定欄の初期化。モデル一覧はGASから「今使えるもの」を取る（取れなければ既知の一覧だけ出す）
-      function hpAiCfgInit(ov) {
-        const s = hpAiLoad();
-        const $m = ov.querySelector("._hp-ai-model"), $in = ov.querySelector("._hp-ai-pin"),
-          $out = ov.querySelector("._hp-ai-pout"), $jpy = ov.querySelector("._hp-ai-jpy"),
-          $dl = ov.querySelector("#_hp-ai-models"), $month = ov.querySelector("._hp-ai-month");
-        const fillList = (ids) => {
-          const all = [...new Set([...(ids || []), ...Object.keys(HP_AI_PRICE_DEFAULTS)])];
-          $dl.innerHTML = all.map((id) => `<option value="${escHtml(id)}">`).join("");
-        };
-        const showPrice = () => {
-          const pr = hpAiPrice(s, $m.value.trim());
-          $in.value = pr ? pr[0] : "";
-          $out.value = pr ? pr[1] : "";
-        };
-        const showMonth = () => {
-          $month.textContent = `今月の累計（このブラウザ）: ${hpUsd(s.month.usd)}（${hpYen(s.month.usd, s)}）・${s.month.calls}回`;
-        };
-        $m.value = s.model;
-        $jpy.value = s.jpy;
-        fillList(state.hpAiModels);
-        showPrice();
-        showMonth();
-        $m.onchange = () => { s.model = $m.value.trim() || HP_AI_DEFAULT_MODEL; $m.value = s.model; hpAiSave(s); showPrice(); };
-        const savePrice = () => {
-          const a = Number($in.value), b = Number($out.value);
-          if ($in.value !== "" && $out.value !== "" && a >= 0 && b >= 0) { s.prices[$m.value.trim()] = [a, b]; hpAiSave(s); }
-        };
-        $in.onchange = savePrice;
-        $out.onchange = savePrice;
-        $jpy.onchange = () => { if (Number($jpy.value) > 0) { s.jpy = Number($jpy.value); hpAiSave(s); showMonth(); } };
-        const $lim = ov.querySelector("._hp-ai-limit");
-        $lim.value = s.limitYen;
-        $lim.onchange = () => { if (Number($lim.value) > 0) { s.limitYen = Number($lim.value); hpAiSave(s); } };
-        if (hpIsGas() && !state.hpAiModels) {
-          hpCallServer("listGeminiModels").then((r) => {
-            if (r && Array.isArray(r.models)) { state.hpAiModels = r.models.map((x) => x.id); fillList(state.hpAiModels); }
-          }).catch(() => { /* 一覧が取れなくても手入力で使える */ });
-        }
-        return { settings: s, model: () => $m.value.trim() || HP_AI_DEFAULT_MODEL, showMonth };
-      }
-
-      // 1回ぶんの使用量と料金。単価が分からないモデルはトークン数だけ出す
-      function hpAiUsageHtml(r, cfg) {
-        const s = cfg.settings;
-        const u = (r && r.usage) || null;
-        const model = (r && r.model) || cfg.model();
-        if (!u) return `<div style="font-size:12px;color:#6b7280;margin-bottom:6px">モデル ${escHtml(model)}（使用量は取得できませんでした）</div>`;
-        const pr = hpAiPrice(s, model);
-        const tokens = `入力 ${u.input.toLocaleString("ja-JP")}・出力 ${u.output.toLocaleString("ja-JP")}${u.thoughts ? `（うち思考 ${u.thoughts.toLocaleString("ja-JP")}）` : ""} トークン`;
-        let cost = "単価が未設定のため料金は計算していません（上の欄で入力できます）";
-        if (pr) {
-          const usd = (u.input * pr[0] + u.output * pr[1]) / 1e6;
-          s.month.usd += usd;
-          s.month.calls += 1;
-          hpAiSave(s);
-          cfg.showMonth();
-          cost = `今回の料金 <b>${hpUsd(usd)}</b>（${hpYen(usd, s)}）`;
-        }
-        return `<div style="font-size:12px;margin-bottom:8px;padding:5px 8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px">モデル <b>${escHtml(model)}</b> ／ ${tokens} ／ ${cost}</div>`;
-      }
-
-      function hpShowResult(res, kind) {
-        const kn = state.hpKnowledge || {};
-        const age = hpAgeDays(kn.built_at);
-        const all = res.price.concat(res.period, res.note, res.structure || []);
-        const byLevel = { error: [], warn: [], ai: [], info: [] };
-        all.forEach((f) => (byLevel[f.level] || byLevel.info).push(f));
-        const sec = (title, list, color) => {
-          if (!list.length) return "";
-          // グリッド本体の th/td（縦書きヘッダー・行高・省略記号）を継承すると列が潰れるので、
-          // このダイアログ内の表は自前のクラスで上書きする
-          const td = 'style="border:1px solid #e5e7eb;padding:3px 6px;vertical-align:top;white-space:normal;height:auto;writing-mode:horizontal-tb;text-align:left"';
-          const rowsHtml = list.slice(0, 300).map((f) => `<tr>
-            <td ${td} data-n>${f.row && f.row._row != null ? f.row._row + 1 : ""}${f.row && f.row._count > 1 ? `<br><span style="color:#6b7280">×${f.row._count}行</span>` : ""}</td>
-            <td ${td}>${escHtml(f.kind)}</td>
-            <td ${td}>${escHtml(f.row ? (f.row.席種エリア名 || f.row.席種エリアコード || "") : "")}</td>
-            <td ${td}>${escHtml(f.row ? (f.row.券種名 || "") : "")}</td>
-            <td ${td}>${escHtml(f.detail)}</td></tr>`).join("");
-          return `<h4 style="margin:14px 0 4px;color:${color}">${title}（${list.length}件）</h4>
-            <table class="_hp-tbl" style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed">
-              <colgroup><col style="width:64px"><col style="width:130px"><col style="width:210px"><col style="width:170px"><col></colgroup>
-              <thead><tr style="background:#f3f4f6">
-                <th ${td}>行</th><th ${td}>種別</th><th ${td}>席種</th><th ${td}>券種</th><th ${td}>内容</th>
-              </tr></thead>
-              <tbody>${rowsHtml}</tbody></table>
-            ${list.length > 300 ? `<div style="color:var(--text-dim);margin-top:4px">…ほか ${list.length - 300} 件</div>` : ""}`;
-        };
-        const ov = document.createElement("div");
-        ov.className = "modal-overlay _hp-res-ov";
-        ov.innerHTML = `<div class="modal-dialog" style="max-width:1180px;width:94vw;max-height:86vh;overflow:auto">
-          <div class="modal-title">HP突合チェック結果</div>
-          <p style="font-size:12px">対象：コードの6文字目がU以外。名称に未確定・未定・販促・団体利用を含む行は除外しています。</p>
-          <p style="font-size:13px;margin:8px 0;line-height:1.7">
-            ${res.meta.hp
-              ? `照合先: <b>${escHtml(kn.label || kn.event_key || "-")}</b> ／ 対象 ${res.meta.rows.toLocaleString()}行（${escHtml(kind)}）${res.meta.groups && res.meta.groups.length ? ` ／ グループ: <b>${escHtml(res.meta.groups.join("、"))}</b>` : ""}<br>
-                 ナレッジの作成: ${escHtml(kn.built_at || "不明")}${age != null ? `（<b style="color:${age > 14 ? "#dc2626" : "inherit"}">${age}日前</b>）` : ""}`
-              : `<b style="color:#b45309">HPナレッジ無しで実行しました。</b>／ 対象 ${res.meta.rows.toLocaleString()}行（${escHtml(kind)}）<br>
-                 調べたのは「同じグループの他の席種には備考があるのに、この行だけ空」だけです。
-                 <b>料金・販売期間・HPとの備考差はチェックしていません。</b>`}
-            ${age != null && age > 14 ? "<br><b style=\"color:#dc2626\">ナレッジが2週間以上前です。HPを取り直してから判断してください。</b>" : ""}
-          </p>
-          ${res.meta.rows === 0 ? "<p>条件に一致するHP突合対象がありません。</p>" : all.length ? "" : "<p style=\"color:#16a34a;font-weight:600\">指摘はありません。</p>"}
-          ${sec("要修正", byLevel.error, "#dc2626")}
-          ${sec("要確認", byLevel.warn, "#b45309")}
-          ${sec("AIで照合する備考（同じ備考×同じHPページは1件にまとめています）", byLevel.ai, "#2563eb")}
-          ${sec("参考・要目視", byLevel.info, "#6b7280")}
-          ${hpAiCfgHtml()}
-          <div class="modal-btns" style="margin-top:10px">
-            <button class="_hp-ai btn-default"${byLevel.error.length + byLevel.warn.length + byLevel.ai.length ? "" : " disabled"}>AIに説明させる（差分行・照合対象の備考のみ送信）</button>
-            <button class="_hp-reload btn-default">ナレッジを読み直す</button>
-            <button class="_hp-close btn-primary">閉じる</button>
-          </div>
-          <div class="_hp-ai-out" style="display:none;margin-top:10px;padding:10px;background:#fafafa;border:1px solid var(--border);font-size:13px;white-space:pre-wrap"></div>
-        </div>`;
-        document.body.appendChild(ov);
-        const aiCfg = hpAiCfgInit(ov);
-        ov.querySelector("._hp-close").onclick = () => ov.remove();
-        ov.querySelector("._hp-reload").onclick = () => { state.hpKnowledge = null; ov.remove(); runHpCheck(); };
-        ov.querySelector("._hp-ai").onclick = async () => {
-          const out = ov.querySelector("._hp-ai-out");
-          const picked = byLevel.error.concat(byLevel.warn, byLevel.ai).filter((f) => !f.noAi).slice(0, 200);
-          // id で回答と元の指摘を結び付ける（AIに行番号や席種名を書き写させると取り違えるため）
-          const send = picked.map((f, i) => f.level === "ai"
-            ? { id: i + 1, 種別: f.kind, 席種表示名: f.seats || [], 件数: f.row ? f.row._count : 1, 現行の備考: f.note, HPページ: f.hpPages || [] }
-            : { id: i + 1, 種別: f.kind, 席種表示名: [f.row ? (f.row.表示名 || f.row.席種エリア名 || "") : ""], 券種: f.row ? f.row.券種名 : "", 内容: f.detail });
-          // 参照されるページのHP記載だけを添える（ナレッジ全体は送らない）
-          const pn = (state.hpKnowledge && state.hpKnowledge.page_notes) || {};
-          const context = {};
-          for (const f of picked) for (const pid of f.hpPages || []) if (pn[pid] && !context[pid]) context[pid] = pn[pid].lines;
-          const question = [
-            "各行（id）について判定し、次のJSONだけを返してください。前置きや説明文は不要です。",
-            '{"総評":"全体の要点を1〜3文","results":[{"id":1,"判定":"要修正|HPに記載なし|問題なし","修正案":"要修正のときだけ、直した後の備考全文（元の<br>区切りの形式を保つ）。それ以外は空文字","理由":"1〜2文","HP根拠":[{"ページ":"ページID","記載":"HPの該当記載をそのまま引用"}]}]}',
-            "判定の基準:",
-            "・要修正 = 現行の備考がHPの記載と矛盾している、またはHPにある重要な条件（有効期間・利用できる日・特典・座席指定・年齢や保護者同伴の条件など）が抜けている。",
-            "・HPに記載なし = 現行の備考の根拠が、渡したHPの記載の中に見当たらない（推測で要修正にしない）。",
-            "・問題なし = 内容がHPと一致している（表記の違いだけのものも含む）。",
-            "・「備考をHPと照合(AI)」以外の行（価格や備考の抜けの指摘）も同じ3区分で判定し、修正案には直すべき値を書く。",
-            "・HP根拠の「記載」はHP側の文をそのまま引用し、言い換えない。根拠が無ければ空配列。",
-          ].join("\n");
-          if (!hpIsGas()) { out.style.display = ""; out.textContent = "AI照合はGAS版でのみ使えます（APIキーをサーバー側に置いているため）。"; return; }
-          // 概算: 日本語はおおむね1文字≒1トークン。出力は1件あたり約150トークン＋思考分を見込む
-          const est = hpAiEstimate(aiCfg, JSON.stringify(send).length + JSON.stringify(context).length + question.length, send.length);
-          const estLine = est.yen == null ? "（単価未設定のため料金の見込みは出せません）"
-            : `見込み: 約${Math.max(1, Math.round(est.yen))}円（入力 約${est.inTok.toLocaleString("ja-JP")}・出力 約${est.outTok.toLocaleString("ja-JP")}トークン）`;
-          const over = est.yen != null && est.yen > aiCfg.settings.limitYen;
-          const msg = `差分・照合対象 ${send.length} 件をGemini（${aiCfg.model()}）へ送ります。TSV全体は送りません。\n${estLine}`
-            + (over ? `\n\n⚠ 1回の上限 ${aiCfg.settings.limitYen}円 を超える見込みです。グループや対象を絞ってから実行することをおすすめします。それでも送りますか？` : "\n続けますか？");
-          if (!confirm(msg)) return;
-          out.style.display = "";
-          out.style.whiteSpace = "pre-wrap";
-          out.textContent = "Gemini（" + aiCfg.model() + "）に問い合わせ中...";
-          try {
-            const r = await hpCallServer("askGemini", { rows: send, question, context, format: "json", model: aiCfg.model() });
-            if (r && r.error) { out.textContent = "失敗: " + r.error; return; }
-            const parsed = hpParseAiJson(r && r.text);
-            const usageHtml = hpAiUsageHtml(r, aiCfg);
-            out.style.whiteSpace = "normal";
-            if (!parsed) {
-              // 形式が崩れたときは生の回答をそのまま見せる（黙って捨てない）
-              out.innerHTML = usageHtml + `<div style="white-space:pre-wrap">${escHtml((r && r.truncated_message ? r.truncated_message + "\n\n" : "") + ((r && r.text) || "(応答が空でした)"))}</div>`;
-              return;
-            }
-            out.innerHTML = usageHtml + hpRenderAiResult(parsed, picked, r.truncated_message);
-          } catch (e) {
-            out.textContent = "失敗: " + e.message;
-          }
-        };
-        setStatus(`HP突合チェック: 要修正 ${byLevel.error.length} / 要確認 ${byLevel.warn.length} / 参考 ${byLevel.info.length}`, !byLevel.error.length);
-      }
-
-      // AIの回答（JSON）を読む。```json で囲まれていても、前後に文が付いていても本体だけ抜く
-      function hpParseAiJson(text) {
-        if (!text) return null;
-        const s = String(text).trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
-        const a = s.indexOf("{"), b = s.lastIndexOf("}");
-        if (a < 0 || b <= a) return null;
-        try {
-          const o = JSON.parse(s.slice(a, b + 1));
-          return o && Array.isArray(o.results) ? o : null;
-        } catch (e) { return null; }
-      }
-
-      // 判定ごとに色を分けた表にする（2026-09-26: Markdownの長文が読みにくかったため）。
-      // 並びは 要修正 → HPに記載なし → 問題なし。問題なしは折りたたむ
-      function hpRenderAiResult(parsed, picked, truncatedMsg) {
-        const V = {
-          "要修正": { bg: "#fef2f2", fg: "#b91c1c" },
-          "HPに記載なし": { bg: "#fffbeb", fg: "#b45309" },
-          "問題なし": { bg: "#f0fdf4", fg: "#15803d" },
-        };
-        const order = ["要修正", "HPに記載なし", "問題なし"];
-        // 備考の <br> は改行として見せる（文字はエスケープしてから <br> だけ戻す）
-        const note = (s) => escHtml(String(s || "")).replace(/&lt;br\s*\/?&gt;/gi, "<br>");
-        const byId = new Map(picked.map((f, i) => [i + 1, f]));
-        const groups = { "要修正": [], "HPに記載なし": [], "問題なし": [] };
-        for (const r of parsed.results) {
-          const v = order.includes(r["判定"]) ? r["判定"] : "HPに記載なし";
-          groups[v].push(r);
-        }
-        const th = 'style="border:1px solid #e5e7eb;padding:4px 6px;background:#f3f4f6;text-align:left;white-space:nowrap;writing-mode:horizontal-tb;height:auto;position:static"';
-        const td = 'style="border:1px solid #e5e7eb;padding:4px 6px;vertical-align:top;white-space:normal;height:auto;writing-mode:horizontal-tb;text-align:left"';
-        const table = (list, v) => {
-          const c = V[v];
-          const rows = list.map((r) => {
-            const f = byId.get(Number(r.id)) || {};
-            const seats = (f.seats && f.seats.length ? f.seats : [f.row ? (f.row.表示名 || f.row.席種エリア名 || "") : ""]).filter(Boolean);
-            const cnt = f.row && f.row._count > 1
-              ? `<div style="color:#6b7280;font-size:11px">${f.row._count}行${f.row._row != null ? "（先頭 " + (f.row._row + 1) + "行目）" : ""}</div>`
-              : (f.row && f.row._row != null ? `<div style="color:#6b7280;font-size:11px">${f.row._row + 1}行目</div>` : "");
-            const current = f.level === "ai" ? f.note : (f.detail || "");
-            const fix = String(r["修正案"] || "").trim();
-            const ev = (r["HP根拠"] || []).map((h) =>
-              `<div style="margin-top:3px;padding:2px 4px;background:#f8fafc;border-left:3px solid #94a3b8;font-size:11px"><span style="color:#64748b">${escHtml(h["ページ"] || "")}</span><br>${escHtml(h["記載"] || "")}</div>`).join("");
-            return `<tr style="background:${c.bg}">
-              <td ${td}><span style="display:inline-block;padding:1px 6px;border-radius:9px;background:${c.fg};color:#fff;font-size:11px;white-space:nowrap">${escHtml(v)}</span></td>
-              <td ${td}><b>${seats.map(escHtml).join("<br>")}</b>${cnt}</td>
-              <td ${td}>${note(current)}</td>
-              <td ${td}>${fix ? `<span style="color:#15803d;font-weight:600">${note(fix)}</span>` : '<span style="color:#9ca3af">―</span>'}</td>
-              <td ${td}>${escHtml(r["理由"] || "")}${ev}</td>
-            </tr>`;
-          }).join("");
-          return `<table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;margin-top:4px">
-            <colgroup><col style="width:92px"><col style="width:170px"><col><col><col style="width:30%"></colgroup>
-            <thead><tr><th ${th}>判定</th><th ${th}>席種エリア表示名</th><th ${th}>現行</th><th ${th}>修正案</th><th ${th}>理由・HPの根拠</th></tr></thead>
-            <tbody>${rows}</tbody></table>`;
-        };
-        const counts = order.map((v) => `<span style="color:${V[v].fg};font-weight:600">${v} ${groups[v].length}件</span>`).join("　");
-        let html = `<div style="font-size:13px;margin-bottom:6px">${counts}</div>`;
-        if (parsed["総評"]) html += `<div style="margin-bottom:8px;padding:6px 8px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:4px;font-size:12px">${escHtml(parsed["総評"])}</div>`;
-        if (truncatedMsg) html += `<div style="color:#b45309;font-size:12px;margin-bottom:6px">${escHtml(truncatedMsg)}</div>`;
-        for (const v of order) {
-          if (!groups[v].length) continue;
-          const body = table(groups[v], v);
-          html += v === "問題なし"
-            ? `<details style="margin-top:10px"><summary style="cursor:pointer;color:${V[v].fg};font-weight:600">${v}（${groups[v].length}件）を表示</summary>${body}</details>`
-            : `<h4 style="margin:10px 0 2px;color:${V[v].fg}">${v}（${groups[v].length}件）</h4>${body}`;
-        }
-        const answered = new Set(parsed.results.map((r) => Number(r.id)));
-        const missing = picked.filter((_, i) => !answered.has(i + 1)).length;
-        if (missing > 0) html += `<div style="margin-top:8px;color:#b45309;font-size:12px">AIが判定を返さなかった項目が ${missing} 件あります。もう一度実行してください。</div>`;
-        return html;
-      }
 
       // 縦書きヘッダー切り替え（列幅節約）
       function toggleVerticalHeader() {
@@ -4761,7 +3378,7 @@
         statusEncoding: $("status-encoding"),
       };
 
-      let ROW_H = 26;
+      let ROW_H = 22;
       const BUFFER = 20;
 
       // ===== セーフアクセス =====
@@ -4908,7 +3525,6 @@
         state.dirty = savedDirty;
         state.undoStack = savedUndo;
         state.redoStack = savedRedo;
-        clearExtraRanges();
         state.selected = t.selected ? { ...t.selected } : null;
         state.anchor = t.anchor ? { ...t.anchor } : null;
         state.range = t.range ? { ...t.range } : null;
@@ -5235,7 +3851,6 @@
         });
 
         $("btn-row-height").onclick = cycleRowHeight;
-        $("btn-ui-zoom").onclick = cycleUiZoom;
         $("btn-autofit-all").onclick = autoFitAllColumns;
         $("btn-wrap").onclick = toggleWrapCells;
         $("btn-sej-link").onclick = toggleSejLink;
@@ -5274,7 +3889,7 @@
         }
         // 検品表示トグル（チケットタブ）: 関連項目をまとめたグループボタン
         $("btn-seatmaster-check").onclick = () => {
-          toggleInspectGroup(["colorView", "gateView", "parkingCheck", "singleDayCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck"], "btn-seatmaster-check", "席種エリアマスタチェック");
+          toggleInspectGroup(["colorView", "gateView", "parkingCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck"], "btn-seatmaster-check", "席種エリアマスタチェック");
         };
         $("btn-sej-check").onclick = () => {
           toggleInspectGroup(["kanaCheck", "sejWordLenCheck"], "btn-sej-check", "SEJチェック");
@@ -5318,12 +3933,9 @@
         // 行の高さ（初期値はROW_Hに合わせてCSS変数を設定）
         document.documentElement.style.setProperty("--row-h", ROW_H + "px");
         setRbLabel("btn-row-height", `行高:${ROW_H}`);
-        // 表示倍率（前回使った倍率をlocalStorageから復元してラベルに出す）
-        restoreUiZoom();
         // 価格スケジュールチェック表
         // HTML出力: 開いているファイルの種別で自動切替（マニュアル記載どおりに復元）
         //   SEJデータ → マスタ照合カード / 席種一括設定 → チェックレポート / 経路価格スケジュール → 価格チェック表
-        $("btn-hp-check").onclick = runHpCheck;
         $("btn-price-sheet").onclick = () => {
           const vr = getVisibleRows();
           const rowIndices = vr._direct
@@ -5504,14 +4116,7 @@
           if (!e.target.closest("#context-menu"))
             els.ctxMenu.style.display = "none";
         };
-        els.container.onscroll = () => {
-          requestAnimationFrame(renderBody);
-          scheduleRowHSettle();
-        };
-        // スクロールバーのドラッグ中は行高見積りの更新（scrollTop補正）を待たせる
-        els.container.addEventListener("pointerdown", () => { _gridPointerDown = true; });
-        document.addEventListener("pointerup", () => { _gridPointerDown = false; });
-        document.addEventListener("pointercancel", () => { _gridPointerDown = false; });
+        els.container.onscroll = () => requestAnimationFrame(renderBody);
 
         // Alt+ホイールでズーム（CSS zoom を使用 — sticky/scrollと互換性あり）
         // Shift+ホイールで横スクロール（列数の多いチケットTSVの横移動を楽にする。
@@ -5527,9 +4132,6 @@
           const delta = e.deltaY > 0 ? -10 : 10;
           state.zoomLevel = Math.max(50, Math.min(200, state.zoomLevel + delta));
           els.container.style.zoom = state.zoomLevel / 100;
-          resetRowHeights();
-          state.forceRender = true;
-          renderBody();
           setStatus(`ズーム: ${state.zoomLevel}%`);
         }, { passive: false });
 
@@ -6074,7 +4676,7 @@
 
       // 指定列の元ヘッダー名に対応するコメントを取得
       function getHeaderComment(colIdx) {
-        const key = state.headers[colIdx] == null ? undefined : hdrKey(state.headers[colIdx]);
+        const key = state.headers[colIdx]?.trim();
         return state.headerComments[key] || "";
       }
 
@@ -6085,10 +4687,10 @@
       function clearAutoDropColumns() {
         if (state.headerMode === "numbered") return;
         // マスターファイル（seat_type_area_cd列がある）の場合のみ発動
-        if (!state.headers.some(h => hdrKey(h) === "seat_type_area_cd")) return;
+        if (!state.headers.some(h => h.trim() === "seat_type_area_cd")) return;
         const clearCols = [];
         state.headers.forEach((h, i) => {
-          if (AUTO_CLEAR_HEADERS.has(hdrKey(h))) clearCols.push(i);
+          if (AUTO_CLEAR_HEADERS.has(h.trim())) clearCols.push(i);
         });
         if (!clearCols.length) return;
         state.data.forEach(row => {
@@ -6098,39 +4700,6 @@
 
 
 
-      // 1列ぶんの「いちばん長い値」を全行から探す。
-      //
-      // 先頭300行だけを見ていたころは、途中から値が入り始める列が header 幅のまま潰れていた。
-      // 実データ（経路価格スケジュール 鈴鹿_27F1・25,319行）だと
-      // 「アップグレード元席種エリアコード/名/券種コード/券種名」は791行目から、
-      // 「法人ランク区分/名」は330行目から値が入るので、後ろの列が軒並み縮んで読めなかった。
-      //
-      // 全行を measureText すると 25,319行×30列 のCanvas計測になって重いので、
-      // まず幅の概算（全角2・半角1の重み付き文字数）で候補を絞り、
-      // 最終的に実測するのは列ごとに上位3件だけにする。重みは必ず raw length 以上・2倍以下なので、
-      // 「v.length*2 < これまでの最大」なら全角でも届かない＝計算せず捨ててよい。
-      const _wlen = (s) => {
-        let n = 0;
-        for (let i = 0; i < s.length; i++) n += s.charCodeAt(i) > 0xff ? 2 : 1;
-        return n;
-      };
-      function widestValuesInColumn(c, keep = 3) {
-        let bestW = 0;
-        let vals = [];
-        const data = state.data;
-        for (let i = 0; i < data.length; i++) {
-          const row = data[i];
-          if (!row) continue;
-          const v = row[c];
-          if (!v) continue;
-          if (v.length * 2 < bestW) continue; // 全角換算でも最大に届かない
-          const w = _wlen(v);
-          if (w > bestW) { bestW = w; vals = [v]; }
-          else if (w === bestW && vals.length < keep && !vals.includes(v)) vals.push(v);
-        }
-        return vals;
-      }
-
       // ステータス表示なしの自動幅調整（ロード時用）
       function autoFitAllColumnsQuiet() {
         // 検品表示の各注記（カラー/ゲート名/駐車券/区画席/カナ/一括設定/SEJ対訳）は、
@@ -6139,9 +4708,13 @@
           const displayH = getDisplayHeader(c);
           // 縦ヘッダー時はヘッダー文字幅を列幅に含めない（列幅節約）
           let maxW = state.verticalHeader ? 40 : measureText(displayH || "", "600 13px system-ui") + 60;
-          for (const v of widestValuesInColumn(c)) {
-            const w = measureText(v, cellMeasureFont()) + 16;
-            if (w > maxW) maxW = w;
+          const sample = Math.min(state.data.length, 300);
+          for (let i = 0; i < sample; i++) {
+            const v = safeGet(i, c);
+            if (v) {
+              const w = measureText(v, "12px Menlo,Consolas,monospace") + 16;
+              if (w > maxW) maxW = w;
+            }
           }
           state.colWidths[c] = Math.max(40, Math.min(maxW, 600));
         }
@@ -6239,7 +4812,6 @@
         }
         applyHeaderMapping();
         updateHeaderModeBtn();
-        resetRowHeights();
         markDirty();
         applyFilters();
         state.colWidths = {};
@@ -6341,263 +4913,6 @@
         });
       }
 
-      // ===== 保存前の差分サマリ（元データ＝開いた時点のファイル内容との突合）=====
-      // ULファイルを作る直前に「元エクスポートから何がどう変わったか」を機械チェックする。
-      // 2026-09-19に、鈴鹿_STAI26の2行へ27F1の備考が丸ごと混入したままULされかけた事故があり、
-      // そのとき効いた検証（キー集合の増減・列ごとの変更件数・グループ別の変更件数）を
-      // 保存経路に組み込んだもの。とくに「対象グループ以外に変更が出ていないか」が要。
-      //
-      // 元データは タブの _rawText（開いた時点のファイル内容そのもの）。保存しても更新しないので、
-      // 何度保存しても比較の基準は「最初に開いたファイル」のまま。
-
-      // 監査列。ULでは空欄でよく、システムが一括打刻するので差分として数えない。
-      const DIFF_IGNORE_COLS = new Set(["create_dt", "update_dt", "create_user", "update_user"]);
-      // 行を対応づけるキー列の候補。上から順に、全列がそろっているものを採用する。
-      const DIFF_KEY_SETS = [
-        ["tenant_cd", "club_cd", "seat_type_area_cd"],
-        ["席種エリアコード", "券種コード", "販売価格区分", "会員ランク区分", "販売経路区分",
-         "アップグレード元席種エリアコード", "アップグレード元券種コード"],
-        ["seat_type_area_cd"],
-        ["席種エリアコード", "券種コード", "販売価格区分"],
-        ["席種エリアコード"], // 日本語ヘッダー版の席種エリアマスタ
-      ];
-      const DIFF_GROUP_COLS = ["grp_nm", "グループ名", "グループ"];
-      const DIFF_SEAT_CODE_COLS = ["seat_type_area_cd", "席種エリアコード"];
-
-      // 保存対象と同じ選び方で現在の行を取り出す（仮想列は除外）
-      function _diffCurrentRows(allRows) {
-        const virtualSet = state.sejVirtualCols ? new Set(state.sejVirtualCols.indices) : null;
-        const keep = [];
-        for (let i = 0; i < state.headers.length; i++) if (!virtualSet || !virtualSet.has(i)) keep.push(i);
-        const headers = state.headerMode === "numbered"
-          ? keep.map((_, i) => String(i + 1))
-          : keep.map((i) => String(state.headers[i] ?? "").trim());
-        const src = state.filteredIndices && !allRows
-          ? state.filteredIndices.map((i) => state.data[i])
-          : state.data;
-        return { headers, rows: src.map((r) => keep.map((i) => String(r[i] ?? ""))) };
-      }
-
-      // 開いた時点のファイル内容を、読み込み時と同じ解釈でパースする
-      function _diffBaselineRows() {
-        const tab = state.tabs[state.activeTab];
-        let text = tab && tab._rawText;
-        if (typeof text !== "string") return null;
-        if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
-        const rows = parseQuotedRows(text, state.delimiter);
-        if (!rows.length) return { headers: [], rows: [] };
-        if (state.headerMode === "numbered") {
-          let maxCols = 0;
-          rows.forEach((r) => { if (r.length > maxCols) maxCols = r.length; });
-          return {
-            headers: Array.from({ length: maxCols }, (_, i) => String(i + 1)),
-            rows: rows.map((r) => Array.from({ length: maxCols }, (_, i) => String(r[i] ?? ""))),
-          };
-        }
-        const headers = rows[0].map((h) => String(h ?? "").trim());
-        const body = rows.slice(1);
-        let maxCols = headers.length;
-        body.forEach((r) => { if (r.length > maxCols) maxCols = r.length; });
-        while (headers.length < maxCols) headers.push("列" + (headers.length + 1));
-        return { headers, rows: body.map((r) => Array.from({ length: maxCols }, (_, i) => String(r[i] ?? ""))) };
-      }
-
-      function buildSaveDiff({ allRows = false } = {}) {
-        const base = _diffBaselineRows();
-        if (!base) return { available: false, reason: "開いた時点のファイル内容を保持していません（新規シート等）" };
-        const cur = _diffCurrentRows(allRows);
-
-        const baseIdx = new Map(), curIdx = new Map();
-        base.headers.forEach((h, i) => { if (h !== "" && !baseIdx.has(h)) baseIdx.set(h, i); });
-        cur.headers.forEach((h, i) => { if (h !== "" && !curIdx.has(h)) curIdx.set(h, i); });
-        const commonCols = [...curIdx.keys()].filter((h) => baseIdx.has(h) && !DIFF_IGNORE_COLS.has(h));
-        const addedCols = [...curIdx.keys()].filter((h) => !baseIdx.has(h));
-        const removedCols = [...baseIdx.keys()].filter((h) => !curIdx.has(h));
-
-        // キー列を決める。見つからない場合は行の並び順で突き合わせる（並べ替えると差分が出る）
-        const keyCols = DIFF_KEY_SETS.find((set) => set.every((h) => baseIdx.has(h) && curIdx.has(h))) || null;
-        const keyOf = (row, idx) => keyCols ? keyCols.map((h) => row[idx.get(h)] ?? "").join("\u0001") : null;
-
-        // グループの引き当て。列があればそれを使い、無ければ席種エリアマスタ連携から引く
-        const groupCol = DIFF_GROUP_COLS.find((h) => curIdx.has(h) || baseIdx.has(h)) || null;
-        const seatCodeCol = DIFF_SEAT_CODE_COLS.find((h) => curIdx.has(h) || baseIdx.has(h)) || null;
-        const master = state.sejMaster;
-        const groupOf = (row, idx) => {
-          if (groupCol && idx.has(groupCol)) {
-            const v = String(row[idx.get(groupCol)] ?? "").trim();
-            if (v) return v;
-          }
-          if (master && master.byCode && master.grpKey && seatCodeCol && idx.has(seatCodeCol)) {
-            const rec = master.byCode[String(row[idx.get(seatCodeCol)] ?? "").trim()];
-            if (rec && rec[master.grpKey]) return String(rec[master.grpKey]);
-          }
-          return "(グループ不明)";
-        };
-
-        const baseMap = new Map(), dupBase = new Set();
-        base.rows.forEach((r, i) => {
-          const k = keyCols ? keyOf(r, baseIdx) : String(i);
-          if (baseMap.has(k)) dupBase.add(k); else baseMap.set(k, r);
-        });
-        const seenCur = new Set(), dupCur = new Set();
-        const byCol = new Map(), byGroup = new Map();
-        const bump = (map, key, field) => {
-          let m = map.get(key);
-          if (!m) { m = { added: 0, removed: 0, changed: 0 }; map.set(key, m); }
-          m[field]++;
-        };
-        const samples = [];
-        let added = 0, changed = 0, same = 0;
-
-        cur.rows.forEach((r, i) => {
-          const k = keyCols ? keyOf(r, curIdx) : String(i);
-          if (seenCur.has(k)) dupCur.add(k);
-          seenCur.add(k);
-          const b = baseMap.get(k);
-          const grp = groupOf(r, curIdx);
-          if (!b) { added++; bump(byGroup, grp, "added"); return; }
-          const diffCols = [];
-          for (const h of commonCols) {
-            if (String(r[curIdx.get(h)] ?? "") !== String(b[baseIdx.get(h)] ?? "")) diffCols.push(h);
-          }
-          if (!diffCols.length) { same++; return; }
-          changed++;
-          bump(byGroup, grp, "changed");
-          for (const h of diffCols) bump(byCol, h, "changed");
-          if (samples.length < 20) {
-            const h0 = diffCols[0];
-            samples.push({
-              group: grp,
-              key: keyCols ? keyCols.map((h) => r[curIdx.get(h)] ?? "").join(" / ") : "行 " + (i + 1),
-              col: h0,
-              before: String(b[baseIdx.get(h0)] ?? ""),
-              after: String(r[curIdx.get(h0)] ?? ""),
-              more: diffCols.length - 1,
-            });
-          }
-        });
-
-        let removed = 0;
-        for (const [k, b] of baseMap) {
-          if (seenCur.has(k)) continue;
-          removed++;
-          bump(byGroup, groupOf(b, baseIdx), "removed");
-        }
-
-        const total = added + removed + changed;
-        return {
-          available: true, keyCols, groupCol: groupCol || (master ? "席種エリアマスタ連携" : null),
-          addedCols, removedCols, added, removed, changed, same, total,
-          byCol: [...byCol.entries()].map(([col, v]) => ({ col, n: v.changed })).sort((a, b) => b.n - a.n),
-          byGroup: [...byGroup.entries()].map(([group, v]) => ({ group, ...v }))
-            .sort((a, b) => (b.added + b.removed + b.changed) - (a.added + a.removed + a.changed)),
-          samples,
-          dupKeys: dupBase.size + dupCur.size,
-          positional: !keyCols,
-        };
-      }
-
-      // 差分サマリをテキストにする（コピー用・ステータス用）
-      function formatSaveDiff(d) {
-        if (!d.available) return d.reason;
-        const lines = [];
-        lines.push(`元データ（開いた時点）との差分: 追加 ${d.added}行 / 削除 ${d.removed}行 / 変更 ${d.changed}行 / 変更なし ${d.same}行`);
-        lines.push(`突合キー: ${d.keyCols ? d.keyCols.join(" + ") : "キー列が見つからないため行の並び順で比較（並べ替えると全行が変更扱いになります）"}`);
-        if (d.addedCols.length) lines.push(`追加された列: ${d.addedCols.join(", ")}`);
-        if (d.removedCols.length) lines.push(`無くなった列: ${d.removedCols.join(", ")}`);
-        if (d.dupKeys) lines.push(`※ キーが重複している行が ${d.dupKeys} 件あります。突合結果は信用できません`);
-        if (d.byGroup.length) {
-          lines.push("");
-          lines.push("グループ別:");
-          for (const g of d.byGroup) lines.push(`  ${g.group}: 追加${g.added} / 削除${g.removed} / 変更${g.changed}`);
-        }
-        if (d.byCol.length) {
-          lines.push("");
-          lines.push("列ごとの変更件数:");
-          for (const c of d.byCol) lines.push(`  ${c.col}: ${c.n}`);
-        }
-        if (d.samples.length) {
-          lines.push("");
-          lines.push("変更の例:");
-          for (const s of d.samples) {
-            lines.push(`  [${s.group}] ${s.key} / ${s.col}: 「${s.before}」→「${s.after}」${s.more ? `ほか${s.more}列` : ""}`);
-          }
-        }
-        lines.push("");
-        lines.push("※ 監査列(create_dt / update_dt / create_user / update_user)は差分から除外しています");
-        return lines.join("\n");
-      }
-
-      // 差分を見せて保存の可否を確認する。true=保存する / false=やめる
-      function showSaveDiffDialog(d) {
-        return new Promise((resolve) => {
-          document.querySelector("._save-diff-ov")?.remove();
-          const esc = escHtml;
-          const warn = [];
-          if (d.positional) warn.push("キー列が見つからないため<b>行の並び順</b>で比較しています。並べ替えていると全行が変更扱いになります。");
-          if (d.dupKeys) warn.push(`キーが重複している行が <b>${d.dupKeys}件</b> あります。突合結果は信用できません。`);
-          if (d.removed) warn.push(`<b>${d.removed}行が無くなります。</b>席種エリアコードの付け替えは「削除＋追加」として出るので、意図した付け替えか確認してください。`);
-          if (d.byGroup.length > 1) warn.push(`変更が <b>${d.byGroup.length}グループ</b> にまたがっています。対象グループ以外に変更が出ていないか確認してください。`);
-
-          const groupRows = d.byGroup.map((g) =>
-            `<tr><td style="padding:2px 8px">${esc(g.group)}</td>
-             <td style="padding:2px 8px;text-align:right">${g.added || ""}</td>
-             <td style="padding:2px 8px;text-align:right">${g.removed || ""}</td>
-             <td style="padding:2px 8px;text-align:right">${g.changed || ""}</td></tr>`).join("");
-          const colRows = d.byCol.slice(0, 12).map((c) =>
-            `<tr><td style="padding:2px 8px">${esc(c.col)}</td><td style="padding:2px 8px;text-align:right">${c.n}</td></tr>`).join("");
-          const sampleRows = d.samples.slice(0, 8).map((s) =>
-            `<li style="margin:2px 0">[${esc(s.group)}] ${esc(s.key)} / <b>${esc(s.col)}</b>:
-             「${esc(s.before)}」→「${esc(s.after)}」${s.more ? `<span style="color:var(--text-dim)">ほか${s.more}列</span>` : ""}</li>`).join("");
-
-          const ov = document.createElement("div");
-          ov.className = "modal-overlay _save-diff-ov";
-          ov.innerHTML = `<div class="modal-dialog" style="max-width:760px;max-height:82vh;overflow:auto">
-            <div class="modal-title">保存前の確認: 元データから何が変わるか</div>
-            <p style="font-size:13px;margin:8px 0;line-height:1.7">
-              追加 <strong>${d.added}</strong>行 ／ 削除 <strong>${d.removed}</strong>行 ／ 変更 <strong>${d.changed}</strong>行
-              <span style="color:var(--text-dim)">（変更なし ${d.same}行）</span><br>
-              <span style="font-size:12px;color:var(--text-dim)">突合キー: ${d.keyCols ? esc(d.keyCols.join(" + ")) : "行の並び順"}</span>
-            </p>
-            ${warn.length ? `<div style="background:#fff4e5;border:1px solid #f0b37e;border-radius:4px;padding:8px 10px;font-size:12.5px;line-height:1.7;margin:6px 0">
-              ${warn.map((w) => "・" + w).join("<br>")}</div>` : ""}
-            ${d.addedCols.length || d.removedCols.length ? `<p style="font-size:12.5px;margin:6px 0">
-              ${d.addedCols.length ? `追加された列: <b>${esc(d.addedCols.join(", "))}</b><br>` : ""}
-              ${d.removedCols.length ? `無くなった列: <b>${esc(d.removedCols.join(", "))}</b>` : ""}</p>` : ""}
-            ${groupRows ? `<div style="margin:10px 0 4px;font-size:12.5px;font-weight:600">グループ別の変更件数</div>
-              <table style="font-size:12.5px;border-collapse:collapse;width:100%">
-                <tr style="background:var(--header-bg)"><th style="text-align:left;padding:2px 8px">グループ</th>
-                <th style="padding:2px 8px">追加</th><th style="padding:2px 8px">削除</th><th style="padding:2px 8px">変更</th></tr>
-                ${groupRows}</table>` : ""}
-            ${colRows ? `<div style="margin:10px 0 4px;font-size:12.5px;font-weight:600">列ごとの変更件数</div>
-              <table style="font-size:12.5px;border-collapse:collapse"><tr style="background:var(--header-bg)">
-              <th style="text-align:left;padding:2px 8px">列</th><th style="padding:2px 8px">件数</th></tr>${colRows}</table>` : ""}
-            ${sampleRows ? `<div style="margin:10px 0 4px;font-size:12.5px;font-weight:600">変更の例</div>
-              <ul style="font-size:12px;margin:0;padding-left:18px;line-height:1.6">${sampleRows}</ul>` : ""}
-            <p style="font-size:11.5px;color:var(--text-dim);margin:10px 0 0">
-              監査列(create_dt / update_dt / create_user / update_user)は差分から除外しています。
-              比較の基準は「このファイルを開いた時点の内容」で、保存しても基準は変わりません。</p>
-            <div class="modal-btns" style="flex-wrap:wrap">
-              <button class="_sd-copy btn-default">レポートをコピー</button>
-              <button class="_sd-cancel btn-default">保存しない</button>
-              <button class="_sd-ok btn-primary">この内容で保存</button>
-            </div>
-          </div>`;
-          document.body.appendChild(ov);
-          const done = (v) => { ov.remove(); resolve(v); };
-          ov.querySelector("._sd-cancel").onclick = () => done(false);
-          ov.querySelector("._sd-ok").onclick = () => done(true);
-          ov.querySelector("._sd-copy").onclick = async () => {
-            try {
-              await navigator.clipboard.writeText(formatSaveDiff(d));
-              ov.querySelector("._sd-copy").textContent = "コピーしました";
-            } catch { ov.querySelector("._sd-copy").textContent = "コピーできません"; }
-          };
-          ov.onkeydown = (e) => { if (e.key === "Escape") done(false); };
-          ov.querySelector("._sd-ok").focus();
-        });
-      }
-
       // askLocation=true で「名前を付けて保存」（保存先フォルダとファイル名を毎回選ぶ）
       async function doSaveFile({ askLocation = false } = {}) {
         // フィルター中は「表示中のみ」か「フィルターを無視して全行」かを選ばせる
@@ -6614,30 +4929,12 @@
             saveAllRows = scope === "all";
           }
         }
+        // 開いた直後の行数と保存時の行数が異なる場合は事前に確認（予期せぬ行の増減チェック）
+        // フィルターで一部行のみ保存する場合は上の確認で足りるため、全行保存時のみ判定する
+        // （絞り込み中に「絞った行数≠開いた時の全行数」で誤警告を出さないため）
         const isFullSave = saveAllRows || !state.filteredIndices || state.filteredIndices.length === state.data.length;
         const savedRows = isFullSave ? state.data.length : state.filteredIndices.length;
-        // 元データ（開いた時点のファイル内容）と突合して、何がどう変わるかを出す。
-        // 差分がある場合だけダイアログを出し、無ければ黙って保存する。
-        // 行数の増減だけを見ていた従来の確認は、この差分サマリに含まれるので置き換えた。
-        let saveDiff = null;
-        try {
-          saveDiff = buildSaveDiff({ allRows: saveAllRows });
-        } catch (e) {
-          console.warn("[保存差分] 算出に失敗:", e);
-          saveDiff = { available: false, reason: "差分を算出できませんでした: " + e.message };
-        }
-        // 列の追加・削除やキー重複は、行の差分件数が0でも保存前に確認する。
-        // 重複キーがあると対応づけ自体が曖昧で、変更行を数え落とす可能性がある。
-        const needsDiffReview = saveDiff.available &&
-          (saveDiff.total > 0 || saveDiff.addedCols.length > 0 ||
-           saveDiff.removedCols.length > 0 || saveDiff.dupKeys > 0);
-        if (needsDiffReview) {
-          if (!(await showSaveDiffDialog(saveDiff))) {
-            setStatus("保存をキャンセルしました");
-            return;
-          }
-        } else if (!saveDiff.available && isFullSave && state.originalRowCount > 0 && savedRows !== state.originalRowCount) {
-          // 元データを保持していない場合（新規シート等）は、従来の行数チェックだけ行う
+        if (isFullSave && state.originalRowCount > 0 && savedRows !== state.originalRowCount) {
           const diff = savedRows - state.originalRowCount;
           if (!confirm(`開いた時点では ${state.originalRowCount}行でしたが、保存時は ${savedRows}行になります（${diff > 0 ? "+" : ""}${diff}行）。\n\n意図した変更でなければキャンセルして確認してください。続行しますか？`)) {
             setStatus("保存をキャンセルしました");
@@ -6704,13 +5001,7 @@
         if (isFullSave) state.originalRowCount = savedRows; // 全行保存時のみ次回の基準を更新（フィルター保存では基準を保つ）
         const locNote = savedTo ? ` → ${savedTo}` : "";
         const scopeNote = saveAllRows ? "・フィルター無視" : "";
-        // 元データとの差分はダイアログで見せた後も、ステータスに残して後から確認できるようにする
-        const diffNote = saveDiff && saveDiff.available
-          ? (saveDiff.total > 0
-              ? `｜元データから 追加${saveDiff.added}/削除${saveDiff.removed}/変更${saveDiff.changed}`
-              : "｜元データから変更なし")
-          : "";
-        setStatus(`保存しました（${savedRows}行${scopeNote}${virtualNote}）${locNote}${rowNote}${diffNote}`);
+        setStatus(`保存しました（${savedRows}行${scopeNote}${virtualNote}）${locNote}${rowNote}`);
       }
 
       async function saveFile() {
@@ -6788,7 +5079,6 @@
         state.selected = null;
         state.range = null;
         state.anchor = null;
-        clearExtraRanges();
         state._dupSet = null; // 行インデックスが変わるためクリア
         clearMarkersOnSort();
         applyFilters();
@@ -7413,19 +5703,9 @@
       //
       // 測定で見積りが変わると start 行の上端位置(offsets[start])が動く＝画面が飛ぶため、
       // ずれた分だけ scrollTop を足して見えている行をその場に留める（アンカー補正）。
-      //
-      // 未測定行の見積り est はスクロール中は固定する。実測平均を毎回使うと、
-      // 背の高い行（備考の長いラウンジ/クラブ行など）を測るたびに画面より上の未測定行の
-      // 見積りが一斉に変わり、スクロール中に scrollTop の補正が何十回も入る。
-      // Chrome はホイールのスムーズスクロール中に scrollTop を書き換えられると
-      // アニメーションが打ち切られるので「引っかかる・戻される」になる。
-      // スクロール中に新しく測るのは描画ウィンドウ内（start 以降）だけなので、
-      // est を固定すれば offsets[start] は動かない。実測平均へ寄せるのは
-      // スクロールが止まってから（settleRowHEstimate）。
       const _rowH = {
         map: new Map(), // データ行index -> 実測高(px)
         sum: 0,         // 実測値の合計（未測定行の見積り平均に使う）
-        est: null,      // 未測定行の見積り高。リセット後の最初の実測で決め、スクロール停止時だけ更新
         sig: null,      // 未描画行の高さにも効く条件。変わったら実測値を全部捨てる
         offsets: null,  // 可視行の累積オフセット Float64Array(可視行数+1)
         offRows: null,  // offsets を作った時点の getVisibleRows() オブジェクト（同一性で判定）
@@ -7437,9 +5717,9 @@
         return (
           visCols.join(",") + "|" + rowH + "|" +
           visCols.map((c) => state.colWidths[c] || 80).join(",") + "|" +
-          [state.colorView, state.gateView, state.parkingCheck, state.singleDayCheck, state.boxCheck,
+          [state.colorView, state.gateView, state.parkingCheck, state.boxCheck,
            state.kanaCheck, state.bikoHtmlCheck, state.ikkatsuCheck,
-           state.sejWordLenCheck, state.spaceCheck, !!state.sejMaster, state.wrapCells]
+           state.sejWordLenCheck, !!state.sejMaster, state.wrapCells]
             .map((b) => (b ? 1 : 0)).join("")
         );
       }
@@ -7448,7 +5728,6 @@
       function resetRowHeights() {
         _rowH.map.clear();
         _rowH.sum = 0;
-        _rowH.est = null;
         _rowH.sig = null;
         _rowH.offsets = null;
         _rowH.offRows = null;
@@ -7471,10 +5750,7 @@
         if (_rowH.offsets && !_rowH.dirty && _rowH.offRows === rows)
           return _rowH.offsets;
         const n = rows.length;
-        // 最初の実測が入った時点の平均で見積りを固定する（理由は _rowH の説明）
-        // 整数pxに丸める。端数があると停止後の補正で scrollTop（整数）との差が1pxずれて画面が動く
-        if (_rowH.est === null && _rowH.map.size) _rowH.est = Math.round(_rowHEstimate(fallbackH));
-        const est = _rowH.est !== null ? _rowH.est : fallbackH;
+        const est = _rowHEstimate(fallbackH);
         const arr = new Float64Array(n + 1);
         const map = _rowH.map, idx = rows._indices;
         let acc = 0;
@@ -7514,12 +5790,7 @@
         return changed;
       }
       // スペーサ高を累積オフセットへ合わせる。測定で見積りがずれたぶんは scrollTop で吸収する。
-      // st0 は renderBody が DOM を触る前に読んだ scrollTop。
-      // スペーサを縮めた瞬間にブラウザが scrollTop を上限へ切り詰めることがあるので、
-      // 補正は「書き換え前の値＋delta」の絶対値で入れる（相対加算だと二重に戻る）。
-      // ここで scrollTop を読み直してはいけない: 差分描画で上の行を消した直後・上スペーサを
-      // 伸ばす前にレイアウトが走り、縮んだ高さで scrollTop が切り詰められる（末尾でホイールが効かなくなる）。
-      function syncSpacerHeights(topEl, botEl, start, end, rows, rowH, st0) {
+      function syncSpacerHeights(topEl, botEl, start, end, rows, rowH) {
         let off = rowOffsets(rows, rowH);
         topEl.style.height = off[start] + "px";
         botEl.style.height = Math.max(0, off[rows.length] - off[end]) + "px";
@@ -7532,60 +5803,7 @@
         // start より上の行の見積りが変わった → 同じ量だけスクロールして見え方を固定する。
         // scrollTop の変更は scroll イベントを起こすが、start/end が同じなら
         // renderBody は lastRenderKey で早期returnするので往復にはならない。
-        // est はスクロール中は固定なので、ここに来るのは start より上の描画済み行の高さが
-        // 変わったとき（行の中身が変わった等）だけ。
-        if (Math.abs(delta) >= 1) els.container.scrollTop = st0 + delta;
-      }
-
-      // スクロールが止まってから、未測定行の見積り est を実測平均へ寄せる。
-      // start 行の上端がずれた分だけ scrollTop を動かすので見た目は変わらない。
-      // スクロールバーをつかんでいる間（ポインタ押下中）は動かさない。
-      let _rowHSettleTimer = 0;
-      let _gridPointerDown = false;
-      function scheduleRowHSettle() {
-        clearTimeout(_rowHSettleTimer);
-        _rowHSettleTimer = setTimeout(settleRowHEstimate, 300);
-      }
-      function settleRowHEstimate() {
-        if (_gridPointerDown) { scheduleRowHSettle(); return; }
-        const domw = _domWindow;
-        if (!domw || !domw.topEl || domw.topEl.parentNode !== els.tbody || !_rowH.map.size) return;
-        const avg = Math.round(_rowHEstimate(_rowH.est || ROW_H));
-        if (avg === _rowH.est) return;
-        const rows = getVisibleRows();
-        const rowH = state.wrapCells ? 56 : ROW_H;
-        const start = Math.min(domw.start, rows.length);
-        const end = Math.min(domw.end, rows.length);
-        const st0 = els.container.scrollTop;
-        const before = rowOffsets(rows, rowH)[start];
-        _rowH.est = avg;
-        _rowH.dirty = true;
-        const off = rowOffsets(rows, rowH);
-        domw.topEl.style.height = off[start] + "px";
-        if (domw.botEl) domw.botEl.style.height = Math.max(0, off[rows.length] - off[end]) + "px";
-        const delta = off[start] - before;
-        if (Math.abs(delta) >= 1) els.container.scrollTop = st0 + delta;
-        renderBody();
-      }
-
-      // 描画した行が画面の下端まで届いていなければ、その場で描き直す。
-      // est が実際より大きいと「画面に入る行数」を少なく見積もり、次のスクロールまで
-      // 下に空白が残る。測り直したオフセットで窓を選び直せば埋まる（無限ループ防止で回数制限）。
-      // renderBody は rAF のコールバックにもなる（引数にタイムスタンプが来る）ので、深さは引数でなく変数で数える。
-      let _coverDepth = 0;
-      function ensureViewportCovered(rows, end) {
-        if (_coverDepth >= 4 || end >= rows.length || !_domWindow || !_domWindow.botEl) return;
-        const cRect = els.container.getBoundingClientRect();
-        const last = _domWindow.botEl.previousElementSibling;
-        if (!last || last === _domWindow.topEl) return;
-        if (last.getBoundingClientRect().bottom >= cRect.bottom) return;
-        _coverDepth++;
-        try {
-          lastRenderKey = null;
-          renderBody();
-        } finally {
-          _coverDepth--;
-        }
+        if (Math.abs(delta) >= 1) els.container.scrollTop += delta;
       }
 
       function renderBody() {
@@ -7611,22 +5829,7 @@
           rows.length,
           Math.max(start + 1, rowAtOffset(off, scrollTop + viewH, rows.length) + 1 + BUFFER),
         );
-        // SEJゴースト行も仮想化する。マスタ全件(4,800件超)を連携すると未使用コードが2,000件近くになり、
-        // 全部DOMへ出すとセルが4万個を超えて、スクロールも全置換も一気に重くなる
-        // （実測: 3,597行のSEJ＋9/23マスタで 全置換 20ms → 484ms、DOM 76行 → 2,052行）。
-        // データ行と同じく「画面に入るぶんだけ」描いて、上下はスペーサ行で高さを稼ぐ。
-        const ghostList = ghostListFor(rows);
-        const gh = _ghostH.row || rowH;
-        // ゴースト領域はデータ行の下（総高 off[rows.length]）＋見出し1行のあとから始まる
-        const ghostTop = off[rows.length] + (ghostList.length ? _ghostH.sep : 0);
-        let gStart = 0, gEnd = 0;
-        if (ghostList.length) {
-          const rel = scrollTop - ghostTop;
-          gStart = Math.max(0, Math.min(ghostList.length, Math.floor(rel / gh) - BUFFER));
-          gEnd = Math.max(gStart, Math.min(ghostList.length, Math.ceil((rel + viewH) / gh) + BUFFER));
-        }
-
-        const key = `${start}-${end}-${rows.length}-${gStart}-${gEnd}-${ghostList.length}`;
+        const key = `${start}-${end}-${rows.length}`;
         const forced = state.forceRender;
         if (!forced && lastRenderKey === key) return;
         lastRenderKey = key;
@@ -7661,7 +5864,7 @@
         const isSejFile = isSejData();
         // SEJ連携: 席種エリアコード列のインデックス
         const sejCodeColIdx = state.sejMaster
-          ? stateHeaderIdx("seat_type_area_cd")
+          ? state.headers.findIndex(h => h.trim() === "seat_type_area_cd")
           : -1;
         // SEJ連携: 席種コードを参照する追加列（席種一括設定の購入限定席種1〜3など）
         const sejExtraCodeCols = new Set();
@@ -7676,7 +5879,7 @@
         }
 
         // 検品表示: 対象列インデックスをキャッシュ
-        const _hIdx = (name) => stateHeaderIdx(name);
+        const _hIdx = (name) => state.headers.findIndex(h => h.trim() === name);
         // カナ検査の対象列インデックス（対象列の定義はモジュール共通の KANA_TEXT_COLS / isKanaTargetHeader を使用）
         const kanaCheckCols = new Set();
         if (state.kanaCheck) {
@@ -7688,11 +5891,6 @@
         const gateMap = gateColIdx !== -1 ? getGateMap() : null;
         const parkCodeIdx = state.parkingCheck ? _hIdx("seat_type_area_cd") : -1;
         const parkFlagIdx = state.parkingCheck ? _hIdx("parking_ticket_flg") : -1;
-        // 単日入場検査: 複数日有効の駐車券・引換券は1が必要、1日だけ有効なら不要（判定は hpValidDayCount と共通）
-        const sdFlagIdx = state.singleDayCheck ? _hIdx("single_day_admission_flg") : -1;
-        const sdCodeIdx = state.singleDayCheck ? _hIdx("seat_type_area_cd") : -1;
-        const sdNoteIdx = state.singleDayCheck ? _hIdx("nte") : -1;
-        const sdNameIdx = state.singleDayCheck ? _hIdx("seat_type_area_control_nm") : -1;
         // 区画席検査: 席種名（〇名）行の設定チェック
         const boxNmIdx = state.boxCheck ? (_hIdx("seat_type_area_disp_nm") !== -1 ? _hIdx("seat_type_area_disp_nm") : _hIdx("seat_type_area_control_nm")) : -1;
         const boxCodeIdx = state.boxCheck ? _hIdx("seat_type_area_cd") : -1;
@@ -7919,22 +6117,10 @@
             if (j === parkFlagIdx && parkCodeIdx !== -1) {
               const code = (row[parkCodeIdx] ?? "").trim();
               const isP = code.length >= 6 && code[5].toUpperCase() === "P";
-              const flagIs1 = masterVal("parking_ticket_flg", cellVal) === "1";
+              const flagIs1 = cellVal.trim() === "1";
               if (isP && flagIs1) displayVal = cellNote(cls, displayVal, "ok", "駐車券OK");
               else if (isP && !flagIs1) displayVal = cellNote(cls, displayVal, "ng", "駐車券(P)は1必須");
               else if (!isP && flagIs1) displayVal = cellNote(cls, displayVal, "warn", "Pでないのに1");
-            }
-            // 単日入場検査
-            if (j === sdFlagIdx && sdFlagIdx !== -1) {
-              const code = sdCodeIdx !== -1 ? String(row[sdCodeIdx] ?? "").trim() : "";
-              const name = sdNameIdx !== -1 ? String(row[sdNameIdx] ?? "") : "";
-              const days = hpValidDayCount({ 備考: sdNoteIdx !== -1 ? row[sdNoteIdx] : "", 席種エリア名: name });
-              const isP = code.length >= 6 && code[5].toUpperCase() === "P";
-              const needType = isP || /引換|オプション|交換/.test(name.normalize("NFKC"));
-              const is1 = masterVal("single_day_admission_flg", cellVal) === "1";
-              if (needType && days === 1) displayVal = cellNote(cls, displayVal, "ok", "1日のみ有効(不要)");
-              else if (needType && days != null && days >= 2) displayVal = is1 ? cellNote(cls, displayVal, "ok", "複数日有効OK") : cellNote(cls, displayVal, "ng", "複数日有効は1必須");
-              else if (needType && !is1) displayVal = cellNote(cls, displayVal, "warn", "有効日数不明");
             }
             // 半角カナ検査: 全角カタカナを含むセルを警告表示（半角ｶﾅ必須のテキスト列のみ対象）
             if (state.kanaCheck && kanaCheckCols.has(j) && cellVal && /[ァ-ヶー]/.test(cellVal)) {
@@ -7946,7 +6132,7 @@
             if (j === boxNmIdx && boxNmIdx !== -1 && /[（(]\s*\d+\s*名\s*[）)]/.test(_toHankakuNum(cellVal))) {
               const code = boxCodeIdx !== -1 ? (row[boxCodeIdx] ?? "").trim() : "";
               const isEP = code.length >= 6 && ["E", "O", "P"].includes(code[5].toUpperCase());
-              const flg = boxFlgIdx !== -1 ? masterVal("box_seat_flg", row[boxFlgIdx]) === "1" : false;
+              const flg = boxFlgIdx !== -1 ? (row[boxFlgIdx] ?? "").trim() === "1" : false;
               const cnt = boxCntIdx !== -1 ? parseInt(_toHankakuNum((row[boxCntIdx] ?? "").trim())) : NaN;
               const cntOk = !isNaN(cnt) && cnt >= 2;
               if (isEP && flg && cntOk) {
@@ -8061,9 +6247,6 @@
         const domw = _domWindow;
         if (
           !forced && domw && domw.sig === renderSig &&
-          // ゴーストの窓が動いたら差分では追えない（ゴーストは下スペーサより後ろにあるため）。
-          // その場合は下の全置換へ落とす。ゴーストも仮想化済みなので全置換でも軽い。
-          domw.gStart === gStart && domw.gEnd === gEnd &&
           start < domw.end && end > domw.start &&
           domw.topEl && domw.topEl.parentNode === els.tbody &&
           domw.botEl && domw.botEl.parentNode === els.tbody
@@ -8091,11 +6274,10 @@
             for (let vi = domw.end; vi < end; vi++) frag += buildRow(vi);
             botEl.insertAdjacentHTML("beforebegin", frag);
           }
-          syncSpacerHeights(topEl, botEl, start, end, rows, rowH, scrollTop);
+          syncSpacerHeights(topEl, botEl, start, end, rows, rowH);
           domw.start = start;
           domw.end = end;
           placeFillHandle();
-          ensureViewportCovered(rows, end);
           return;
         }
 
@@ -8106,136 +6288,43 @@
 
         // SEJゴースト行: 表示中データと同じグループのマスタ登録のうち、表示中データに無い席種だけを最終行に表示
         // （セブン発券対象の漏れ確認用。別イベント・別グループの席種は対象外。グループ絞り込み時は絞ったグループのみ）
-        // データ行と同じく gStart〜gEnd の窓だけ描き、残りはスペーサ行で高さを作る。
-        if (ghostList.length) {
-          const vcolSet = state.sejVirtualCols ? new Set(state.sejVirtualCols.indices) : null;
-          html += `<tr class="ghost-sep"><td colspan="${colSpan}">▼ 同グループのマスタ未使用 ${ghostList.length}件（表示中データに無い＝セブン発券していない席種。漏れがないか確認）</td></tr>`;
-          if (gStart > 0)
-            html += `<tr class="vspacer ghost-vspacer-top" aria-hidden="true" style="height:${gStart * gh}px"><td colspan="${colSpan}"></td></tr>`;
-          for (let k = gStart; k < gEnd; k++) {
-            const g = ghostList[k];
-            html += `<tr class="ghost-row" title="${escHtml(g.cd)}"><td class="row-num">−</td>`;
-            for (const j of visCols) {
-              const tdCw = state.colWidths[j] || 80;
-              let v = "";
-              if (j === sejCodeColIdx) {
-                v = escHtml(g.nm);
-              } else if (vcolSet && vcolSet.has(j)) {
-                v = escHtml(g.grp);
+        if (state.sejMaster && sejCodeColIdx !== -1) {
+          const missing = getSejGhostList(sejCodeColIdx, rows);
+          if (missing.length) {
+            html += `<tr class="ghost-sep"><td colspan="${colSpan}">▼ 同グループのマスタ未使用 ${missing.length}件（表示中データに無い＝セブン発券していない席種。漏れがないか確認）</td></tr>`;
+            for (const g of missing) {
+              html += `<tr class="ghost-row" title="${escHtml(g.cd)}"><td class="row-num">−</td>`;
+              for (const j of visCols) {
+                const tdCw = state.colWidths[j] || 80;
+                let v = "";
+                if (j === sejCodeColIdx) {
+                  v = escHtml(g.nm);
+                } else if (state.sejVirtualCols && state.sejVirtualCols.indices.includes(j)) {
+                  v = escHtml(g.grp);
+                }
+                html += `<td style="width:${tdCw}px;min-width:${tdCw}px;max-width:${tdCw}px">${v}</td>`;
               }
-              html += `<td style="width:${tdCw}px;min-width:${tdCw}px;max-width:${tdCw}px">${v}</td>`;
+              html += `</tr>`;
             }
-            html += `</tr>`;
           }
-          const gRest = ghostList.length - gEnd;
-          if (gRest > 0)
-            html += `<tr class="vspacer ghost-vspacer-bot" aria-hidden="true" style="height:${gRest * gh}px"><td colspan="${colSpan}"></td></tr>`;
         }
         els.tbody.innerHTML = html;
-        // 実測した1行ぶん／見出しぶんの高さを覚える。次の描画からスペーサの高さがぴたりと合う
-        // （ゴースト行は均一なので1回測れば足りる。0px はレイアウト前なので採用しない）。
-        if (ghostList.length) {
-          const sepEl = els.tbody.querySelector("tr.ghost-sep");
-          const gEl = els.tbody.querySelector("tr.ghost-row");
-          if (sepEl && sepEl.offsetHeight > 0) _ghostH.sep = sepEl.offsetHeight;
-          if (gEl && gEl.offsetHeight > 0) _ghostH.row = gEl.offsetHeight;
-        }
         _domWindow = {
-          start, end, gStart, gEnd, sig: renderSig,
+          start, end, sig: renderSig,
           topEl: els.tbody.querySelector("tr.vspacer-top"),
           botEl: els.tbody.querySelector("tr.vspacer-bottom"),
         };
         if (_domWindow.topEl && _domWindow.botEl)
-          syncSpacerHeights(_domWindow.topEl, _domWindow.botEl, start, end, rows, rowH, scrollTop);
+          syncSpacerHeights(_domWindow.topEl, _domWindow.botEl, start, end, rows, rowH);
         placeFillHandle();
         _prevHighlight = {
           selected: state.selected ? { ...state.selected } : null,
           range: state.range ? { ...state.range } : null,
           selectedCol: state.selectedCol,
         };
-        ensureViewportCovered(rows, end);
-      }
-
-      // ===== 飛び飛び選択（Ctrl+クリック / Ctrl+Shift+クリック）=====
-      // 「いまの選択」(state.selected / state.range) の他に、確定済みの範囲を extraRanges に溜める。
-      // 削除・コピー・切り取りは selectionRects() 経由で全範囲を対象にする。
-      const _normRect = (g) => ({
-        r1: Math.min(g.r1, g.r2), r2: Math.max(g.r1, g.r2),
-        c1: Math.min(g.c1, g.c2), c2: Math.max(g.c1, g.c2),
-      });
-      function commitSelectionToExtra() {
-        const rg = state.range
-          || (state.selected ? { r1: state.selected.row, c1: state.selected.col, r2: state.selected.row, c2: state.selected.col } : null);
-        if (!rg) return;
-        state.extraRanges.push(_normRect(rg));
-        state._extraVer++;
-      }
-      function clearExtraRanges() {
-        if (state.extraRanges.length) { state.extraRanges = []; state._extraVer++; }
-      }
-      // 選択中の全範囲（正規化・位置順）。範囲が無ければ空配列
-      function selectionRects() {
-        const out = state.extraRanges.map((g) => ({ ...g }));
-        if (state.range) out.push(_normRect(state.range));
-        else if (state.selected) out.push({ r1: state.selected.row, r2: state.selected.row, c1: state.selected.col, c2: state.selected.col });
-        out.sort((a, b) => a.r1 - b.r1 || a.c1 - b.c1);
-        return out;
-      }
-      // 全範囲に含まれる「見えている」行（昇順・重複なし）
-      function selectedVisibleRows() {
-        const set = new Set();
-        for (const g of selectionRects()) for (const r of visibleRowsInRange(g.r1, g.r2)) set.add(r);
-        return [...set].sort((a, b) => a - b);
-      }
-      // 全範囲に含まれる「見えている」列（昇順・重複なし）
-      function selectedVisibleCols() {
-        const set = new Set();
-        for (const g of selectionRects()) for (const c of visibleColsInRange(g.c1, g.c2)) set.add(c);
-        return [...set].sort((a, b) => a - b);
-      }
-      // 全範囲の見えているセルを1回ずつ列挙する（削除・切り取り用）
-      function forEachSelectedCell(fn) {
-        const seen = new Set();
-        for (const g of selectionRects()) {
-          const cols = visibleColsInRange(g.c1, g.c2);
-          for (const r of visibleRowsInRange(g.r1, g.r2))
-            for (const c of cols) {
-              const k = r + "," + c;
-              if (seen.has(k)) continue;
-              seen.add(k);
-              fn(r, c);
-            }
-        }
-      }
-      // コピー用の座標グリッド。範囲が複数あるときは Excel と同様、列(または行)がそろう場合だけ許可
-      function selectionCellGrid() {
-        const rects = selectionRects();
-        if (!rects.length) return { grid: [] };
-        const blocks = rects.map((g) => ({ rows: visibleRowsInRange(g.r1, g.r2), cols: visibleColsInRange(g.c1, g.c2) }));
-        if (blocks.length === 1) return { grid: blocks[0].rows.map((r) => blocks[0].cols.map((c) => [r, c])) };
-        const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
-        if (blocks.every((b) => same(b.cols, blocks[0].cols))) {
-          const grid = [];
-          for (const b of blocks) for (const r of b.rows) grid.push(b.cols.map((c) => [r, c]));
-          return { grid };
-        }
-        if (blocks.every((b) => same(b.rows, blocks[0].rows))) {
-          return { grid: blocks[0].rows.map((r) => blocks.flatMap((b) => b.cols.map((c) => [r, c]))) };
-        }
-        return { error: "飛び飛びの選択をコピー/切り取りできるのは、同じ列どうし（または同じ行どうし）のときだけです" };
-      }
-      function _inExtra(r, c) {
-        for (const g of state.extraRanges) if (r >= g.r1 && r <= g.r2 && c >= g.c1 && c <= g.c2) return true;
-        return false;
-      }
-      function _rowInExtra(r) {
-        const last = state.headers.length - 1;
-        for (const g of state.extraRanges) if (g.c1 === 0 && g.c2 === last && r >= g.r1 && r <= g.r2) return true;
-        return false;
       }
 
       function isRowInRange(r) {
-        if (_rowInExtra(r)) return true;
         if (!state.range) return false;
         const { r1, r2, c1, c2 } = state.range;
         return (
@@ -8246,7 +6335,6 @@
         );
       }
       function isInRange(r, c) {
-        if (_inExtra(r, c)) return true;
         if (!state.range) return false;
         const { r1, c1, r2, c2 } = state.range;
         return (
@@ -8323,7 +6411,6 @@
           if (rowAttr === null) continue; // スペーサ行・ゴースト行は対象外
           const i = +rowAttr;
           const rowIn = !!rg && i >= r1 && i <= r2;
-          const rowInExtra = _rowInExtra(i);
           const tds = tr.children;
           for (let k = 0; k < tds.length; k++) {
             const td = tds[k];
@@ -8332,20 +6419,19 @@
               // 行番号セル
               td.classList.toggle(
                 "row-selected",
-                !!((fullRow && rowIn) || rowInExtra || (sel && sel.row === i)),
+                !!((fullRow && rowIn) || (sel && sel.row === i)),
               );
               continue;
             }
             const j = +colAttr;
             const isSel = !!sel && sel.row === i && sel.col === j;
-            const isInMain = rowIn && j >= c1 && j <= c2;
-            const isIn = isInMain || _inExtra(i, j);
+            const isIn = rowIn && j >= c1 && j <= c2;
             td.classList.toggle("selected", isSel);
             td.classList.toggle("in-range", isIn);
-            td.classList.toggle("rng-t", isInMain && !!edge && i === edge.firstRow);
-            td.classList.toggle("rng-b", isInMain && !!edge && i === edge.lastRow);
-            td.classList.toggle("rng-l", isInMain && !!edge && j === edge.firstCol);
-            td.classList.toggle("rng-r", isInMain && !!edge && j === edge.lastCol);
+            td.classList.toggle("rng-t", isIn && !!edge && i === edge.firstRow);
+            td.classList.toggle("rng-b", isIn && !!edge && i === edge.lastRow);
+            td.classList.toggle("rng-l", isIn && !!edge && j === edge.firstCol);
+            td.classList.toggle("rng-r", isIn && !!edge && j === edge.lastCol);
             td.classList.toggle("col-highlight", selCol === j && !isIn && !isSel);
             const as = isSel || isIn ? "true" : "false";
             if (td.getAttribute("aria-selected") !== as)
@@ -8363,11 +6449,8 @@
       }
 
       let _prevHighlight = { selected: null, range: null, selectedCol: null };
-      let _prevExtraVer = 0;
       function updateHighlight() {
         const prev = _prevHighlight;
-        const extraChanged = _prevExtraVer !== state._extraVer;
-        _prevExtraVer = state._extraVer;
         const cur = {
           selected: state.selected,
           range: state.range,
@@ -8377,7 +6460,7 @@
         // 範囲・列選択の変化。JSON.stringifyはドラッグ中に毎フレーム走るので使わない
         const rangeChanged = !sameRange(prev.range, cur.range);
         const colChanged = prev.selectedCol !== cur.selectedCol;
-        if (rangeChanged || colChanged || extraChanged) {
+        if (rangeChanged || colChanged) {
           // selectedはクローンして保持（state.selectedを直接参照すると、
           // 後でin-place変更された際に前回値の追跡がずれる）
           _prevHighlight = {
@@ -8535,9 +6618,6 @@
         if (e.target.closest("td.editing")) return;
         // 右クリックは onContextMenu で処理（選択範囲を維持するため）
         if (e.button === 2) return;
-        // Ctrl(Mac:Cmd)を押していない通常のクリックは、飛び飛び選択をリセットする
-        const _multi = e.ctrlKey || e.metaKey;
-        if (!_multi) clearExtraRanges();
         // フィルハンドル: 通常の選択ドラッグより先に処理（下/右へコピー入力）
         if (e.target.classList && e.target.classList.contains("fill-handle")) {
           e.preventDefault();
@@ -8573,7 +6653,6 @@
             state.range = { r1: state.anchor.row, c1: 0, r2: r, c2: last };
             state.selected = { row: r, col: 0 };
           } else {
-            if (_multi) commitSelectionToExtra();
             state.selected = { row: r, col: 0 };
             state.anchor = { row: r, col: 0 };
             state.range = { r1: r, c1: 0, r2: r, c2: last };
@@ -8602,7 +6681,6 @@
             state.selected = { row: 0, col: c };
             state.range = { r1: 0, c1: Math.min(anchorCol, c), r2: lastRow, c2: Math.max(anchorCol, c) };
           } else {
-            if (_multi) commitSelectionToExtra();
             state.selected = { row: 0, col: c };
             state.anchor = { row: 0, col: c };
             state.range = { r1: 0, c1: c, r2: lastRow, c2: c };
@@ -8632,14 +6710,12 @@
           };
           state.selected = { row: r, col: c };
         } else {
-          if (_multi) commitSelectionToExtra();
           state.selected = { row: r, col: c };
           state.anchor = { row: r, col: c };
           state.range = null;
           state.isDrag = true;
         }
         updateHighlight();
-        if (state.extraRanges.length) setStatus(`飛び飛び選択中: ${state.extraRanges.length + 1}か所（Ctrl+クリックで追加 / Ctrl+Shiftで範囲追加 / 通常クリックで解除）`);
       }
 
       // ===== ドラッグ中の自動スクロール =====
@@ -8983,17 +7059,11 @@
           setStatus("フィル元に表示中のセルがありません");
           return;
         }
-        const fillDown = downExt >= rightExt;
-        const tgtRowIdx = fillDown ? visibleRowsInRange(src.r2 + 1, r2) : [];
-        const tgtColIdx = fillDown ? [] : visibleColsInRange(src.c2 + 1, c2);
-        if (fillDown ? !tgtRowIdx.length : !tgtColIdx.length) {
-          setStatus("フィル先に表示中のセルがありません");
-          return;
-        }
         saveUndo();
         let changed = false;
-        if (fillDown) {
+        if (downExt >= rightExt) {
           // 下方向フィル: 列ごとに系列判定（無ければ行タイル）
+          const tgtRowIdx = visibleRowsInRange(src.r2 + 1, r2);
           for (const c of srcColIdx) {
             const ser = fillSeriesInfo(srcRowIdx.map((r) => safeGet(r, c)));
             tgtRowIdx.forEach((r, k) => {
@@ -9004,6 +7074,7 @@
           state.range = { r1: src.r1, c1: src.c1, r2, c2: src.c2 };
         } else {
           // 右方向フィル: 行ごとに系列判定（無ければ列タイル）
+          const tgtColIdx = visibleColsInRange(src.c2 + 1, c2);
           for (const r of srcRowIdx) {
             const ser = fillSeriesInfo(srcColIdx.map((c) => safeGet(r, c)));
             tgtColIdx.forEach((c, k) => {
@@ -9196,7 +7267,6 @@
       }
 
       function moveTo(r, c) {
-        clearExtraRanges();
         state.selected = { row: r, col: c };
         state.anchor = { row: r, col: c };
         state.range = null;
@@ -9718,9 +7788,11 @@
         if (key === "Delete" || key === "Backspace") {
           e.preventDefault();
           saveUndo();
-          if (state.range || state.extraRanges.length) {
-            // 非表示列・非表示行・フィルター除外行は消さない。飛び飛び選択も全範囲を対象にする
-            forEachSelectedCell((r, c) => safeSet(r, c, ""));
+          if (state.range) {
+            const { r1, c1, r2, c2 } = state.range;
+            const delCols = visibleColsInRange(c1, c2); // 非表示列は消さない
+            for (const r of visibleRowsInRange(r1, r2)) // 非表示行・フィルター除外行は消さない
+              for (const c of delCols) safeSet(r, c, "");
           } else safeSet(row, col, "");
           markDirty();
           state.forceRender = true;
@@ -9865,12 +7937,13 @@
       // ===== クリップボード（セル） =====
       async function cutToClipboard() {
         if (!state.selected) return;
-        const _g = selectionCellGrid();
-        if (_g.error) { setStatus("⚠ " + _g.error); return; } // コピーできない形なら消さない
         await copyToClipboard();
         saveUndo();
-        if (state.range || state.extraRanges.length) {
-          forEachSelectedCell((r, c) => safeSet(r, c, "")); // コピーされていない列・行は消さない
+        if (state.range) {
+          const { r1, c1, r2, c2 } = state.range;
+          const cutCols = visibleColsInRange(c1, c2); // コピーされていない列は消さない
+          for (const r of visibleRowsInRange(r1, r2))
+            for (const c of cutCols) safeSet(r, c, "");
         } else {
           safeSet(state.selected.row, state.selected.col, "");
         }
@@ -9882,8 +7955,18 @@
 
       async function copyToClipboard() {
         if (!state.selected) return;
-        const g = selectionCellGrid();
-        if (g.error) { setStatus("⚠ " + g.error); return; }
+        const { r1, c1, r2, c2 } = state.range
+          ? state.range
+          : {
+              r1: state.selected.row,
+              c1: state.selected.col,
+              r2: state.selected.row,
+              c2: state.selected.col,
+            };
+        const minR = Math.min(r1, r2),
+          maxR = Math.max(r1, r2),
+          minC = Math.min(c1, c2),
+          maxC = Math.max(c1, c2);
         const data2d = [];
         let txt = "";
         // ファイルの区切り文字に合わせてコピー（CSV対応）
@@ -9895,10 +7978,11 @@
             : s;
         };
         const htmlRows = [];
-        for (const coords of g.grid) {
+        const copyCols = visibleColsInRange(minC, maxC);
+        for (const r of visibleRowsInRange(minR, maxR)) {
           const row = [];
           const htmlCells = [];
-          for (const [r, c] of coords) {
+          for (const c of copyCols) {
             const val = safeGet(r, c);
             row.push(val);
             const bg = state.cellColors[r + "," + c];
@@ -9914,7 +7998,7 @@
           rows: data2d.length,
           cols: data2d[0]?.length ?? 0,
         };
-        const headerNote = g.grid.some((coords) => coords.length && coords[0][0] === 0) ? " (ヘッダー含む)" : "";
+        const headerNote = minR === 0 ? " (ヘッダー含む)" : "";
         const htmlTable = `<table><tbody>${htmlRows.join("")}</tbody></table>`;
         try {
           if (typeof ClipboardItem !== "undefined") {
@@ -10866,7 +8950,6 @@
 
       // ===== ユーティリティ =====
       function resetState() {
-        clearExtraRanges();
         state.selected = null;
         state.range = null;
         state.anchor = null;
@@ -10903,7 +8986,7 @@
         if (_bm) { _bm.classList.remove("active-state"); _bm.setAttribute("aria-pressed","false"); }
         document.body.classList.remove("marker-mode");
         // 検品表示トグルは現在のデータの列構成に紐づくため、別ファイル/タブへ持ち越さずリセットする
-        ["colorView", "gateView", "parkingCheck", "singleDayCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck", "sejWordLenCheck", "ikkatsuCheck"].forEach((k) => { state[k] = false; });
+        ["colorView", "gateView", "parkingCheck", "boxCheck", "kanaCheck", "bikoHtmlCheck", "sejWordLenCheck", "ikkatsuCheck"].forEach((k) => { state[k] = false; });
         const _bik = $("btn-ikkatsu-check");
         if (_bik) { _bik.classList.remove("active-state"); _bik.setAttribute("aria-pressed", "false"); }
         syncInspectUI();
@@ -10982,62 +9065,54 @@
         setStatus(`行 ${at + 1} を挿入しました`);
       }
 
-      // 選択中の「見えている」行だけを削除する。
-      // 以前は state.range の r1〜r2 をそのまま連続削除していたため、絞り込み(フィルター)や
-      // 行の非表示で画面に出ていない行まで一緒に消えていた。飛び飛び選択にも対応。
       function deleteSelectedRows() {
-        if (!state.selected && !state.range && !state.extraRanges.length) return;
-        const rows = selectedVisibleRows();
-        if (!rows.length) return;
-        if (state.data.length <= rows.length) return;
-        const firstDeleted = rows[0];
+        let r1, r2;
+        if (state.range) {
+          r1 = Math.min(state.range.r1, state.range.r2);
+          r2 = Math.max(state.range.r1, state.range.r2);
+        } else if (state.selected) {
+          r1 = r2 = state.selected.row;
+        } else return;
+        const delCount = r2 - r1 + 1;
+        if (state.data.length <= delCount) return;
         saveUndo();
-        const delSet = new Set(rows);
-        // 後ろから消せば前方のインデックスはずれない
-        for (let k = rows.length - 1; k >= 0; k--) {
-          const r = rows[k];
-          state.data.splice(r, 1);
-          if (state.markedCells.size) {
-            const next = new Set();
-            for (const key of state.markedCells) {
-              const [mr, mc] = key.split(",").map(Number);
-              if (mr === r) continue; // 削除行のマーカーは消す
-              next.add(mr > r ? `${mr - 1},${mc}` : key);
-            }
-            state.markedCells = next;
-          }
-          _deleteRangeHiddenRows(r, r);
-        }
+        state.data.splice(r1, delCount);
         resetRowHeights();
         state._dupSet = null;
+        for (let _dr = 0; _dr < delCount; _dr++) shiftMarkers(r1, -1);
+        _deleteRangeHiddenRows(r1, r2);
         // 削除行の色を除去し、後続行のインデックスをシフト
         const newCC = {};
         for (const [k, v] of Object.entries(state.cellColors)) {
           const sep = k.indexOf(",");
           const ri = parseInt(k.slice(0, sep));
           const ci = k.slice(sep);
-          if (delSet.has(ri)) continue;
-          let lo = 0, hi = rows.length; // ri より小さい削除行の数
-          while (lo < hi) { const mid = (lo + hi) >> 1; if (rows[mid] < ri) lo = mid + 1; else hi = mid; }
-          newCC[(ri - lo) + ci] = v;
+          if (ri >= r1 && ri <= r2) continue;
+          const newRi = ri > r2 ? ri - delCount : ri;
+          newCC[newRi + ci] = v;
         }
         state.cellColors = newCC;
         const maxRow = state.data.length - 1;
-        state.selected = { row: Math.min(firstDeleted, maxRow), col: state.selected?.col ?? 0 };
+        state.selected = { row: Math.min(r1, maxRow), col: state.selected?.col ?? 0 };
         state.anchor = { ...state.selected };
         state.range = null;
-        clearExtraRanges();
         markDirty();
         applyFilters();
         state.forceRender = true;
         renderBody();
-        setStatus(`${rows.length}行を削除しました`);
+        setStatus(`${delCount}行を削除しました`);
       }
 
       function deleteSelectedCols() {
-        if (!state.selected && !state.range && !state.extraRanges.length) return;
-        const delCols = selectedVisibleCols(); // 非表示列は削除しない
-        if (!delCols.length) return;
+        let c1, c2;
+        if (state.range) {
+          c1 = Math.min(state.range.c1, state.range.c2);
+          c2 = Math.max(state.range.c1, state.range.c2);
+        } else if (state.selected) {
+          c1 = c2 = state.selected.col;
+        } else return;
+        const delCols = [];
+        for (let c = c1; c <= c2; c++) delCols.push(c);
         if (state.headers.length <= delCols.length) return;
         const delNames = delCols.map((c) => getDisplayHeader(c));
         saveUndo();
@@ -11047,11 +9122,10 @@
           state.data.forEach((r) => r.splice(c, 1));
           shiftColIndices(c, -1);
         }
-        const newCol = Math.min(delCols[0], state.headers.length - 1);
+        const newCol = Math.min(c1, state.headers.length - 1);
         state.selected = { row: state.selected?.row ?? 0, col: newCol };
         state.range = null;
         state.anchor = { ...state.selected };
-        clearExtraRanges();
         markDirty();
         renderHeader();
         state.forceRender = true;
@@ -11362,9 +9436,7 @@
       function undo() {
         if (!state.undoStack.length) return;
         state.redoStack.push(cloneState());
-        clearExtraRanges();
         restoreState(state.undoStack.pop());
-        resetRowHeights();
         state._dupSet = null; // 行インデックスが変わる可能性があるためクリア
         markDirty();
         applyFilters();
@@ -11378,9 +9450,7 @@
       function redo() {
         if (!state.redoStack.length) return;
         state.undoStack.push(cloneState());
-        clearExtraRanges();
         restoreState(state.redoStack.pop());
-        resetRowHeights();
         state._dupSet = null;
         markDirty();
         applyFilters();
@@ -11612,15 +9682,6 @@
       }
 
       let _canvasCtx = null;
-      // 列幅の実測に使うフォント。セル(td)の実際の描画と一致させること。
-      // ここがズレると測った幅では足りず、末尾が「…」で切れる
-      // （2026-09-23: セルを12px→13pxにしたとき、実測が12px monospace のままで券種コード等が切れた）。
-      function cellMeasureFont() {
-        const cs = getComputedStyle(document.documentElement);
-        const fs = cs.getPropertyValue("--cell-fs").trim() || "13px";
-        const ff = cs.getPropertyValue("--font-ui").trim() || "sans-serif";
-        return fs + " " + ff;
-      }
       function measureText(text, font) {
         if (!_canvasCtx)
           _canvasCtx = document.createElement("canvas").getContext("2d");
@@ -11633,7 +9694,7 @@
         for (let i = 0; i < sample; i++) {
           const v = safeGet(i, col);
           if (v) {
-            const w = measureText(v, cellMeasureFont()) + 16;
+            const w = measureText(v, "12px Menlo,Consolas,monospace") + 16;
             if (w > maxW) maxW = w;
           }
         }
@@ -11835,7 +9896,6 @@
         }
         const removed = before - state.data.length;
         if (removed > 0) {
-          resetRowHeights();
           markDirty();
           applyFilters();
           state.forceRender = true;
@@ -11926,10 +9986,13 @@
         let changed = false;
         for (let c = 0; c < state.headers.length; c++) {
           let maxW = state.verticalHeader ? 40 : measureText(getDisplayHeader(c) || "", "600 13px system-ui") + 60;
-          // 全行から探す（先頭300行だけだと、途中から値が入る列が潰れる）。詳細は widestValuesInColumn のコメント
-          for (const v of widestValuesInColumn(c)) {
-            const w = measureText(v, cellMeasureFont()) + 20;
-            if (w > maxW) maxW = w;
+          const sample = Math.min(state.data.length, 300);
+          for (let i = 0; i < sample; i++) {
+            const v = safeGet(i, c);
+            if (v) {
+              const w = measureText(v, "12px Menlo,Consolas,monospace") + 20;
+              if (w > maxW) maxW = w;
+            }
           }
           const newW = Math.max(40, Math.min(maxW, 500));
           if (newW !== state.colWidths[c]) changed = true;
@@ -11943,48 +10006,15 @@
       }
 
       // ===== 行の高さ変更 =====
-      // 既定は26px（2026-09-23に22pxから引き上げ。12px文字＋22pxは詰まって読みにくいという指摘）。
-      // 詰めて一覧したいときのために22pxも残してある。
-      const ROW_H_OPTIONS = [26, 32, 40, 22];
+      const ROW_H_OPTIONS = [22, 30, 40];
       function cycleRowHeight() {
         const idx = ROW_H_OPTIONS.indexOf(ROW_H);
         ROW_H = ROW_H_OPTIONS[(idx + 1) % ROW_H_OPTIONS.length];
         document.documentElement.style.setProperty("--row-h", ROW_H + "px");
         setRbLabel("btn-row-height", `行高:${ROW_H}`);
-        resetRowHeights();
         state.forceRender = true;
         renderBody();
         setStatus(`行の高さ: ${ROW_H}px`);
-      }
-
-      // ===== 表示倍率（アプリ全体） =====
-      // CSS の zoom を body にかけてアプリごと拡大する。表だけを拡大する Alt+ホイールのズーム
-      // （state.zoomLevel / els.container.style.zoom）とは別物で、こちらはリボンやパネルにも効く。
-      // 業務PCでは毎回同じ倍率で使うので localStorage に覚えさせる。
-      const UI_ZOOM_OPTIONS = [90, 100, 110, 125, 150];
-      const UI_ZOOM_KEY = "tsvEditor.uiZoom";
-      let uiZoom = 100;
-      function applyUiZoom(pct, { save = true, status = false } = {}) {
-        uiZoom = UI_ZOOM_OPTIONS.includes(pct) ? pct : 100;
-        document.documentElement.style.setProperty("--ui-zoom", String(uiZoom / 100));
-        setRbLabel("btn-ui-zoom", `倍率:${uiZoom}%`);
-        if (save) {
-          try { localStorage.setItem(UI_ZOOM_KEY, String(uiZoom)); } catch (e) {}
-        }
-        // 拡大すると1行の実寸も描画ウィンドウも変わるので、実測値を捨てて測り直す
-        resetRowHeights();
-        state.forceRender = true;
-        renderBody();
-        if (status) setStatus(`表示倍率: ${uiZoom}%`);
-      }
-      function cycleUiZoom() {
-        const idx = UI_ZOOM_OPTIONS.indexOf(uiZoom);
-        applyUiZoom(UI_ZOOM_OPTIONS[(idx + 1) % UI_ZOOM_OPTIONS.length], { status: true });
-      }
-      function restoreUiZoom() {
-        let saved = 100;
-        try { saved = parseInt(localStorage.getItem(UI_ZOOM_KEY) || "100", 10); } catch (e) {}
-        applyUiZoom(saved, { save: false });
       }
 
       // ===== SEJ連携: 席種エリアマスタ読込 =====
@@ -12011,7 +10041,7 @@
         return rows;
       }
 
-
+      
       function loadPriceMasterFile(file, _encoding, onDone) {
         if (typeof _encoding === 'function') {
           onDone = _encoding;
@@ -12034,13 +10064,13 @@
           const routeIdx = headers.findIndex(h => h === "販売経路区分");
           const dayIdx = headers.findIndex(h => h === "当日価格");
           const advIdx = headers.findIndex(h => h === "前売価格");
-
+          
           if (codeIdx === -1 || (dayIdx === -1 && advIdx === -1)) {
             alert("「席種エリアコード」および価格の列が見つかりません。\n価格経路スケジュールマスタ(BO-F-21030)を選択してください。");
             setStatus("⚠ 価格経路スケジュールの列が不足しています");
             return;
           }
-
+          
           const maxPrices = {};
           // リセール上限はチケットアカウントの「前売価格」の上限と一致すべき（当日価格は対象外）。
           // 桁区切りカンマを除いて数値化。0/空欄や売止めダミー(999999等)は「最高額」の対象外にする
@@ -12070,7 +10100,7 @@
         };
         r.readAsText(file, _encoding || "utf-8");
       }
-
+      
       function _openPriceMasterPicker(onDone) {
         pickFileWithFallback(
           [".tsv", ".csv", ".txt"],
@@ -12106,7 +10136,7 @@
           if (ok) return;
           state.sejVirtualCols = null;
         }
-        const curCodeIdx = stateHeaderIdx("seat_type_area_cd");
+        const curCodeIdx = state.headers.findIndex(h => String(h).trim() === "seat_type_area_cd");
         if (curCodeIdx === -1) return;
         // 席種エリアマスタ自身などグループ名の実列を持つデータには追加しない（重複防止）
         const norm = state.headers.map(h => String(h ?? "").replace(/^﻿/, "").trim());
@@ -12145,13 +10175,9 @@
               return;
             }
             const headers = rows[0].map(h => h.trim());
-            // 日本語ヘッダー版(NEW席種エリアマスタ一覧)は英語キーへ別名解決し、値(入場可能/対象外等)も1/0へ寄せて持つ。
-            // 元ヘッダー名のキーには生の値も残す。
-            const jpMaster = isJpSeatMasterHeaders(headers);
-            const hkeys = headers.map(h => jpMaster ? (_jpAlias()[_normHdr(h)] || _normHdr(h)) : _normHdr(h));
-            const codeIdx = hkeys.indexOf("seat_type_area_cd");
+            const codeIdx = headers.indexOf("seat_type_area_cd");
             if (codeIdx === -1) {
-              alert("seat_type_area_cd(席種エリアコード) 列が見つかりません。\n席種エリアマスタTSVを選択してください。\n\n1行目: " + rows[0].slice(0, 5).join(", ") + " ...");
+              alert("seat_type_area_cd 列が見つかりません。\n席種エリアマスタTSVを選択してください。\n\n1行目: " + rows[0].slice(0, 5).join(", ") + " ...");
               setStatus("⚠ seat_type_area_cd 列が見つかりません");
               return;
             }
@@ -12161,17 +10187,13 @@
               const code = (r[codeIdx] || "").trim();
               if (!code) continue;
               const obj = {};
-              headers.forEach((h, idx) => {
-                const raw = (r[idx] ?? "").replace(/^\ufeff/, "");
-                obj[h] = raw;
-                if (hkeys[idx] !== h) obj[hkeys[idx]] = masterVal(hkeys[idx], raw);
-              });
+              headers.forEach((h, idx) => { obj[h] = (r[idx] ?? "").replace(/^\ufeff/, ""); });
               byCode[code] = obj;
             }
             state.sejMaster = { byCode, fileName: file.name, headers };
             const cnt = Object.keys(byCode).length;
             // 現在のデータでどれだけヒットするか確認
-            const curCodeIdx = stateHeaderIdx("seat_type_area_cd");
+            const curCodeIdx = state.headers.findIndex(h => h.trim() === "seat_type_area_cd");
             let hitCnt = 0, missCnt = 0;
             if (curCodeIdx !== -1) {
               for (const row of state.data) {
@@ -12182,7 +10204,7 @@
             }
             // 仮想列「グループ名」を追加（保存時除外・フィルター/ソート可能）
             // マスタ側のグループ名候補列を優先順位で探す（BOM/空白除去）
-            const normHeaders = hkeys;
+            const normHeaders = headers.map(h => (h || "").replace(/^\ufeff/, "").trim());
             const grpKeyCandidates = ["grp_nm", "seat_type_grp_nm1", "seat_type_grp_nm2", "group_nm"];
             const grpKeyIdx = grpKeyCandidates
               .map(k => normHeaders.indexOf(k))
@@ -12319,7 +10341,7 @@
       // 現在の行データから席種エリアコードを取り、マスタの表示名を返す
       function getSejMasterInfo(row) {
         if (!state.sejMaster) return null;
-        const codeIdx = stateHeaderIdx("seat_type_area_cd");
+        const codeIdx = state.headers.findIndex(h => h.trim() === "seat_type_area_cd");
         if (codeIdx === -1) return null;
         const code = (row[codeIdx] ?? "").trim();
         if (!code) return null;
@@ -12624,212 +10646,6 @@
         return escHtml(v);
       }
 
-      // ===DAY_CUTOFF_CORE_START=== UI/stateに依存しない純粋ロジック（tests/day_cutoff.test.js が抽出して検証する）
-      function _dayCutoffWeekdayJa(dateStr) {
-        const m = String(dateStr ?? "").trim().match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
-        if (!m) return "";
-        const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-        if (isNaN(d.getTime())) return "";
-        return "日月火水木金土"[d.getDay()] || "";
-      }
-
-      function estimateDayCutoffCandidate(headers, rows) {
-        const H = (headers || []).map(h => String(h).trim());
-        const ix = (n) => H.indexOf(n);
-        const ixAny = (...names) => { for (const n of names) { const i = ix(n); if (i !== -1) return i; } return -1; };
-        const seatCdIdx = ixAny("席種エリアコード", "seat_type_area_cd");
-        const seatIdx = ix("席種エリア名");
-        const ugFlagIdx = ix("アップグレード該当フラグ");
-        const endIdx = ix("販売終了日時");
-
-        const getVal = (row, idx, name) => {
-          if (!row) return "";
-          if (Array.isArray(row)) return idx >= 0 ? (row[idx] ?? "") : "";
-          if (typeof row === "object") {
-            if (name && row[name] != null) return row[name];
-            if (idx >= 0 && row[idx] != null) return row[idx];
-            return "";
-          }
-          return "";
-        };
-
-        const isParkingRow = (row) => {
-          const ug = String(getVal(row, ugFlagIdx, "アップグレード該当フラグ")).normalize("NFKC").trim();
-          if (ug === "該当" || ug === "1") return false;
-
-          const seatCd = String(getVal(row, seatCdIdx, "席種エリアコード") || getVal(row, seatCdIdx, "seat_type_area_cd")).normalize("NFKC").trim();
-          if (seatCd.length >= 6 && seatCd[5].toUpperCase() === "P") {
-            return true;
-          }
-          const seat = String(getVal(row, seatIdx, "席種エリア名")).normalize("NFKC");
-          if (seat.includes("駐車")) {
-            return true;
-          }
-          return false;
-        };
-
-        const parseEnd = (raw) => {
-          const m = String(raw || "").normalize("NFKC").trim().match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);
-          if (!m) return null;
-          const hasTime = m[4] != null;
-          const y = m[1];
-          const mon = String(m[2]).padStart(2, "0");
-          const d = String(m[3]).padStart(2, "0");
-          const hh = String(m[4] ?? "00").padStart(2, "0");
-          const mm = String(m[5] ?? "00").padStart(2, "0");
-          return {
-            year: y,
-            month: mon,
-            day: d,
-            dateKey: `${y}-${mon}-${d}`,
-            slashDate: `${y}/${mon}/${d}`,
-            hh,
-            mm,
-            timeKey: `${hh}:${mm}`,
-            hasTime,
-            fullKey: `${y}-${mon}-${d} ${hh}:${mm}`,
-          };
-        };
-
-        const nextDay = (dateKey) => {
-          const parts = dateKey.split("-");
-          const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-          d.setDate(d.getDate() + 1);
-          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-        };
-
-        let parkingRowCount = 0;
-        const parkingEndCounts = new Map();
-        const count2359 = new Map();
-        const countAll = new Map();
-
-        for (const row of (rows || [])) {
-          const rawEnd = getVal(row, endIdx, "販売終了日時");
-          const parsed = parseEnd(rawEnd);
-
-          if (isParkingRow(row)) {
-            parkingRowCount++;
-            if (parsed) {
-              const rec = parkingEndCounts.get(parsed.fullKey) || { count: 0, parsed };
-              rec.count++;
-              parkingEndCounts.set(parsed.fullKey, rec);
-            }
-          }
-
-          if (parsed) {
-            const dateKey = parsed.dateKey;
-            if (parsed.hh === "23" && parsed.mm === "59") {
-              const r = count2359.get(dateKey) || { n: 0, dateKey };
-              r.n++;
-              count2359.set(dateKey, r);
-            }
-            // 時刻なしの終了日時は従来どおり 11:00 を代表時刻にする（変更前の推定と同じ）
-            const rec = countAll.get(dateKey) || { n: 0, dateKey, time: parsed.hasTime ? `${parsed.hh}:${parsed.mm}` : "11:00" };
-            rec.n++;
-            countAll.set(dateKey, rec);
-          }
-        }
-
-        // 新ルール: 駐車場の行の販売終了日時が最も多い日時の翌日0:00（同数なら遅い日時）
-        if (parkingRowCount > 0 && parkingEndCounts.size > 0) {
-          let best = null;
-          for (const rec of parkingEndCounts.values()) {
-            if (!best || rec.count > best.count || (rec.count === best.count && rec.parsed.fullKey > best.parsed.fullKey)) {
-              best = rec;
-            }
-          }
-          const candDate = nextDay(best.parsed.dateKey);
-          const candTime = "00:00";
-          const wd = _dayCutoffWeekdayJa(best.parsed.slashDate);
-          const wdStr = wd ? `(${wd})` : "";
-          const basis = `駐車場 ${parkingRowCount}行のうち最多の販売終了 ${best.parsed.slashDate}${wdStr} ${best.parsed.timeKey}（${best.count}行）の翌日0:00`;
-          return { date: candDate, time: candTime, basis };
-        }
-
-        // 駐車場の行はあるが販売終了日時が1件も読めない: 他の行から推すと根拠が食い違うので推定しない（手入力）
-        if (parkingRowCount > 0) {
-          return { date: "", time: "00:00", basis: `駐車場 ${parkingRowCount}行の販売終了日時が読めないため推定できません。日時を手で入力してください` };
-        }
-
-        // 駐車場の行が無い場合のフォールバック（23:59終了が最多の日の翌日0:00 → 無ければ最多の終了日時）
-        const pickMostDate = (map) => {
-          let best = null;
-          for (const [k, v] of map) {
-            if (!best || v.n > best.v.n || (v.n === best.v.n && k > best.k)) {
-              best = { k, v };
-            }
-          }
-          return best;
-        };
-
-        const best2359 = pickMostDate(count2359);
-        if (best2359) {
-          const candDate = nextDay(best2359.k);
-          const candTime = "00:00";
-          const basis = "駐車場の行が無いため、23:59終了が最多の日の翌日0:00";
-          return { date: candDate, time: candTime, basis };
-        }
-
-        const bestAll = pickMostDate(countAll);
-        if (bestAll) {
-          let candDate = bestAll.k;
-          let candTime = bestAll.v.time;
-          if (candTime === "23:59") {
-            candDate = nextDay(candDate);
-            candTime = "00:00";
-          }
-          const basis = "駐車場の行が無いため、最多の販売終了日時";
-          return { date: candDate, time: candTime, basis };
-        }
-
-        return { date: "", time: "00:00", basis: "販売終了日時が無いため推定不可" };
-      }
-
-      // 日時の書式（マトリクス用）: 年は省略、「M/D(曜) HH:MM」（月日の先頭0は付けない）
-      function dtMatrix(s) {
-        s = String(s || "").normalize("NFKC").trim();
-        if (!s) return "";
-        let m = s.match(/\d{4}[\/\-](\d{1,2})[\/\-](\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);
-        if (!m) m = s.match(/^(\d{1,2})[\/\-](\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);
-        if (!m) return s;
-        const mon = String(Number(m[1]));
-        const day = String(Number(m[2]));
-        const wd = _dayCutoffWeekdayJa(s);
-        const wdStr = wd ? `(${wd})` : "";
-        const md = `${mon}/${day}${wdStr}`;
-        if (m[3] != null) {
-          const hh = String(m[3]).padStart(2, "0");
-          const mm = String(m[4] ?? "00").padStart(2, "0");
-          return `${md} ${hh}:${mm}`;
-        }
-        return md;
-      }
-
-      // 日時の比較キー（年を含む "YYYY-MM-DD HH:MM"）。表示は年を省くが、比較は年込みで行う
-      //  （年を省いた文字列で比べると、年違いで月日・曜日が同じ期間を同一とみなしてしまう）
-      function _periodKey(raw) {
-        const s = String(raw ?? "").normalize("NFKC").trim();
-        if (!s) return "";
-        const m = s.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);
-        if (!m) return s;
-        const p2 = (x) => String(x).padStart(2, "0");
-        return `${m[1]}-${p2(m[2])}-${p2(m[3])}` + (m[4] != null ? ` ${p2(m[4])}:${m[5]}` : "");
-      }
-
-      // 販売期間差分フォーマット（マトリクス用: 基本期間と同じなら空文字、違う側だけ短く出力）
-      //  引数は生の日時（基本期間も生の値）。片側が空なら「開始未設定」「終了未設定」を出して欠落を隠さない。
-      function formatPeriodDiff(startRaw, endRaw, baseStartRaw, baseEndRaw) {
-        const sKey = _periodKey(startRaw), eKey = _periodKey(endRaw);
-        const bsKey = _periodKey(baseStartRaw), beKey = _periodKey(baseEndRaw);
-        const sPart = sKey === bsKey ? null : (sKey ? dtMatrix(startRaw) : "開始未設定");
-        const ePart = eKey === beKey ? null : (eKey ? dtMatrix(endRaw) : "終了未設定");
-        if (sPart == null && ePart == null) return "";
-        if (sPart != null && ePart != null) return `${sPart}〜${ePart}`;
-        if (sPart != null) return `${sPart}〜`;
-        return `〜${ePart}`;
-      }
-      // ===DAY_CUTOFF_CORE_END===
-
       // ===== 経路価格スケジュール → チェック用HTML出力 =====
       // 通常価格表 / UGマトリクス / UG一覧 を任意選択で出力。会員ランクは全件出力し、
       // 出力先HTMLで列ごとの並べ替え・絞り込み（会員ランク/販売期間/席種名など）が可能。
@@ -12861,9 +10677,53 @@
         if (!rowIndices.length) { setStatus("⚠ 表示する行がありません"); return; }
         const isFiltered = rowIndices.length < state.data.length;
 
-        // 当日/前売の境界日時の推定（ユーザー確定ルール・2026-09-27）
-        const visibleRows = rowIndices.map(i => state.data[i]);
-        const { date: candidateDate, time: candidateTime, basis: candidateBasis } = estimateDayCutoffCandidate(state.headers, visibleRows);
+        // 当日/前売の境界日時の推定（ユーザー確定ルール・2026-07-07）:
+        //  価格経路スケジュール内の「販売終了が 23:59（その日の最後の1分）の行」の日付で最も件数が多い日を
+        //  “前売の最終日”とみなし、その 23:59 の1分後＝翌日00:00 を当日開始の候補にする。
+        //  ここでは候補を出すだけで、実際の境界は出力ダイアログでユーザーが確認・変更できる（曜日も表示）。
+        const endIdx = H.indexOf("販売終了日時");
+        let candidateDate = "", candidateTime = "00:00";
+        if (endIdx !== -1) {
+          const parseEnd = (raw) => String(raw || "").match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);
+          const nextDay = (dateKey) => {
+            const d = new Date(dateKey + "T00:00:00");
+            d.setDate(d.getDate() + 1);
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+          };
+          const pickMost = (map) => {
+            let best = null;
+            // 同数なら遅い日付を採用（イベント最終日側に倒す）
+            for (const [k, v] of map) if (!best || v.n > best.v.n || (v.n === best.v.n && k > best.k)) best = { k, v };
+            return best;
+          };
+          const count2359 = new Map(); // 23:59終了行の日付ごとの件数
+          const countAll = new Map();  // フォールバック用: 全終了日時の日付ごと（代表時刻も保持）
+          for (const i of rowIndices) {
+            const m = parseEnd(state.data[i]?.[endIdx]);
+            if (!m) continue;
+            const dateKey = `${m[1]}-${String(m[2]).padStart(2, "0")}-${String(m[3]).padStart(2, "0")}`;
+            const hh = String(m[4] ?? "").padStart(2, "0"), mm = String(m[5] ?? "").padStart(2, "0");
+            if (hh === "23" && mm === "59") {
+              const r = count2359.get(dateKey) || { n: 0 }; r.n++; count2359.set(dateKey, r);
+            }
+            const rec = countAll.get(dateKey) || { n: 0, time: `${String(m[4] || 11).padStart(2, "0")}:${String(m[5] || 0).padStart(2, "0")}` };
+            rec.n++; countAll.set(dateKey, rec);
+          }
+          const best2359 = pickMost(count2359);
+          if (best2359) {
+            // 最多の「23:59終了日」＋1分＝翌日00:00 を当日開始候補に
+            candidateDate = nextDay(best2359.k);
+            candidateTime = "00:00";
+          } else {
+            // 23:59終了の行が無い場合のみ、従来どおり最多の販売終了日時を候補にする
+            const best = pickMost(countAll);
+            if (best) {
+              candidateDate = best.k;
+              candidateTime = best.v.time;
+              if (candidateTime === "23:59") { candidateDate = nextDay(candidateDate); candidateTime = "00:00"; }
+            }
+          }
+        }
         const weekdayLabel = (dateStr) => {
           if (!dateStr) return "";
           const d = new Date(dateStr + "T00:00:00");
@@ -12887,7 +10747,7 @@
             </div>
             <div style="border:1px solid #e2e8ee;border-radius:6px;padding:10px 12px;margin-bottom:16px;background:#f8fafc">
               <div style="font-weight:600;margin-bottom:4px">当日／前売の境界日時（999999ダミー判定に使用）</div>
-              <div style="color:#737373;font-size:11.5px;margin-bottom:8px">この日時より後を「当日」、前を「前売り」として999999(ダミー価格)の検算に使います。<br>候補: <b>${escHtml(candidateBasis)}</b><br>日付は必ずカレンダーで確認し、曜日が想定と合っているか確認してください。</div>
+              <div style="color:#737373;font-size:11.5px;margin-bottom:8px">この日時より後を「当日」、前を「前売り」として999999(ダミー価格)の検算に使います。候補は<b>販売終了が23:59の行が最も多い日の翌日0:00</b>（＝前売最終日の1分後）を自動推定したものです。日付は必ずカレンダーで確認し、曜日が想定と合っているか確認してください。</div>
               <div style="display:flex;align-items:center;gap:6px">
                 <input type="date" id="px-cutoff-date" value="${candidateDate}" style="font-size:13px;padding:4px 6px">
                 <input type="time" id="px-cutoff-time" value="${candidateTime}" style="font-size:13px;padding:4px 6px">
@@ -13001,16 +10861,11 @@
           if (ch6 === "P") return "駐車券";
           // 検算側(buildUgValidator の seatCat)と同じ判定条件にする。表示ラベルだけ「エリア」→「数在庫」。
           // 在庫種別と指定席区分の片方でも 2 なら数在庫（2026-09-20 厳格化）。
-          if (seatMeta) { const m = seatMeta(code, seat); if (m && m.found) {
-            if (m.cat && m.cat !== "指定席") return m.cat === "エリア" ? "数在庫" : m.cat;
-            const rsve = m.isReserved ? "1" : m.isFree ? "2" : "";
-            if (m.stockTyp === "2" || rsve === "2") return "数在庫";
-            if (m.stockTyp === "1" || rsve === "1") return "指定席";
-          } }
+          if (seatMeta) { const m = seatMeta(code, seat); if (m && m.found) { const rsve = m.isReserved ? "1" : m.isFree ? "2" : ""; if (m.stockTyp === "2" || rsve === "2") return "数在庫"; if (m.stockTyp === "1" || rsve === "1") return "指定席"; } }
           // NFKCで半角カナ（「ｴﾘｱ」等）を全角化してから判定（buildUgValidator内のseatCatと同一化）
           const sn = String(seat || "").normalize("NFKC");
           if (/駐車/.test(sn)) return "駐車券";
-          return /自由席|エリア|木曜日券|金曜日券|Paddock Club|同伴/i.test(sn) ? "数在庫" : "指定席";
+          return /自由席|エリア/.test(sn) ? "数在庫" : "指定席";
         };
         const catBadge = (cat) => `<span class="catb cat-${cat === "指定席" ? "r" : cat === "数在庫" ? "a" : cat === "駐車券" ? "p" : "o"}">${cat}</span>`;
         // 日時 → MM/DD(曜)HH:MM（分単位まで）。"YYYY/MM/DD HH:MM" 等を想定
@@ -13124,7 +10979,7 @@ ${_sortableTable(labels, rowsHtml)}` };
           const period = periodOf; // 共通ヘルパーを使用
           // ツールチップ用: 前売/当日それぞれの「登録／期待／先−元=差額」を1行で説明する。
           // セルは略称（前売NG/当日NG）だけにし、なぜその期待値かはホバーで分かるようにするため
-          // （値下がりUGは不可理由を表示し、正の差額と手数料の根拠を確認できる）。
+          // （例: 子供で先<元のとき 期待0円 ＝ 差額がマイナスのため0 ということが読み取れる）。
           const _yen = (n) => n != null ? n.toLocaleString("ja-JP") + "円" : "?";
           const winTipLine = (label, src, dst, exp, actual, ng, note) => {
             // 期待値が出せない（価格不明 or ダミー価格）場合は、その理由（noteに「販売期間がかぶっているのに
@@ -13134,6 +10989,7 @@ ${_sortableTable(labels, rowsHtml)}` };
             if (src != null && dst != null) {
               const raw = dst - src;
               s += `（先${_yen(dst)} − 元${_yen(src)} = 差額${raw.toLocaleString("ja-JP")}円`;
+              if (exp === 0 && raw <= 0) s += " → マイナス/0のため期待0円";
               s += "）";
             }
             if (ng) s += "  ← 不一致";
@@ -13149,46 +11005,9 @@ ${_sortableTable(labels, rowsHtml)}` };
           let missingTotal = 0;
           let mxBody = "";
           for (const [k, list] of byCond) {
-            // 販売条件ブロックごとに「基本の販売期間」を決める: UG行の販売期間（開始,終了の組）の最頻値
-            const periodCounts = new Map();
-            for (const row of list) {
-              const s = v(row, c.start), e = v(row, c.end);
-              if (!s && !e) continue;
-              const pKey = s + "|||" + e;
-              const rec = periodCounts.get(pKey) || { count: 0, s, e };
-              rec.count++;
-              periodCounts.set(pKey, rec);
-            }
-            let basePeriod = null;
-            for (const rec of periodCounts.values()) {
-              if (!basePeriod || rec.count > basePeriod.count) {
-                basePeriod = rec;
-              }
-            }
-            let baseStartFmt = "", baseEndFmt = "", basePeriodHtml = "";
-            const baseStartRaw = basePeriod ? basePeriod.s : "", baseEndRaw = basePeriod ? basePeriod.e : "";
-            if (basePeriod) {
-              baseStartFmt = basePeriod.s ? dtMatrix(basePeriod.s) : "";
-              baseEndFmt = basePeriod.e ? dtMatrix(basePeriod.e) : "";
-              if (baseStartFmt || baseEndFmt) {
-                const periodText = (baseStartFmt && baseEndFmt)
-                  ? `販売期間 ${baseStartFmt} → ${baseEndFmt}`
-                  : `販売期間 ${baseStartFmt || baseEndFmt}`;
-                basePeriodHtml = `<span class="cond-period">${escHtml(periodText)}</span>`;
-              }
-            }
-
-            // 基準価格マップ（席種|券種 → {adv,day,code,start,end}）
+            // 基準価格マップ（席種|券種 → {adv,day}）
             const priceMap = {};
-            for (const row of (normalsByCond[k] || [])) {
-              priceMap[v(row, c.seat) + "|" + v(row, c.age)] = {
-                adv: v(row, c.adv),
-                day: v(row, c.day),
-                code: v(row, c.seatCd),
-                start: v(row, c.start),
-                end: v(row, c.end),
-              };
-            }
+            for (const row of (normalsByCond[k] || [])) priceMap[v(row, c.seat) + "|" + v(row, c.age)] = { adv: v(row, c.adv), day: v(row, c.day), code: v(row, c.seatCd), period: period(row) };
 
             const fromSeats = [], toSeats = [], fromAges = {}, toAges = {}, map = new Map();
             const seatCode = {};
@@ -13214,29 +11033,15 @@ ${_sortableTable(labels, rowsHtml)}` };
             for (const ts of toSeats) for (const ta of toAges[ts]) toCols.push({ ts, ta });
 
             // ヘッダー: 行1=先席種(colspan,色,カテゴリ) / 行2=先券種＋先基準価格
-            // 通常価格の期間: 基本期間と同じなら省略、違うときだけ差分を短く表示
-            const periodHeaderHtml = (p) => {
-              if (!p) return "";
-              const diff = formatPeriodDiff(p.start, p.end, baseStartRaw, baseEndRaw);
-              if (!diff) return "";
-              const formatted = (diff.indexOf("〜") > 0 && !diff.endsWith("〜"))
-                ? escHtml(diff).replace("〜", "<br>〜")
-                : escHtml(diff);
-              return `<br><span class="hp-period-diff">${formatted}</span>`;
-            };
-            const periodRowHtml = (p) => {
-              if (!p) return "";
-              const diff = formatPeriodDiff(p.start, p.end, baseStartRaw, baseEndRaw);
-              if (!diff) return "";
-              return `<br><span class="hp-period-diff">${escHtml(diff)}</span>`;
-            };
+            // 販売期間（開始〜終了）はヘッダーが狭く横にはみ出るため、開始日と終了日の間で改行する
+            const periodHtml = (p) => p.period ? `<br><span class="hp-period">${escHtml(p.period).replace("〜", "<br>〜")}</span>` : "";
             let head = `<tr><th class="corner" colspan="2" rowspan="2">元＼先</th>`;
             for (const ts of toSeats) head += `<th class="seathdr" colspan="${toAges[ts].length}" style="background:${seatColor(ts)}"><span class="seathdr-label">${escHtml(seatLabel(ts, seatCode[ts]))}${catBadge(seatCat(seatCode[ts], ts))}</span></th>`;
             head += `</tr><tr>`;
             let prevTsHead = null;
             for (const ts of toSeats) for (const ta of toAges[ts]) {
               const p = priceMap[ts + "|" + ta];
-              const pr = p ? `<div class="hp">前${money(p.adv)}<br>当${money(p.day)}${periodHeaderHtml(p)}</div>` : "";
+              const pr = p ? `<div class="hp">前${money(p.adv)}<br>当${money(p.day)}${periodHtml(p)}</div>` : "";
               const colSep = ts !== prevTsHead ? " mx-colsep" : "";
               prevTsHead = ts;
               head += `<th class="agehdr${colSep}">${escHtml(ageLabel(ta))}${pr}</th>`;
@@ -13252,7 +11057,7 @@ ${_sortableTable(labels, rowsHtml)}` };
                 // 各行に複製して常に表示する（見た目のグループ分けは背景色とseat-sep枠線で行う）
                 bodyRows += `<th class="rowh seatrow" style="background:${seatColor(fs)}">${escHtml(seatLabel(fs, seatCode[fs]))}${catBadge(seatCat(seatCode[fs], fs))}</th>`;
                 const p = priceMap[fs + "|" + fa];
-                const pr = p ? `<div class="hp">前${money(p.adv)} 当${money(p.day)}${periodRowHtml(p)}</div>` : "";
+                const pr = p ? `<div class="hp">前${money(p.adv)} 当${money(p.day)}${periodHtml(p)}</div>` : "";
                 bodyRows += `<th class="agehdr rowh agecol">${escHtml(ageLabel(fa))}${pr}</th>`;
                 let prevTsBody = null;
                 for (const { ts, ta } of toCols) {
@@ -13261,7 +11066,7 @@ ${_sortableTable(labels, rowsHtml)}` };
                   prevTsBody = ts;
                   const e = map.get(fs + "|" + fa + "=>" + ts + "|" + ta);
                   if (!e) {
-                    // UG登録が無いセル。同年齢区分どうしで先のほうが高く、車椅子/エリア/年齢降格/席種・券種ダウングレード等の
+                    // UG登録が無いセル。同年齢区分どうしで先のほうが高く、車椅子/エリア/年齢降格/大人ダウングレード等の
                     // 対象外ルールにも当たらない場合は「本来UGが成立しうるのに登録漏れの可能性」として目立たせる。
                     const sameRank = ugAgeRank(fa) !== 0 && ugAgeRank(fa) === ugAgeRank(ta);
                     let missing = false;
@@ -13291,7 +11096,7 @@ ${_sortableTable(labels, rowsHtml)}` };
                       : "通常価格が見つからず検算不能")
                     + `\n販売期間 ${v(row, c.start)} 〜 ${v(row, c.end)}`;
                   const cls = (chk.status === "ng" || chk.status === "invalid") ? " mx-ng" : chk.status === "unknown" ? " mx-na" : "";
-                  const dg = chk.isDown ? '<div class="dg">▼UG不可</div>' : "";
+                  const dg = chk.isDown ? '<div class="dg">▼0</div>' : "";
                   const mid = encodeURIComponent(["M", k, fs, fa, ts, ta].join("|"));
                   // セル本体は略称のみ（前売NG/当日NG）。何が期待値でなぜNGかの詳細はホバー(title)で見せる。
                   let reason = "";
@@ -13303,27 +11108,23 @@ ${_sortableTable(labels, rowsHtml)}` };
                     if (rs.length) reason = `<div class="rsn">${rs.join("・")}</div>`;
                   }
                   // 期待差額バッジ: 本来の差額（先−元）を表示する。先<元でマイナス等になり登録すべき額（期待）が
-                  // 本来差額と異なる場合は「本来差額→期待」を併記（例: 大人の差額200→手数料500）。
+                  // 本来差額と異なる場合は「本来差額→期待」を併記（例: 先<元で −200→0 = 実差額は−200だが登録は0円）。
                   const rawAdvDiff = (chk.dstAdv != null && chk.srcAdv != null) ? chk.dstAdv - chk.srcAdv : null;
                   const expBadge = (chk.status !== "invalid" && chk.expected != null)
                     ? `<div class="exp-badge">先－元 ${(!chk.sameSeat && rawAdvDiff != null && rawAdvDiff !== chk.expected)
                         ? `${rawAdvDiff.toLocaleString("ja-JP")}→${chk.expected.toLocaleString("ja-JP")}`
                         : chk.expected.toLocaleString("ja-JP")}</div>` : "";
-                  const diffPer = formatPeriodDiff(v(row, c.start), v(row, c.end), baseStartRaw, baseEndRaw);
-                  const perHtml = diffPer ? `<div class="per"><span class="per-diff">${escHtml(diffPer)}</span></div>` : "";
-                  const advHtml = `<div class="adv${chk.advNg ? " l-ng" : ""}"><span class="lbl">前売</span> <span class="val">${escHtml(money(v(row, c.adv)))}</span></div>`;
-                  const dayHtml = `<div class="day${chk.dayNg ? " l-ng" : ""}"><span class="lbl">当日</span> <span class="val">${escHtml(money(v(row, c.day)))}</span></div>`;
-                  bodyRows += `<td class="mxc${cls}${colSep}" data-mid="${mid}" title="${escHtml(tip)}">${expBadge}${advHtml}${dayHtml}${perHtml}${dg}${reason}</td>`;
+                  bodyRows += `<td class="mxc${cls}${colSep}" data-mid="${mid}" title="${escHtml(tip)}">${expBadge}<div class="adv${chk.advNg ? " l-ng" : ""}">前売 ${escHtml(money(v(row, c.adv)))}</div><div class="day${chk.dayNg ? " l-ng" : ""}">当日 ${escHtml(money(v(row, c.day)))}</div><div class="per">${escHtml(period(row))}</div>${dg}${reason}</td>`;
                 }
                 bodyRows += `</tr>`;
               });
             }
-            mxBody += `<div class="cond-block" data-cond="${escHtml(k)}"><h3>${escHtml(k)}${basePeriodHtml}</h3><div class="scroll mxscroll"><table class="mx">${head}${bodyRows}</table></div></div>`;
+            mxBody += `<div class="cond-block" data-cond="${escHtml(k)}"><h3>${escHtml(k)}</h3><div class="scroll mxscroll"><table class="mx">${head}${bodyRows}</table></div></div>`;
           }
           const ngBadge = ngTotal ? `　<span class="badge-ng">NG ${ngTotal}件</span>` : `　<span class="badge-ok">検算OK</span>`;
           const missingBadge = missingTotal ? `　<span class="badge-ng" style="background:#b45309">登録漏れ?候補 ${missingTotal}件</span>` : "";
           sections.matrix = { title: "UGマトリクス", body: `<h2>🔢 アップグレードマトリクス（俯瞰）${ngBadge}${missingBadge}</h2>
-<p class="legend">行=元席種/券種、列=先席種/券種（大人の前売価格の安い順）。基本の販売期間は各ブロック見出しに表示。席種は表示略称＋区分（<span class="catb cat-r">指定席</span><span class="catb cat-a">数在庫</span><span class="catb cat-o">その他</span>）。各セル: 先－元=期待差額（緑） / 前売・当日=実際の金額（数字太字） / 橙ラベル=基本と異なる販売期間（差分のみ短縮表示、見出しの通常価格も同様）。<b>期待差額</b>は差額0円なら全組合せ500（手数料）・同区分の大人は1〜500も500・U23/子供/幼児は正の実差額、異区分間は1〜500→500・500超→実差額。前売/当日の対象券種価格が先&lt;元ならUG不可（0円に丸めない）。<b>不一致は文字が赤・セルが薄ピンク</b>。<b>「？」の橙セル</b>はUG登録が無いセルのうち、先のほうが価格が高く対象外ルールにも当たらないため登録漏れの可能性がある候補（推測なので必ず人が確認してください）。クリックでマーク</p>${mxBody}` };
+<p class="legend">行=元席種/券種、列=先席種/券種（大人の前売価格の安い順）。見出しには通常価格の販売期間も併記。席種は表示略称＋区分（<span class="catb cat-r">指定席</span><span class="catb cat-a">数在庫</span><span class="catb cat-o">その他</span>）。各セル: 先－元=期待差額（緑） / 前売・当日=実際の金額 / 下=販売期間（曜日付き）。<b>期待差額</b>は差額0円なら全組合せ500（手数料）・同区分の大人は1〜500も500・U23/子供/幼児は実差額(マイナス→0)、異区分間はマイナス→0・1〜500→500・500超→実差額。<b>不一致は文字が赤・セルが薄ピンク</b>。<b>「？」の橙セル</b>はUG登録が無いセルのうち、先のほうが価格が高く対象外ルールにも当たらないため登録漏れの可能性がある候補（推測なので必ず人が確認してください）。クリックでマーク</p>${mxBody}` };
         }
 
         // --- UG一覧（席種ペアでセル結合・元⇒先・金額対比・差異強調） ---
@@ -13368,7 +11169,7 @@ ${_sortableTable(labels, rowsHtml)}` };
               const expStr = (chk.expected != null || chk.expectedDay != null)
                 ? `前 ${chk.expected != null ? chk.expected.toLocaleString("ja-JP") : "?"} / 当 ${chk.expectedDay != null ? chk.expectedDay.toLocaleString("ja-JP") : "?"}`
                 : (chk.advNote || "—");
-              const dgNote = chk.isDown ? `<div class="dg-note">▼ダウングレード（UG不可）</div>` : "";
+              const dgNote = chk.isDown ? `<div class="dg-note">▼ダウングレード</div>` : "";
               const sep = i === 0 ? " seat-sep" : "";
               // 列ごとの絞り込み用に検索対象テキストを各行のデータ属性へ持たせる（区間セルはrowspanで
               // 全行に存在しないため、cells[index]ではなくデータ属性で照合する）
@@ -13380,7 +11181,7 @@ ${_sortableTable(labels, rowsHtml)}` };
               bodyRows += `<td class="kenpair">${escHtml(ageLabel(v(row, c.ugAge)))}<span class="arrow">⇒</span>${escHtml(ageLabel(v(row, c.age)))}</td>`
                 + `<td class="prices">${dual(money(chk.srcAdv != null ? chk.srcAdv : ""), money(chk.srcDay != null ? chk.srcDay : ""))}</td>`
                 + `<td class="prices">${dual(money(chk.dstAdv != null ? chk.dstAdv : ""), money(chk.dstDay != null ? chk.dstDay : ""))}</td>`
-                + `<td class="exp" title="先−元の期待差額（同席種同区分=一律500／差額0円は全組合せ500・大人は1〜500も500・U23/子供/幼児は正の実差額／異区分間は1〜500→500・500超→実差額／先&lt;元はUG不可）">${escHtml(expStr)}${dgNote}</td>`
+                + `<td class="exp" title="先−元の期待差額（同席種同区分=一律500／差額0円は全組合せ500・大人は1〜500も500・U23/子供/幼児は実差額(マイナス→0)／異区分間はマイナス→0・1〜500→500・500超→実差額）">${escHtml(expStr)}${dgNote}</td>`
                 + `<td class="prices reg">${dual(money(v(row, c.adv)), money(v(row, c.day)), chk.advNg, chk.dayNg, chk.advNg ? "期待 " + (chk.expected != null ? chk.expected.toLocaleString("ja-JP") : "?") : "", chk.dayNg ? "期待 " + (chk.expectedDay != null ? chk.expectedDay.toLocaleString("ja-JP") : "?") : "")}</td>`
                 + cell(condOf(row), condOf(row))
                 + cell(periodOf(row), v(row, c.start), "dt")
@@ -13401,7 +11202,7 @@ ${_sortableTable(labels, rowsHtml)}` };
             + (inv ? `　<span class="badge-ng">設定不可 ${inv}件</span>` : "")
             + (na ? `　<span class="badge-na">価格不明 ${na}件</span>` : "");
           sections.ug = { title: "UG一覧", body: `<h2>🔀 アップグレード一覧（${ugs.length}件）${badges}</h2>
-<p class="legend">見出し下の入力欄で区間・券種・販売条件・販売期間・コメントを絞り込み。区間=元席種⇒先席種（セル結合）。期待差額=先−元（前売・当日とも）。同席種・同年齢区分は一律500。<b>異席種でも同年齢区分どうし</b>は、差額0円なら全区分とも500円（席変更手数料）、差額ありは大人が1〜500→500・500超→実差額、U23・子供・幼児は正の実差額のまま。<b>異年齢区分間</b>は0円→500・1〜500→500・500超→実差額。<b>前売/当日いずれかの対象券種価格が先&lt;元なら、共通・子供・幼児・U23を含めUG不可（0円への丸め不可）</b>。車椅子は他席種との相互UG不可、席種最高額が先&lt;元のUGも不可。登録差額が期待と違う項目は文字が赤、コメント欄に理由。${seatMeta ? "席種は表示略称・" : ""}券種は略称</p>
+<p class="legend">見出し下の入力欄で区間・券種・販売条件・販売期間・コメントを絞り込み。区間=元席種⇒先席種（セル結合）。期待差額=先−元（前売・当日とも）。同席種・同年齢区分は一律500。<b>異席種でも同年齢区分どうし</b>は、差額0円なら全区分とも500円（席変更手数料）、差額ありは大人が1〜500→500・500超→実差額、U23・子供・幼児は実差額のまま（マイナス→0）。<b>異年齢区分間</b>はマイナス→0・0円→500・1〜500→500・500超→実差額。車椅子は他席種との相互UG不可、大人料金が先&lt;元のUGも原則不可。登録差額が期待と違う項目は文字が赤、コメント欄に理由。${seatMeta ? "席種は表示略称・" : ""}券種は略称</p>
 <div class="scroll uglistscroll"><table class="uglist">${head}${bodyRows}</table></div>` };
         }
 
@@ -13525,20 +11326,13 @@ table.mx th.agecol { position: sticky; left: 58px; z-index: 5; width: 92px; min-
 table.mx th.corner { position: sticky; top: 0; left: 0; z-index: 7; background: #e2e8ee; }
 table.mx .hp { font-size: 9px; font-weight: 400; color: #777; line-height: 1.15; margin-top: 1px; }
 table.mx .hp-period { color: #999; white-space: nowrap; }
-table.mx .hp-period-diff { display: inline-block; font-size: 8.5px; font-weight: 600; color: #c2410c; background: #ffedd5; border: 1px solid #fed7aa; border-radius: 3px; padding: 0 3px; line-height: 1.25; margin-top: 2px; }
-.cond-period { font-size: 11.5px; font-weight: 400; color: #4b5563; margin-left: 12px; }
 td.mxc { cursor: pointer; position: relative; min-width: 76px; }
 /* 差額(先−元)・前売・当日は読み比べやすいよう文字サイズを統一 */
 td.mxc .exp-badge { font-weight: 700; font-size: 11px; color: #1d4ed8; line-height: 1.2; }
-td.mxc .adv { font-size: 11px; color: #16a34a; line-height: 1.25; }
-td.mxc .day { font-size: 11px; color: #b45309; line-height: 1.25; }
-td.mxc .lbl { font-size: 9px; font-weight: 400; color: #78716c; margin-right: 2px; }
-td.mxc .val { font-weight: 700; }
-td.mxc .per { font-size: 9px; margin-top: 1px; }
-td.mxc .per-diff { display: inline-block; font-size: 8.5px; font-weight: 600; color: #c2410c; background: #ffedd5; border: 1px solid #fed7aa; border-radius: 3px; padding: 0 3px; line-height: 1.25; }
-td.mxc .l-ng { color: #dc2626; }
-td.mxc .l-ng .lbl { color: #dc2626; }
-td.mxc .l-ng .val { color: #dc2626; font-weight: 800; }
+td.mxc .adv { font-weight: 600; font-size: 11px; color: #16a34a; }
+td.mxc .day { font-size: 11px; color: #b45309; }
+td.mxc .per { font-size: 9px; color: #999; }
+td.mxc .l-ng { color: #dc2626; font-weight: 700; }
 td.mxc .rsn { font-size: 9px; color: #dc2626; font-weight: 700; margin-top: 1px; }
 .catb { display: inline-block; font-size: 8.5px; font-weight: 700; padding: 0 4px; border-radius: 6px; margin-left: 3px; vertical-align: middle; line-height: 1.5; }
 .cat-r { background: #dbeafe; color: #1d4ed8; }
@@ -13548,7 +11342,6 @@ td.mxc .rsn { font-size: 9px; color: #dc2626; font-weight: 700; margin-top: 1px;
 td.mxc.mx-ng { background: #fde8e8; }
 td.mxc.mx-na { background: #f5f5f5; }
 td.mxc.mx-na .adv, td.mxc.mx-na .day { color: #9ca3af; }
-td.mxc.mx-na .lbl, td.mxc.mx-na .val { color: #9ca3af; }
 td.mxc.marked { box-shadow: inset 0 0 0 3px var(--mk); }
 td.mxc.marked::after { content: "✓"; position: absolute; top: 1px; right: 3px; font-size: 10px; color: #16a34a; font-weight: 700; }
 .sub { font-size: 10px; color: #888; font-weight: 400; }
@@ -13937,7 +11730,7 @@ html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         const findings = []; // {rowNo, code, name, check, sev, msg}
         let okRows = 0, ngSeats = 0, warnSeats = 0;
         const CHK_KEYS = ["席種名", "指定席整合", "初期値9", "リセール下限", "リセール上限", "購入限定/複数", "単体販売", "マスタ未登録"];
-
+        
         const limSeatCodes = new Set();
         for (const r of state.data) {
           if (!r) continue;
@@ -14015,14 +11808,14 @@ html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
               add("購入限定/複数", "NG", `購入限定席種にP(駐車)と他種が混在[${named}]のに購入限定区分=「${kubun}」。単数だと駐車券は選べても追加券が選べません→複数購入可にすべき`);
             }
           }
-
+          
           if (limSeatCodes.has(code)) {
             const solo = g(row, c.solo);
             if (!solo.includes("不可")) {
               add("単体販売", "NG", `購入限定席種として他席から指定されているため、単体販売不可にする必要があります`);
             }
           }
-
+          
           if (state.priceMaster && g(row, c.resale) === "可能") {
              const maxPrice = state.priceMaster.maxPrices[code];
              if (maxPrice !== undefined) {
@@ -14224,7 +12017,6 @@ ${findings.length
             else state.wrapRows.add(r);
           }
           const count = r2 - r1 + 1;
-          resetRowHeights();
           state.forceRender = true;
           renderBody();
           setStatus(allWrapped ? `${count}行の折り返しを解除` : `${count}行に折り返しを適用`);
@@ -14280,7 +12072,6 @@ ${findings.length
         // 折り返し解除
         state.wrapCells = false;
         state.wrapRows.clear();
-        resetRowHeights();
         document.body.classList.remove("wrap-cells");
         $("btn-wrap").classList.remove("active-state");
         $("btn-wrap").setAttribute("aria-pressed", "false");
@@ -14536,22 +12327,14 @@ ${findings.length
           const r2 = Math.max(state.range.r1, state.range.r2);
           const c1 = Math.min(state.range.c1, state.range.c2);
           const c2 = Math.max(state.range.c1, state.range.c2);
-          const rows = visibleRowsInRange(r1, r2);
-          const cols = visibleColsInRange(c1, c2);
-          if (!rows.length || !cols.length) {
-            setStatus("選択範囲に表示中のセルがありません");
-            return false;
-          }
           // 全セルがマーク済みなら解除、それ以外は付与
           let allMarked = true;
-          for (const r of rows) {
-            for (const c of cols)
+          for (let r = r1; r <= r2 && allMarked; r++)
+            for (let c = c1; c <= c2; c++)
               if (!state.markedCells.has(`${r},${c}`)) { allMarked = false; break; }
-            if (!allMarked) break;
-          }
           saveUndo();
-          for (const r of rows)
-            for (const c of cols) {
+          for (let r = r1; r <= r2; r++)
+            for (let c = c1; c <= c2; c++) {
               const key = `${r},${c}`;
               if (allMarked) state.markedCells.delete(key);
               else state.markedCells.add(key);
@@ -14560,7 +12343,7 @@ ${findings.length
           updateEncodingStatus();
           state.forceRender = true;
           renderBody();
-          const n = rows.length * cols.length;
+          const n = (r2 - r1 + 1) * (c2 - c1 + 1);
           setStatus(allMarked ? `選択範囲のマーカーを解除しました（${n}セル）` : `選択範囲にマーカーを付けました（${n}セル）`);
           return true;
         }

@@ -3,49 +3,49 @@
     {
       "id": "price-schedule-dummy",
       "label": "価格スケジュール(ダミー): 通常価格表/UGマトリクス/UG一覧",
-      "lastChecked": "2026-09-08T16:13:46.033Z",
-      "lastResult": "ok"
+      "lastChecked": "2026-10-02T18:00:25.892Z",
+      "lastResult": "ng"
     },
     {
       "id": "sej-dummy",
       "label": "SEJデータ(ダミー): カナ検査・備考HTML変換・SEJチェック",
-      "lastChecked": "2026-09-08T16:13:46.033Z",
-      "lastResult": "ok"
+      "lastChecked": "2026-10-02T18:00:25.892Z",
+      "lastResult": "ng"
     },
     {
       "id": "ikkatsu-dummy",
       "label": "一括設定TSV(ダミー): 一括設定チェックのNG検出",
-      "lastChecked": "2026-09-08T16:19:20.496Z",
-      "lastResult": "error"
+      "lastChecked": "2026-09-30T18:00:25.870Z",
+      "lastResult": "ng"
     },
     {
       "id": "html-save",
       "label": "HTML保存ボタンで非空ファイルが保存されるか",
-      "lastChecked": "2026-09-08T16:19:20.496Z",
-      "lastResult": "error"
+      "lastChecked": "2026-09-30T18:00:25.870Z",
+      "lastResult": "ng"
     },
     {
       "id": "sort-filter",
       "label": "通常価格表の並べ替え/絞り込み（種別=前売/当日列含む）",
-      "lastChecked": "2026-09-08T16:20:11.067Z",
-      "lastResult": "ok"
+      "lastChecked": "2026-10-01T18:00:26.406Z",
+      "lastResult": "ng"
     },
     {
       "id": "master-unlinked",
       "label": "席種エリアマスタ未連携時の挙動・案内メッセージ",
-      "lastChecked": "2026-09-08T16:20:11.067Z",
-      "lastResult": "ok"
+      "lastChecked": "2026-10-01T18:00:26.406Z",
+      "lastResult": "ng"
     },
     {
       "id": "large-data-perf",
       "label": "大量行データでの表示・出力パフォーマンス",
-      "lastChecked": "2026-09-08T16:12:49.824Z",
+      "lastChecked": "2026-10-02T16:20:15.211Z",
       "lastResult": "ng"
     },
     {
       "id": "real-data-optional",
       "label": "MAIN内の実マスターが見つかった場合の参考チェック",
-      "lastChecked": "2026-09-08T16:12:49.824Z",
+      "lastChecked": "2026-10-02T16:20:15.211Z",
       "lastResult": "ng"
     }
   ],
@@ -616,6 +616,246 @@
       "focusAreas": [
         "sort-filter",
         "master-unlinked"
+      ]
+    },
+    {
+      "date": "2026-09-08",
+      "status": "ok",
+      "focusAreas": [
+        "large-data-perf",
+        "real-data-optional"
+      ]
+    },
+    {
+      "date": "2026-09-08",
+      "status": "ok",
+      "focusAreas": [
+        "price-schedule-dummy",
+        "sej-dummy"
+      ]
+    },
+    {
+      "date": "2026-09-09",
+      "status": "ok",
+      "focusAreas": [
+        "ikkatsu-dummy",
+        "html-save"
+      ]
+    },
+    {
+      "date": "2026-09-10",
+      "status": "ok",
+      "focusAreas": [
+        "sort-filter",
+        "master-unlinked"
+      ]
+    },
+    {
+      "date": "2026-09-11",
+      "status": "ok",
+      "focusAreas": [
+        "large-data-perf",
+        "real-data-optional"
+      ]
+    },
+    {
+      "date": "2026-09-12",
+      "status": "ok",
+      "focusAreas": [
+        "price-schedule-dummy",
+        "sej-dummy"
+      ]
+    },
+    {
+      "date": "2026-09-13",
+      "status": "ok",
+      "focusAreas": [
+        "ikkatsu-dummy",
+        "html-save"
+      ]
+    },
+    {
+      "date": "2026-09-14",
+      "status": "ng",
+      "focusAreas": [
+        "sort-filter",
+        "master-unlinked"
+      ]
+    },
+    {
+      "date": "2026-09-15",
+      "status": "ng",
+      "focusAreas": [
+        "large-data-perf",
+        "real-data-optional"
+      ]
+    },
+    {
+      "date": "2026-09-16",
+      "status": "ng",
+      "focusAreas": [
+        "price-schedule-dummy",
+        "sej-dummy"
+      ]
+    },
+    {
+      "date": "2026-09-17",
+      "status": "ng",
+      "focusAreas": [
+        "ikkatsu-dummy",
+        "html-save"
+      ]
+    },
+    {
+      "date": "2026-09-18",
+      "status": "ng",
+      "focusAreas": [
+        "sort-filter",
+        "master-unlinked"
+      ]
+    },
+    {
+      "date": "2026-09-19",
+      "status": "ng",
+      "focusAreas": [
+        "large-data-perf",
+        "real-data-optional"
+      ]
+    },
+    {
+      "date": "2026-09-19",
+      "status": "ng",
+      "focusAreas": [
+        "price-schedule-dummy",
+        "sej-dummy"
+      ]
+    },
+    {
+      "date": "2026-09-19",
+      "status": "ng",
+      "focusAreas": [
+        "ikkatsu-dummy",
+        "html-save"
+      ]
+    },
+    {
+      "date": "2026-09-20",
+      "status": "ng",
+      "focusAreas": [
+        "sort-filter",
+        "master-unlinked"
+      ]
+    },
+    {
+      "date": "2026-09-20",
+      "status": "ng",
+      "focusAreas": [
+        "large-data-perf",
+        "real-data-optional"
+      ]
+    },
+    {
+      "date": "2026-09-21",
+      "status": "ng",
+      "focusAreas": [
+        "price-schedule-dummy",
+        "sej-dummy"
+      ]
+    },
+    {
+      "date": "2026-09-22",
+      "status": "ng",
+      "focusAreas": [
+        "ikkatsu-dummy",
+        "html-save"
+      ]
+    },
+    {
+      "date": "2026-09-23",
+      "status": "ng",
+      "focusAreas": [
+        "sort-filter",
+        "master-unlinked"
+      ]
+    },
+    {
+      "date": "2026-09-24",
+      "status": "ng",
+      "focusAreas": [
+        "large-data-perf",
+        "real-data-optional"
+      ]
+    },
+    {
+      "date": "2026-09-25",
+      "status": "ng",
+      "focusAreas": [
+        "price-schedule-dummy",
+        "sej-dummy"
+      ]
+    },
+    {
+      "date": "2026-09-26",
+      "status": "ng",
+      "focusAreas": [
+        "ikkatsu-dummy",
+        "html-save"
+      ]
+    },
+    {
+      "date": "2026-09-27",
+      "status": "ng",
+      "focusAreas": [
+        "sort-filter",
+        "master-unlinked"
+      ]
+    },
+    {
+      "date": "2026-09-28",
+      "status": "ng",
+      "focusAreas": [
+        "large-data-perf",
+        "real-data-optional"
+      ]
+    },
+    {
+      "date": "2026-09-29",
+      "status": "ng",
+      "focusAreas": [
+        "price-schedule-dummy",
+        "sej-dummy"
+      ]
+    },
+    {
+      "date": "2026-09-30",
+      "status": "ng",
+      "focusAreas": [
+        "ikkatsu-dummy",
+        "html-save"
+      ]
+    },
+    {
+      "date": "2026-10-01",
+      "status": "ng",
+      "focusAreas": [
+        "sort-filter",
+        "master-unlinked"
+      ]
+    },
+    {
+      "date": "2026-10-02",
+      "status": "ng",
+      "focusAreas": [
+        "large-data-perf",
+        "real-data-optional"
+      ]
+    },
+    {
+      "date": "2026-10-02",
+      "status": "ng",
+      "focusAreas": [
+        "price-schedule-dummy",
+        "sej-dummy"
       ]
     }
   ]
