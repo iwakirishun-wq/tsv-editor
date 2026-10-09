@@ -3384,6 +3384,53 @@
         }, { canUpgrade });
       }
       // ===UG_VALIDATOR_CORE_END===
+      // ===MISSING_AGE_CORE_START=== UI/stateに依存しない純粋ロジック（tests/missing_age.test.js が抽出して検証する。ugAgeSpan を使う）
+      // 価格チェック表「券種抜けの可能性」の判定。入力は 席種 → { 販売条件 → 券種名の配列 }。
+      // 2026-10-09: 旧判定は「全席種の6割が持つ券種が無ければ警告」で、27F1では
+      // 3歳以上共通の席種（BOX・Q2等 58件）、券種なしの駐車場・クローク（22件）、
+      // 中学生以上共通・8歳以上共通（6件）の計86件がすべて誤警告になり、本当の抜けが埋もれていた。
+      // 売り方の違う席種は比べず、次の2つだけを抜けとして返す。
+      //  1. 同じ席種なのに、販売条件（一般／会員等）によって年齢別券種がそろっていない
+      //  2. 年齢別券種を2つ以上持つ席種どうしで、6割以上が持つ券種が欠けている
+      // 共通券種（3歳以上共通等）を持つ販売条件、券種なし・「なし」の行は全年齢をカバー済み／年齢と無関係として対象外。
+      // 年齢別券種が1つだけの席種（大人限定の商品等）は、席種間の比較では欠けとみなさない。
+      function detectMissingAgeTickets(seatConds, threshold) {
+        const ratio = threshold == null ? 0.6 : threshold;
+        const isNoAge = (a) => { const s = String(a || "").normalize("NFKC").replace(/^.*_/, "").trim(); return !s || /^(なし|無し|-|ー)$/.test(s); };
+        const isCommon = (a) => ugAgeSpan(a).common;
+        // 席種×条件ごとに、年齢別券種だけを残す（共通券種があればその条件は対象外）
+        const units = []; // { seat, cond, ages:Set }
+        for (const seat of Object.keys(seatConds)) {
+          for (const cond of Object.keys(seatConds[seat])) {
+            const all = seatConds[seat][cond] || [];
+            if (all.some(isCommon)) continue;
+            const ages = new Set(all.filter((a) => !isNoAge(a)));
+            if (ages.size) units.push({ seat, cond, ages });
+          }
+        }
+        const found = new Map(); // seat||cond -> { seat, cond, ages:Set, sameSeat:bool, otherSeats:bool }
+        const add = (u, age, kind) => {
+          const k = u.seat + "||" + u.cond;
+          if (!found.has(k)) found.set(k, { seat: u.seat, cond: u.cond, ages: new Set(), sameSeat: false, otherSeats: false });
+          const f = found.get(k); f.ages.add(age); f[kind] = true;
+        };
+        // 1. 同じ席種の販売条件どうし
+        const bySeat = new Map();
+        for (const u of units) { if (!bySeat.has(u.seat)) bySeat.set(u.seat, []); bySeat.get(u.seat).push(u); }
+        for (const list of bySeat.values()) {
+          if (list.length < 2) continue;
+          const union = new Set(); for (const u of list) for (const a of u.ages) union.add(a);
+          for (const u of list) for (const a of union) if (!u.ages.has(a)) add(u, a, "sameSeat");
+        }
+        // 2. 年齢別券種を2つ以上持つ席種どうし
+        const multi = units.filter((u) => u.ages.size >= 2);
+        const count = {};
+        for (const u of multi) for (const a of u.ages) count[a] = (count[a] || 0) + 1;
+        const expected = Object.keys(count).filter((a) => count[a] >= multi.length * ratio);
+        for (const u of multi) for (const a of expected) if (!u.ages.has(a)) add(u, a, "otherSeats");
+        return [...found.values()].map((f) => ({ seat: f.seat, cond: f.cond, ages: [...f.ages], sameSeat: f.sameSeat, otherSeats: f.otherSeats }));
+      }
+      // ===MISSING_AGE_CORE_END===
       // ===HP_CHECK_CORE_START=== UI/stateに依存しない純粋ロジック（tests/hp_check.test.js が抽出して検証する）
       //
       // HPナレッジ（正本スキーマ hp_price_knowledge/1）と、いま開いているTSVを突き合わせる。
@@ -12940,26 +12987,20 @@
               + cell(fmt(v(row, c.day)), numOfCell(v(row, c.day)), "num")
               + `</tr>`;
           }
-          // 券種抜けの検出（他マスタが無いため、データ内の券種ユニバースから推定）
-          // 席種×条件ごとに持つ券種を集計し、過半数の席種が持つ券種が欠けている席種を警告
-          const ageUniverse = {}; // age -> 出現席種数
-          const seatAgeSet = {};  // seat||cond -> Set(age)
-          const seatCondCount = new Set();
+          // 券種抜けの検出（他マスタが無いため、データ内の券種から推定）。判定は detectMissingAgeTickets（純粋ロジック）。
+          // 共通券種・券種なし（駐車場等）の席種は比べない。同じ席種の販売条件間の差と、年齢別券種で売る席種どうしの差だけを出す
+          const seatConds = {}; // seat -> { cond -> [age] }
           for (const row of normals) {
-            const sc = v(row, c.seat) + "||" + condOf(row);
-            if (!seatAgeSet[sc]) { seatAgeSet[sc] = new Set(); seatCondCount.add(sc); }
-            seatAgeSet[sc].add(v(row, c.age));
+            const seat = v(row, c.seat), cond = condOf(row);
+            const byCond = seatConds[seat] || (seatConds[seat] = {});
+            (byCond[cond] || (byCond[cond] = [])).push(v(row, c.age));
           }
-          for (const sc in seatAgeSet) for (const a of seatAgeSet[sc]) ageUniverse[a] = (ageUniverse[a] || 0) + 1;
-          const totalSC = seatCondCount.size || 1;
-          const expectedAges = Object.keys(ageUniverse).filter(a => ageUniverse[a] >= totalSC * 0.6);
-          const missingWarn = [];
-          for (const sc in seatAgeSet) {
-            const miss = expectedAges.filter(a => !seatAgeSet[sc].has(a));
-            if (miss.length) { const [seat, cond] = sc.split("||"); missingWarn.push(`${seat}（${cond}）: ${miss.map(ageLabel).join("・")}`); }
-          }
+          const missingWarn = detectMissingAgeTickets(seatConds).map((m) => {
+            const why = [m.sameSeat ? "同じ席種の他の販売条件にはある" : "", m.otherSeats ? "年齢別に売る他の席種の多くにはある" : ""].filter(Boolean).join("・");
+            return `${m.seat}（${m.cond}）: ${m.ages.map(ageLabel).join("・")}　← ${why}`;
+          });
           const missBanner = missingWarn.length
-            ? `<div class="warn">⚠ 券種抜けの可能性（他席種では設定があるのに欠けています・要確認）:<br>${missingWarn.slice(0, 30).map(escHtml).join("<br>")}${missingWarn.length > 30 ? `<br>…他${missingWarn.length - 30}件` : ""}</div>`
+            ? `<div class="warn">⚠ 券種抜けの可能性（要確認）:<br>${missingWarn.slice(0, 30).map(escHtml).join("<br>")}${missingWarn.length > 30 ? `<br>…他${missingWarn.length - 30}件` : ""}<br><span style="font-size:11px">※共通券種（3歳以上共通等）・券種なし（駐車場等）の席種は対象外</span></div>`
             : "";
           sections.normal = { title: "通常価格表", body: `<h2>📋 通常価格表（${normals.length}件）</h2>
 <p class="legend">列見出しクリック、または下の「並び替え列を選択」（検索・チェックボックスで列を指定）で並べ替え。各列の入力欄で絞り込み（会員ランク・席種名・期間など）。席種は表示略称・券種は略称表示</p>${missBanner}
