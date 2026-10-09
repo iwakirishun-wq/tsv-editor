@@ -165,10 +165,75 @@ function getHpKnowledge(eventKey) {
  * @param {{ rows?: Array<Object>, question?: string }} payload
  * @return {{ text?: string, error?: string, truncated?: boolean, truncated_message?: string }}
  */
-// モデル名は URL のパスに入るので、英数字と . - _ だけを通す（それ以外は無視して既定に戻す）
+// モデル名は URL のパスに入るので、英数字と . - _ だけを通す（それ以外は無視して既定に戻す）。
+// OpenRouter のモデル名（anthropic/claude-haiku-5.5 のような「提供元/名前」）は本文に入るだけなので、/ を1つだけ許す
 function sanitizeGeminiModel_(name) {
   var s = String(name || '').trim().replace(/^models\//, '');
-  return /^[A-Za-z0-9._-]{1,80}$/.test(s) ? s : '';
+  if (/^[A-Za-z0-9._-]{1,80}$/.test(s)) return s;
+  return /^[a-z0-9][a-z0-9._-]{0,39}\/[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/.test(s) ? s : '';
+}
+
+/**
+ * OpenRouter 経由で問い合わせる（モデル名に / を含むとき）。キーはスクリプトプロパティ OPENROUTER_API_KEY。
+ * 戻り値は askGemini と同じ形（text / model / usage）に、OpenRouter が返した実費 cost_usd を足したもの。
+ * 2026-10-08: Claude Haiku 5.5 は同じ照合で現行 Gemini と同じ判定で、費用は約1/10だった（hiring_ledger JC-02b）
+ */
+function askOpenRouter_(props, model, fullPrompt, wantJson) {
+  var key = (props.getProperty('OPENROUTER_API_KEY') || '').trim();
+  if (!key) return { error: 'OPENROUTER_API_KEY が未設定です（スクリプトプロパティに設定してください）' };
+  var S = String.fromCharCode(47);
+  var url = 'https:' + S + S + 'openrouter.ai' + S + 'api' + S + 'v1' + S + 'chat' + S + 'completions';
+  // 思考（reasoning）は max_tokens を食う。長い備考が並ぶと思考だけで枠を使い切って本文が空になる（2026-10-08に実際に発生）。
+  // まず思考を軽く（low）して試し、枠切れ(length)なら思考なしでやり直す。費用は両方の合計
+  var attempts = [{ effort: 'low' }, { enabled: false }];
+  var totalCost = 0, hasCost = true;
+  var usage = { input: 0, output: 0, thoughts: 0, total: 0 };
+  var lastReason = '';
+  for (var i = 0; i < attempts.length; i++) {
+    var body = {
+      model: model,
+      messages: [{ role: 'user', content: fullPrompt }],
+      max_tokens: 16000,
+      reasoning: attempts[i],
+      usage: { include: true }
+    };
+    if (wantJson) body.response_format = { type: 'json_object' };
+    var response;
+    try {
+      response = UrlFetchApp.fetch(url, {
+        method: 'post',
+        contentType: 'application/json',
+        headers: { Authorization: 'Bearer ' + key },
+        payload: JSON.stringify(body),
+        muteHttpExceptions: true
+      });
+    } catch (fetchErr) {
+      return { error: 'OpenRouter 呼び出し中に通信エラーが発生しました: ' + fetchErr.message };
+    }
+    var status = response.getResponseCode();
+    var text = response.getContentText();
+    var json;
+    try { json = JSON.parse(text); } catch (e) { json = null; }
+    if (status !== 200 || !json) {
+      var msg = json && json.error && json.error.message ? json.error.message : text;
+      return { error: 'OpenRouter エラー (HTTP ' + status + '): ' + String(msg).slice(0, 300) };
+    }
+    var u = json.usage || {};
+    var details = u.completion_tokens_details || {};
+    usage.input += Number(u.prompt_tokens || 0);
+    usage.output += Number(u.completion_tokens || 0);
+    usage.thoughts += Number(details.reasoning_tokens || 0);
+    usage.total += Number(u.total_tokens || 0);
+    if (u.cost != null) totalCost += Number(u.cost); else hasCost = false;
+    var choice = json.choices && json.choices[0];
+    var content = choice && choice.message && choice.message.content;
+    lastReason = choice && choice.finish_reason;
+    // 枠切れ（length）は、本文が空でも途中で切れていても、次の試行へ
+    if (content && lastReason !== 'length') {
+      return { text: String(content), model: model, usage: usage, cost_usd: hasCost ? totalCost : null };
+    }
+  }
+  return { error: 'OpenRouter からテキストが返されませんでした (finish_reason: ' + lastReason + ')。行数を減らして再実行してください' };
 }
 
 /**
@@ -201,11 +266,8 @@ function listGeminiModels() {
 function askGemini(payload) {
   try {
     var props = PropertiesService.getScriptProperties();
-    var apiKey = props.getProperty('GEMINI_API_KEY');
-    if (!apiKey || !apiKey.trim()) {
-      return { error: 'GEMINI_API_KEY が未設定です' };
-    }
-    apiKey = apiKey.trim();
+    // Gemini のキーは、Gemini を使うときだけ必要（OpenRouter のモデルなら下で別に確認する）
+    var apiKey = (props.getProperty('GEMINI_API_KEY') || '').trim();
 
     payload = payload || {};
     var rows = payload.rows;
@@ -264,6 +326,21 @@ function askGemini(payload) {
     }
 
     var fullPrompt = promptLines.join('\n');
+
+    // モデル名に / があれば OpenRouter 経由（例: anthropic/claude-haiku-5.5）
+    if (model.indexOf('/') >= 0) {
+      var orResult = askOpenRouter_(props, model, fullPrompt, payload.format === 'json');
+      if (orResult.error) return orResult;
+      if (isTruncated) {
+        orResult.truncated = true;
+        orResult.truncated_message = '行数が上限（' + maxRows + '行）を超過したため、先頭' + maxRows + '行のみを対象としました（全' + originalRowCount + '行）。';
+      }
+      return orResult;
+    }
+
+    if (!apiKey) {
+      return { error: 'GEMINI_API_KEY が未設定です' };
+    }
 
     // URL組み立て: 文字列リテラル内に // を含めないよう String.fromCharCode(47) を使用
     var S = String.fromCharCode(47);

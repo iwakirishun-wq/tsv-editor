@@ -4094,9 +4094,9 @@
 
       const hpIsGas = () => typeof google !== "undefined" && google.script && google.script.run;
 
-      function hpCallServer(fn, arg) {
+      function hpCallServer(fn, arg, timeoutMs) {
         return new Promise((resolve, reject) => {
-          const timer = setTimeout(() => reject(new Error("GASからの応答がありません。時間をおいて再実行してください。")), 30000);
+          const timer = setTimeout(() => reject(new Error("GASからの応答がありません。時間をおいて再実行してください。")), timeoutMs || 30000);
           google.script.run
             .withSuccessHandler((value) => { clearTimeout(timer); resolve(value); })
             .withFailureHandler((e) => { clearTimeout(timer); reject(new Error(e && e.message ? e.message : String(e))); })
@@ -4338,8 +4338,11 @@
       // モデルは入れ替わりが早い（2026-09-25に gemini-2.5-flash が新規提供終了）ので、画面で選べて手入力もできるようにする。
       // 単価の既定値の出典: https://ai.google.dev/gemini-api/docs/pricing（2026-09-24更新、有料枠・テキスト、USD/100万トークン）。
       // 「*」付きの 3.6〜3.8-flash は2026-12-31までの期間限定価格。値は画面で上書きでき、上書きはこのブラウザに保存する。
-      const HP_AI_DEFAULT_MODEL = "gemini-3.8-flash";
+      // 2026-10-08: 既定を Claude Haiku 5.5（OpenRouter経由）へ。同じ照合で現行と同じ判定、費用は約1/10（hiring_ledger JC-02b）。
+      // 使うにはGASのスクリプトプロパティ OPENROUTER_API_KEY が要る。Geminiへ戻すときは上の欄に gemini-3.5-flash-lite などを入れる。
+      const HP_AI_DEFAULT_MODEL = "anthropic/claude-haiku-5.5";
       const HP_AI_PRICE_DEFAULTS = {
+        "anthropic/claude-haiku-5.5": [0.1, 0.5],
         "gemini-3.8-flash": [0.75, 3.75], "gemini-3.7-flash": [0.75, 3.75], "gemini-3.6-flash": [0.75, 3.75],
         "gemini-3.5-flash": [1.5, 9], "gemini-3.5-flash-lite": [0.3, 2.5], "gemini-3.1-flash-lite": [0.25, 1.5],
         "gemini-3.1-pro-preview": [2, 12], "gemini-3-flash-preview": [0.5, 3],
@@ -4439,7 +4442,8 @@
         const tokens = `入力 ${u.input.toLocaleString("ja-JP")}・出力 ${u.output.toLocaleString("ja-JP")}${u.thoughts ? `（うち思考 ${u.thoughts.toLocaleString("ja-JP")}）` : ""} トークン`;
         let cost = "単価が未設定のため料金は計算していません（上の欄で入力できます）";
         if (pr) {
-          const usd = (u.input * pr[0] + u.output * pr[1]) / 1e6;
+          // OpenRouterは実費を返すので、あればそれを使う（思考トークンの数え方がモデルごとに違い、単価計算だとずれるため）
+          const usd = (r && typeof r.cost_usd === "number") ? r.cost_usd : (u.input * pr[0] + u.output * pr[1]) / 1e6;
           s.month.usd += usd;
           s.month.calls += 1;
           hpAiSave(s);
@@ -4510,37 +4514,50 @@
           const out = ov.querySelector("._hp-ai-out");
           const picked = byLevel.error.concat(byLevel.warn, byLevel.ai).filter((f) => !f.noAi).slice(0, 200);
           // id で回答と元の指摘を結び付ける（AIに行番号や席種名を書き写させると取り違えるため）
-          const send = picked.map((f, i) => f.level === "ai"
-            ? { id: i + 1, 種別: f.kind, 席種表示名: f.seats || [], 件数: f.row ? f.row._count : 1, 現行の備考: f.note, HPページ: f.hpPages || [] }
-            : { id: i + 1, 種別: f.kind, 席種表示名: [f.row ? (f.row.表示名 || f.row.席種エリア名 || "") : ""], 券種: f.row ? f.row.券種名 : "", 内容: f.detail });
-          // 参照されるページのHP記載だけを添える（ナレッジ全体は送らない）
+          // 参照されるページのHP記載だけを添える（ナレッジ全体は送らない）。送る抜粋は備考に関係の濃い行に絞る（hpBuildContext）
           const pn = (state.hpKnowledge && state.hpKnowledge.page_notes) || {};
-          const context = {};
+          const context = {}; // 画面側の原文照合用（絞らない全文）
           for (const f of picked) for (const pid of f.hpPages || []) if (pn[pid] && !context[pid]) context[pid] = pn[pid].lines;
+          // 機械メモ: 備考にあってHPの記載に見当たらない日付・時刻・金額・日数（AIの手がかり兼、画面の警告用）
+          const mech = {};
+          const send = picked.map((f, i) => {
+            if (f.level !== "ai") return { id: i + 1, 種別: f.kind, 席種表示名: [f.row ? (f.row.表示名 || f.row.席種エリア名 || "") : ""], 券種: f.row ? f.row.券種名 : "", 内容: f.detail };
+            const lines = [];
+            (f.hpPages || []).forEach((pid) => (context[pid] || []).forEach((l) => lines.push(l)));
+            const diff = hpFactDiff(f.note, lines);
+            if (diff.length) mech[i + 1] = diff;
+            const row = { id: i + 1, 種別: f.kind, 席種表示名: f.seats || [], 件数: f.row ? f.row._count : 1, 現行の備考: f.note, HPページ: f.hpPages || [] };
+            if (diff.length) row["機械メモ_備考にあってHPに見当たらない値"] = diff;
+            return row;
+          });
+          const sendCtx = hpBuildContext(send, pn, 24);
           const question = [
             "各行（id）について判定し、次のJSONだけを返してください。前置きや説明文は不要です。",
-            '{"総評":"全体の要点を1〜3文","results":[{"id":1,"判定":"要修正|HPに記載なし|問題なし","修正案":"要修正のときだけ、直した後の備考全文（元の<br>区切りの形式を保つ）。それ以外は空文字","理由":"1〜2文","HP根拠":[{"ページ":"ページID","記載":"HPの該当記載をそのまま引用"}]}]}',
+            '{"results":[{"id":1,"判定":"要修正|HPに記載なし|問題なし","分類":"指摘の種類を12字以内の短い名詞句で（例: 有効期間の食い違い / 条件の抜け / HPに根拠なし / 一致）。同じ種類には毎回同じ言い方を使う","修正案":"要修正のときだけ、直した後の備考全文（元の<br>区切りの形式を保つ。直さない行は元の文字のまま写す）。それ以外は空文字","HP根拠":[{"ページ":"ページID","記載":"HPの該当記載をそのまま引用","強調":"記載のうち判断の決め手になる部分を、一字一句そのまま抜き出す（30字以内）"}]}]}',
             "判定の基準:",
             "・要修正 = 現行の備考がHPの記載と矛盾している、またはHPにある重要な条件（有効期間・利用できる日・特典・座席指定・年齢や保護者同伴の条件など）が抜けている。",
             "・HPに記載なし = 現行の備考の根拠が、渡したHPの記載の中に見当たらない（推測で要修正にしない）。",
             "・問題なし = 内容がHPと一致している（表記の違いだけのものも含む）。",
+            "・備考の日付・曜日・時刻・金額・日数は、HPの記載と一字ずつ突き合わせてから判定する。期間は「4/9(金)~11(日)」を4/9・4/10・4/11と数えて比べる。",
+            "・行に「機械メモ_備考にあってHPに見当たらない値」がある場合、その値がHPの記載のどこにも無いことを機械が確認している。HPの記載を読み直し、本当に無ければ要修正かHPに記載なしにする。表記の違い（例: 「19時」と「19:00」）だけなら問題なし。",
             "・「備考をHPと照合(AI)」以外の行（価格や備考の抜けの指摘）も同じ3区分で判定し、修正案には直すべき値を書く。",
             "・HP根拠の「記載」はHP側の文をそのまま引用し、言い換えない。根拠が無ければ空配列。",
           ].join("\n");
           if (!hpIsGas()) { out.style.display = ""; out.textContent = "AI照合はGAS版でのみ使えます（APIキーをサーバー側に置いているため）。"; return; }
           // 概算: 日本語はおおむね1文字≒1トークン。出力は1件あたり約150トークン＋思考分を見込む
-          const est = hpAiEstimate(aiCfg, JSON.stringify(send).length + JSON.stringify(context).length + question.length, send.length);
+          const est = hpAiEstimate(aiCfg, JSON.stringify(send).length + JSON.stringify(sendCtx).length + question.length, send.length);
           const estLine = est.yen == null ? "（単価未設定のため料金の見込みは出せません）"
             : `見込み: 約${Math.max(1, Math.round(est.yen))}円（入力 約${est.inTok.toLocaleString("ja-JP")}・出力 約${est.outTok.toLocaleString("ja-JP")}トークン）`;
           const over = est.yen != null && est.yen > aiCfg.settings.limitYen;
-          const msg = `差分・照合対象 ${send.length} 件をGemini（${aiCfg.model()}）へ送ります。TSV全体は送りません。\n${estLine}`
+          const aiVendor = aiCfg.model().indexOf("/") >= 0 ? "OpenRouter" : "Gemini";
+          const msg = `差分・照合対象 ${send.length} 件を${aiVendor}（${aiCfg.model()}）へ送ります。TSV全体は送りません。\n${estLine}`
             + (over ? `\n\n⚠ 1回の上限 ${aiCfg.settings.limitYen}円 を超える見込みです。グループや対象を絞ってから実行することをおすすめします。それでも送りますか？` : "\n続けますか？");
           if (!confirm(msg)) return;
           out.style.display = "";
           out.style.whiteSpace = "pre-wrap";
-          out.textContent = "Gemini（" + aiCfg.model() + "）に問い合わせ中...";
+          out.textContent = aiVendor + "（" + aiCfg.model() + "）に問い合わせ中...";
           try {
-            const r = await hpCallServer("askGemini", { rows: send, question, context, format: "json", model: aiCfg.model() });
+            const r = await hpAskAi(send, question, pn, aiCfg.model());
             if (r && r.error) { out.textContent = "失敗: " + r.error; return; }
             const parsed = hpParseAiJson(r && r.text);
             const usageHtml = hpAiUsageHtml(r, aiCfg);
@@ -4550,12 +4567,45 @@
               out.innerHTML = usageHtml + `<div style="white-space:pre-wrap">${escHtml((r && r.truncated_message ? r.truncated_message + "\n\n" : "") + ((r && r.text) || "(応答が空でした)"))}</div>`;
               return;
             }
-            out.innerHTML = usageHtml + hpRenderAiResult(parsed, picked, r.truncated_message);
+            out.innerHTML = usageHtml + hpRenderAiResult(parsed, picked, r.truncated_message, context, mech);
+            hpWireAiFilter(out);
           } catch (e) {
             out.textContent = "失敗: " + e.message;
           }
         };
         setStatus(`HP突合チェック: 要修正 ${byLevel.error.length} / 要確認 ${byLevel.warn.length} / 参考 ${byLevel.info.length}`, !byLevel.error.length);
+      }
+
+      // AI照合の問い合わせ。OpenRouterのモデル（名前に「/」）は、1回で全行を返させると数分かかりGASの待ち時間も超えるので、
+      // 12行ずつに分けて並列に問い合わせ、結果（results）をつないで1つの回答に戻す（2026-10-08: 200行で30秒の待ちを超えた）。
+      // Geminiのモデルは従来どおり1回で送る。待ち時間はどちらも5分まで延ばす（GAS側の上限6分より短く）
+      async function hpAskAi(send, question, pageNotes, model) {
+        const WAIT = 280000;
+        const base = { question, format: "json", model };
+        if (model.indexOf("/") < 0 || send.length <= 12) {
+          return hpCallServer("askGemini", { ...base, rows: send, context: hpBuildContext(send, pageNotes, 24) }, WAIT);
+        }
+        const chunks = [];
+        for (let i = 0; i < send.length; i += 12) chunks.push(send.slice(i, i + 12));
+        const rs = await Promise.all(chunks.map((rows) =>
+          hpCallServer("askGemini", { ...base, rows, context: hpBuildContext(rows, pageNotes, 24) }, WAIT)));
+        const bad = rs.find((x) => x && x.error);
+        if (bad) return { error: bad.error + "（" + chunks.length + "分割のうち一部が失敗しました）" };
+        const results = [];
+        const usage = { input: 0, output: 0, thoughts: 0, total: 0 };
+        let cost = 0, hasCost = true;
+        rs.forEach((x) => {
+          const p = hpParseAiJson(x && x.text);
+          if (p) results.push(...p.results);
+          const u = (x && x.usage) || {};
+          Object.keys(usage).forEach((k) => { usage[k] += Number(u[k] || 0); });
+          if (typeof (x && x.cost_usd) === "number") cost += x.cost_usd; else hasCost = false;
+        });
+        return {
+          // 分割したときは各回の総評をつなぐと長くなるので捨てる（画面は分類ごとの件数でまとめる）
+          text: JSON.stringify({ "総評": "", results }),
+          model: rs[0].model, usage, cost_usd: hasCost ? cost : null
+        };
       }
 
       // AIの回答（JSON）を読む。```json で囲まれていても、前後に文が付いていても本体だけ抜く
@@ -4570,64 +4620,318 @@
         } catch (e) { return null; }
       }
 
-      // 判定ごとに色を分けた表にする（2026-09-26: Markdownの長文が読みにくかったため）。
-      // 並びは 要修正 → HPに記載なし → 問題なし。問題なしは折りたたむ
-      function hpRenderAiResult(parsed, picked, truncatedMsg) {
-        const V = {
-          "要修正": { bg: "#fef2f2", fg: "#b91c1c" },
-          "HPに記載なし": { bg: "#fffbeb", fg: "#b45309" },
-          "問題なし": { bg: "#f0fdf4", fg: "#15803d" },
+      // ===HP_AI_VIEW_START===
+      // ---- AI照合の精度と見せ方（2026-10-08）----
+      // 精度: 備考の日付・時刻・金額・日数を機械で取り出してHPの記載と突き合わせ、「HPに無い値」をAIへの手がかりにする。
+      //       AIへ渡すHPの抜粋は、備考と関係の薄い行を落として関連行だけにする（無関係な行に引きずられるのを防ぐ）。
+      //       AIが「問題なし」と言っても機械が差を見つけていれば、画面に警告を出す（見逃しが一番危ないため）。
+      // 見せ方: エクセル風の表。修正箇所（現行）と変更案を並べ、変わった所だけ色を付ける。説明文は出さない。
+      const hpBrSplit = (s) => String(s || "").split(/<br\s*\/?>/i).map((x) => x.trim()).filter((x) => x !== "");
+
+      // 全角数字を半角にし、波ダッシュ類を ~ にそろえる
+      function hpNormText(s) {
+        return String(s || "").replace(/<br\s*\/?>/gi, " ")
+          .replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 65248))
+          .replace(/：/g, ":").replace(/／/g, "/").replace(/，/g, ",").replace(/[〜～]/g, "~");
+      }
+
+      // 文章から、比べられる事実（日付・時刻・金額・日数）を取り出す。4/9(金)~11(日) は 4/9,4/10,4/11 に展開する
+      function hpFacts(text) {
+        const s = hpNormText(text);
+        const dates = new Set(), times = new Set(), amounts = new Set(), days = new Set();
+        const used = [];
+        const range = /(\d{1,2})[\/月]\s*(\d{1,2})日?(?:\([^)]*\)|（[^）]*）)?\s*(?:\d{1,2}:\d{2})?\s*~\s*(?:(\d{1,2})[\/月]\s*)?(\d{1,2})(?![\d:])日?/g;
+        let m;
+        while ((m = range.exec(s))) {
+          const m1 = +m[1], d1 = +m[2], m2 = m[3] ? +m[3] : m1, d2 = +m[4];
+          if (m1 === m2 && d2 >= d1 && d2 - d1 <= 31) { for (let d = d1; d <= d2; d++) dates.add(m1 + "/" + d); }
+          else { dates.add(m1 + "/" + d1); dates.add(m2 + "/" + d2); }
+          used.push([m.index, range.lastIndex]);
+        }
+        const single = /(\d{1,2})[\/月]\s*(\d{1,2})日?/g;
+        while ((m = single.exec(s))) {
+          if (!used.some(([a, b]) => m.index >= a && m.index < b)) dates.add(+m[1] + "/" + +m[2]);
+        }
+        const tm = /(\d{1,2}):(\d{2})/g;
+        while ((m = tm.exec(s))) times.add(+m[1] + ":" + m[2]);
+        const tj = /(\d{1,2})時(?:(\d{2})分)?/g;
+        while ((m = tj.exec(s))) times.add(+m[1] + ":" + (m[2] || "00"));
+        const am = /(\d{1,3}(?:,\d{3})+|\d{3,})\s*円/g;
+        while ((m = am.exec(s))) amounts.add(String(Number(m[1].replace(/,/g, ""))));
+        const dy = /(\d+)\s*日間/g;
+        while ((m = dy.exec(s))) days.add(m[1] + "日間");
+        return { dates: [...dates], times: [...times], amounts: [...amounts], days: [...days] };
+      }
+
+      // 備考にあって、HPの記載（複数行）のどこにも見当たらない事実。期間の端の 0:00 / 23:59 は数えない
+      function hpFactDiff(note, lines) {
+        const n = hpFacts(note);
+        const hp = { dates: new Set(), times: new Set(), amounts: new Set(), days: new Set() };
+        for (const l of lines || []) {
+          const f = hpFacts(l);
+          for (const k of Object.keys(hp)) f[k].forEach((x) => hp[k].add(x));
+        }
+        const out = [];
+        n.dates.filter((x) => !hp.dates.has(x)).forEach((x) => out.push("日付 " + x));
+        n.times.filter((x) => x !== "0:00" && x !== "23:59" && !hp.times.has(x)).forEach((x) => out.push("時刻 " + x));
+        n.amounts.filter((x) => !hp.amounts.has(x)).forEach((x) => out.push("金額 " + Number(x).toLocaleString("ja-JP") + "円"));
+        n.days.filter((x) => !hp.days.has(x)).forEach((x) => out.push("日数 " + x));
+        return out;
+      }
+
+      const hpGrams = (s) => {
+        const t = String(s || "").replace(/<br\s*\/?>|\s+/gi, "");
+        const g = new Set();
+        for (let i = 0; i < t.length - 1; i++) g.add(t.slice(i, i + 2));
+        return g;
+      };
+
+      // HPの記載のうち、備考（複数可）と関係の濃い行だけを残す。行が少なければそのまま。順序は元のまま
+      function hpSelectLines(lines, notes, limit) {
+        const arr = (lines || []).map(String);
+        if (arr.length <= limit || !notes.length) return arr;
+        const ng = notes.map(hpGrams);
+        const nf = notes.map(hpFacts);
+        const shared = (a, b) => a.filter((x) => b.includes(x)).length;
+        const scored = arr.map((l, i) => {
+          const g = hpGrams(l), lf = hpFacts(l);
+          let best = 0;
+          ng.forEach((n, k) => {
+            let hit = 0;
+            g.forEach((x) => { if (n.has(x)) hit++; });
+            let sc = g.size && n.size ? hit / Math.sqrt(g.size * n.size) : 0;
+            sc += 0.15 * (shared(lf.dates, nf[k].dates) + shared(lf.times, nf[k].times) + shared(lf.amounts, nf[k].amounts) + shared(lf.days, nf[k].days));
+            if (sc > best) best = sc;
+          });
+          return { i, sc: best };
+        });
+        scored.sort((a, b) => b.sc - a.sc || a.i - b.i);
+        const keep = new Set(scored.slice(0, limit).map((x) => x.i));
+        return arr.filter((_, i) => keep.has(i));
+      }
+
+      // AIへ渡すHPの抜粋（ページ別）。その回に送る行が参照するページだけ、関連行に絞って返す
+      function hpBuildContext(rows, pageNotes, limit) {
+        const notesByPage = new Map();
+        for (const r of rows) {
+          for (const pid of r["HPページ"] || []) {
+            if (!notesByPage.has(pid)) notesByPage.set(pid, []);
+            if (r["現行の備考"]) notesByPage.get(pid).push(String(r["現行の備考"]));
+          }
+        }
+        const ctx = {};
+        notesByPage.forEach((notes, pid) => {
+          const lines = pageNotes && pageNotes[pid] && pageNotes[pid].lines;
+          if (lines) ctx[pid] = hpSelectLines(lines, notes, limit);
+        });
+        return ctx;
+      }
+
+      // 1行を比べて、違う部分（真ん中）だけを返す。似ていない行は全体を違う扱いにする
+      function hpCharDiff(a, b) {
+        let p = 0;
+        while (p < a.length && p < b.length && a[p] === b[p]) p++;
+        let q = 0;
+        while (q < a.length - p && q < b.length - p && a[a.length - 1 - q] === b[b.length - 1 - q]) q++;
+        const shorter = Math.min(a.length, b.length);
+        if (p + q < shorter * 0.3) return { a: ["", a, ""], b: ["", b, ""] };
+        return { a: [a.slice(0, p), a.slice(p, a.length - q), a.slice(a.length - q)], b: [b.slice(0, p), b.slice(p, b.length - q), b.slice(b.length - q)] };
+      }
+
+      // <br>区切りの行を比べ、そのまま(same)・消える(del)・入る(ins) に分ける
+      function hpLineOps(a, b) {
+        const n = a.length, m = b.length;
+        const dp = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+        for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+        const ops = [];
+        let i = 0, j = 0;
+        while (i < n || j < m) {
+          if (i < n && j < m && a[i] === b[j]) { ops.push({ t: "same", s: a[i] }); i++; j++; }
+          else if (j >= m || (i < n && dp[i + 1][j] >= dp[i][j + 1])) { ops.push({ t: "del", s: a[i] }); i++; }
+          else { ops.push({ t: "ins", s: b[j] }); j++; }
+        }
+        return ops;
+      }
+
+      // 「修正箇所」(現行) と「変更案」を左右に分けて作る。変わった行だけ見せ、同じ行は「他N行 同じ」にたたむ。
+      // 行が置き換わっているときは、行の中の変わった文字だけ濃く強調する
+      function hpDiffCols(cur, fix) {
+        const a = hpBrSplit(cur), b = hpBrSplit(fix);
+        const ops = hpLineOps(a, b);
+        const left = [], right = [];
+        let same = 0;
+        for (let k = 0; k < ops.length;) {
+          if (ops[k].t === "same") { same++; k++; continue; }
+          const dels = [], inss = [];
+          while (k < ops.length && ops[k].t === "del") dels.push(ops[k++].s);
+          while (k < ops.length && ops[k].t === "ins") inss.push(ops[k++].s);
+          const pairs = Math.min(dels.length, inss.length);
+          dels.forEach((s, x) => {
+            let body = escHtml(s);
+            if (x < pairs) { const d = hpCharDiff(s, inss[x]); body = `${escHtml(d.a[0])}<span style="background:#ffc7c7;text-decoration:line-through">${escHtml(d.a[1])}</span>${escHtml(d.a[2])}`; }
+            left.push(`<div style="padding:1px 0">${body}</div>`);
+          });
+          inss.forEach((s, x) => {
+            let body = escHtml(s);
+            if (x < pairs) { const d = hpCharDiff(dels[x], s); body = `${escHtml(d.b[0])}<span style="background:#a8e6a8;font-weight:700">${escHtml(d.b[1])}</span>${escHtml(d.b[2])}`; }
+            else body = `<span style="background:#a8e6a8;font-weight:700">${body}</span>`;
+            right.push(`<div style="padding:1px 0">${body}</div>`);
+          });
+        }
+        const gray = (n) => `<div style="color:#999;font-size:11px;margin-top:2px">他${n}行 同じ</div>`;
+        if (same) { if (left.length) left.push(gray(same)); if (right.length) right.push(gray(same)); }
+        const hatch = "background:repeating-linear-gradient(135deg,#fff,#fff 6px,#f4f4f4 6px,#f4f4f4 12px)";
+        return {
+          left: a.length ? left.join("") : "", right: right.join(""),
+          leftStyle: a.length ? "" : hatch + ";color:#999", leftEmpty: !a.length,
         };
+      }
+
+      // 2つの文字列の最長の共通部分（4文字以上）。HPの引用のうち、備考と一致している箇所を見つけるのに使う
+      function hpCommonPart(a, b) {
+        let best = 0, end = 0;
+        let prev = new Array(b.length + 1).fill(0);
+        for (let i = 1; i <= a.length; i++) {
+          const cur = new Array(b.length + 1).fill(0);
+          for (let j = 1; j <= b.length; j++) {
+            if (a[i - 1] === b[j - 1]) { cur[j] = prev[j - 1] + 1; if (cur[j] > best) { best = cur[j]; end = i; } }
+          }
+          prev = cur;
+        }
+        return best >= 4 ? a.slice(end - best, end) : "";
+      }
+
+      // HPの引用文のうち、強調したい部分に印を付ける。AIが「強調」を返し、それが引用に含まれていればそれを使い、
+      // 無ければ備考（修正案・現行）と共通する最長の部分を使う
+      function hpQuoteHtml(quote, hint, compareTexts) {
+        const q = String(quote || "");
+        let m = String(hint || "").trim();
+        if (!m || !q.includes(m)) {
+          m = "";
+          for (const t of compareTexts) {
+            const c = hpCommonPart(q, hpBrSplit(t).join(" "));
+            if (c.length > m.length) m = c;
+          }
+        }
+        const i = m ? q.indexOf(m) : -1;
+        if (i < 0) return escHtml(q);
+        return `${escHtml(q.slice(0, i))}<mark style="background:#fff176;padding:0 1px">${escHtml(m)}</mark>${escHtml(q.slice(i + m.length))}`;
+      }
+
+      // AIが引いたHP原文が、実際に渡したHPの抜粋にあるか（言い換え・でっち上げの検出）
+      function hpQuoteVerified(quote, pageId, context) {
+        const norm = (s) => String(s || "").replace(/\s+/g, "");
+        const q = norm(quote);
+        if (!q) return null;
+        const lines = (context && context[pageId]) || [];
+        if (lines.some((l) => norm(l).includes(q))) return true;
+        return Object.values(context || {}).some((arr) => (arr || []).some((l) => norm(l).includes(q)));
+      }
+
+      // 件数の絞り込み（指摘の分類ごと）。結果の表を作り直さず、行の表示だけを切り替える
+      function hpWireAiFilter(root) {
+        const chips = [...root.querySelectorAll("._hp-tag")];
+        const apply = (tag) => {
+          chips.forEach((c) => {
+            const on = c.dataset.tag === tag;
+            c.style.background = on ? "#fff" : "transparent";
+            c.style.fontWeight = on ? "700" : "400";
+            c.style.borderColor = on ? "#c6c6c6" : "transparent";
+          });
+          root.querySelectorAll("tr[data-tag]").forEach((tr) => { tr.style.display = !tag || tr.dataset.tag === tag ? "" : "none"; });
+          root.querySelectorAll("._hp-grp").forEach((g) => {
+            const any = [...g.querySelectorAll("tr[data-tag]")].some((tr) => tr.style.display !== "none");
+            g.style.display = any ? "" : "none";
+          });
+        };
+        chips.forEach((c) => { c.onclick = () => apply(c.dataset.tag); });
+        apply("");
+      }
+      // ===HP_AI_VIEW_END===
+
+      // 判定ごとに色を分けた表にする。エクセル風: 判定｜席種｜修正箇所｜変更案｜HP根拠。
+      // 並びは 要修正 → HPに記載なし → 問題なし。問題なしは折りたたむ
+      function hpRenderAiResult(parsed, picked, truncatedMsg, context, mech) {
+        const V = {
+          "要修正": { bg: "#f9cccc", fg: "#8a1f1f", row: "#fff" },
+          "HPに記載なし": { bg: "#ffeeb0", fg: "#7a5a00", row: "#fff" },
+          "問題なし": { bg: "#d9efd9", fg: "#256025", row: "#fff" },
+        };
+        const label = { "要修正": "要修正", "HPに記載なし": "記載なし", "問題なし": "問題なし" };
         const order = ["要修正", "HPに記載なし", "問題なし"];
-        // 備考の <br> は改行として見せる（文字はエスケープしてから <br> だけ戻す）
-        const note = (s) => escHtml(String(s || "")).replace(/&lt;br\s*\/?&gt;/gi, "<br>");
         const byId = new Map(picked.map((f, i) => [i + 1, f]));
         const groups = { "要修正": [], "HPに記載なし": [], "問題なし": [] };
         for (const r of parsed.results) {
           const v = order.includes(r["判定"]) ? r["判定"] : "HPに記載なし";
           groups[v].push(r);
         }
-        const th = 'style="border:1px solid #e5e7eb;padding:4px 6px;background:#f3f4f6;text-align:left;white-space:nowrap;writing-mode:horizontal-tb;height:auto;position:static"';
-        const td = 'style="border:1px solid #e5e7eb;padding:4px 6px;vertical-align:top;white-space:normal;height:auto;writing-mode:horizontal-tb;text-align:left"';
+        const th = 'style="border:1px solid #d4d4d4;padding:4px 6px;background:#f3f3f3;color:#444;font-weight:400;text-align:center;white-space:nowrap;writing-mode:horizontal-tb;height:auto;position:static"';
+        const td = 'style="border:1px solid #d4d4d4;padding:4px 6px;vertical-align:top;white-space:normal;height:auto;writing-mode:horizontal-tb;text-align:left;background:#fff"';
         const table = (list, v) => {
           const c = V[v];
           const rows = list.map((r) => {
             const f = byId.get(Number(r.id)) || {};
             const seats = (f.seats && f.seats.length ? f.seats : [f.row ? (f.row.表示名 || f.row.席種エリア名 || "") : ""]).filter(Boolean);
-            const cnt = f.row && f.row._count > 1
-              ? `<div style="color:#6b7280;font-size:11px">${f.row._count}行${f.row._row != null ? "（先頭 " + (f.row._row + 1) + "行目）" : ""}</div>`
-              : (f.row && f.row._row != null ? `<div style="color:#6b7280;font-size:11px">${f.row._row + 1}行目</div>` : "");
+            const rowNo = f.row && f.row._row != null ? `行 ${f.row._row + 1}` : "";
+            const cnt = f.row && f.row._count > 1 ? ` ×${f.row._count}` : "";
             const current = f.level === "ai" ? f.note : (f.detail || "");
             const fix = String(r["修正案"] || "").trim();
-            const ev = (r["HP根拠"] || []).map((h) =>
-              `<div style="margin-top:3px;padding:2px 4px;background:#f8fafc;border-left:3px solid #94a3b8;font-size:11px"><span style="color:#64748b">${escHtml(h["ページ"] || "")}</span><br>${escHtml(h["記載"] || "")}</div>`).join("");
-            return `<tr style="background:${c.bg}">
-              <td ${td}><span style="display:inline-block;padding:1px 6px;border-radius:9px;background:${c.fg};color:#fff;font-size:11px;white-space:nowrap">${escHtml(v)}</span></td>
-              <td ${td}><b>${seats.map(escHtml).join("<br>")}</b>${cnt}</td>
-              <td ${td}>${note(current)}</td>
-              <td ${td}>${fix ? `<span style="color:#15803d;font-weight:600">${note(fix)}</span>` : '<span style="color:#9ca3af">―</span>'}</td>
-              <td ${td}>${escHtml(r["理由"] || "")}${ev}</td>
+            const compare = [fix, current].filter(Boolean);
+            const ev = (r["HP根拠"] || []).map((h) => {
+              const ok = hpQuoteVerified(h["記載"], h["ページ"], context);
+              const badge = ok === false ? ' <span style="color:#b91c1c;font-weight:700">⚠原文に無い</span>' : "";
+              return `<div style="margin-bottom:3px;font-size:12px;color:#444"><span style="color:#8a8a8a;font-size:11px">${escHtml(h["ページ"] || "")}</span>${badge}<br>${hpQuoteHtml(h["記載"], h["強調"], compare)}</div>`;
+            }).join("") || '<span style="color:#999">―</span>';
+            let left, right, leftStyle = "";
+            if (v === "要修正" && fix) {
+              const d = hpDiffCols(current, fix);
+              if (!d.left && !d.right) { left = '<span style="color:#999">（現行と同じ）</span>'; right = '<span style="color:#999">―</span>'; }
+              else { left = d.leftEmpty ? "（空）" : d.left; right = d.right || '<span style="color:#999">―</span>'; leftStyle = d.leftStyle; }
+            } else {
+              const ls = hpBrSplit(current);
+              left = `<span style="color:${v === "問題なし" ? "#888" : "#222"}">${ls.slice(0, 2).map(escHtml).join("<br>")}${ls.length > 2 ? `<div style="color:#999;font-size:11px">他${ls.length - 2}行</div>` : ""}</span>`;
+              right = '<span style="color:#999">―</span>';
+            }
+            const warn = v === "問題なし" && mech && mech[r.id] && mech[r.id].length
+              ? `<div style="margin-top:4px;font-size:11px;color:#b45309;font-weight:700">⚠ HPに無い: ${escHtml(mech[r.id].join("・"))}</div>` : "";
+            return `<tr data-tag="${escHtml(r["分類"] || "")}">
+              <td ${td}><div style="background:${c.bg};color:${c.fg};font-weight:700;text-align:center;padding:2px 4px">${label[v]}</div>${warn}</td>
+              <td ${td}>${seats.map(escHtml).join("<br>")}<div style="color:#8a8a8a;font-size:11px">${rowNo}${cnt}</div></td>
+              <td style="${td.slice(7, -1)};${leftStyle}">${left}</td>
+              <td ${td}>${right}</td>
+              <td ${td}>${ev}</td>
             </tr>`;
           }).join("");
-          return `<table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;margin-top:4px">
-            <colgroup><col style="width:92px"><col style="width:170px"><col><col><col style="width:30%"></colgroup>
-            <thead><tr><th ${th}>判定</th><th ${th}>席種エリア表示名</th><th ${th}>現行</th><th ${th}>修正案</th><th ${th}>理由・HPの根拠</th></tr></thead>
+          return `<table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed;margin-top:2px">
+            <colgroup><col style="width:84px"><col style="width:190px"><col style="width:26%"><col style="width:26%"><col></colgroup>
+            <thead><tr><th ${th}>判定</th><th ${th}>席種</th><th ${th}>修正箇所</th><th ${th}>変更案</th><th ${th}>HP根拠</th></tr></thead>
             <tbody>${rows}</tbody></table>`;
         };
-        const counts = order.map((v) => `<span style="color:${V[v].fg};font-weight:600">${v} ${groups[v].length}件</span>`).join("　");
-        let html = `<div style="font-size:13px;margin-bottom:6px">${counts}</div>`;
-        if (parsed["総評"]) html += `<div style="margin-bottom:8px;padding:6px 8px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:4px;font-size:12px">${escHtml(parsed["総評"])}</div>`;
-        if (truncatedMsg) html += `<div style="color:#b45309;font-size:12px;margin-bottom:6px">${escHtml(truncatedMsg)}</div>`;
+        const sw = (v) => `<span style="display:inline-block;width:10px;height:10px;background:${V[v].bg};border:1px solid ${V[v].fg}55;margin-right:4px"></span>`;
+        const counts = order.map((v) => `<span style="margin-right:16px">${sw(v)}${label[v]} <b>${groups[v].length}</b></span>`).join("");
+        const legend = '<span style="margin-left:auto;color:#555;font-size:12px"><span style="background:#ffc7c7;text-decoration:line-through;padding:0 3px">旧</span> 消える　<span style="background:#a8e6a8;font-weight:700;padding:0 3px">新</span> 入る　<span style="background:#fff176;padding:0 3px">HP</span> 決め手</span>';
+        let html = `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;height:auto;min-height:32px;background:#f3f3f3;border:1px solid #c6c6c6;padding:2px 10px;font-size:13px">${counts}${legend}</div>`;
+        // 分類ごとの絞り込み（エクセルのシートタブ風）
+        const tagCount = new Map();
+        for (const r of parsed.results) {
+          if (r["判定"] === "問題なし" || !r["分類"]) continue;
+          tagCount.set(r["分類"], (tagCount.get(r["分類"]) || 0) + 1);
+        }
+        if (tagCount.size) {
+          const chip = (tag, text, n) => `<span class="_hp-tag" data-tag="${escHtml(tag)}" style="cursor:pointer;padding:3px 12px;border:1px solid transparent;border-bottom:none;font-size:12px">${escHtml(text)}${n != null ? ` <b>${n}</b>` : ""}</span>`;
+          html += `<div style="display:flex;flex-wrap:wrap;background:#e9e9e9;border:1px solid #c6c6c6;border-top:none;padding:3px 8px 0">${chip("", "すべて", null)}${[...tagCount.entries()].sort((x, y) => y[1] - x[1]).slice(0, 8).map(([k, n]) => chip(k, k, n)).join("")}</div>`;
+        }
+        if (truncatedMsg) html += `<div style="color:#b45309;font-size:12px;margin-top:6px">${escHtml(truncatedMsg)}</div>`;
         for (const v of order) {
           if (!groups[v].length) continue;
           const body = table(groups[v], v);
           html += v === "問題なし"
-            ? `<details style="margin-top:10px"><summary style="cursor:pointer;color:${V[v].fg};font-weight:600">${v}（${groups[v].length}件）を表示</summary>${body}</details>`
-            : `<h4 style="margin:10px 0 2px;color:${V[v].fg}">${v}（${groups[v].length}件）</h4>${body}`;
+            ? `<div class="_hp-grp"><details style="margin-top:8px"><summary style="cursor:pointer;color:${V[v].fg};font-weight:600;font-size:12px">問題なし ${groups[v].length}件を表示</summary>${body}</details></div>`
+            : `<div class="_hp-grp" style="margin-top:8px">${body}</div>`;
         }
         const answered = new Set(parsed.results.map((r) => Number(r.id)));
         const missing = picked.filter((_, i) => !answered.has(i + 1)).length;
-        if (missing > 0) html += `<div style="margin-top:8px;color:#b45309;font-size:12px">AIが判定を返さなかった項目が ${missing} 件あります。もう一度実行してください。</div>`;
+        if (missing > 0) html += `<div style="margin-top:8px;color:#b45309;font-size:12px">判定が返らなかった項目が ${missing} 件あります。もう一度実行してください。</div>`;
         return html;
       }
 
