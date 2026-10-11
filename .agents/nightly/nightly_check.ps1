@@ -23,13 +23,15 @@ try {
     "$stamp 起動失敗: $($_.Exception.Message)" | Out-File -FilePath $runMarker -Encoding utf8
 }
 
-# 失敗時は他の定期タスクと同じntfyへ通知する。以前は終了コードがタスク履歴に残るだけで、
-# 2026-07-07〜08-01の25日間と2026-09-15〜10-02の18日間、誰も気づかないまま毎晩失敗していた。
-if ($exitCode -ne 0) {
+# 失敗時は他の定期タスクと同じく MAIN の ROUTINE_FAILURES.md へ記録し、朝のブリーフィングで拾う。
+# 以前は終了コードがタスク履歴に残るだけで、2026-07-07〜08-01の25日間と2026-09-15〜10-02の18日間、
+# 誰も気づかないまま毎晩失敗していた（2026-10-03〜10-11はntfy通知、以降はログ記録）。
+$routineFailure = "C:\Users\test\MAIN\10_AI_NEXUS\Tasks\RoutineFailure.ps1"
+if ($exitCode -ne 0 -and (Test-Path -LiteralPath $routineFailure)) {
     try {
-        curl.exe -s -m 20 -H "Title: TSV Editor Nightly UI Check NG" -H "Tags: warning" `
-            -d "exitCode=$exitCode. See repos/tsv-editor/.agents/nightly/log/latest.md" `
-            "https://ntfy.sh/iwakiri_ai_notify_9x8f2" | Out-Null
+        . $routineFailure
+        Write-RoutineFailure -Source "TsvEditor_NightlyUiCheck" `
+            -Message "exitCode=$exitCode。repos/tsv-editor/.agents/nightly/log/latest.md を確認"
     } catch {}
 }
 
