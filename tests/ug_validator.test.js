@@ -407,7 +407,8 @@ eqCU(validate.canUpgrade("VIPスイート・プレミアム 5F", "RESV96", "大�
 
 // --- 車椅子席・同伴席: 席移動不可（同一席種内の大人への年齢変更のみ可・2026-08-27確定）---
 eqCU(validate.canUpgrade("車椅子席V1", "RESV31", "子供", "車椅子席V1", "RESV31", "大人"), true, "車椅子: 同一席種内の子供→大人(年齢変更)は可");
-eqCU(validate.canUpgrade("車椅子席V1", "RESV31", "大人", "車椅子席V1", "RESV31", "大人"), false, "車椅子: 席移動不可のため同券種UG(再発行)は不可");
+// 2026-10-13: 車いす指定席は同席種同券種の座席移動UG可（車いすエリア席・同伴席は不可のまま）
+eqCU(validate.canUpgrade("車椅子席V1", "RESV31", "大人", "車椅子席V1", "RESV31", "大人"), true, "車椅子(指定席): 同席種同券種の座席移動UGは可");
 eqCU(validate.canUpgrade("車椅子席V1", "RESV31", "大人", "車椅子席V2", "RESV32", "大人"), false, "車椅子: 別の車椅子席(V1→V2)へのUGは不可");
 eqCU(validate.canUpgrade("車椅子席V1", "RESV31", "子供", "車椅子席V2", "RESV32", "大人"), false, "車椅子: 別席への年齢変更(V1子供→V2大人)も不可");
 eqCU(validate.canUpgrade("車椅子席V1", "RESV31", "子供", "車椅子席V1", "RESV31", "U23"), false, "車椅子: 同一席でも中間昇格(子供→U23)は不可");
@@ -905,6 +906,45 @@ for (const s of CUTOFF_SCENARIOS) {
   // 確認3後段: 3歳以上共通 → 8歳以上共通・中学生以上共通 は可
   eqCU(cu(C3, "3歳以上共通", PC, "8歳以上共通"), true, "3歳以上共通→8歳以上共通 は可");
   eqCU(cu(C3, "3歳以上共通", VP, "中学生以上共通"), true, "3歳以上共通→中学生以上共通 は可");
+}
+
+// 2026-10-13 SHUN確認: 車いす指定席の座席移動・Paddock Clubは元にできない
+{
+  const WR = { name: "F1_B1車いす観戦券[T2]", cd: "SF1B1W001" };
+  const WC = { name: "F1_B1車いす同伴観戦券[T2]", cd: "SF1B1C001" };
+  const WA = { name: "IGTC26_車いすV2ｴﾘｱ観戦券", cd: "SIGV2W001" };
+  const PC = { name: "F1_Formula 1 Paddock Club™観戦券", cd: "SF1PC0001" };
+  const HI = { name: "F1_GRAN席", cd: "SF1GR0001" };
+  const LO = { name: "F1_B2席", cd: "SF1B20001" };
+  const ROWS = [
+    priceRow(WR.name, WR.cd, "大人（24歳以上）", 30000, 30000), priceRow(WR.name, WR.cd, "子ども（小学生・中学生）", 5000, 5000),
+    priceRow(WC.name, WC.cd, "大人（24歳以上）", 30000, 30000),
+    priceRow(WA.name, WA.cd, "大人（24歳以上）", 4000, 4000),
+    priceRow(PC.name, PC.cd, "8歳以上共通", 1200000, 1200000),
+    priceRow(HI.name, HI.cd, "3歳以上共通", 1500000, 1500000),
+    priceRow(LO.name, LO.cd, "大人（24歳以上）", 40000, 40000),
+  ];
+  const val = buildUgValidator(ROWS, c, v, null);
+  const cu = (s, sa, d, da) => val.canUpgrade(s.name, s.cd, sa, d.name, d.cd, da);
+  eqCU(cu(WR, "大人（24歳以上）", WR, "大人（24歳以上）"), true, "車いす指定席: 同席種同券種の座席移動UGは可");
+  {
+    const chk = val(ugRow(WR.name, WR.cd, "大人（24歳以上）", WR.name, WR.cd, "大人（24歳以上）", 500, 500));
+    eqCU(chk.status, "ok", "validate 車いす指定席の座席移動 はok（500円）");
+  }
+  eqCU(cu(WC, "大人（24歳以上）", WC, "大人（24歳以上）"), false, "車いす同伴席: 同席種同券種UGは不可");
+  eqCU(cu(WA, "大人（24歳以上）", WA, "大人（24歳以上）"), false, "車いすエリア席: 同席種同券種UGは不可");
+  {
+    const chk = val(ugRow(WC.name, WC.cd, "大人（24歳以上）", WC.name, WC.cd, "大人（24歳以上）", 500, 500));
+    eqCU(chk.problems.some((p) => p.includes("車いすエリア席・同伴席は席移動不可")), true, "validate 車いす同伴席の同券種UG の不可理由");
+  }
+  eqCU(cu(WR, "大人（24歳以上）", WC, "大人（24歳以上）"), false, "車いす→同伴 は不可のまま");
+  // Paddock Club は元にできない（先としては可）
+  eqCU(cu(PC, "8歳以上共通", HI, "3歳以上共通"), false, "Paddock Club→上位席 は不可");
+  {
+    const chk = val(ugRow(PC.name, PC.cd, "8歳以上共通", HI.name, HI.cd, "3歳以上共通", 300000, 300000));
+    eqCU(chk.problems.some((p) => p.includes("Paddock Clubからの席種変更は不可")), true, "validate Paddock Club→上位席 の不可理由");
+  }
+  eqCU(cu(LO, "大人（24歳以上）", PC, "8歳以上共通"), true, "一般席→Paddock Club は可");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

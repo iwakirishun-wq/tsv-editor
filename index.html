@@ -3192,6 +3192,8 @@
         // かつ販売経路=法人のため対象外（IGTCのホスピタリティ観戦券は対象に残すので厳密一致させる）。
         const isUgExcludedSeat = (seat) =>
           /ファミリーシート|カメラマン|市民応援席|ローカルホスピ/.test(String(seat || "").normalize("NFKC"));
+        // 元にできない席種（先としてはUG可）。Formula 1 Paddock Club から他席種への変更は不可（2026-10-13 SHUN確認・正本§2-9）
+        const isUgSourceExcludedSeat = (seat) => /Paddock Club|パドッククラブ/i.test(String(seat || "").normalize("NFKC"));
         // 元席種内の年齢区分変更だけを認める席種（SHUN指示 2026-08-19）。
         // 木曜日券・木・金曜日券は上位席へのUG不可。マスタ上エリア席（数在庫）なので
         // 同席種・同券種の再発行UGも不可＝実質「同一席種内の年齢区分変更のみ」。
@@ -3243,6 +3245,7 @@
           if (ticketDowngradeWindows(any.get(srcSeat + "|" + srcAge), any.get(dstSeat + "|" + dstAge)).length) return false;
           // 公式HPでUG対象外と明示された席種（2026-08-18ルール。VBA側から2026-08-24に移植）
           if (isUgExcludedSeat(srcSeat) || isUgExcludedSeat(dstSeat)) return false;
+          if (isUgSourceExcludedSeat(srcSeat) && srcSeat !== dstSeat) return false;
           const sameAgeCatPre = (sr !== 0 && sr === dr) || srcAge === dstAge;
           // 年齢別券種の席種どうしの別席種UGは横（同じ年齢区分）のみ（2026-10-13・正本§14）
           if (ugYouthToAdultReason(srcSeat, srcAge, dstSeat, dstAge)) return false;
@@ -3270,7 +3273,8 @@
             if (srcWc !== dstWc) return false;
             if (srcComp !== dstComp) return false;
             if (srcSeat !== dstSeat) return false;
-            if (sameAgeCat) return false;
+            // 2026-10-13: 車いす指定席は同席種同券種の座席移動UG（500円）可。車いすエリア席・同伴席は不可（正本§2-5）
+            if (sameAgeCat) return !srcComp && dstCat === "指定席";
             if (dr !== 4) return false;
             return true;
           }
@@ -3316,6 +3320,7 @@
           }
           // 公式HPでUG対象外と明示された席種（2026-08-18ルール。VBA側から2026-08-24に移植）
           if (isUgExcludedSeat(srcSeat) || isUgExcludedSeat(dstSeat)) problems.push("公式HPでUG対象外の席種");
+          if (isUgSourceExcludedSeat(srcSeat) && srcSeat !== dstSeat) problems.push("Paddock Clubからの席種変更は不可");
           // 木曜日券・木・金曜日券は同一席種内の年齢区分変更のみ（2026-08-19ルール。VBA側から移植）
           if (isSameSeatOnlyUg(srcSeat) || isSameSeatOnlyUg(dstSeat)) {
             if (srcSeat !== dstSeat) problems.push("木曜日券・木金曜日券は他席種とのUG不可");
@@ -3335,7 +3340,8 @@
             } else if (srcSeat !== dstSeat) {
               problems.push("車椅子席は同伴含め席移動不可（他席種への変更不可）");
             } else if (sameAgeCat) {
-              problems.push("車椅子席は席移動不可のため同券種UGは設定不可");
+              // 2026-10-13: 車いす指定席は同席種同券種の座席移動UG可。車いすエリア席・同伴席は不可（正本§2-5）
+              if (srcComp || dstCat !== "指定席") problems.push("車いすエリア席・同伴席は席移動不可のため同券種UGは設定不可");
             } else if (dr !== 4) {
               problems.push("車椅子席の年齢変更は大人へのみ可");
             }
