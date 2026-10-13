@@ -947,5 +947,25 @@ for (const s of CUTOFF_SCENARIOS) {
   eqCU(cu(LO, "大人（24歳以上）", PC, "8歳以上共通"), true, "一般席→Paddock Club は可");
 }
 
+// 2026-10-13 SHUN確認（正本§15）: ホスピタリティのクラブ・ラウンジは指定席でも座席移動不可。
+// 同じ席種どうしは年齢区分の変更だけ可（同席種・同券種UGは設定不可）
+{
+  const CLUB = { name: "8HRR26_ﾎｽﾋﾟﾀﾘﾃｨｸﾗﾌﾞ 観戦券", cd: "SEHC00001" };
+  const LNG = { name: "8HRR26_ﾎｽﾋﾟﾀﾘﾃｨﾗｳﾝｼﾞ 7食あり", cd: "SEHL00001" };
+  const ROWS = [
+    priceRow(CLUB.name, CLUB.cd, "大人（高校生以上）", 69050, 69050), priceRow(CLUB.name, CLUB.cd, "子ども(3歳～中学生)", 9000, 9000),
+    priceRow(LNG.name, LNG.cd, "大人（高校生以上）", 75450, 75450), priceRow(LNG.name, LNG.cd, "子ども(3歳～中学生)", 12200, 12200),
+  ];
+  const val = buildUgValidator(ROWS, c, v, null);
+  const cu = (s, sa, d, da) => val.canUpgrade(s.name, s.cd, sa, d.name, d.cd, da);
+  eqCU(cu(CLUB, "大人（高校生以上）", CLUB, "大人（高校生以上）"), false, "クラブ: 同席種同券種（座席移動）は不可");
+  eqCU(cu(LNG, "子ども(3歳～中学生)", LNG, "子ども(3歳～中学生)"), false, "ラウンジ: 同席種同券種（座席移動）は不可");
+  eqCU(cu(CLUB, "子ども(3歳～中学生)", CLUB, "大人（高校生以上）"), true, "クラブ: 同席種内の子ども→大人は可");
+  {
+    const chk = val(ugRow(CLUB.name, CLUB.cd, "大人（高校生以上）", CLUB.name, CLUB.cd, "大人（高校生以上）", 500, 500));
+    eqCU(chk.problems.some((p) => p.includes("クラブ・ラウンジは席移動不可")), true, "validate クラブの同席種同券種UG の不可理由");
+  }
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

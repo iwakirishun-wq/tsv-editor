@@ -3333,6 +3333,9 @@
           /ファミリーシート|カメラマン|市民応援席|ローカルホスピ/.test(String(seat || "").normalize("NFKC"));
         // 元にできない席種（先としてはUG可）。Formula 1 Paddock Club から他席種への変更は不可（2026-10-13 SHUN確認・正本§2-9）
         const isUgSourceExcludedSeat = (seat) => /Paddock Club|パドッククラブ/i.test(String(seat || "").normalize("NFKC"));
+        // 指定席でも座席移動（同席種・同券種の再発行UG）ができない席種。ホスピタリティのクラブ・ラウンジは
+        // 同じ席種どうしでは年齢区分の変更だけ可（2026-10-13 SHUN確認・正本§15）
+        const isNoSeatMoveSeat = (seat) => /クラブ|ラウンジ/.test(String(seat || "").normalize("NFKC"));
         // 元席種内の年齢区分変更だけを認める席種（SHUN指示 2026-08-19）。
         // 木曜日券・木・金曜日券は上位席へのUG不可。マスタ上エリア席（数在庫）なので
         // 同席種・同券種の再発行UGも不可＝実質「同一席種内の年齢区分変更のみ」。
@@ -3417,7 +3420,7 @@
             if (dr !== 4) return false;
             return true;
           }
-          if (sameSeat && dstCat === "エリア") return false;
+          if (sameSeat && (dstCat === "エリア" || isNoSeatMoveSeat(dstSeat))) return false;
           // 0円商品はUGの元にも先にもできない（VBAから2026-08-25移植）
           if (hasZeroPrice(any.get(srcSeat + "|" + srcAge)) || hasZeroPrice(any.get(dstSeat + "|" + dstAge))) return false;
           // 席種の最高額どうしの比較によるダウングレード防止（2026-07-12 VBA確定ルール・2026-08-25 JS移植）
@@ -3468,6 +3471,7 @@
           // エリア席のみ「同席種・同券種UG不可」。その他(O・車椅子・パス等)/指定席は対象外
           const dstCat = seatCat(dstCode, dstSeat);
           if (sameSeat && dstCat === "エリア") problems.push("エリア席の同席種同券種UGは設定不可");
+          else if (sameSeat && isNoSeatMoveSeat(dstSeat)) problems.push("ホスピタリティのクラブ・ラウンジは席移動不可のため同席種同券種UGは設定不可");
           // 車椅子・同伴: 席移動不可（他席種への変更・同席種同券種の再発行は不可。同一席種内の年齢区分変更のみ可）
           const srcWc = isWheelchair(srcSeat), dstWc = isWheelchair(dstSeat);
           const srcComp = isCompanion(srcSeat), dstComp = isCompanion(dstSeat);
@@ -14678,7 +14682,11 @@ ${_sortableTable(labels, rowsHtml)}` };
               if (!diff) return "";
               return `<br><span class="hp-period-diff">${escHtml(diff)}</span>`;
             };
-            let head = `<tr><th class="corner" colspan="2" rowspan="2">元＼先</th>`;
+            // 基準の販売期間は「元＼先」セルの下に強調表示（2026-10-13 SHUN要望。ブロック見出しの横から移動）
+            const cornerPeriod = (baseStartFmt || baseEndFmt)
+              ? `<div class="corner-period"><span class="cp-label">基準の販売期間</span><b>${escHtml(baseStartFmt || "")}</b><span class="cp-arrow">↓</span><b>${escHtml(baseEndFmt || "")}</b></div>`
+              : "";
+            let head = `<tr><th class="corner" colspan="2" rowspan="2">元＼先${cornerPeriod}</th>`;
             for (const ts of toSeats) head += `<th class="seathdr" colspan="${toAges[ts].length}" style="background:${seatColor(ts)}"><span class="seathdr-label">${escHtml(seatLabel(ts, seatCode[ts]))}${catBadge(seatCat(seatCode[ts], ts))}</span></th>`;
             head += `</tr><tr>`;
             let prevTsHead = null;
@@ -14757,13 +14765,13 @@ ${_sortableTable(labels, rowsHtml)}` };
                 bodyRows += `</tr>`;
               });
             }
-            mxBody += `<div class="cond-block" data-cond="${escHtml(k)}"><h3>${escHtml(k)}${basePeriodHtml}</h3><div class="scroll mxscroll"><table class="mx">${head}${bodyRows}</table></div></div>`;
+            mxBody += `<div class="cond-block" data-cond="${escHtml(k)}"><h3>${escHtml(k)}</h3><div class="scroll mxscroll"><table class="mx">${head}${bodyRows}</table></div></div>`;
           }
           const ngBadge = ngTotal ? `　<span class="badge-ng">NG ${ngTotal}件</span>` : `　<span class="badge-ok">検算OK</span>`;
           const missingAll = ugmx ? ugmx.model.counts.missing : 0;
           const missingBadge = (missingTotal || missingAll) ? `　<span class="badge-ng" style="background:#b45309">登録漏れ?候補 ${missingTotal}件${missingAll > missingTotal ? `（この表に行・列の無い券種を含めると${missingAll}件）` : ""}</span>` : "";
           sections.matrix = { title: "UGマトリクス", body: `<h2>🔢 アップグレードマトリクス（券種別・金額）${ngBadge}${missingBadge}</h2>
-<p class="legend">行=元席種/券種、列=先席種/券種（大人の前売価格の安い順）。基本の販売期間は各ブロック見出しに表示。席種は表示略称＋区分（<span class="catb cat-r">指定席</span><span class="catb cat-a">数在庫</span><span class="catb cat-o">その他</span>）。各セル: 先－元=期待差額（緑） / 前売・当日=実際の金額（数字太字） / 橙ラベル=基本と異なる販売期間（差分のみ短縮表示、見出しの通常価格も同様）。<b>期待差額</b>は同席種・同年齢区分なら一律500、それ以外は元と先が同額（差額0円）なら500（席変更手数料）・差額があれば年齢区分を問わず実差額（2026-10-13改訂）。前売/当日の対象券種価格が先&lt;元ならUG不可（0円に丸めない）。<b>不一致は文字が赤・セルが薄ピンク</b>。<b>「？」の橙セル</b>はUG登録が無いセルのうち、正本のUG可否で可（子ども→大人・共通券・車いす指定席の座席移動などを含む）かつ値下がりしないため登録漏れの可能性がある候補（推測なので必ず人が確認してください）。行・列はUG行に出てくる席種・券種だけ。クリックでマーク</p>${mxBody}` };
+${mxBody}` };
         }
 
         // --- UG席種マトリクス（元席種×先席種。券種ごとの判定を点で集約・違反/差額違い/設定漏れを俯瞰） ---
@@ -14982,6 +14990,10 @@ table.mx th.seatrow { position: sticky; left: 0; z-index: 5; width: 58px; min-wi
 table.mx th.agecol { position: sticky; left: 58px; z-index: 5; width: 92px; min-width: 92px; max-width: 92px; text-align: left; background: #f3f5f8; font-weight: 600; }
 /* 隅（上＋左固定） */
 table.mx th.corner { position: sticky; top: 0; left: 0; z-index: 7; background: #e2e8ee; }
+table.mx th.corner .corner-period { display: flex; flex-direction: column; align-items: center; gap: 1px; margin-top: 6px; padding: 5px 8px; border: 2px solid #217346; border-radius: 6px; background: #fff; color: #14532d; font-size: 12px; line-height: 1.35; font-weight: 400; }
+table.mx th.corner .corner-period .cp-label { font-size: 10.5px; color: #217346; font-weight: 700; }
+table.mx th.corner .corner-period b { font-size: 13px; font-weight: 800; white-space: nowrap; }
+table.mx th.corner .corner-period .cp-arrow { font-size: 10px; color: #64748b; }
 table.mx .hp { font-size: 9px; font-weight: 400; color: #777; line-height: 1.15; margin-top: 1px; }
 table.mx .hp-period { color: #999; white-space: nowrap; }
 table.mx .hp-period-diff { display: inline-block; font-size: 8.5px; font-weight: 600; color: #c2410c; background: #ffedd5; border: 1px solid #fed7aa; border-radius: 3px; padding: 0 3px; line-height: 1.25; margin-top: 2px; }
