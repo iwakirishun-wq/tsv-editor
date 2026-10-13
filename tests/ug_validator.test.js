@@ -266,10 +266,10 @@ const SCENARIOS = [
   {
     name: "範囲: 「幼児〜中学生」→小学生(別席種・範囲内) → OK（可否が開くことの確認）",
     // 元(RC席・幼児〜中学生)=5000/5300、先(EL席・小学生)=5300/5600 → 範囲内でUG可（従来はinvalid）。
-    // 差額は既存の価格ロジック（ugAgeRankは「幼児」が先にヒットし異区分扱い→1〜500は500に切上げ）で500。
-    row: ugRow(SEAT_RC.name, SEAT_RC.cd, "幼児〜中学生", SEAT_EL.name, SEAT_EL.cd, "小学生", 500, 500),
+    // 差額は実差額300（2026-10-13: 1〜499円の500円切り上げを廃止。旧期待500）。
+    row: ugRow(SEAT_RC.name, SEAT_RC.cd, "幼児〜中学生", SEAT_EL.name, SEAT_EL.cd, "小学生", 300, 300),
     expectStatus: "ok",
-    expectExpected: 500,
+    expectExpected: 300,
   },
   {
     name: "範囲: 「高校生以上」→小中 → invalid（年齢降格）",
@@ -551,9 +551,9 @@ const CUTOFF_SCENARIOS = [
     expectStatus: "ng",
   },
   {
-    // 先(Q)は07/02で売り切る＝当日窓にかぶらない（当日は売らない）ので当日ダミーは正常。前売差額500は正しく登録 → OK
+    // 先(Q)は07/02で売り切る＝当日窓にかぶらない（当日は売らない）ので当日ダミーは正常。前売差額200（実差額）は正しく登録 → OK
     name: "[dayCutoff] 先(Q)は07/02で売り切る（当日窓にかぶらない）当日ダミー → OK（当日は売らないので正常）",
-    row: ugRow(SEAT_R.name, SEAT_R.cd, "大人", SEAT_Q.name, SEAT_Q.cd, "大人", 500, 12345),
+    row: ugRow(SEAT_R.name, SEAT_R.cd, "大人", SEAT_Q.name, SEAT_Q.cd, "大人", 200, 12345),
     expectStatus: "ok",
   },
   {
@@ -658,7 +658,7 @@ for (const s of CUTOFF_SCENARIOS) {
     priceRow(B1.name, B1.cd, "鈴鹿_幼児（3歳～未就学児）", 4200, 6700),
   ];
   const val = buildUgValidator(ROWS, c, v, null);
-  for (const [age, adv, day] of [["鈴鹿_大人（24歳以上）", 500, 600], ["鈴鹿_U23（高校生～23歳）", 0, 0], ["鈴鹿_子ども（小学生・中学生）", 0, 0], ["鈴鹿_幼児（3歳～未就学児）", 0, 0]]) {
+  for (const [age, adv, day] of [["鈴鹿_大人（24歳以上）", 400, 600], ["鈴鹿_U23（高校生～23歳）", 0, 0], ["鈴鹿_子ども（小学生・中学生）", 0, 0], ["鈴鹿_幼児（3歳～未就学児）", 0, 0]]) {
     const ok = val.canUpgrade(Q12.name, Q12.cd, "鈴鹿_3歳以上共通", B1.name, B1.cd, age);
     const chk = val(ugRow(Q12.name, Q12.cd, "鈴鹿_3歳以上共通", B1.name, B1.cd, age, adv, day));
     const adult = age.includes("大人");
