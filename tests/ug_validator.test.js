@@ -127,7 +127,7 @@ NORMALS.push(priceRow(SEAT_EL.name, SEAT_EL.cd, "小学生", 5300, 5600));
 
 // 複合大人ラベル「大人（高校生以上）」対応テスト用データ（2026-07-18・IGTC26パドックパス実ケース）。
 // span=[3,4]の範囲になるが ugAgeRank=4 の大人チケットなので、どの区分からのUGも可
-const SEAT_PP = { name: "PPパドックパス", cd: "TESTO1" }; // 同一席種内の年齢区分変更（子ども⇔大人）
+const SEAT_PP = { name: "PPパドックパス", cd: "SIGTCO26011" }; // 同一席種内の年齢区分変更（子ども⇔大人）
 NORMALS.push(priceRow(SEAT_PP.name, SEAT_PP.cd, "子ども(3歳〜中学生)", 3000, 3000));
 NORMALS.push(priceRow(SEAT_PP.name, SEAT_PP.cd, "大人（高校生以上）", 8000, 8000));
 
@@ -393,11 +393,13 @@ eqCU(validate.canUpgrade(SEAT_S.name, SEAT_S.cd, "大人", SEAT_EMPTY.name, SEAT
 
 // --- パス系: 完全同一席種の年齢区分変更のみ可（2026-07-18ルール・2026-08-25にVBAから移植）---
 // 大分類「その他」/コード6桁目Oで弾かれる前に判定される。IGTC26の実ケースの回帰テスト
-eqCU(validate.canUpgrade("IGTC26_パドックパス", "TESTO1", "子ども(3歳〜中学生)", "IGTC26_パドックパス", "TESTO1", "大人（高校生以上）"), true, "パス系: 同一席種の子ども→大人は可");
-eqCU(validate.canUpgrade("IGTC26_ﾊﾟﾄﾞｯｸﾊﾟｽ", "TESTO1", "子ども(3歳〜中学生)", "IGTC26_ﾊﾟﾄﾞｯｸﾊﾟｽ", "TESTO1", "大人（高校生以上）"), true, "パス系: 半角カナ表記でも同じ判定になる");
-eqCU(validate.canUpgrade("IGTC26_パドックパス", "TESTO1", "大人", "IGTC26_パドックパス", "TESTO1", "大人"), false, "パス系: 同年齢区分の自己UG(再発行)は不可");
-eqCU(validate.canUpgrade("IGTC26_パドックパス", "TESTO1", "大人", SEAT_A.name, SEAT_A.cd, "大人"), false, "パス系: 他席種へのUGは不可");
-eqCU(validate.canUpgrade(SEAT_S.name, SEAT_S.cd, "大人", "IGTC26_パドックパス", "TESTO1", "大人"), false, "パス系: 他席種からのUGは不可");
+// 2026-10-14（正本§15-5/§15-7 SHUN確認）: パス系は「コード6桁目O（その他）かつ 名前にパス」。偽コード TESTO1 は6桁目が O でないため
+// 実データ形のコード SIGTCO26011（6桁目O）に変更（コードが O でない「パドックパス」は通常席扱いになり、旧コードのままだと3件が不成立）
+eqCU(validate.canUpgrade("IGTC26_パドックパス", "SIGTCO26011", "子ども(3歳〜中学生)", "IGTC26_パドックパス", "SIGTCO26011", "大人（高校生以上）"), true, "パス系: 同一席種の子ども→大人は可");
+eqCU(validate.canUpgrade("IGTC26_ﾊﾟﾄﾞｯｸﾊﾟｽ", "SIGTCO26011", "子ども(3歳〜中学生)", "IGTC26_ﾊﾟﾄﾞｯｸﾊﾟｽ", "SIGTCO26011", "大人（高校生以上）"), true, "パス系: 半角カナ表記でも同じ判定になる");
+eqCU(validate.canUpgrade("IGTC26_パドックパス", "SIGTCO26011", "大人", "IGTC26_パドックパス", "SIGTCO26011", "大人"), false, "パス系: 同年齢区分の自己UG(再発行)は不可");
+eqCU(validate.canUpgrade("IGTC26_パドックパス", "SIGTCO26011", "大人", SEAT_A.name, SEAT_A.cd, "大人"), false, "パス系: 他席種へのUGは不可");
+eqCU(validate.canUpgrade(SEAT_S.name, SEAT_S.cd, "大人", "IGTC26_パドックパス", "SIGTCO26011", "大人"), false, "パス系: 他席種からのUGは不可");
 
 // --- 高額席（Paddock Club / VIPスイート等）へのUG許可・およびダウングレード防止 ---
 eqCU(validate.canUpgrade(SEAT_A.name, SEAT_A.cd, "大人", "Formula 1 Paddock Club", "RESV74", "大人"), true, "下位席→Paddock ClubへのUGは可");

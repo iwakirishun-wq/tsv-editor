@@ -3076,8 +3076,9 @@
       function ugYouthStageReason(srcAge, dstAge) {
         const s = ugYouthStage(srcAge), d = ugYouthStage(dstAge);
         if (!s || !d) return null;
-        if (d.lo >= s.lo && d.hi <= s.hi) return null;
-        if (s.lo >= d.lo && s.hi <= d.hi) return null;
+        // 2026-10-14 SHUN確認: 範囲が一部でも重なれば可（子ども(小学生・中学生)⇔3歳～小学生 等）。
+        // 重ならない変更（小学生→中学生、中学生→子ども(小学生)、3歳～未就学児→0〜2歳 等）は不可のまま
+        if (d.lo <= s.hi && s.lo <= d.hi) return null;
         if (s.hi === 0 && d.lo >= 1) return "infant02";
         if (s.hi > s.lo) return d.hi > s.hi ? "stage_up" : "stage_down";
         if (d.hi > d.lo) return s.hi > d.hi ? "stage_down" : "stage_up";
@@ -3439,12 +3440,22 @@
         //  ・席種名が ピットウォーク／パドックパス／激感エリアパス／パークパスポート を含み、かつ「観戦券」「観覧券」を含まない
         //    （「ﾊﾟﾄﾞﾊﾟｽ付き観戦券」「ﾊﾟｰｸﾊﾟｽﾎﾟｰﾄ付観戦券」「観戦券(ﾊﾟｽ差額)」は通常の観戦券）
         //  ZERO円パスはパス系ではなくUG不可（ugSeatExcludeReason）。BOX・駐車券の判定が先に効く。
+        // 2026-10-14 SHUN確認: パス系は「席種カテゴリ『その他』（コード6桁目O）かつ 名前に『パス』」の両方を満たすものだけ。
+        // コード6桁目Oでも名前にパスが無い席種（Tarpchair等）は「その他」のまま（UG対象外）、名前だけパスの席種は通常の席種。
+        // ただし席種エリアコードが空で seatMeta でも見つからない席種（8H26/MFJ/SF/SGT/STAI の旧データ等）は「その他」かどうかが
+        // 分からないため、従来の名前判定（ピットウォーク／パドックパス／激感エリアパス／パークパスポート）でパス系とする。
         const isSpecialPass = (code, seat) => {
           const s = String(seat || "").normalize("NFKC");
           if (/ZERO円/i.test(s)) return false;
-          if (seatCat(code, seat) === "その他") return true;
-          return /ピットウォーク|パドックパス|激感エリアパス|パークパスポート/.test(s) && !/観戦券|観覧券/.test(s);
+          if (/観戦券|観覧券/.test(s)) return false;
+          if (seatCat(code, seat) === "その他") return /パス/.test(s);
+          const m = seatMeta ? seatMeta(code, seat) : null;
+          if (!String(code || "").trim() && !(m && m.found)) return /ピットウォーク|パドックパス|激感エリアパス|パークパスポート/.test(s);
+          return false;
         };
+        // パス系でない「その他」カテゴリ（コード6桁目O／大分類「その他」。例: Tarpchair）はUG対象外（2026-10-14 SHUN確認）。
+        // canUpgrade は指定席/エリア以外を除外して元から不可。validate（検算）も同じ結果にする
+        const isOtherNonPass = (code, seat) => seatCat(code, seat) === "その他" && !isSpecialPass(code, seat);
         // 駐車券（2026-10-13・正本§15-5: 同一席種内でもUG不可）。席種カテゴリ「駐車券」（コード6桁目P／大分類「駐車場」）または席種名に「駐車」
         const isParkingSeat = (code, seat) => seatCat(code, seat) === "駐車券" || /駐車/.test(String(seat || "").normalize("NFKC"));
         // 席種名に「エリア」表記が無いがマスタ上は数在庫（エリア席）の席種。
@@ -3462,6 +3473,8 @@
         // VBA（席種名で判定）と割れていた。BOX（区画席）は同一席種内でもUG不可。
         const isBoxSeat = (code, seat) => {
           const sn = String(seat || "").normalize("NFKC");
+          // 2026-10-14 SHUN確認: 「S-BOX同伴者観戦券」等の同伴席はBOXとして扱わず、車いす同伴席と同じ同伴席ルール（isCompanion）で判定する
+          if (/同伴/.test(sn)) return false;
           if (/BOX|ボックス/i.test(sn) || /[（(]\s*[0-9０-９]+\s*名\s*[）)]/.test(sn)) return true;
           if (seatMeta) { const m = seatMeta(code, seat); if (m && m.found) return !!m.box; }
           return false;
@@ -3590,9 +3603,12 @@
             if (srcSeat !== dstSeat) problems.push("木曜日券・木金曜日券は他席種とのUG不可");
             else if (sameAgeCat) problems.push("木曜日券・木金曜日券の同席種同券種UGは設定不可");
           }
-          // パス系（コード6桁目O＝その他、または ピットウォーク/パドックパス/激感エリアパス/パークパスポート）は
+          // パス系（その他カテゴリ かつ 名前に「パス」。コード空・マスタ未登録なら名前判定）は
           // 同一席種内で大人扱いの券種への年齢区分変更のみ可。他席種・同券種・子ども系への変更は不可（2026-10-13・正本§15-5/§15-7。
           // 旧: 検算では見ておらず登録漏れ候補だけ制限していた）
+          if (!srcBox && !dstBox && !srcPark && !dstPark && (isOtherNonPass(srcCode, srcSeat) || isOtherNonPass(dstCode, dstSeat))) {
+            problems.push("その他の席種（パス以外）はUG対象外");
+          }
           if (!srcBox && !dstBox && !srcPark && !dstPark && (isSpecialPass(srcCode, srcSeat) || isSpecialPass(dstCode, dstSeat))) {
             if (srcSeat !== dstSeat) problems.push("パス系は他席種とのUG不可");
             else if (sameAgeCat) problems.push("パス系の同券種UG（座席移動）は設定不可");

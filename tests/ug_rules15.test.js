@@ -55,9 +55,9 @@ const S = {
   PARK_NM: { name: "御薗事業所第一駐車場（土日）", cd: "", meta: null },                           // コードなし・マスタなし（名前「駐車」）
   PASS_PD: { name: "IGTC26_ﾊﾟﾄﾞｯｸﾊﾟｽ", cd: "SIGTCO26011", meta: R("2", "2") },                   // パス系（コードO）
   PASS_PW: { name: "MJRR1_(土)ﾋﾟｯﾄｳｫｰｸﾊﾟｽ", cd: "MJRR1O26051", meta: R("2", "2") },              // パス系（コードO）
-  OTHER_O: { name: "MJRR1_Tarpchair", cd: "MJRR1O26041", meta: R("2", "2") },                    // コードO（名前にパスなし）→パス系扱い
+  OTHER_O: { name: "MJRR1_Tarpchair", cd: "MJRR1O26041", meta: R("2", "2") },                    // コードO（名前にパスなし）→「その他」でUG対象外（2026-10-14）
   GEKI:    { name: "MSGT25_5ｺｰﾅｰOUT側激感ｴﾘｱﾊﾟｽ", cd: "MSGT1O25031", meta: R("2", "2") },        // 激感エリアパス（コードO）
-  PARKPP:  { name: "SHANA25_ﾊﾟｰｸﾊﾟｽﾎﾟｰﾄ", cd: "SHANAE25013", meta: R("2", "2") },               // パークパスポート（コードE＝名前で判定）
+  PARKPP:  { name: "SHANA25_ﾊﾟｰｸﾊﾟｽﾎﾟｰﾄ", cd: "SHANAE25013", meta: R("2", "2") },               // パークパスポート（コードE・マスタあり→通常席。2026-10-14）
   PD_NOCD: { name: "パドックパス　大人", cd: "", meta: null },                                    // コードなし・マスタなし（名前で判定）
   PADPAS:  { name: "IGTC_ﾊﾟﾄﾞﾊﾟｽ付き観戦券", cd: "SIGTCE25011", meta: R("2", "2") },               // §15-7 通常の観戦券
   PPTICK:  { name: "TR25_ﾊﾟｰｸﾊﾟｽﾎﾟｰﾄ付観戦券 (土)のみ有効", cd: "MTRGPE25051", meta: R("2", "2") }, // ﾊﾟｰｸﾊﾟｽﾎﾟｰﾄ「付観戦券」も通常
@@ -175,9 +175,13 @@ const S2 = [
   // 範囲券種の内側への変更は従来どおり可
   [K.CH_SM, K.CH_S, true], [K.CH_SM, K.MS, true], [K.M_3M, K.CH_S, true], [K.M_3M, K.M_3S, true], [K.M_3M, K.MS, true], [K.CH_3M, K.INF, true],
   [K.CH_S, K.CH_SM, true], [K.CH_S, K.M_3S, true], [K.CH_S, K.M_3M, true], [K.CH_SM, K.CH_3M, true], [K.INF, K.CH_3M, true],
-  // 派生（小学生と中学生を区別した結果）: 小学生 → 中学生だけの券種は中間昇格で不可、
-  // 子ども(小学生・中学生)⇔3歳～小学生 は中学生／幼児が範囲から外れるため不可（旧: 同じ「子供」区分で可）
-  [K.CH_S, K.MS, false], [K.M_3S, K.MS, false], [K.CH_SM, K.M_3S, false], [K.M_3S, K.CH_SM, false],
+  // 小学生 → 中学生だけの券種は重ならないので不可（2026-10-14 SHUN確認で確定）
+  [K.CH_S, K.MS, false], [K.M_3S, K.MS, false],
+  // 2026-10-14 SHUN確認: 子ども系どうしは範囲が一部でも重なれば可。子ども(小学生・中学生)⇔3歳～小学生 は小学生で重なるので可
+  // （2026-10-13 版では「範囲から外れる」として不可を期待していたのを可へ更新）
+  [K.CH_SM, K.M_3S, true], [K.M_3S, K.CH_SM, true], [K.CH_SM, K.CH_3S, true], [K.CH_3S, K.CH_SM, true],
+  // 3歳～未就学児 → 0～2歳 は重ならないので不可（SHUN確認・変更なし）
+  [K.M_3P, K.INF02, false], [K.INF, K.INF02, false],
 ];
 for (const [sa, da, want] of S2) {
   both(A, sa, A, da, want, `§15-2 同一席種 ${sa}→${da}`);
@@ -245,19 +249,34 @@ for (const k of ["BOX", "BOX_GV", "PARK", "PARK_NM"]) {
 hasMsg(S.BOX, K.CH_SM, S.BOX, K.ADT24, "BOX（区画席）はUG不可", "§15-5 BOX 同一席種");
 // マスタのBOXフラグが無くても席種名の BOX/ボックス/（〇名）で区画席（VBA isBoxSeat と同じ）
 {
-  const SBC = { name: "F1_S-BOX同伴者観戦券[T18]", cd: "SF1GPE26215" };       // マスタ: 数在庫・BOXフラグなし
   const VBX = { name: "MJRR1_ﾋﾞｸﾄﾘｰｺｰﾅｰﾃﾗｽ ﾎﾞｯｸｽｼｰﾄ指定区画券(5名)", cd: "MJRR1O26031" }; // コードO・BOXフラグなし
   const SEAT6 = { name: "MJRR1_SORAｻｲﾄ観戦券(6名)", cd: "MJRR1O26151" };
-  META[SBC.cd] = R("2", "2"); META[VBX.cd] = R("2", "2"); META[SEAT6.cd] = R("2", "2");
-  for (const s of [SBC, VBX, SEAT6]) {
+  META[VBX.cd] = R("2", "2"); META[SEAT6.cd] = R("2", "2");
+  for (const s of [VBX, SEAT6]) {
     both(s, K.CH_SM, s, K.ADT24, false, `§15-5 名前BOX ${s.name} 同一席種 子ども→大人`);
     both(s, K.ADT24, A, K.ADT24, false, `§15-5 名前BOX ${s.name}→指定席`);
   }
+  hasMsg(VBX, K.CH_SM, VBX, K.ADT24, "BOX（区画席）はUG不可", "§15-5 名前BOX（コードO）");
+  // 2026-10-14 SHUN確認: 「S-BOX同伴者観戦券」等の『同伴』を含む席種はBOXにせず、車いす同伴席と同じ同伴席ルール
+  // （他席種不可・同券種不可・同一席種内の大人への年齢区分変更のみ可）。2026-10-13 版では BOX として全不可を期待していた
+  const SBC = { name: "F1_S-BOX同伴者観戦券[T18]", cd: "SF1GPE26215" }; // マスタ: 数在庫・BOXフラグなし
+  const SBC2 = { name: "S-BOX同伴者観戦券", cd: "" };                   // 同伴＋BOX表記（コードなし・マスタ未登録）
+  META[SBC.cd] = R("2", "2");
+  for (const s of [SBC, SBC2]) {
+    both(s, K.CH_SM, s, K.ADT24, true, `§15-5 S-BOX同伴 ${s.name} 同一席種 子ども→大人（同伴席ルール）`);
+    both(s, K.U23, s, K.ADT_HS, true, `§15-5 S-BOX同伴 ${s.name} 同一席種 U23→大人(高校生以上)`);
+    both(s, K.ADT24, s, K.ADT24, false, `§15-5 S-BOX同伴 ${s.name} 同券種`);
+    both(s, K.CH_SM, s, K.U23, false, `§15-5 S-BOX同伴 ${s.name} 同一席種 子ども→U23（大人以外）`);
+    both(s, K.ADT24, A, K.ADT24, false, `§15-5 S-BOX同伴 ${s.name}→指定席`);
+    both(A, K.ADT24, s, K.ADT24, false, `§15-5 指定席→S-BOX同伴 ${s.name}`);
+    eq(probs(s, K.CH_SM, s, K.ADT24).includes("BOX（区画席）"), false, `§15-5 S-BOX同伴 ${s.name} はBOX扱いしない`);
+  }
+  both(SBC, K.ADT24, S.BOX, K.ADT24, false, "§15-5 S-BOX同伴→BOX");
 }
 hasMsg(S.PARK, K.ADT24, S.PARK, K.ADT24, "駐車券はUG不可", "§15-5 駐車券 同一席種");
 hasMsg(A, K.ADT24, S.PARK_NM, K.ADT24, "駐車券はUG不可", "§15-5 駐車券（コードなし・名前）");
-// パス系（コード6桁目O）: 同一席種内で大人の券種へのみ可、他席種へは不可
-for (const k of ["PASS_PD", "PASS_PW", "OTHER_O", "GEKI"]) {
+// パス系（コード6桁目O かつ 名前に「パス」。2026-10-14 SHUN確認）: 同一席種内で大人の券種へのみ可、他席種へは不可
+for (const k of ["PASS_PD", "PASS_PW", "GEKI"]) {
   both(S[k], K.CH_3M, S[k], K.ADT_HS, true, `§15-5 パス ${k} 子ども(3歳～中学生)→大人(高校生以上)`);
   both(S[k], K.U23, S[k], K.ADT24, true, `§15-5 パス ${k} U23→大人`);
   both(S[k], K.CH_SM, S[k], K.C3, true, `§15-5 パス ${k} 子ども→3歳以上共通（大人扱い）`);
@@ -273,6 +292,21 @@ both(S.PASS_PD, K.ADT24, S.PASS_PW, K.ADT24, false, "§15-5 パドックパス�
 hasMsg(S.PASS_PD, K.ADT24, A, K.ADT24, "パス系は他席種とのUG不可", "§15-5 パス→指定席");
 hasMsg(S.PASS_PD, K.ADT24, S.PASS_PD, K.ADT24, "パス系の同券種UG（座席移動）は設定不可", "§15-5 パス 同券種");
 hasMsg(S.PASS_PD, K.CH_3M, S.PASS_PD, K.INF, "パス系の年齢区分変更は大人の券種へのみ可", "§15-5 パス 子ども→幼児");
+// パス系でない「その他」（コード6桁目Oで名前に「パス」が無い。例: Tarpchair、IGTC26_ﾋﾟｯﾄｳｫｰｸ(土)）はUG対象外。
+// 2026-10-14 SHUN確認で「その他 かつ 名前にパス」に限定。2026-10-13 版では OTHER_O をパス系として同一席種→大人を可にしていた。
+// validate も canUpgrade と同じく不可（理由「その他の席種（パス以外）はUG対象外」）
+{
+  const PW_NOPASS = { name: "IGTC26_ﾋﾟｯﾄｳｫｰｸ(土)", cd: "SIGTCO26021" };
+  META[PW_NOPASS.cd] = R("2", "2");
+  for (const s of [S.OTHER_O, PW_NOPASS]) {
+    both(s, K.CH_3M, s, K.ADT_HS, false, `§15-5 その他(パス以外) ${s.name} 同一席種 子ども→大人`);
+    both(s, K.U23, s, K.ADT24, false, `§15-5 その他(パス以外) ${s.name} 同一席種 U23→大人`);
+    both(s, K.C3, s, K.C3, false, `§15-5 その他(パス以外) ${s.name} 同券種`);
+    both(s, K.ADT24, A, K.ADT24, false, `§15-5 その他(パス以外) ${s.name}→指定席`);
+    both(A, K.ADT24, s, K.ADT24, false, `§15-5 指定席→その他(パス以外) ${s.name}`);
+    hasMsg(s, K.CH_3M, s, K.ADT_HS, "その他の席種（パス以外）はUG対象外", `§15-5 その他(パス以外) ${s.name}`);
+  }
+}
 
 // =============================================================
 // §15-6 IGTC26「S-BOX ○ 追加観戦券」は UG対象外（マスタはBOXフラグなし・数在庫）
@@ -298,12 +332,24 @@ for (const k of ["ZERO", "ZERO_FR", "ZERO_FS"]) {
   both(S[k], K.U23, S[k], K.ADT24, false, `§15-7 ${k} 同一席種 U23→大人`);
 }
 hasMsg(S.ZERO, K.U23, A, K.ADT24, "16-23 ZERO円パスはUG不可", "§15-7 ZERO円パス");
-// 激感エリアパス・パークパスポート・パドックパス（コードが O でなくても・コードが無くても）はパス系
-for (const k of ["GEKI", "PARKPP", "PD_NOCD"]) {
-  both(S[k], K.CH_SM, S[k], K.ADT24, true, `§15-7 ${k} 同一席種 子ども→大人`);
-  both(S[k], K.ADT24, A, K.ADT24, false, `§15-7 ${k}→指定席`);
-  both(A, K.ADT24, S[k], K.ADT24, false, `§15-7 指定席→${k}`);
+// パス系は「その他（コードO）かつ 名前にパス」（2026-10-14 SHUN確認）。
+// コードが空でマスタにも無い席種（8H26/MFJ/SF/SGT/STAI の旧データ等）だけは、名前（ピットウォーク／パドックパス／激感エリアパス／
+// パークパスポート）でパス系とするフォールバック。
+const PP_NOCD = { name: "ﾊﾟｰｸﾊﾟｽﾎﾟｰﾄ", cd: "" }, PW_NOCD = { name: "ピットウォークパス", cd: "" }, GK_NOCD = { name: "5ｺｰﾅｰOUT側激感ｴﾘｱﾊﾟｽ", cd: "" };
+for (const s of [S.GEKI, S.PD_NOCD, PP_NOCD, PW_NOCD, GK_NOCD]) {
+  both(s, K.CH_SM, s, K.ADT24, true, `§15-7 パス系 ${s.name} 同一席種 子ども→大人`);
+  both(s, K.CH_3M, s, K.INF, false, `§15-7 パス系 ${s.name} 同一席種 子ども→幼児`);
+  both(s, K.ADT24, A, K.ADT24, false, `§15-7 パス系 ${s.name}→指定席`);
+  both(A, K.ADT24, s, K.ADT24, false, `§15-7 指定席→パス系 ${s.name}`);
 }
+// コードが O 以外（E 等）でマスタにある「ﾊﾟｰｸﾊﾟｽﾎﾟｰﾄ」は通常の席種（2026-10-13 版では名前でパス系にしていた）
+both(S.PARKPP, K.ADT24, A, K.ADT24, true, "§15-7 コードEのﾊﾟｰｸﾊﾟｽﾎﾟｰﾄ→指定席 は通常席として可");
+both(A, K.ADT24, S.PARKPP, K.ADT24, true, "§15-7 指定席→コードEのﾊﾟｰｸﾊﾟｽﾎﾟｰﾄ は通常席として可");
+both(S.PARKPP, K.ADT24, S.PARKPP, K.ADT24, false, "§15-7 コードEのﾊﾟｰｸﾊﾟｽﾎﾟｰﾄ 同券種（数在庫のため自己UG不可）");
+// コードはあるがマスタ未登録の「パドックパス」（6桁目E）も名前フォールバックしない＝通常席
+both({ name: "T_パドックパス", cd: "SPTSTE09999" }, K.ADT24, A, K.ADT24, true, "§15-7 コードあり(E)・マスタ未登録のパドックパスは通常席");
+// コードなしでも「観戦券」付きは通常の観戦券
+both({ name: "パドックパス付き観戦券", cd: "" }, K.ADT24, A, K.ADT24, true, "§15-7 コードなし パドックパス付き観戦券 は通常席");
 // ﾊﾟﾄﾞﾊﾟｽ付き観戦券・ﾊﾟｰｸﾊﾟｽﾎﾟｰﾄ付観戦券・観戦券(ﾊﾟｽ差額) は通常の観戦券（他席種とのUG可）
 for (const k of ["PADPAS", "PPTICK", "PASSDIF"]) {
   both(S[k], K.ADT24, A, K.ADT24, true, `§15-7 ${k}→指定席 は可（通常の観戦券）`);
