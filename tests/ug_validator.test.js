@@ -747,5 +747,49 @@ for (const s of CUTOFF_SCENARIOS) {
   eqCU(val.canUpgrade(S_SRC.name, S_SRC.cd, "3歳以上共通", S_DST.name, S_DST.cd, "高校生以上"), true, "高校生以上は大人扱いのため可");
 }
 
+// =============================================================
+// 2026-10-13 SHUN確定（正本§14）: 年齢別4券種の席種どうしの別席種UGは横（同じ年齢区分）のみ可。
+// 子ども・U23・幼児→大人は同一席種内だけ。共通券種だけの席種が絡む組合せは従来どおり。
+// =============================================================
+{
+  const AGES = ["鈴鹿_大人（24歳以上）", "鈴鹿_U23（高校生～23歳）", "鈴鹿_子ども（小学生・中学生）", "鈴鹿_幼児（3歳～未就学児）"];
+  const LO = { name: "F1_B2席", cd: "SF1B20001" }, HI = { name: "F1_A1席", cd: "SF1A10001" };
+  const COM = { name: "F1_Q2席", cd: "SF1Q20001" };
+  const [ADULT, U23, CHILD, INF] = AGES;
+  const ROWS = [
+    priceRow(LO.name, LO.cd, ADULT, 40000, 42000), priceRow(LO.name, LO.cd, U23, 20000, 21000),
+    priceRow(LO.name, LO.cd, CHILD, 6000, 6000), priceRow(LO.name, LO.cd, INF, 3000, 3000),
+    priceRow(HI.name, HI.cd, ADULT, 60000, 62000), priceRow(HI.name, HI.cd, U23, 30000, 31000),
+    priceRow(HI.name, HI.cd, CHILD, 9000, 9000), priceRow(HI.name, HI.cd, INF, 4000, 4000),
+    priceRow(COM.name, COM.cd, "鈴鹿_3歳以上共通", 30000, 30000),
+  ];
+  const val = buildUgValidator(ROWS, c, v, null);
+
+  // 1. 別席種（4券種どうし）: 横は可、年齢区分の変更は不可
+  for (const age of AGES) {
+    eqCU(val.canUpgrade(LO.name, LO.cd, age, HI.name, HI.cd, age), true, `別席種の横UG [${age}] は可`);
+  }
+  for (const srcAge of [U23, CHILD, INF]) {
+    eqCU(val.canUpgrade(LO.name, LO.cd, srcAge, HI.name, HI.cd, ADULT), false, `別席種の大人化 [${srcAge}→大人] は不可`);
+    const chk = val(ugRow(LO.name, LO.cd, srcAge, HI.name, HI.cd, ADULT, 50000, 50000));
+    eqCU(chk.status, "invalid", `validate 別席種の大人化 [${srcAge}→大人] はinvalid`);
+    eqCU(chk.problems.some((p) => p.includes("4券種席種の別席種UGは同じ年齢区分のみ可")), true, `validate [${srcAge}→大人] の不可理由`);
+  }
+  {
+    const chk = val(ugRow(LO.name, LO.cd, CHILD, HI.name, HI.cd, CHILD, 3000, 3000));
+    eqCU(chk.status, "ok", "validate 別席種の横UG 子ども→子ども はok");
+  }
+
+  // 2. 同一席種内: 子ども・U23・幼児→大人は従来どおり可
+  for (const srcAge of [U23, CHILD, INF]) {
+    eqCU(val.canUpgrade(HI.name, HI.cd, srcAge, HI.name, HI.cd, ADULT), true, `同一席種の大人化 [${srcAge}→大人] は可`);
+    const chk = val(ugRow(HI.name, HI.cd, srcAge, HI.name, HI.cd, ADULT, 60000 - (srcAge === U23 ? 30000 : srcAge === CHILD ? 9000 : 4000), 62000 - (srcAge === U23 ? 31000 : srcAge === CHILD ? 9000 : 4000)));
+    eqCU(chk.problems.some((p) => p.includes("4券種席種")), false, `validate 同一席種の大人化 [${srcAge}→大人] に新ルールの不可理由が出ない`);
+  }
+
+  // 3. 4券種がそろわない席種（共通券種だけ）が絡む組合せは従来どおり
+  eqCU(val.canUpgrade(COM.name, COM.cd, "鈴鹿_3歳以上共通", HI.name, HI.cd, ADULT), true, "共通券種席→4券種席の大人 は可（従来どおり）");
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
