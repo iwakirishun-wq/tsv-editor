@@ -8,6 +8,8 @@
  * 正本に規定が無い・正本と実装が食い違うと判明した組合せ（分類 (b)(c)）は、ここでは意図的に
  * アサートしていない。一覧は 50_OUTPUTS/01_開発成果物/tsv_editor/2026-10-13_UGパターン網羅検証.md。
  * それらのルールが確定したら、このファイルに追加すること。
+ * → 2026-10-13 に (b)(c) は正本§15として確定・実装した。§15 の回帰は tests/ug_rules15.test.js。
+ *   このファイルでは §15 で挙動が変わった Part A-4（子ども系→下限つき共通券）・B-6/B-7（検算にもパス・駐車・BOXの制限）を更新した。
  *
  * 席種名・券種名は 27F1 / もてぎJRR26 / IGTC26 の実データの表記（半角カナ・接頭辞つき）に寄せてある。
  * 席種カテゴリは席種エリアマスタ連携時と同じ seatMeta（在庫種別・指定席区分・BOXフラグ）で与える。
@@ -148,28 +150,32 @@ for (const sa of [K.U23, K.HS, "鈴鹿_U23（高校生～23歳）", "もてぎ_U
 }
 
 // =============================================================
-// Part A-4: §14 子ども系 → 共通券は対象年齢が重なるときだけ可（席種を問わない）
+// Part A-4: 子ども系 → 共通券（席種を問わない）
+//  2026-10-13 正本§15-1 で改訂: §14 の「対象年齢が重なるときだけ可」を廃止し、子ども系（U23・高校生を含む）→
+//  下限つき共通券（8歳以上・小学生以上・中学生以上・高校生以上共通）は対象年齢が重なっていても不可。
+//  全年齢の3歳以上共通だけ可（§15-1'）。旧期待値で true だった「重なる」組（子ども(小中)→中学生以上共通、
+//  U23→高校生以上共通 等）を false に更新した。詳細な回帰は tests/ug_rules15.test.js。
 // =============================================================
 const OVERLAP = [
   // [元, 先, 可否]
   [K.INF, K.C3, true], [K.INF, K.C8, false], [K.INF, K.C_MS, false], [K.INF, "高校生以上共通", false], [K.INF, K.C_SH, false],
   [K.M_3P, K.C3, true], [K.M_3P, K.C8, false], [K.M_3P, K.C_MS, false],
-  [K.CH_3S, K.C3, true], [K.CH_3S, K.C8, true], [K.CH_3S, K.C_MS, false], [K.CH_3S, "高校生以上共通", false], [K.CH_3S, K.C_SH, true],
-  [K.M_3S, K.C3, true], [K.M_3S, K.C8, true], [K.M_3S, K.C_MS, false],
-  [K.CH_S, K.C8, true], [K.CH_S, K.C_MS, false], [K.CH_S, K.C_SH, true],
-  [K.CH_SM, K.C3, true], [K.CH_SM, K.C8, true], [K.CH_SM, K.C_MS, true], [K.CH_SM, "高校生以上共通", false], [K.CH_SM, K.C_SH, true],
-  [K.CH_3M, K.C3, true], [K.CH_3M, K.C8, true], [K.CH_3M, K.C_MS, true], [K.CH_3M, "高校生以上共通", false],
-  [K.M_3M, K.C3, true], [K.M_3M, K.C8, true], [K.M_3M, K.C_MS, true], [K.M_3M, "高校生以上共通", false],
-  [K.MS, K.C_MS, true], [K.MS, "高校生以上共通", false], [K.HS, K.C_MS, true], [K.HS, "高校生以上共通", true],
-  [K.U23, K.C3, true], [K.U23, K.C8, true], [K.U23, K.C_MS, true], [K.U23, "高校生以上共通", true],
+  [K.CH_3S, K.C3, true], [K.CH_3S, K.C8, false], [K.CH_3S, K.C_MS, false], [K.CH_3S, "高校生以上共通", false], [K.CH_3S, K.C_SH, false],
+  [K.M_3S, K.C3, true], [K.M_3S, K.C8, false], [K.M_3S, K.C_MS, false],
+  [K.CH_S, K.C8, false], [K.CH_S, K.C_MS, false], [K.CH_S, K.C_SH, false],
+  [K.CH_SM, K.C3, true], [K.CH_SM, K.C8, false], [K.CH_SM, K.C_MS, false], [K.CH_SM, "高校生以上共通", false], [K.CH_SM, K.C_SH, false],
+  [K.CH_3M, K.C3, true], [K.CH_3M, K.C8, false], [K.CH_3M, K.C_MS, false], [K.CH_3M, "高校生以上共通", false],
+  [K.M_3M, K.C3, true], [K.M_3M, K.C8, false], [K.M_3M, K.C_MS, false], [K.M_3M, "高校生以上共通", false],
+  [K.MS, K.C_MS, false], [K.MS, "高校生以上共通", false], [K.HS, K.C_MS, false], [K.HS, "高校生以上共通", false],
+  [K.U23, K.C3, true], [K.U23, K.C8, false], [K.U23, K.C_MS, false], [K.U23, "高校生以上共通", false],
   ["鈴鹿_幼児（3歳～未就学児）", "鈴鹿_8歳以上共通", false], ["鈴鹿_幼児（3歳～未就学児）", "鈴鹿_3歳以上共通", true],
-  ["鈴鹿_子ども（小学生・中学生）", "鈴鹿_中学生以上共通", true], ["もてぎ_3歳～中学生", "もてぎ_3歳以上共通", true],
+  ["鈴鹿_子ども（小学生・中学生）", "鈴鹿_中学生以上共通", false], ["もてぎ_3歳～中学生", "もてぎ_3歳以上共通", true],
 ];
 for (const [sa, da, want] of OVERLAP) {
-  both(A, sa, A, da, want, `§14 共通 同一席種 ${sa}→${da}`);
-  both(A, sa, B, da, want, `§14 共通 別席種 ${sa}→${da}`);
+  both(A, sa, A, da, want, `§14/§15-1 共通 同一席種 ${sa}→${da}`);
+  both(A, sa, B, da, want, `§14/§15-1 共通 別席種 ${sa}→${da}`);
 }
-eq(probs(A, K.INF, B, K.C8).includes("共通券種の対象年齢外のためUG不可"), true, "§14 共通 不可理由の文言");
+eq(probs(A, K.INF, B, K.C8).includes("子ども・U23券種から下限つき共通券種へは変更不可"), true, "§15-1 共通 不可理由の文言");
 
 // =============================================================
 // Part A-5: §2.1 子ども系どうしの範囲判定（同一席種・別席種とも同じ）
@@ -264,21 +270,21 @@ for (const k of ["PASS_PD", "PASS_PW"]) {
   both(S[k], K.CH_3M, S[k], K.ADT_HS, true, `${k} 子ども(3歳～中学生)→大人(高校生以上)`);
   both(S[k], K.U23, S[k], K.ADT24, true, `${k} U23→大人`);
   both(S[k], K.ADT_HS, S[k], K.CH_3M, false, `${k} 大人→子ども`);
-  // ここから下は canUpgrade のみ（validate はパス系の同券種・他席種をチェックしない＝レポート(b)）
-  eq(cu(S[k], K.ADT24, S[k], K.ADT24), false, `${k} 同券種 canUpgrade`);
-  eq(cu(S[k], K.ADT24, S.RSV_A, K.ADT24), false, `${k}→指定席 canUpgrade`);
-  eq(cu(S.RSV_A, K.ADT24, S[k], K.ADT24), false, `指定席→${k} canUpgrade`);
+  // 2026-10-13 正本§15-5 で validate（検算）にもパス系の制限が入ったため、canUpgrade のみだった3件を both に変更
+  both(S[k], K.ADT24, S[k], K.ADT24, false, `${k} 同券種`);
+  both(S[k], K.ADT24, S.RSV_A, K.ADT24, false, `${k}→指定席`);
+  both(S.RSV_A, K.ADT24, S[k], K.ADT24, false, `指定席→${k}`);
 }
-eq(cu(S.PASS_PD, K.ADT24, S.PASS_PW, K.ADT24), false, "パドックパス→ピットウォーク canUpgrade");
+both(S.PASS_PD, K.ADT24, S.PASS_PW, K.ADT24, false, "パドックパス→ピットウォーク");
 
-// B-7 駐車券・その他(O)・BOX は登録漏れ候補にしない（canUpgrade=false。validate は対象外＝レポート(b)）
+// B-7 駐車券・その他(O)・BOX は不可（2026-10-13 正本§15-5 で validate にも制限が入ったため both に変更）
 for (const k of ["PARK", "OTHER_O", "BOX"]) {
   for (const o of ["RSV_A", "AREA_A"]) {
-    eq(cu(S[k], K.ADT24, S[o], K.ADT24), false, `${k}→${o} canUpgrade`);
-    eq(cu(S[o], K.ADT24, S[k], K.ADT24), false, `${o}→${k} canUpgrade`);
-    eq(cu(S[k], K.C3, S[o], K.C3), false, `${k}→${o} 共通 canUpgrade`);
+    both(S[k], K.ADT24, S[o], K.ADT24, false, `${k}→${o}`);
+    both(S[o], K.ADT24, S[k], K.ADT24, false, `${o}→${k}`);
+    both(S[k], K.C3, S[o], K.C3, false, `${k}→${o} 共通`);
   }
-  eq(cu(S[k], K.C3, S[k], K.C3), false, `${k} 同券種 canUpgrade`);
+  both(S[k], K.C3, S[k], K.C3, false, `${k} 同券種`);
 }
 eq(cu(S.PARK, "なし", S.PARK, "なし"), false, "駐車券 券種なし canUpgrade");
 

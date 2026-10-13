@@ -35,7 +35,8 @@
         --col-active-bg: #e8f0e8;
         /* 選択範囲の見え方（Excel準拠）: 外周は緑の太線、内側は薄いグレー */
         --range-line: #217346;
-        --range-fill: rgba(0, 0, 0, 0.08);
+        /* 2026-10-13 不具合報告「選択範囲をもっとわかりやすく」: 薄い灰(8%)→薄い緑(16%)、外周は3px */
+        --range-fill: rgba(33, 115, 70, 0.16);
         --danger-bg: #fef2f2;
         --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
         --shadow-md: 0 2px 4px rgba(0,0,0,0.06);
@@ -776,10 +777,10 @@
           inset 0 0 0 1000px var(--cell-fill);
       }
       td.in-range { --cell-fill: var(--range-fill); }
-      td.rng-t { --e-t: 0 2px 0 0 var(--range-line); }
-      td.rng-b { --e-b: 0 -2px 0 0 var(--range-line); }
-      td.rng-l { --e-l: 2px 0 0 0 var(--range-line); }
-      td.rng-r { --e-r: -2px 0 0 0 var(--range-line); }
+      td.rng-t { --e-t: 0 3px 0 0 var(--range-line); }
+      td.rng-b { --e-b: 0 -3px 0 0 var(--range-line); }
+      td.rng-l { --e-l: 3px 0 0 0 var(--range-line); }
+      td.rng-r { --e-r: -3px 0 0 0 var(--range-line); }
       /* アクティブセルは四辺を緑の太線で囲み、中は塗らない（Excelと同じく、
          範囲選択中でも「いまどのセルにカーソルがあるか」が分かるようにする） */
       td.selected {
@@ -1437,7 +1438,7 @@
       }
       /* フリーズ列は半透明ハイライトだと下のスクロール文字が透けるため、不透明色で塗る */
       td.frozen-col.selected { background: #c7dcf5 !important; }
-      td.frozen-col.in-range { background: #deeaf9 !important; }
+      td.frozen-col.in-range { background: #d8ebe0 !important; } /* 選択範囲の塗り（薄い緑）とそろえる */
       td.frozen-col.col-highlight { background: #eef3fb !important; }
       td.frozen-col.search-hit { background: #fdf0b8 !important; }
       td.frozen-col.marked { background: color-mix(in srgb, var(--marker-color, #facc15) 35%, #ffffff) !important; }
@@ -2999,15 +3000,26 @@
         SEAT_CHANGE_FEE: 500,    // 同席種同区分／差額0円（元と先が同額）のUG手数料
         RESALE_MIN: 1321,        // リセール用販売価格下限（手数料割れ防止）
       };
+      // 券種名（年齢区分ラベル）の正規化。年齢判定系の関数はすべてこれを通してから正規表現を当てる（2026-10-13・正本§15 表記ゆれ）。
+      //  ・NFKC（半角カナ→全角、全角英数→半角、「～」U+FF5E→「~」）
+      //  ・波ダッシュ「〜」U+301C／「∼」U+223C も「~」へ統一（NFKCでは U+301C が残り、「3歳～中学生」と「3歳〜中学生」で判定が割れていた）
+      //  ・「U-23」「U－23」「U‐23」→「U23」（「U-23（高校生～23歳）」が「高校」で大人(4)扱いになっていた）
+      function ugNormAgeText(a) {
+        return String(a == null ? "" : a).normalize("NFKC")
+          .replace(/[〜～∼]/g, "~")
+          .replace(/U\s*[-‐‑‒–—―ー]\s*23/gi, "U23")
+          .trim();
+      }
       // 年齢区分ランク（1=幼児 2=子供 3=U23 4=大人 0=共通/不明）
       function ugAgeRank(a) {
         // NFKCで半角カナ（例:「ｱﾝﾀﾞｰ」）を全角に正規化してから判定。英数字は変化しないため安全
         // （2026-07-04発見: 半角カナ表記が全角前提の正規表現から漏れる不具合の再発防止）
-        a = String(a).normalize("NFKC");
+        a = ugNormAgeText(a);
         if (/幼児|未就学|INFANT/i.test(a)) return 1;
         // 「3歳〜中学生」「中学生以下」等の上限が中学生のラベルは子供区分として扱う
         // （ナレッジの年齢マッチング表: U23/大人→「3歳〜中学生」は年齢が下がるため不可、を降格判定で拾えるように）
-        if (/子供|こども|子ども|小中|小・中|小学|CHILD|中学生以下|〜中学生|～中学生/i.test(a)) return 2;
+        // 2026-10-13: 波ダッシュは ugNormAgeText で「~」に統一済み（旧実装は「～」がNFKCで「~」になり取りこぼしていた）
+        if (/子供|こども|子ども|小中|小・中|小学|CHILD|中学生以下|~中学生/i.test(a)) return 2;
         if (/U23|アンダー/i.test(a)) return 3;
         if (/大人|ADULT|高校/i.test(a)) return 4;
         return 0; // 共通・不明はランク判定しない
@@ -3016,7 +3028,7 @@
       //  common=true: 「3歳以上共通」等の全年齢券種（年齢制限なし）／ min=0: 判定不能。
       //  単一ラベルは min===max。範囲例:「幼児〜中学生」「3歳〜中学生」=[1,2]／「高校生以上」「高校生〜大人」=[3,4]。
       function ugAgeSpan(a) {
-        a = String(a).normalize("NFKC");
+        a = ugNormAgeText(a);
         if (/共通|全年齢/.test(a)) return { min: 1, max: 4, common: true };
         const ranks = [];
         if (/幼児|未就学|INFANT/i.test(a)) ranks.push(1);
@@ -3036,7 +3048,42 @@
       //  ・共通/判定不能はスキップ（可）
       //  ・元または先が範囲券種: 相手の年齢が範囲内に収まるか（範囲外の上=up_out／下=down）
       //  ・単一どうし: 従来ルール（同ランク可 / 昇格は大人へのみ可=mid_up / 降格不可=down）
+      //  ・2026-10-13（正本§15-2・§15-3）: 上の判定で可になった子ども系どうしは、幼児(0歳～2歳)／幼児(3歳～)／小学生／中学生を
+      //    区別する細かい段階（ugYouthStageReason）でもう一度判定する（infant02|stage_down|stage_up）
       function ugAgeSpanReason(srcAge, dstAge) {
+        return ugAgeSpanReasonCoarse(srcAge, dstAge) || ugYouthStageReason(srcAge, dstAge);
+      }
+      // 子ども系券種の細かい年齢段階 {lo,hi}（2026-10-13・正本§15-2/§15-3）。大人扱い・共通・複合・判定不能は null。
+      //  0=幼児(0歳～2歳) / 1=幼児(3歳～未就学児) / 2=小学生 / 3=中学生 / 4=高校生・U23
+      //  ugAgeSpan の「子ども(2)」を小学生・中学生に分ける。学年表記が片方だけならその学年だけ、両方または無し（「子ども」「小中」）は小学生～中学生。
+      //  「0歳」「1歳」「2歳」を含み 3～6歳・未就学 を含まない幼児ラベルは 0～2歳のみ（KEN210 幼児(0歳～2歳)）。「以下」は 0歳から。
+      function ugYouthStage(a) {
+        a = ugNormAgeText(a);
+        if (!a || ugIsAdultCategory(a) || ugIsCompositeAgeTicket(a)) return null;
+        const sp = ugAgeSpan(a);
+        if (sp.common || sp.min === 0) return null;
+        const has小 = /小学/.test(a), has中 = /中学/.test(a);
+        const under3 = /(^|[^0-9])[0-2]\s*歳/.test(a);
+        const only02 = under3 && !/未就学|(^|[^0-9])[3-6]\s*歳/.test(a);
+        const lo = { 1: under3 ? 0 : 1, 2: (has中 && !has小) ? 3 : 2, 3: 4 }, hi = { 1: only02 ? 0 : 1, 2: (has小 && !has中) ? 2 : 3, 3: 4 };
+        if (!(sp.min in lo) || !(sp.max in hi)) return null;
+        return { lo: /以下/.test(a) ? 0 : lo[sp.min], hi: hi[sp.max] };
+      }
+      // 子ども系どうし（元・先とも ugYouthStage が取れる）の細かい段階での可否。戻り: null=可 / infant02|stage_down|stage_up
+      //  ・先が元の範囲内、または元が先の範囲内なら可（中学生→子ども(小学生・中学生)・3歳～中学生 は可）
+      //  ・幼児(0歳～2歳)から3歳以上の子ども系券種へは不可（infant02。3歳以上共通は共通券なのでここは通らず可＝§15-3）
+      //  ・それ以外は範囲から下へ外れる=stage_down（中学生→子ども(小学生)・3歳～小学生）、上へ外れる=stage_up（小学生→中学生）
+      function ugYouthStageReason(srcAge, dstAge) {
+        const s = ugYouthStage(srcAge), d = ugYouthStage(dstAge);
+        if (!s || !d) return null;
+        if (d.lo >= s.lo && d.hi <= s.hi) return null;
+        if (s.lo >= d.lo && s.hi <= d.hi) return null;
+        if (s.hi === 0 && d.lo >= 1) return "infant02";
+        if (s.hi > s.lo) return d.hi > s.hi ? "stage_up" : "stage_down";
+        if (d.hi > d.lo) return s.hi > d.hi ? "stage_down" : "stage_up";
+        return d.lo > s.lo ? "stage_up" : "stage_down";
+      }
+      function ugAgeSpanReasonCoarse(srcAge, dstAge) {
         if (ugAdultToYouthDowngradeReason(srcAge, dstAge)) return "down";
         const s = ugAgeSpan(srcAge), d = ugAgeSpan(dstAge);
         if (s.common || d.common) return null;
@@ -3062,6 +3109,9 @@
         return "down";
       }
       function ugAgeReasonMsg(reason, srcAge, dstAge) {
+        if (reason === "infant02") return "幼児(0歳～2歳)から3歳以上の子ども券種へは変更不可(" + srcAge + "→" + dstAge + ")";
+        if (reason === "stage_down") return "対象年齢が下がる変更は不可（小学生・中学生を区別）(" + srcAge + "→" + dstAge + ")";
+        if (reason === "stage_up") return "年齢区分の昇格は大人へのみ可（小学生・中学生を区別）(" + srcAge + "→" + dstAge + ")";
         if (reason === "mid_up") return "年齢区分の昇格は大人へのみ可(" + srcAge + "→" + dstAge + ")";
         if (reason === "up_out") return "範囲券種の範囲外(上)へのUG不可(" + srcAge + "→" + dstAge + ")";
         return "年齢降格(" + srcAge + "→" + dstAge + ")";
@@ -3071,8 +3121,9 @@
 
       // 未確定の複合券種（KEN314=高校生以上＋中学生以下 等）
       // 単純な「以上」だけで大人へ分類せず、未確定複合券種として既存扱いを維持
+      // 2026-10-13（正本§15-4）: KEN314「高校生以上＋中学生以下」は今回UG不可（元・先とも）。canUpgrade・validate で弾く
       function ugIsCompositeAgeTicket(a) {
-        a = String(a || "").normalize("NFKC").trim();
+        a = ugNormAgeText(a);
         if (/(\+|＋)/.test(a) && /高校生以上|中学生以上|小学生以上|大人|共通/.test(a) && /中学生以下|小学生以下|子ども|子供|こども|幼児/.test(a)) return true;
         return false;
       }
@@ -3083,7 +3134,7 @@
       // KEN301=高校生以上, KEN302=中学生以上, KEN309=小学生以上, KEN310=大人(ﾊﾟｰｸﾊﾟｽﾎﾟｰﾄ付)
       // ※知らないラベルを大人と決めつけない
       function ugIsAdultCategory(a) {
-        a = String(a || "").normalize("NFKC").trim();
+        a = ugNormAgeText(a);
         if (!a || ugIsCompositeAgeTicket(a)) return false;
         if (/大人|ADULT/i.test(a)) return true;
         if (/共通|全年齢/.test(a)) return true;
@@ -3099,7 +3150,7 @@
       // KEN208/KEN318=3歳～中学生, KEN214/KEN316=3歳～小学生, KEN209/KEN317=3歳～未就学児, KEN210=幼児(0歳～2歳)
       // ※高校生単独は若年限定、高校生以上は大人扱いで厳格に区別
       function ugIsYouthCategory(a) {
-        a = String(a || "").normalize("NFKC").trim();
+        a = ugNormAgeText(a);
         if (!a || ugIsCompositeAgeTicket(a)) return false;
         if (ugIsAdultCategory(a)) return false;
         if (ugIsU23Category(a)) return false;
@@ -3108,14 +3159,15 @@
         if (/中学生|中学/i.test(a)) return true;
         if (/高校生|高校/i.test(a)) return true;
         if (/(^|[^0-9０-９])[3-6３-６][\s　]*歳/.test(a)) return true;
-        if (/[0-9０-９]+歳～[0-9０-９]+歳/.test(a)) return true;
+        // 2026-10-13: 波ダッシュは ugNormAgeText で「~」に統一済み（旧「歳～」はNFKC後に一致しなかった）
+        if (/[0-9]+歳~[0-9]+歳/.test(a)) return true;
         return false;
       }
 
       // U23区分
       // KEN203/KEN312=U23(高校生～23歳)
       function ugIsU23Category(a) {
-        a = String(a || "").normalize("NFKC").trim();
+        a = ugNormAgeText(a);
         if (!a || ugIsCompositeAgeTicket(a)) return false;
         if (ugIsAdultCategory(a)) return false;
         return /U23|アンダー|U\-23/i.test(a);
@@ -3132,8 +3184,9 @@
       }
       // 子ども系券種の対象年齢の上限（この歳未満）。共通券種の下限と重なるかを見るのに使う。判定不能=null。
       //  U23=24 / 高校生=18 / 中学生まで=15 / 小学生まで=12 / 子ども(学年表記なし)=15 / 幼児・未就学=6
+      // ※2026-10-13（正本§15-1）以降、可否判定（ugYouthToAdultReason）では使っていない。VBA との対照・参考用に残す
       function ugYouthUpperAge(a) {
-        a = String(a || "").normalize("NFKC");
+        a = ugNormAgeText(a);
         if (/U23|アンダー|23歳/i.test(a)) return 24;
         if (/高校/.test(a)) return 18;
         if (/中学/.test(a)) return 15;
@@ -3144,7 +3197,7 @@
       }
       // 共通券種の対象年齢の下限（「8歳以上共通」=8 / 小学生以上=6 / 中学生以上=12 / 高校生以上=15 / 全年齢・3歳以上=3以下）
       function ugCommonLowerAge(a) {
-        a = String(a || "").normalize("NFKC");
+        a = ugNormAgeText(a);
         const m = a.match(/([0-9]+)\s*歳以上/);
         if (m) return Number(m[1]);
         if (/小学生以上|小学以上/.test(a)) return 6;
@@ -3152,8 +3205,15 @@
         if (/高校生以上|高校以上/.test(a)) return 15;
         return 0;
       }
-      // 子ども系券種（幼児・子ども・U23等＝大人扱いでない券種）から大人扱い券種への変更可否（2026-10-13 SHUN確定・正本§14）。
-      //  ・先が共通券種: 対象年齢が重なるときだけ可（幼児→8歳以上共通・中学生以上共通は不可、子ども(小中)→中学生以上共通は可）。席種を問わない
+      // 全年齢の共通券（「共通」「全年齢」を含み、下限 ugCommonLowerAge が3歳以下＝3歳以上共通・3歳以上共通(ご招待)・全年齢共通 等）。
+      // 8歳以上共通・小学生以上共通・中学生以上共通・高校生以上共通 などの「下限つき共通券」は false（2026-10-13・正本§15-1）
+      function ugIsAllAgeCommon(a) {
+        a = ugNormAgeText(a);
+        return /共通|全年齢/.test(a) && !ugIsCompositeAgeTicket(a) && ugCommonLowerAge(a) <= 3;
+      }
+      // 子ども系券種（幼児・子ども・U23等＝大人扱いでない券種）から大人扱い券種への変更可否（2026-10-13 SHUN確定・正本§14／§15で改訂）。
+      //  ・先が共通券種: 全年齢の共通券（3歳以上共通 等）だけ可。下限つき共通券（8歳以上・小学生以上・中学生以上・高校生以上共通 等）は
+      //    対象年齢が重なっていても不可（§15-1。§14 の「対象年齢が重なれば可」を廃止）。幼児(0歳～2歳)→3歳以上共通も可（§15-3）。席種を問わない
       //  ・先が大人券（大人・高校生以上・中学生以上等）: 同一席種なら可。別席種は U23・高校生 → 高校生を含む大人券（大人(高校生以上)等）だけ横として可
       //  大人扱い券種が元の場合（共通→共通等）は対象外。子ども系どうしは ugAgeSpanReason の範囲判定に任せる。戻り: null=可 / 不可理由
       function ugYouthToAdultReason(srcSeat, srcAge, dstSeat, dstAge) {
@@ -3163,10 +3223,9 @@
         const sc = ugAgeClass(srcAge);
         if (!sc) return null;
         const pair = "(" + srcAge + "→" + dstAge + ")";
-        if (/共通|全年齢/.test(String(dstAge).normalize("NFKC"))) {
-          const hi = ugYouthUpperAge(srcAge);
-          if (hi == null || hi > ugCommonLowerAge(dstAge)) return null;
-          return "共通券種の対象年齢外のためUG不可" + pair;
+        if (/共通|全年齢/.test(ugNormAgeText(dstAge))) {
+          if (ugIsAllAgeCommon(dstAge)) return null;
+          return "子ども・U23券種から下限つき共通券種へは変更不可" + pair;
         }
         if (srcSeat === dstSeat) return null;
         const d = ugAgeSpan(dstAge);
@@ -3184,6 +3243,20 @@
           return "大人・共通券種から子ども・若年限定券種への変更不可(" + srcAge + "→" + dstAge + ")";
         }
         return null;
+      }
+      // 同じ券種か（同一席種の「同券種＝座席移動・500円」／エリア席の自己UG／パス系・木曜日券の同券種 の判定に使う）。
+      // 2026-10-13（正本§15-C1）: 旧実装は ugAgeRank の一致で同券種としていたため、同一席種の
+      // 高校生→大人(24歳以上)・大人(24歳以上)→大人(高校生以上)・子ども→小学生以上共通・U-23→大人 等を「同券種」と取り違え、
+      // 500円固定の期待差額やエリア席の自己UG不可で誤判定していた。券種名の表記ゆれだけを吸収した完全一致に改める。
+      //  正規化（ugTicketKey）: ugNormAgeText（NFKC・波ダッシュ統一・U-23→U23）→ 空白除去 → 最後の「_」までの接頭辞（鈴鹿_／もてぎ_ 等）を除去
+      //  → 子供／こども→子ども。括弧の全角/半角は NFKC で揃う。
+      function ugTicketKey(a) {
+        return ugNormAgeText(a).replace(/\s+/g, "").replace(/^.*_/, "").replace(/子供|こども/g, "子ども");
+      }
+      function ugSameTicket(srcAge, dstAge) {
+        if (srcAge === dstAge) return true;
+        const k = ugTicketKey(srcAge);
+        return k !== "" && k === ugTicketKey(dstAge);
       }
 
       // 売止め等のダミー価格（検算対象外）か。売止めの記号は全桁9（999999等）のみ。
@@ -3329,8 +3402,20 @@
         // S-BOX/R-BOX/GRAN VIEWはBOX判定、車椅子はisWheelchairで既にブロックされるため、
         // 既存判定を素通りしていた席種だけを列挙する。ローカルホスピは27F1席種エリアマスタ未登録
         // かつ販売経路=法人のため対象外（IGTCのホスピタリティ観戦券は対象に残すので厳密一致させる）。
-        const isUgExcludedSeat = (seat) =>
-          /ファミリーシート|カメラマン|市民応援席|ローカルホスピ/.test(String(seat || "").normalize("NFKC"));
+        // 2026-10-13（正本§15-6・§15-7・§15-8）で次を追加。理由文言は項目ごとに分ける（元・先どちらでも不可）:
+        //  ・S席かつファミリーの席種（「S席ファミリー観戦券」等。「ファミリーシート」表記以外も）は全大会で対象外（§15-8・子どもが必須の席）
+        //    判定: 席種名（NFKC後）に「S」または「S席」の直後（空白・中黒を挟んでよい）に「ファミリー」。S の直前は英字以外
+        //  ・「16-23 ZERO円パス」を含む席種（ZERO円パス本体・ZERO円パス付き観戦券・ZERO円パス限定の券）はUG不可（§15-7）。判定: 「ZERO円」
+        //  ・「S-BOX ○ 追加観戦券」はUG対象外（§15-6）。判定: 「BOX」のあとに「追加観戦券」
+        const ugSeatExcludeReason = (seat) => {
+          const s = String(seat || "").normalize("NFKC");
+          if (/ファミリーシート|カメラマン|市民応援席|ローカルホスピ/.test(s)) return "公式HPでUG対象外の席種";
+          if (/(^|[^A-Za-z])S席?[\s・]*ファミリー/.test(s)) return "S席ファミリーはUG対象外の席種";
+          if (/ZERO円/i.test(s)) return "16-23 ZERO円パスはUG不可";
+          if (/BOX.*追加観戦券/i.test(s)) return "S-BOX追加観戦券はUG対象外";
+          return null;
+        };
+        const isUgExcludedSeat = (seat) => !!ugSeatExcludeReason(seat);
         // 元にできない席種（先としてはUG可）。Formula 1 Paddock Club から他席種への変更は不可（2026-10-13 SHUN確認・正本§2-9）
         const isUgSourceExcludedSeat = (seat) => /Paddock Club|パドッククラブ/i.test(String(seat || "").normalize("NFKC"));
         // 指定席でも座席移動（同席種・同券種の再発行UG）ができない席種。ホスピタリティのクラブ・ラウンジは
@@ -3343,7 +3428,19 @@
         // パス系（ピットウォーク・パドックパス等）は完全同一席種の年齢区分変更のみ可。
         // 大分類「その他」やコード6桁目Oで弾かれる前に判定する必要がある（2026-07-18確定）。
         // 半角カナ表記（ﾊﾟﾄﾞｯｸﾊﾟｽ）の実データがあるため NFKC 正規化してから判定する。
-        const isSpecialPass = (seat) => /ピットウォーク|パドックパス|パス/.test(String(seat || "").normalize("NFKC"));
+        // 2026-10-13（正本§15-5・§15-7）: 名前に「パス」が入るだけではパス系にしない。次のどちらかでパス系とする。
+        //  ・席種カテゴリ「その他」＝席種エリアコード6桁目が O（コードが無い呼び出し元では seatMeta の cat「その他」＝料金表の大分類「その他」）
+        //  ・席種名が ピットウォーク／パドックパス／激感エリアパス／パークパスポート を含み、かつ「観戦券」「観覧券」を含まない
+        //    （「ﾊﾟﾄﾞﾊﾟｽ付き観戦券」「ﾊﾟｰｸﾊﾟｽﾎﾟｰﾄ付観戦券」「観戦券(ﾊﾟｽ差額)」は通常の観戦券）
+        //  ZERO円パスはパス系ではなくUG不可（ugSeatExcludeReason）。BOX・駐車券の判定が先に効く。
+        const isSpecialPass = (code, seat) => {
+          const s = String(seat || "").normalize("NFKC");
+          if (/ZERO円/i.test(s)) return false;
+          if (seatCat(code, seat) === "その他") return true;
+          return /ピットウォーク|パドックパス|激感エリアパス|パークパスポート/.test(s) && !/観戦券|観覧券/.test(s);
+        };
+        // 駐車券（2026-10-13・正本§15-5: 同一席種内でもUG不可）。席種カテゴリ「駐車券」（コード6桁目P／大分類「駐車場」）または席種名に「駐車」
+        const isParkingSeat = (code, seat) => seatCat(code, seat) === "駐車券" || /駐車/.test(String(seat || "").normalize("NFKC"));
         // 席種名に「エリア」表記が無いがマスタ上は数在庫（エリア席）の席種。
         // seatMeta連携時はマスタの在庫種別が正なので不要だが、未連携時のフォールバック判定で
         // これらが指定席扱いになると「エリア席の同席種同券種UG不可」を取りこぼす。
@@ -3354,10 +3451,14 @@
         // VIP/スイート/ラウンジ/テラス等の名称だけでは区画席にしない（指定/エリアとしてUG対象にする）。
         // 2026-08-25: BOX/ボックス表記の判定を追加（VBA isBoxSeat と同一化）。マスタ未連携時に
         // R-BOX・S-BOX が区画席と認識されず、料金表マクロ経由の判定で406件の乖離が出ていた。
+        // 2026-10-13（正本§15-5・§15-6）: マスタ優先をやめ「マスタのボックス席フラグ または 席種名の BOX/ボックス/（〇名）」に変更。
+        // マスタ上はBOXフラグ無し・数在庫の「S-BOX ○ 追加観戦券」やコードO「ﾎﾞｯｸｽｼｰﾄ(5名)」が区画席と認識されず、
+        // VBA（席種名で判定）と割れていた。BOX（区画席）は同一席種内でもUG不可。
         const isBoxSeat = (code, seat) => {
-          if (seatMeta) { const m = seatMeta(code, seat); if (m && m.found) return !!m.box; }
           const sn = String(seat || "").normalize("NFKC");
-          return /BOX|ボックス/i.test(sn) || /[（(]\s*[0-9０-９]+\s*名\s*[）)]/.test(sn);
+          if (/BOX|ボックス/i.test(sn) || /[（(]\s*[0-9０-９]+\s*名\s*[）)]/.test(sn)) return true;
+          if (seatMeta) { const m = seatMeta(code, seat); if (m && m.found) return !!m.box; }
+          return false;
         };
         const isDummyPrice = ugIsDummyPrice; // 売止め等のダミー価格判定（純粋ロジックを委譲）
         const lookup = (ck, seat, age) => byCond.get(ck + "|" + seat + "|" + age) || any.get(seat + "|" + age) || null;
@@ -3378,8 +3479,10 @@
         // マトリクスの「—」セル（登録なし）が、本来UGが成立しうるのに登録漏れなのか、
         // そもそも対象外（車椅子/エリア/年齢降格/席種・券種ダウングレード）なのかを区別するために使う。
         function canUpgrade(srcSeat, srcCode, srcAge, dstSeat, dstCode, dstAge) {
-          const sr = ageRank(srcAge), dr = ageRank(dstAge);
-          // 年齢降格/範囲外/中間昇格をまとめて判定（範囲券種対応・両方向。2026-07-07）
+          const dr = ageRank(dstAge);
+          // 2026-10-13（正本§15-4）: 未確定複合券種（KEN314 高校生以上＋中学生以下）は元・先ともUG不可
+          if (ugIsCompositeAgeTicket(srcAge) || ugIsCompositeAgeTicket(dstAge)) return false;
+          // 年齢降格/範囲外/中間昇格をまとめて判定（範囲券種対応・両方向。2026-07-07）。§15-2/§15-3 の小学生・中学生・0～2歳の区別も含む
           if (ugAgeSpanReason(srcAge, dstAge)) return false;
           // 2026-10-01: 大人・共通券種から子ども・若年限定券種への変更は同額以上でも不可
           if (ugAdultToYouthDowngradeReason(srcAge, dstAge)) return false;
@@ -3388,24 +3491,27 @@
           // 公式HPでUG対象外と明示された席種（2026-08-18ルール。VBA側から2026-08-24に移植）
           if (isUgExcludedSeat(srcSeat) || isUgExcludedSeat(dstSeat)) return false;
           if (isUgSourceExcludedSeat(srcSeat) && srcSeat !== dstSeat) return false;
-          const sameAgeCatPre = (sr !== 0 && sr === dr) || srcAge === dstAge;
-          // 年齢別券種の席種どうしの別席種UGは横（同じ年齢区分）のみ（2026-10-13・正本§14）
+          // 同券種の判定は券種名の正規化一致（2026-10-13・正本§15-C1。旧: ugAgeRank の一致）
+          const sameAgeCatPre = ugSameTicket(srcAge, dstAge);
+          // 年齢別券種の席種どうしの別席種UGは横（同じ年齢区分）のみ（2026-10-13・正本§14）。子ども系→下限つき共通券も不可（§15-1）
           if (ugYouthToAdultReason(srcSeat, srcAge, dstSeat, dstAge)) return false;
+          // BOX（区画席）・駐車券は同一席種内でもUG不可（2026-10-13・正本§15-5）。パス系・木曜日券の早期判定より先に見る
+          if (isBoxSeat(srcCode, srcSeat) || isBoxSeat(dstCode, dstSeat)) return false;
+          if (isParkingSeat(srcCode, srcSeat) || isParkingSeat(dstCode, dstSeat)) return false;
           // 木曜日券・木・金曜日券は同一席種内の年齢区分変更のみ（2026-08-19ルール。VBA側から移植）
           if (isSameSeatOnlyUg(srcSeat) || isSameSeatOnlyUg(dstSeat)) {
             return srcSeat === dstSeat && !sameAgeCatPre;
           }
-          // パス系も完全同一席種の年齢区分変更のみ可（2026-07-18ルール。2026-08-25にVBAから移植）。
+          // パス系は完全同一席種で大人扱いの券種への年齢区分変更のみ可（2026-07-18ルール。2026-10-13・正本§15-5で「大人の券種へのみ」に限定）。
           // 大分類「その他」で弾かれる前に判定する。IGTC26のパドックパス 子ども→大人(5,000円)
-          // のような正当なUGを取りこぼさないため。同年齢区分の自己UG（再発行）は対象外。
-          if (isSpecialPass(srcSeat) || isSpecialPass(dstSeat)) {
-            return srcSeat === dstSeat && srcSeat !== "" && !sameAgeCatPre;
+          // のような正当なUGを取りこぼさないため。同券種の自己UG（再発行）は対象外。
+          if (isSpecialPass(srcCode, srcSeat) || isSpecialPass(dstCode, dstSeat)) {
+            return srcSeat === dstSeat && srcSeat !== "" && !sameAgeCatPre && ugIsAdultCategory(dstAge);
           }
           // UG対象は基本「指定席」または「エリア席」。その他(パドックパス等)・駐車券・BOX席(区画席)は
           // 登録漏れ候補に含めない（これらの席種間のUGは想定しないため）。
           const srcCat = seatCat(srcCode, srcSeat), dstCat = seatCat(dstCode, dstSeat);
           if ((srcCat !== "指定席" && srcCat !== "エリア") || (dstCat !== "指定席" && dstCat !== "エリア")) return false;
-          if (isBoxSeat(srcCode, srcSeat) || isBoxSeat(dstCode, dstSeat)) return false;
           const sameAgeCat = sameAgeCatPre;
           const sameSeat = srcSeat === dstSeat && srcSeat !== "" && sameAgeCat;
           // 車椅子・同伴: 席移動不可（他席種への変更・同席種同券種の再発行は不可。同一席種内の年齢区分変更のみ可）
@@ -3434,11 +3540,12 @@
           const srcCode = v(row, c.ugSeatCd), dstCode = v(row, c.seatCd);
           const kbn = v(row, c.kbn), rank = v(row, c.rank);
           const advActual = num(v(row, c.adv)), dayActual = num(v(row, c.day));
-          // 年齢区分の同一判定はランク基準（席種ごとにラベル表記が違っても同じ区分として扱う。文字列完全一致だと
-          // 「子供」でも席によって表記が違うケースを異区分と誤認識してしまう）。
-          // 「3歳以上共通」等のランク判定不能(rank=0)なラベルは文字列完全一致なら同区分とみなすフォールバックも持つ
-          const sr = ageRank(srcAge), dr = ageRank(dstAge);
-          const sameAgeCat = (sr !== 0 && sr === dr) || srcAge === dstAge;
+          // 同券種（座席移動・再発行）の判定は券種名の正規化一致（ugSameTicket。接頭辞「鈴鹿_」等・子供/子ども・括弧・波ダッシュの表記ゆれは吸収）。
+          // 2026-10-13（正本§15-C1）: 旧実装は ugAgeRank の一致で同区分としていたため、同一席種の 高校生→大人(24歳以上)・
+          // 大人(24歳以上)→大人(高校生以上)・子ども(小学生・中学生)→小学生以上共通 等を同券種と取り違えていた
+          // （指定席は500円固定で実差額をng、エリア席は自己UGとして invalid）。
+          const dr = ageRank(dstAge);
+          const sameAgeCat = ugSameTicket(srcAge, dstAge);
           // 一律500円は「席種も券種も同一」の場合のみ（再発行等）。
           // 同席種でも年齢区分が変わる場合（例: G席 U23→大人）は実差額で計算する
           // （もてぎMotoGPチェックリスト.xlsx「大人に変更」表で確認: G席 U23→大人=4,000円など、500円ではない）
@@ -3450,7 +3557,10 @@
           if (!/会員/.test(kbn) && !/会員/.test(rank)) problems.push("一般販売にUG不可");
           // 年齢区分の可否（降格/範囲外/中間昇格）を範囲券種対応でまとめて判定（両方向・2026-07-07）。
           // 大人扱いの共通券から若年限定への変更は、価格や年齢範囲に関係なく不可。
-          {
+          // 2026-10-13（正本§15-4）: 未確定複合券種（KEN314 高校生以上＋中学生以下）は元・先ともUG不可
+          if (ugIsCompositeAgeTicket(srcAge) || ugIsCompositeAgeTicket(dstAge)) {
+            problems.push("未確定複合券種（高校生以上＋中学生以下）はUG不可(" + srcAge + "→" + dstAge + ")");
+          } else {
             const adultYouthReason = ugAdultToYouthDowngradeReason(srcAge, dstAge);
             const ageReason = ugAgeSpanReason(srcAge, dstAge);
             if (adultYouthReason) problems.push(adultYouthReason);
@@ -3460,13 +3570,27 @@
               if (youthReason) problems.push(youthReason);
             }
           }
-          // 公式HPでUG対象外と明示された席種（2026-08-18ルール。VBA側から2026-08-24に移植）
-          if (isUgExcludedSeat(srcSeat) || isUgExcludedSeat(dstSeat)) problems.push("公式HPでUG対象外の席種");
+          // 公式HPでUG対象外と明示された席種（2026-08-18ルール。VBA側から2026-08-24に移植）。
+          // 2026-10-13: S席ファミリー（§15-8）・ZERO円パス（§15-7）・S-BOX追加観戦券（§15-6）を追加。理由は席種ごとに出す
+          for (const r of new Set([ugSeatExcludeReason(srcSeat), ugSeatExcludeReason(dstSeat)])) if (r) problems.push(r);
           if (isUgSourceExcludedSeat(srcSeat) && srcSeat !== dstSeat) problems.push("Paddock Clubからの席種変更は不可");
+          // BOX（区画席）・駐車券は同一席種内でもUG不可（2026-10-13・正本§15-5。旧: 検算では見ておらず登録漏れ候補だけ除外していた）
+          const srcBox = isBoxSeat(srcCode, srcSeat), dstBox = isBoxSeat(dstCode, dstSeat);
+          const srcPark = isParkingSeat(srcCode, srcSeat), dstPark = isParkingSeat(dstCode, dstSeat);
+          if (srcBox || dstBox) problems.push("BOX（区画席）はUG不可（同一席種内も不可）");
+          if (srcPark || dstPark) problems.push("駐車券はUG不可（同一席種内も不可）");
           // 木曜日券・木・金曜日券は同一席種内の年齢区分変更のみ（2026-08-19ルール。VBA側から移植）
           if (isSameSeatOnlyUg(srcSeat) || isSameSeatOnlyUg(dstSeat)) {
             if (srcSeat !== dstSeat) problems.push("木曜日券・木金曜日券は他席種とのUG不可");
             else if (sameAgeCat) problems.push("木曜日券・木金曜日券の同席種同券種UGは設定不可");
+          }
+          // パス系（コード6桁目O＝その他、または ピットウォーク/パドックパス/激感エリアパス/パークパスポート）は
+          // 同一席種内で大人扱いの券種への年齢区分変更のみ可。他席種・同券種・子ども系への変更は不可（2026-10-13・正本§15-5/§15-7。
+          // 旧: 検算では見ておらず登録漏れ候補だけ制限していた）
+          if (!srcBox && !dstBox && !srcPark && !dstPark && (isSpecialPass(srcCode, srcSeat) || isSpecialPass(dstCode, dstSeat))) {
+            if (srcSeat !== dstSeat) problems.push("パス系は他席種とのUG不可");
+            else if (sameAgeCat) problems.push("パス系の同券種UG（座席移動）は設定不可");
+            else if (!ugIsAdultCategory(dstAge)) problems.push("パス系の年齢区分変更は大人の券種へのみ可");
           }
           // エリア席のみ「同席種・同券種UG不可」。その他(O・車椅子・パス等)/指定席は対象外
           const dstCat = seatCat(dstCode, dstSeat);
@@ -3755,7 +3879,8 @@
                 // その販売条件の価格で値下がり（前売・当日どちらか）なら対象外。ダミー・空欄は比べない
                 if (["adv", "day"].some((w) => realPrice(s[w]) && realPrice(d[w]) && d[w] < s[w])) continue;
                 // validate と同じ「同席種・同年齢区分＝一律500円」の判定
-                const sameSeat = s.seat === d.seat && ((ugAgeRank(s.age) !== 0 && ugAgeRank(s.age) === ugAgeRank(d.age)) || s.age === d.age);
+                // 同券種（座席移動・一律500円）の判定は検算と同じ ugSameTicket（正本§15-C1。年齢ランクだけで比べない）
+                const sameSeat = s.seat === d.seat && ugSameTicket(s.age, d.age);
                 const exp = (w) => sameSeat ? PRICE_RULES.SEAT_CHANGE_FEE
                   : (realPrice(s[w]) && realPrice(d[w]) ? ugExpectedCharge(s.age, d.age, s[w], d[w]) : null);
                 const cell = cellOf(g, s.seat, d.seat);
@@ -3845,6 +3970,171 @@
         return out;
       }
       // ===UG_MATRIX_CORE_END===
+      // ===UG_MATRIX_EDIT_CORE_START=== UI/stateに依存しない純粋ロジック（tests/ug_matrix_edit.test.js が抽出して検証する。PRICE_RULES_CORE・UG_VALIDATOR_CORE を呼ぶだけで判定ルールは持たない）
+      // 価格チェック表の券種別マトリクス「編集モード」の部品（2026-10-13 SHUN要望: マトリクス上で差額・販売期間を直し、そのままアップロード用TSVを出す）。
+      //  セル = 販売条件(販売価格区分・会員ランク名) × 元(席種,券種) × 先(席種,券種)。期分け・経路違いで1セルに複数のUG行があり得る。
+      //  c は _priceCols の列位置、v は _priceVal（trim済み文字列）。行は配列（列位置で読む）。可否・期待差額は validate(row) が正。
+      const UGE_SEP = "\u0001";
+      function ugEditIsUg(row, c, v) { const f = v(row, c.ugFlag); return f === "該当" || f === "1"; }
+      // 価格チェック表の販売条件ブロックと同じ区切り（_priceCondOf と同じ。販売経路は含まない）
+      function ugEditCondOf(row, c, v) { return [v(row, c.kbn), v(row, c.rank)].filter((x) => x).join("・") || "（条件なし）"; }
+      // validate の条件キーと同じ（販売経路まで含む）
+      function ugEditFullCond(row, c, v) { return [v(row, c.kbn), v(row, c.rank), v(row, c.route)].join("|"); }
+      function ugEditRowSpec(row, c, v) {
+        return { cond: ugEditCondOf(row, c, v), fs: v(row, c.ugSeat) || "?", fa: v(row, c.ugAge), ts: v(row, c.seat) || "?", ta: v(row, c.age) };
+      }
+      function ugEditSpecKey(s) { return [s.cond, s.fs, s.fa, s.ts, s.ta].join(UGE_SEP); }
+      // 行の同一性チェック用（ポップアップが見ていた行と、今の行が同じ中身か）
+      function ugEditRowFp(row) { return (row || []).map((x) => String(x ?? "")).join("\t"); }
+      // セルに属するUG行の位置（データ順）
+      function ugEditFindRows(rows, c, v, spec) {
+        const key = ugEditSpecKey(spec), out = [];
+        rows.forEach((row, i) => { if (row && ugEditIsUg(row, c, v) && ugEditSpecKey(ugEditRowSpec(row, c, v)) === key) out.push(i); });
+        return out;
+      }
+      // "YYYY/MM/DD HH:MM"（- 区切り・T 区切り・時刻省略も可）→ ミリ秒。実在しない日付は null
+      function ugEditParseDt(s) {
+        const m = String(s || "").trim().match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?$/);
+        if (!m) return null;
+        const hh = +(m[4] || 0), mm = +(m[5] || 0);
+        if (hh > 23 || mm > 59) return null;
+        const d = new Date(+m[1], +m[2] - 1, +m[3], hh, mm);
+        if (isNaN(d.getTime()) || d.getMonth() !== +m[2] - 1 || d.getDate() !== +m[3]) return null;
+        return d.getTime();
+      }
+      function ugEditFormatDt(ms) {
+        const d = new Date(ms), p = (n) => ("0" + n).slice(-2);
+        return d.getFullYear() + "/" + p(d.getMonth() + 1) + "/" + p(d.getDate()) + " " + p(d.getHours()) + ":" + p(d.getMinutes());
+      }
+      // 編集パネルの入力（前売差額・当日差額・販売開始・販売終了）を検査し、登録用の文字列に整える。
+      //  金額: 全角・カンマ可、0以上の整数（売止めダミーの全桁9も可）。日時: 年/月/日 時:分（時刻は必須）。開始≦終了。
+      //  戻り: { ok, values: { adv, day, start, end }, errors: { adv|day|start|end: 理由 } }
+      function ugEditCheckInput(input) {
+        const errors = {}, values = {};
+        const src = input || {};
+        for (const k of ["adv", "day"]) {
+          const t = String(src[k] ?? "").normalize("NFKC").replace(/[,\s]/g, "");
+          if (t === "") errors[k] = "金額が空です";
+          else if (!/^\d+$/.test(t)) errors[k] = "金額は0以上の整数で入力してください";
+          else values[k] = String(Number(t));
+        }
+        const ms = {};
+        for (const k of ["start", "end"]) {
+          const t = String(src[k] ?? "").normalize("NFKC").trim().replace(/\s+/g, " ");
+          const n = /\d{1,2}:\d{2}$/.test(t) ? ugEditParseDt(t) : null;
+          if (t === "") errors[k] = "日時が空です";
+          else if (n == null) errors[k] = "日時は 2026/11/15 11:00 の形で入力してください";
+          else { ms[k] = n; values[k] = ugEditFormatDt(n); }
+        }
+        if (ms.start != null && ms.end != null && ms.start > ms.end) errors.end = "販売終了が販売開始より前です";
+        return { ok: !Object.keys(errors).length, values, errors };
+      }
+      // 通常行（UG以外）の販売期間。同じ条件キー（経路まで）の行を優先し、無ければ全条件から（validate の lookup と同じ優先順）。
+      // 期分けで複数行あれば外枠（最早の開始〜最遅の終了）。文字列はデータの表記のまま返す。戻り { start, end, startStr, endStr, n } | null
+      function ugEditNormalSpan(rows, c, v, fullCond, seat, age) {
+        let own = null, any = null;
+        const bump = (acc, s, e, ss, es) => {
+          if (!acc) return { start: s, end: e, startStr: ss, endStr: es, n: 1 };
+          if (s < acc.start) { acc.start = s; acc.startStr = ss; }
+          if (e > acc.end) { acc.end = e; acc.endStr = es; }
+          acc.n++;
+          return acc;
+        };
+        for (const row of rows) {
+          if (!row || ugEditIsUg(row, c, v) || v(row, c.seat) !== seat || v(row, c.age) !== age) continue;
+          const ss = v(row, c.start), es = v(row, c.end);
+          const s = ugEditParseDt(ss), e = ugEditParseDt(es);
+          if (s == null || e == null) continue;
+          any = bump(any, s, e, ss, es);
+          if (ugEditFullCond(row, c, v) === fullCond) own = bump(own, s, e, ss, es);
+        }
+        return own || any;
+      }
+      // UG行の正しい販売期間＝元と先の通常販売期間の重なり（正本§10.2: 開始=遅いほう・終了=早いほう）。
+      // 戻り { start, end, empty(重なりなし), multi(期分けあり＝外枠で計算) } | null（元か先の通常行が無い）
+      function ugEditCorrectPeriod(rows, c, v, ugRow) {
+        const fc = ugEditFullCond(ugRow, c, v);
+        const s = ugEditNormalSpan(rows, c, v, fc, v(ugRow, c.ugSeat), v(ugRow, c.ugAge));
+        const d = ugEditNormalSpan(rows, c, v, fc, v(ugRow, c.seat), v(ugRow, c.age));
+        if (!s || !d) return null;
+        const start = s.start >= d.start ? s.startStr : d.startStr;
+        const end = s.end <= d.end ? s.endStr : d.endStr;
+        return { start, end, empty: Math.max(s.start, d.start) > Math.min(s.end, d.end), multi: s.n > 1 || d.n > 1 };
+      }
+      // validate(row) の結果から「期待値」（登録すべき前売差額・当日差額の文字列）を出す。
+      //  期待差額が出る窓はその値。通常価格が売止めダミー（全桁9）で検算対象外の窓は、今の登録値が全桁9ならそのまま、
+      //  そうでなければ通常価格側のダミー値を入れる（売止めダミーは全桁9に統一）。価格不明・UG不可は null（入れる値が無い）。
+      function ugEditExpected(chk, current) {
+        const one = (exp, dummy, src, dst, cur) => {
+          if (exp != null) return String(exp);
+          if (dummy) {
+            const cu = String(cur ?? "").trim();
+            if (cu !== "" && ugIsDummyPrice(cu)) return cu;
+            const d = [dst, src].find((p) => p != null && ugIsDummyPrice(p));
+            return d != null ? String(d) : null;
+          }
+          return null;
+        };
+        const cur = current || {};
+        return {
+          adv: one(chk.expected, chk.advDummy, chk.srcAdv, chk.dstAdv, cur.adv),
+          day: one(chk.expectedDay, chk.dayDummy, chk.srcDay, chk.dstDay, cur.day),
+        };
+      }
+      // 行の前売・当日・販売開始・販売終了を差し替えた新しい行（元の行は変えない）
+      function ugEditApplyValues(row, c, values) {
+        const r = (row || []).slice();
+        for (const [k, i] of [["adv", c.adv], ["day", c.day], ["start", c.start], ["end", c.end]]) {
+          if (i < 0 || values[k] == null) continue;
+          while (r.length <= i) r.push("");
+          r[i] = values[k];
+        }
+        return r;
+      }
+      // 登録漏れセルへ追加するUG行を作る（列構成は既存UG行と同じ）:
+      //  ・販売条件まわりの列（販売価格区分・会員ランク・販売経路・販売価格種別・抽選・日付条件 等、下の役割に当たらない列）は
+      //    同じ条件キー（経路まで）の既存UG行から引き継ぐ
+      //  ・先（席種エリアコード/名・券種コード/名・会場座席コード・会場領域コード）は先の通常行、
+      //    元（アップグレード元〜コード/名）は元の通常行から。opt.dstCols の列（仮想列など）も先の通常行から
+      //  ・アップグレード該当フラグは既存UG行の値のまま、販売期間は元・先の通常販売期間の重なり、差額は validate の期待値
+      // セルの販売条件ブロックに複数の経路の既存UG行があれば経路ごとに1行。元・先の通常行がその経路に無ければ作らない。
+      // 戻り: { rows: [{ row, chk }], error }
+      function ugEditPlanAdd(headers, rows, c, v, validate, spec, opt) {
+        const H = headers.map((h) => String(h).trim());
+        const ix = (n) => H.indexOf(n);
+        const venueSeat = ix("会場座席コード"), venueArea = ix("会場領域コード"), ugVenueSeat = ix("アップグレード元会場座席コード");
+        const templates = new Map();
+        for (const row of rows) {
+          if (!row || !ugEditIsUg(row, c, v) || ugEditCondOf(row, c, v) !== spec.cond) continue;
+          const fc = ugEditFullCond(row, c, v);
+          if (!templates.has(fc)) templates.set(fc, row);
+        }
+        if (!templates.size) return { rows: [], error: "この販売条件に既存のUG行が無いため、列の引き継ぎ元がありません" };
+        const findNormal = (fc, seat, age) => rows.find((row) => row && !ugEditIsUg(row, c, v)
+          && ugEditFullCond(row, c, v) === fc && v(row, c.seat) === seat && v(row, c.age) === age) || null;
+        const raw = (r, i) => (i >= 0 ? String(r[i] ?? "") : "");
+        const out = [];
+        for (const [fc, tpl] of templates) {
+          const src = findNormal(fc, spec.fs, spec.fa), dst = findNormal(fc, spec.ts, spec.ta);
+          if (!src || !dst) continue;
+          const row = tpl.slice();
+          while (row.length < H.length) row.push("");
+          const set = (i, val) => { if (i >= 0) row[i] = val; };
+          for (const i of [c.seat, c.seatCd, c.age, c.ageCd, venueSeat, venueArea].concat((opt && opt.dstCols) || [])) set(i, raw(dst, i));
+          set(c.ugSeat, raw(src, c.seat)); set(c.ugSeatCd, raw(src, c.seatCd));
+          set(c.ugAge, raw(src, c.age)); set(c.ugAgeCd, raw(src, c.ageCd));
+          if (ugVenueSeat >= 0 && ugVenueSeat !== c.ugSeatCd) set(ugVenueSeat, raw(src, venueSeat));
+          set(c.adv, ""); set(c.day, "");
+          const per = ugEditCorrectPeriod(rows, c, v, row);
+          if (per && !per.empty) { set(c.start, per.start); set(c.end, per.end); }
+          const exp = ugEditExpected(validate(row), null);
+          set(c.adv, exp.adv ?? ""); set(c.day, exp.day ?? "");
+          out.push({ row, chk: validate(row) });
+        }
+        if (!out.length) return { rows: [], error: "元・先の通常行（同じ販売条件・販売経路）が見つからないため追加できません" };
+        return { rows: out, error: null };
+      }
+      // ===UG_MATRIX_EDIT_CORE_END===
       // ===MISSING_AGE_CORE_START=== UI/stateに依存しない純粋ロジック（tests/missing_age.test.js が抽出して検証する。ugAgeSpan を使う）
       // 価格チェック表「券種抜けの可能性」の判定。入力は 席種 → { 販売条件 → 券種名の配列 }。
       // 2026-10-09: 旧判定は「全席種の6割が持つ券種が無ければ警告」で、27F1では
@@ -8088,15 +8378,12 @@
         dd.appendChild(footer);
         document.body.appendChild(dd);
 
-        // 位置調整
-        const rect = anchorEl.getBoundingClientRect();
-        dd.style.left = Math.max(0, rect.left) + "px";
-        dd.style.top = rect.bottom + 4 + "px";
-        const ddR = dd.getBoundingClientRect();
-        if (ddR.right > window.innerWidth)
-          dd.style.left = Math.max(0, window.innerWidth - ddR.width - 4) + "px";
-        if (ddR.bottom > window.innerHeight)
-          dd.style.top = Math.max(0, rect.top - ddR.height - 4) + "px";
+        // 位置調整: ボタンの下（入らなければ上）に、画面からはみ出さないよう置く。
+        // 2026-10-13 不具合報告「一番右の列のフィルターが範囲外に表示され、ズームダウンが必要」:
+        // 表示倍率（CSS zoom）がかかると left/top が倍率分ずれて右端からはみ出していたため、
+        // 実測で倍率を補正する placeTooltipNear（見出し説明と同じ配置処理）を使う。高さが入らなければ中をスクロール。
+        placeTooltipNear(dd, anchorEl.getBoundingClientRect(), { gap: 4, align: "left", margin: 8 });
+        if (dd.style.maxHeight) dd.style.overflowY = "auto";
         dd.addEventListener("keydown", (e) => {
           if (e.key === "Escape") {
             closeFilterDropdown();
@@ -14405,6 +14692,677 @@
         };
       }
 
+      // ===== 券種別マトリクスの1セル（td）=====
+      // 初回出力（_buildPriceCheckHtml）と編集モードの再描画（_ugMxEditApi）で同じHTMLを使う。
+      //  o: { k(販売条件), fs, fa, ts, ta, colSep, entries:[{ row, chk }], missing, baseStartRaw, baseEndRaw, c, v, withKey }
+      //  entries が空なら登録なしセル（missing=true なら「？登録漏れ?」）。期分け・経路違いで複数行あるときは一番重い判定の行を表示する
+      //  （1行だけのセルは従来と同じ表示）。data-ngn=NG/設定不可の行数（バッジ集計用）、data-n=行数（2行以上のとき）、
+      //  data-mk=セルのキー（登録漏れセルと、編集モードで描き直したセルに付ける）。
+      function _ugMxCellHtml(o) {
+        const { k, fs, fa, ts, ta, c, v } = o;
+        const colSep = o.colSep || "";
+        const entries = o.entries || [];
+        const keyAttr = ` data-mk="${escHtml(JSON.stringify([k, fs, fa, ts, ta]))}"`;
+        if (!entries.length) {
+          if (o.missing) {
+            const missTip = "UG登録がありませんが、正本のUG可否（車椅子/エリア/年齢/§14の子ども→大人・共通券/その他席/駐車券/区画席など）で可、かつ前売・当日とも値下がりしない組合せのため、登録漏れの可能性があります（要確認）";
+            return `<td class="na mx-missing${colSep}"${keyAttr} title="${escHtml(missTip)}">？<div class="rsn">登録漏れ?</div></td>`;
+          }
+          return `<td class="na${colSep}"${o.withKey ? keyAttr : ""}>—</td>`;
+        }
+        // マスタの登録金額をそのまま表示する（売止めダミー(999999等)も置換せず実値表示）
+        const money = (s) => { const n = Number(String(s).replace(/,/g, "")); if (isNaN(n)) return ""; return n.toLocaleString("ja-JP"); };
+        // ツールチップ用: 前売/当日それぞれの「登録／期待／先−元=差額」を1行で説明する。
+        // セルは略称（前売NG/当日NG）だけにし、なぜその期待値かはホバーで分かるようにするため
+        // （値下がりUGは不可理由を表示し、正の差額と手数料の根拠を確認できる）。
+        const _yen = (n) => n != null ? n.toLocaleString("ja-JP") + "円" : "?";
+        const winTipLine = (label, src, dst, exp, actual, ng, note) => {
+          // 期待値が出せない（価格不明 or ダミー価格）場合は、その理由（noteに「販売期間がかぶっているのに
+          // ダミー値のまま設定不可」等）をそのまま見せる。NGなのに「検算不能」とだけ出して誤解させない。
+          if (exp == null) return `${label}: ${note || "検算不能（通常価格が不明/ダミー）"}`;
+          let s = `${label}: 登録${_yen(actual)} / 期待${_yen(exp)}`;
+          if (src != null && dst != null) {
+            const raw = dst - src;
+            s += `（先${_yen(dst)} − 元${_yen(src)} = 差額${raw.toLocaleString("ja-JP")}円`;
+            s += "）";
+          }
+          if (ng) s += "  ← 不一致";
+          return s;
+        };
+        const isBad = (e) => e.chk.status === "ng" || e.chk.status === "invalid";
+        const pick = entries.find((e) => e.chk.status === "invalid") || entries.find((e) => e.chk.status === "ng") || entries[entries.length - 1];
+        const { row, chk } = pick;
+        // ホバーで見せる詳細（セル本体は略称のみ）。前売・当日それぞれの期待値の根拠を併記する。
+        const tip = (chk.status === "invalid" ? chk.note
+          : (chk.expected != null || chk.expectedDay != null)
+            ? (chk.sameSeat ? "同席種・同年齢区分 = 一律500円（再発行等）\n" : "")
+              + winTipLine("前売", chk.srcAdv, chk.dstAdv, chk.expected, chk.advActual, chk.advNg, chk.advNote) + "\n"
+              + winTipLine("当日", chk.srcDay, chk.dstDay, chk.expectedDay, chk.dayActual, chk.dayNg, chk.dayNote)
+            : "通常価格が見つからず検算不能")
+          + `\n販売期間 ${v(row, c.start)} 〜 ${v(row, c.end)}`
+          + (entries.length > 1 ? `\n※このセルにはUG行が${entries.length}行あります（表示は一番重い判定の行）` : "");
+        const cls = (chk.status === "ng" || chk.status === "invalid") ? " mx-ng" : chk.status === "unknown" ? " mx-na" : "";
+        const dg = chk.isDown ? '<div class="dg">▼UG不可</div>' : "";
+        const mid = encodeURIComponent(["M", k, fs, fa, ts, ta].join("|"));
+        // セル本体は略称のみ（前売NG/当日NG）。何が期待値でなぜNGかの詳細はホバー(title)で見せる。
+        let reason = "";
+        if (chk.status === "invalid") reason = `<div class="rsn">${escHtml((chk.problems || []).join("/"))}</div>`;
+        else {
+          const rs = [];
+          if (chk.advNg) rs.push("前売NG");
+          if (chk.dayNg) rs.push("当日NG");
+          if (rs.length) reason = `<div class="rsn">${rs.join("・")}</div>`;
+        }
+        // 期待差額バッジ: 本来の差額（先−元）を表示する。先<元でマイナス等になり登録すべき額（期待）が
+        // 本来差額と異なる場合は「本来差額→期待」を併記（例: 大人の差額200→手数料500）。
+        const rawAdvDiff = (chk.dstAdv != null && chk.srcAdv != null) ? chk.dstAdv - chk.srcAdv : null;
+        const expBadge = (chk.status !== "invalid" && chk.expected != null)
+          ? `<div class="exp-badge">先－元 ${(!chk.sameSeat && rawAdvDiff != null && rawAdvDiff !== chk.expected)
+              ? `${rawAdvDiff.toLocaleString("ja-JP")}→${chk.expected.toLocaleString("ja-JP")}`
+              : chk.expected.toLocaleString("ja-JP")}</div>` : "";
+        const diffPer = formatPeriodDiff(v(row, c.start), v(row, c.end), o.baseStartRaw || "", o.baseEndRaw || "");
+        const perHtml = diffPer ? `<div class="per"><span class="per-diff">${escHtml(diffPer)}</span></div>` : "";
+        const advHtml = `<div class="adv${chk.advNg ? " l-ng" : ""}"><span class="lbl">前売</span> <span class="val">${escHtml(money(v(row, c.adv)))}</span></div>`;
+        const dayHtml = `<div class="day${chk.dayNg ? " l-ng" : ""}"><span class="lbl">当日</span> <span class="val">${escHtml(money(v(row, c.day)))}</span></div>`;
+        const ngn = entries.filter(isBad).length;
+        const extra = (ngn ? ` data-ngn="${ngn}"` : "") + (entries.length > 1 ? ` data-n="${entries.length}"` : "") + (o.withKey ? keyAttr : "");
+        return `<td class="mxc${cls}${colSep}" data-mid="${mid}"${extra} title="${escHtml(tip)}">${expBadge}${advHtml}${dayHtml}${perHtml}${dg}${reason}</td>`;
+      }
+
+      // ===== 券種別マトリクスの編集モード: ポップアップ（価格チェック表）から呼ばれる本体側の窓口 =====
+      // ポップアップは window.opener._ugMxEditApi(JSON文字列) だけを呼ぶ（別ウィンドウ間の受け渡しはJSON文字列に限定）。
+      // データの書き換えは既存の編集と同じく saveUndo → state.data 更新 → markDirty → 再描画 の順で行い、
+      // Undo（Ctrl+Z / ポップアップの「元に戻す」）と未保存表示（●）が効くようにする。判定は buildUgValidator（validate）が正。
+      function _ugMxEditHolder() { return (state.tabs && state.activeTab >= 0 && state.tabs[state.activeTab]) || state; }
+      // 価格チェック表を出したタブの目印。別タブ・別ファイルを開いているときに、そちらのデータを書き換えないため
+      function _ugMxEditSid() {
+        const h = _ugMxEditHolder();
+        if (!h._ugMxSid) h._ugMxSid = "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+        return h._ugMxSid;
+      }
+      // ポップアップとのやり取りは postMessage（file:// で開いたときは blob のポップアップが別オリジン扱いになり、
+      // window.opener の関数を直接呼べないため）。受け付けるのは、このアプリが開いた価格チェック表のウィンドウからだけ。
+      const _ugMxEditWins = new Set();
+      function _ugMxEditRegisterWin(w) {
+        if (!w) return;
+        for (const x of [..._ugMxEditWins]) { try { if (x.closed) _ugMxEditWins.delete(x); } catch (_) { _ugMxEditWins.delete(x); } }
+        _ugMxEditWins.add(w);
+      }
+      window.addEventListener("message", (e) => {
+        const d = e.data;
+        if (!d || d.type !== "ugMxEditReq" || typeof d.req !== "string" || !_ugMxEditWins.has(e.source)) return;
+        const out = _ugMxEditApi(d.req);
+        try { e.source.postMessage({ type: "ugMxEditRes", id: d.id, res: out }, e.origin && e.origin !== "null" ? e.origin : "*"); } catch (_) {}
+      });
+      function _ugMxEditApi(reqJson) {
+        let req;
+        try { req = JSON.parse(reqJson); } catch (e) { return JSON.stringify({ ok: false, error: "要求を読み取れません" }); }
+        let res;
+        try { res = _ugMxEditHandle(req); } catch (e) {
+          console.error("[マトリクス編集]", e);
+          res = { ok: false, error: "処理に失敗しました: " + ((e && e.message) || e) };
+        }
+        res.version = _dataVersion;
+        return JSON.stringify(res);
+      }
+      function _ugMxEditCtx(cutoff) {
+        const c = _priceCols(state.headers), v = _priceVal, seatMeta = _priceSeatMeta();
+        return { c, v, seatMeta, validate: buildUgValidator(state.data, c, v, seatMeta, cutoff == null ? null : cutoff) };
+      }
+      // 登録なしセルが「登録漏れ?」か。初回出力（ugMatrixBuild → buildUgMatrixModel）と同じ判定を、そのセルの元・先の通常行だけで行う
+      function _ugMxEditIsMissing(ctx, spec) {
+        const { c, v, validate } = ctx;
+        const normals = [], ugs = [];
+        for (const r of state.data) {
+          if (!r || ugEditCondOf(r, c, v) !== spec.cond) continue;
+          if (ugEditIsUg(r, c, v)) { ugs.push(r); continue; }
+          const s = v(r, c.seat), a = v(r, c.age);
+          if ((s === spec.fs && a === spec.fa) || (s === spec.ts && a === spec.ta)) normals.push(r);
+        }
+        if (!ugs.length || !normals.length) return false;
+        const num = (s) => { const t = String(s).trim(); if (t === "") return null; const n = Number(t.replace(/,/g, "")); return isNaN(n) ? null : n; };
+        const model = buildUgMatrixModel({
+          normals: normals.map((r) => ({ cond: spec.cond, seat: v(r, c.seat), code: v(r, c.seatCd), age: v(r, c.age), adv: num(v(r, c.adv)), day: num(v(r, c.day)) })),
+          ugs: ugs.map((r) => ({ cond: spec.cond, srcSeat: v(r, c.ugSeat) || "?", srcCode: v(r, c.ugSeatCd), srcAge: v(r, c.ugAge),
+            dstSeat: v(r, c.seat) || "?", dstCode: v(r, c.seatCd), dstAge: v(r, c.age), chk: null, ref: r })),
+          canUpgrade: validate.canUpgrade,
+          isUgCond: (k) => /会員/.test(k),
+        });
+        const g = model.conds[0];
+        const cell = g && g.cells.get(spec.fs + UGE_SEP + spec.ts);
+        return !!(cell && cell.items.some((it) => it.srcAge === spec.fa && it.dstAge === spec.ta && it.state === "missing"));
+      }
+      // パネル表示用に1行の判定結果をまとめる（JSONで渡せる値だけ）
+      function _ugMxEditRowInfo(ctx, row, chk) {
+        const { c, v } = ctx;
+        const cur = { adv: v(row, c.adv), day: v(row, c.day) };
+        const notes = [];
+        if (chk.advNote) notes.push(chk.advNote === chk.dayNote ? chk.advNote : "前売: " + chk.advNote);
+        if (chk.dayNote && chk.dayNote !== chk.advNote) notes.push("当日: " + chk.dayNote);
+        return {
+          fp: ugEditRowFp(row), route: v(row, c.route), adv: cur.adv, day: cur.day, start: v(row, c.start), end: v(row, c.end),
+          status: chk.status, problems: chk.problems || [], notes: chk.notes || [], note: notes.join(" / "),
+          expected: chk.expected, expectedDay: chk.expectedDay, advNg: !!chk.advNg, dayNg: !!chk.dayNg,
+          srcAdv: chk.srcAdv, srcDay: chk.srcDay, dstAdv: chk.dstAdv, dstDay: chk.dstDay,
+          set: ugEditExpected(chk, cur), period: ugEditCorrectPeriod(state.data, c, v, row),
+          srcCode: v(row, c.ugSeatCd), dstCode: v(row, c.seatCd),
+        };
+      }
+      // セル1つ分の応答。detail=true なら編集パネル用の行情報・追加案も付ける
+      function _ugMxEditCellPayload(ctx, req, detail) {
+        const { c, v, validate } = ctx;
+        const spec = req.spec;
+        const idx = ugEditFindRows(state.data, c, v, spec);
+        const entries = idx.map((i) => ({ row: state.data[i], chk: validate(state.data[i]) }));
+        const missing = entries.length ? false : _ugMxEditIsMissing(ctx, spec);
+        const base = req.base || [];
+        const html = _ugMxCellHtml({ k: spec.cond, fs: spec.fs, fa: spec.fa, ts: spec.ts, ta: spec.ta, colSep: req.colSep || "",
+          entries, missing, baseStartRaw: base[0] || "", baseEndRaw: base[1] || "", c, v, withKey: true });
+        if (!detail) return { ok: true, html };
+        const rows = entries.map((e) => _ugMxEditRowInfo(ctx, e.row, e.chk));
+        let plan = null, planError = null;
+        if (!entries.length && missing) {
+          const p = ugEditPlanAdd(state.headers, state.data, c, v, validate, spec, { dstCols: state.sejVirtualCols ? state.sejVirtualCols.indices : [] });
+          plan = p.rows.map((x) => _ugMxEditRowInfo(ctx, x.row, x.chk));
+          planError = p.error;
+        }
+        const first = rows[0] || (plan && plan[0]) || null;
+        const seatLabel = _priceSeatLabelFn(ctx.seatMeta);
+        return {
+          ok: true, html, missing, rows, plan, planError,
+          ref: first ? { srcAdv: first.srcAdv, srcDay: first.srcDay, dstAdv: first.dstAdv, dstDay: first.dstDay, set: first.set, period: first.period, note: first.note } : null,
+          labels: { fs: seatLabel(spec.fs, first ? first.srcCode : ""), fa: _priceAgeLabel(spec.fa), ts: seatLabel(spec.ts, first ? first.dstCode : ""), ta: _priceAgeLabel(spec.ta) },
+        };
+      }
+      // 1行削除（deleteSelectedRows と同じ後始末: マーカー・非表示/折返し行・セル色・選択位置をずらす）
+      function _ugMxEditDeleteRow(r) {
+        state.data.splice(r, 1);
+        if (state.markedCells.size) {
+          const next = new Set();
+          for (const key of state.markedCells) {
+            const [mr, mc] = key.split(",").map(Number);
+            if (mr === r) continue;
+            next.add(mr > r ? `${mr - 1},${mc}` : key);
+          }
+          state.markedCells = next;
+        }
+        _deleteRangeHiddenRows(r, r);
+        resetRowHeights();
+        const newCC = {};
+        for (const [k, val] of Object.entries(state.cellColors)) {
+          const sep = k.indexOf(",");
+          const ri = parseInt(k.slice(0, sep));
+          if (ri === r) continue;
+          newCC[(ri > r ? ri - 1 : ri) + k.slice(sep)] = val;
+        }
+        state.cellColors = newCC;
+        if (state.selected) {
+          const maxRow = state.data.length - 1;
+          const row = state.selected.row > r ? state.selected.row - 1 : state.selected.row;
+          state.selected = { row: Math.max(0, Math.min(row, maxRow)), col: state.selected.col };
+          state.anchor = { ...state.selected };
+        }
+        state.range = null;
+        clearExtraRanges();
+      }
+      function _ugMxEditAfterChange(msg, rowsChanged) {
+        state._dupSet = null;
+        markDirty();
+        if (rowsChanged) applyFilters();
+        state.forceRender = true;
+        renderBody();
+        setStatus(msg);
+      }
+      function _ugMxEditHandle(req) {
+        if (req.op === "version") return { ok: true };
+        if (!req.sid || _ugMxEditHolder()._ugMxSid !== req.sid) {
+          return { ok: false, error: "アプリ側で別のタブ（ファイル）が表示されています。価格チェック表を出力したファイルのタブに戻すか、価格チェック表を出力し直してください。" };
+        }
+        if (state.headerMode === "numbered") return { ok: false, error: "アプリのヘッダーが連番表示です。「ヘッダー:1行目」に戻してください。" };
+        const c = _priceCols(state.headers), v = _priceVal;
+        if ([c.kbn, c.ugFlag, c.seat, c.age, c.ugSeat, c.ugAge, c.adv, c.day, c.start, c.end].some((i) => i === -1)) {
+          return { ok: false, error: "経路価格スケジュール（BO-F-21030）形式の列がそろっていません。" };
+        }
+        if (req.op === "hello") return { ok: true };
+        if (req.op === "undo") {
+          if (!state.undoStack.length) return { ok: false, error: "元に戻せる操作がありません。" };
+          undo();
+          setStatus("元に戻しました（価格チェック表の編集モードから）");
+          return { ok: true };
+        }
+        if (req.op === "export") {
+          // 既存の保存と同じ組み立て（buildFileContent: ヘッダー＋全行・元の区切り/改行・仮想列は除外、BOMは開いたファイルどおり）。
+          // システムは全件入れ替え方式なので、フィルターに関係なく全件を出す。
+          const bom = state.encoding === "utf8bom" ? "﻿" : "";
+          const text = bom + buildFileContent({ allRows: true });
+          let diff;
+          try { diff = buildSaveDiff({ allRows: true }); } catch (e) { diff = { available: false, reason: "差分を算出できませんでした: " + e.message }; }
+          return { ok: true, text, fileName: state.fileName || "data.tsv", rows: state.data.length, encoding: state.encoding, newline: state.newline,
+            diff: { available: !!diff.available, reason: diff.reason || "", added: diff.added || 0, removed: diff.removed || 0, changed: diff.changed || 0, dupKeys: diff.dupKeys || 0 } };
+        }
+        if (req.op === "exported") {
+          // 保存（ダウンロード保存）と同じく未保存表示を消し、次回の行数比較の基準を更新する
+          markClean();
+          state.originalRowCount = state.data.length;
+          setStatus(`価格チェック表から修正済みTSVを出力しました（${state.data.length}行）→ ${req.fileName || ""}`);
+          return { ok: true };
+        }
+        const ctx = _ugMxEditCtx(req.cutoff);
+        if (req.op === "cells") {
+          const cells = [];
+          for (const it of req.items || []) {
+            if (!it || !it.spec) continue;
+            cells.push({ key: it.key, html: _ugMxEditCellPayload(ctx, it, false).html });
+          }
+          return { ok: true, cells };
+        }
+        const spec = req.spec;
+        if (!spec || spec.cond == null) return { ok: false, error: "セルが指定されていません。" };
+        if (req.op === "cell") return _ugMxEditCellPayload(ctx, req, true);
+        const findByFp = () => ugEditFindRows(state.data, c, v, spec).find((i) => ugEditRowFp(state.data[i]) === req.fp);
+        const stale = { ok: false, stale: true, error: "対象のUG行が見つかりません（アプリ側でデータが変わった可能性があります）。セルを開き直してください。" };
+        // 書き換え後の判定: validate は通常行だけで索引を作るので、UG行の変更・追加・削除の前に作った ctx をそのまま使える
+        if (req.op === "update") {
+          const inp = ugEditCheckInput(req.values || {});
+          if (!inp.ok) return { ok: false, inputErrors: inp.errors, error: "入力に誤りがあります。" };
+          const ri = findByFp();
+          if (ri == null) return stale;
+          const next = ugEditApplyValues(state.data[ri], c, inp.values);
+          const cols = [c.adv, c.day, c.start, c.end].filter((i) => String(state.data[ri][i] ?? "") !== String(next[i] ?? ""));
+          if (cols.length) {
+            saveUndo();
+            for (const i of cols) safeSet(ri, i, next[i]);
+            _ugMxEditAfterChange(`価格チェック表からUG行を更新しました（${ri + 1}行目: ${cols.map((i) => state.headers[i]).join("・")}）`, false);
+          }
+          return Object.assign(_ugMxEditCellPayload(ctx, req, true), { changed: cols.length });
+        }
+        if (req.op === "delete") {
+          const ri = findByFp();
+          if (ri == null) return stale;
+          saveUndo();
+          _ugMxEditDeleteRow(ri);
+          _ugMxEditAfterChange(`価格チェック表からUG行を削除しました（元の${ri + 1}行目）`, true);
+          return Object.assign(_ugMxEditCellPayload(ctx, req, true), { deleted: 1 });
+        }
+        if (req.op === "add") {
+          if (ugEditFindRows(state.data, c, v, spec).length) return { ok: false, error: "このセルには既にUG行があります。セルを開き直してください。" };
+          const plan = ugEditPlanAdd(state.headers, state.data, c, v, ctx.validate, spec, { dstCols: state.sejVirtualCols ? state.sejVirtualCols.indices : [] });
+          if (plan.error) return { ok: false, error: plan.error };
+          saveUndo();
+          for (const p of plan.rows) {
+            const row = p.row.slice();
+            while (row.length < state.headers.length) row.push("");
+            state.data.push(row);
+            markForceVisible(state.data.length - 1, 1);
+          }
+          _ugMxEditAfterChange(`価格チェック表からUG行を${plan.rows.length}行追加しました（末尾）`, true);
+          return Object.assign(_ugMxEditCellPayload(ctx, req, true), { added: plan.rows.length });
+        }
+        return { ok: false, error: "不明な操作です: " + req.op };
+      }
+
+      // 価格チェック表（ポップアップ）側の編集モードのスクリプト。toString() で埋め込むため外の変数を参照しないこと。
+      // GAS配信では JS 文字列内の「//」が欠けることがあるので、この関数の中では「//」を使わない（コメントも /* */）。
+      function _ugMxEditPopup() {
+        var bar = document.getElementById("mxe-bar");
+        if (!bar) return;
+        var sid = bar.getAttribute("data-sid") || "";
+        var cutoffAttr = bar.getAttribute("data-cutoff");
+        var cutoff = cutoffAttr ? Number(cutoffAttr) : null;
+        var chk = document.getElementById("mxe-on");
+        var tools = document.getElementById("mxe-tools");
+        var msgEl = document.getElementById("mxe-msg");
+        var on = false, syncedVersion = null, panel = null;
+        var touched = {}; /* セルのキー → td（このページで編集したセル。アプリ側の元に戻す後に描き直す） */
+        var SEL = "table.mx td.mxc, table.mx td.mx-missing, table.mx td[data-mk]";
+        var ST = { ok: ["正常", "ok"], ng: ["差額NG", "ng"], invalid: ["設定不可（ルール違反）", "ng"], unknown: ["価格不明", "na"] };
+
+        function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+        function yen(n) {
+          if (n == null || n === "") return "?";
+          var x = Number(String(n).replace(/,/g, ""));
+          return isNaN(x) ? esc(n) : x.toLocaleString("ja-JP");
+        }
+        function say(text, kind) { msgEl.textContent = text || ""; msgEl.className = "mxe-msg" + (kind ? " mxe-" + kind : ""); }
+        /* アプリ本体（window.opener）とは postMessage でやり取りする（ローカルファイルで開いたときも別オリジン扱いで止まらないように）。戻りは Promise */
+        var seq = 0, waiting = {}, busy = 0;
+        var NO_OPENER = "アプリ本体（この表を出力した tsv-editor の画面）につながっていません。アプリを閉じた・再読み込みした、またはHTML保存したファイルを開いた場合は、アプリから価格チェック表を出力し直してください。";
+        window.addEventListener("message", function (e) {
+          var d = e.data;
+          if (!d || d.type !== "ugMxEditRes" || e.source !== window.opener || !waiting[d.id]) return;
+          var cb = waiting[d.id];
+          delete waiting[d.id];
+          var res;
+          try { res = JSON.parse(d.res); } catch (err) { res = { ok: false, error: "アプリ本体の応答を読み取れません" }; }
+          cb(res);
+        });
+        function setBusy(n) {
+          busy += n;
+          if (busy > 0) document.body.setAttribute("data-mxe-busy", "1"); else document.body.removeAttribute("data-mxe-busy");
+        }
+        function api(op, data) {
+          return new Promise(function (resolve) {
+            var o = window.opener;
+            var closed = true;
+            try { closed = !o || o.closed; } catch (e) { closed = true; }
+            if (closed) { resolve({ ok: false, noOpener: true, error: NO_OPENER }); return; }
+            var req = data || {};
+            req.op = op; req.sid = sid; req.cutoff = cutoff;
+            var id = "m" + (++seq);
+            setBusy(1);
+            var timer = setTimeout(function () {
+              if (!waiting[id]) return;
+              delete waiting[id]; setBusy(-1);
+              resolve({ ok: false, noOpener: op === "hello", error: op === "hello" ? NO_OPENER : "アプリ本体から応答がありません（時間切れ）。アプリの画面を確認してください。" });
+            }, op === "hello" ? 5000 : 60000);
+            waiting[id] = function (res) { clearTimeout(timer); setBusy(-1); resolve(res); };
+            try { o.postMessage({ type: "ugMxEditReq", id: id, req: JSON.stringify(req) }, "*"); }
+            catch (e) { delete waiting[id]; clearTimeout(timer); setBusy(-1); resolve({ ok: false, noOpener: true, error: NO_OPENER }); }
+          });
+        }
+        function disable(reason) {
+          on = false; chk.checked = false; chk.disabled = true;
+          document.body.classList.remove("mx-editing");
+          tools.style.display = "none";
+          closePanel();
+          say("編集モードは使えません: " + reason, "err");
+        }
+        function setOn(v) {
+          on = v;
+          document.body.classList.toggle("mx-editing", on);
+          tools.style.display = on ? "" : "none";
+          if (!on) { closePanel(); say(""); }
+          else say("セルをクリックすると、前売差額・当日差額・販売期間を直せます（「？登録漏れ?」セルはUG行を追加）。直した内容はアプリ本体のデータに反映されます。", "info");
+        }
+        function specOf(td) {
+          var mk = td.getAttribute("data-mk");
+          if (mk) { try { var a = JSON.parse(mk); return { cond: a[0], fs: a[1], fa: a[2], ts: a[3], ta: a[4] }; } catch (e) { return null; } }
+          var mid = td.getAttribute("data-mid");
+          if (!mid) return null;
+          var p = decodeURIComponent(mid).split("|");
+          if (p.length !== 6 || p[0] !== "M") return null;
+          return { cond: p[1], fs: p[2], fa: p[3], ts: p[4], ta: p[5] };
+        }
+        function keyOf(spec) { return JSON.stringify([spec.cond, spec.fs, spec.fa, spec.ts, spec.ta]); }
+        function blockOf(td) { var b = td.closest(".cond-block"); return b ? [b.getAttribute("data-bs") || "", b.getAttribute("data-be") || ""] : ["", ""]; }
+        function reqOf(td, spec) { return { spec: spec, base: blockOf(td), colSep: td.classList.contains("mx-colsep") ? " mx-colsep" : "" }; }
+        function replaceCell(td, html) {
+          var t = document.createElement("table");
+          t.innerHTML = "<tbody><tr>" + html + "</tr></tbody>";
+          var nt = t.querySelector("td");
+          if (!nt || !td.parentNode) return td;
+          if (td.classList.contains("marked") && nt.getAttribute("data-mid") === td.getAttribute("data-mid")) nt.classList.add("marked");
+          nt.classList.add("mxe-touched");
+          td.parentNode.replaceChild(nt, td);
+          return nt;
+        }
+        function updateBadges() {
+          var b = document.getElementById("mx-badges");
+          if (!b) return;
+          var ng = 0;
+          document.querySelectorAll("table.mx td.mxc[data-ngn]").forEach(function (td) { ng += Number(td.getAttribute("data-ngn")) || 0; });
+          var miss = document.querySelectorAll("table.mx td.mx-missing").length;
+          var all = miss + (Number(b.getAttribute("data-missextra")) || 0);
+          var h = ng ? "　<span class=\"badge-ng\">NG " + ng + "件</span>" : "　<span class=\"badge-ok\">検算OK</span>";
+          if (miss || all) h += "　<span class=\"badge-ng\" style=\"background:#b45309\">登録漏れ?候補 " + miss + "件" + (all > miss ? "（この表に行・列の無い券種を含めると" + all + "件）" : "") + "</span>";
+          b.innerHTML = h;
+          return { ng: ng, miss: miss };
+        }
+        function stBadge(s) { var x = ST[s] || [s || "?", "na"]; return "<span class=\"mxe-st mxe-st-" + x[1] + "\">" + esc(x[0]) + "</span>"; }
+        function field(name, label, val, ng) {
+          return "<label class=\"mxe-f" + (ng ? " mxe-fng" : "") + "\"><span>" + esc(label) + "</span><input type=\"text\" name=\"" + name + "\" value=\"" + esc(val) + "\" autocomplete=\"off\"><em class=\"mxe-ferr\" data-for=\"" + name + "\"></em></label>";
+        }
+        function worst(rows) {
+          var order = ["invalid", "ng", "unknown", "ok"], best = -1;
+          (rows || []).forEach(function (r) { var i = order.indexOf(r.status); if (i !== -1 && (best === -1 || i < best)) best = i; });
+          return best === -1 ? null : order[best];
+        }
+        function renderPanel(spec, res, flash) {
+          var L = (res && res.labels) || {};
+          var h = "<div class=\"mxe-head\"><div><b>" + esc(L.fs || spec.fs) + "</b> " + esc(L.fa || spec.fa) + " <span class=\"mxe-arrow\">→</span> <b>" + esc(L.ts || spec.ts) + "</b> " + esc(L.ta || spec.ta)
+            + "<div class=\"mxe-cond\">元 " + esc(spec.fs) + " / " + esc(spec.fa) + "<br>先 " + esc(spec.ts) + " / " + esc(spec.ta) + "<br>販売条件 " + esc(spec.cond) + "</div></div>"
+            + "<button type=\"button\" class=\"mxe-x\" data-act=\"close\" title=\"閉じる（Esc）\">×</button></div>";
+          if (flash) h += "<div class=\"mxe-flash mxe-flash-" + flash[1] + "\">" + esc(flash[0]) + "</div>";
+          if (!res || !res.ok) return h + "<div class=\"mxe-errbox\">" + esc((res && res.error) || "エラー") + "</div>";
+          var ref = res.ref;
+          if (ref) {
+            h += "<table class=\"mxe-ref\"><tr><th></th><th>前売</th><th>当日</th></tr>"
+              + "<tr><th>元の通常価格</th><td>" + yen(ref.srcAdv) + "</td><td>" + yen(ref.srcDay) + "</td></tr>"
+              + "<tr><th>先の通常価格</th><td>" + yen(ref.dstAdv) + "</td><td>" + yen(ref.dstDay) + "</td></tr>"
+              + "<tr class=\"mxe-exp\"><th>期待差額</th><td>" + (ref.set && ref.set.adv != null ? yen(ref.set.adv) : "—") + "</td><td>" + (ref.set && ref.set.day != null ? yen(ref.set.day) : "—") + "</td></tr></table>";
+            if (ref.note) h += "<div class=\"mxe-note\">" + esc(ref.note) + "</div>";
+            h += "<div class=\"mxe-per\">正しい販売期間（元と先の通常販売期間の重なり）:<br>"
+              + (ref.period ? "<b>" + esc(ref.period.start) + " 〜 " + esc(ref.period.end) + "</b>" + (ref.period.multi ? "（期分けあり: 全期の外枠で計算）" : "") + (ref.period.empty ? " <span class=\"mxe-errt\">（重なりなし）</span>" : "") : "不明（元か先の通常行がありません）") + "</div>";
+          }
+          if (res.rows && res.rows.length) {
+            res.rows.forEach(function (r, i) {
+              h += "<div class=\"mxe-row\" data-i=\"" + i + "\"><div class=\"mxe-rowhead\">" + (res.rows.length > 1 ? "UG行 " + (i + 1) + "/" + res.rows.length : "UG行") + "　" + stBadge(r.status) + (r.route ? " <span class=\"mxe-route\">" + esc(r.route) + "</span>" : "") + "</div>";
+              var probs = (r.problems || []).slice();
+              if (r.advNg) probs.push("前売差額が期待（" + yen(r.expected) + "）と違います");
+              if (r.dayNg) probs.push("当日差額が期待（" + yen(r.expectedDay) + "）と違います");
+              if (probs.length) h += "<ul class=\"mxe-probs\">" + probs.map(function (p) { return "<li>" + esc(p) + "</li>"; }).join("") + "</ul>";
+              h += "<div class=\"mxe-grid\">" + field("adv", "前売差額", r.adv, r.advNg) + field("day", "当日差額", r.day, r.dayNg)
+                + field("start", "販売開始", r.start, false) + field("end", "販売終了", r.end, false) + "</div>";
+              h += "<div class=\"mxe-btns\"><button type=\"button\" data-act=\"set\" data-i=\"" + i + "\" title=\"期待差額と正しい販売期間を入力欄に入れます（まだ反映はしません）\">期待値をセット</button>"
+                + "<button type=\"button\" class=\"mxe-primary\" data-act=\"apply\" data-i=\"" + i + "\">反映</button>"
+                + "<button type=\"button\" class=\"mxe-danger\" data-act=\"del\" data-i=\"" + i + "\">この行を削除</button></div></div>";
+            });
+          } else if (res.missing) {
+            h += "<div class=\"mxe-miss\">UG登録がありません（登録漏れ候補）。期待差額と正しい販売期間でUG行を追加できます。列は同じ販売条件の既存UG行・元/先の通常行から引き継ぎます。</div>";
+            if (res.plan && res.plan.length) {
+              h += "<table class=\"mxe-plan\"><tr><th>販売経路</th><th>前売</th><th>当日</th><th>販売期間</th><th>判定</th></tr>"
+                + res.plan.map(function (p) { return "<tr><td>" + esc(p.route) + "</td><td>" + yen(p.adv) + "</td><td>" + yen(p.day) + "</td><td>" + esc(p.start) + "<br>〜 " + esc(p.end) + "</td><td>" + stBadge(p.status) + "</td></tr>"; }).join("")
+                + "</table><div class=\"mxe-btns\"><button type=\"button\" class=\"mxe-primary\" data-act=\"add\">＋ UG行を追加</button></div>";
+            } else h += "<div class=\"mxe-errbox\">" + esc(res.planError || "追加する行を作れません") + "</div>";
+          } else {
+            h += "<div class=\"mxe-miss\">UG登録はありません（登録漏れ候補でもありません）。</div>";
+          }
+          return h;
+        }
+        function closePanel() {
+          if (panel) {
+            if (panel._td) panel._td.classList.remove("mxe-cur");
+            if (panel.parentNode) panel.parentNode.removeChild(panel);
+          }
+          panel = null;
+        }
+        function place(p, td) {
+          var r = td.getBoundingClientRect(), pw = p.offsetWidth, ph = p.offsetHeight;
+          var vw = window.innerWidth, vh = window.innerHeight - 56;
+          var left = r.right + 8;
+          if (left + pw > vw - 8) left = r.left - pw - 8;
+          if (left < 8) left = Math.max(8, vw - pw - 8);
+          var top = r.top;
+          if (top + ph > vh) top = vh - ph;
+          if (top < 8) top = 8;
+          p.style.left = left + "px"; p.style.top = top + "px";
+        }
+        function showPanel(td, spec, res, flash) {
+          closePanel();
+          panel = document.createElement("div");
+          panel.className = "mxe-panel";
+          panel.setAttribute("role", "dialog");
+          panel._td = td; panel._spec = spec; panel._res = res;
+          panel.innerHTML = renderPanel(spec, res, flash);
+          document.body.appendChild(panel);
+          place(panel, td);
+          td.classList.add("mxe-cur");
+          panel.addEventListener("click", onPanelClick);
+          panel.addEventListener("keydown", function (e) {
+            if (e.key === "Escape") { closePanel(); return; }
+            if (e.key === "Enter" && e.target.tagName === "INPUT") {
+              var rowEl = e.target.closest(".mxe-row");
+              if (rowEl) { e.preventDefault(); act("apply", Number(rowEl.getAttribute("data-i"))); }
+            }
+          });
+        }
+        async function openPanel(td, flash) {
+          var spec = specOf(td);
+          if (!spec) { say("このセルは編集できません（席種名・券種名に「|」を含むため位置を特定できません）", "err"); return; }
+          var res = await api("cell", reqOf(td, spec));
+          if (res.noOpener) { disable(res.error); return; }
+          showPanel(td, spec, res, flash);
+        }
+        /* 本体の応答でセルとパネルを描き直す */
+        function afterChange(res, flash) {
+          if (!res.ok) {
+            var box = panel && panel.querySelector(".mxe-flash");
+            var html = "<div class=\"mxe-flash mxe-flash-err\">" + esc(res.error || "エラー") + "</div>";
+            if (box) box.outerHTML = html;
+            else if (panel) panel.querySelector(".mxe-head").insertAdjacentHTML("afterend", html);
+            if (res.noOpener) disable(res.error);
+            return;
+          }
+          var spec = panel._spec;
+          var td = replaceCell(panel._td, res.html);
+          touched[keyOf(spec)] = td;
+          syncedVersion = res.version;
+          updateBadges();
+          showPanel(td, spec, res, flash);
+        }
+        function resultFlash(res, verb) {
+          var w = worst(res.rows);
+          if (!res.rows || !res.rows.length) return [verb + "。" + (res.missing ? "このセルは「登録漏れ?」に戻りました。" : "このセルのUG行はなくなりました。"), "info"];
+          if (w === "ok") return [verb + "。判定: 正常", "ok"];
+          if (w === "ng") return [verb + "。判定: 差額NG（期待値と違います）", "err"];
+          if (w === "invalid") return [verb + "。判定: 設定不可（ルール違反）", "err"];
+          return [verb + "。判定: 価格不明（検算できません）", "info"];
+        }
+        async function act(name, i) {
+          if (!panel || busy) return;
+          var res0 = panel._res, td = panel._td, spec = panel._spec;
+          if (name === "close") { closePanel(); return; }
+          if (name === "set" || name === "apply" || name === "del") {
+            var r = res0 && res0.rows && res0.rows[i];
+            var rowEl = panel.querySelector(".mxe-row[data-i=\"" + i + "\"]");
+            if (!r || !rowEl) return;
+            var inp = function (n) { return rowEl.querySelector("input[name=\"" + n + "\"]"); };
+            if (name === "set") {
+              if (r.set && r.set.adv != null) inp("adv").value = r.set.adv;
+              if (r.set && r.set.day != null) inp("day").value = r.set.day;
+              if (r.period && !r.period.empty) { inp("start").value = r.period.start; inp("end").value = r.period.end; }
+              rowEl.querySelectorAll(".mxe-ferr").forEach(function (em) { em.textContent = ""; });
+              return;
+            }
+            if (name === "apply") {
+              var req = reqOf(td, spec);
+              req.fp = r.fp;
+              req.values = { adv: inp("adv").value, day: inp("day").value, start: inp("start").value, end: inp("end").value };
+              var res = await api("update", req);
+              rowEl.querySelectorAll(".mxe-ferr").forEach(function (em) { em.textContent = ""; });
+              if (res.inputErrors) {
+                Object.keys(res.inputErrors).forEach(function (k) { var em = rowEl.querySelector(".mxe-ferr[data-for=\"" + k + "\"]"); if (em) em.textContent = res.inputErrors[k]; });
+                return;
+              }
+              afterChange(res, res.ok ? (res.changed ? resultFlash(res, "反映しました") : ["変更はありません（入力が登録値と同じです）", "info"]) : null);
+              return;
+            }
+            if (name === "del") {
+              if (!window.confirm("このUG行を削除しますか？\n（アプリ本体のデータから1行消えます。「元に戻す」で戻せます）")) return;
+              var dreq = reqOf(td, spec);
+              dreq.fp = r.fp;
+              var dres = await api("delete", dreq);
+              afterChange(dres, dres.ok ? resultFlash(dres, "UG行を削除しました") : null);
+              return;
+            }
+          }
+          if (name === "add") {
+            var ares = await api("add", reqOf(td, spec));
+            afterChange(ares, ares.ok ? resultFlash(ares, "UG行を" + (ares.added || 0) + "行追加しました") : null);
+          }
+        }
+        function onPanelClick(e) {
+          var b = e.target.closest("[data-act]");
+          if (!b) return;
+          act(b.getAttribute("data-act"), Number(b.getAttribute("data-i")));
+        }
+        async function refreshTouched() {
+          var keys = Object.keys(touched);
+          if (!keys.length) return { ok: true };
+          var items = [];
+          keys.forEach(function (k) { var td = touched[k]; var sp = td && specOf(td); if (sp) items.push({ key: k, spec: sp, base: blockOf(td), colSep: td.classList.contains("mx-colsep") ? " mx-colsep" : "" }); });
+          var res = await api("cells", { items: items });
+          if (!res.ok) { say(res.error, "err"); if (res.noOpener) disable(res.error); return res; }
+          var curKey = panel ? keyOf(panel._spec) : null;
+          res.cells.forEach(function (cc) { var td = touched[cc.key]; if (td && td.parentNode) touched[cc.key] = replaceCell(td, cc.html); });
+          syncedVersion = res.version;
+          updateBadges();
+          if (curKey && touched[curKey]) await openPanel(touched[curKey]);
+          return res;
+        }
+
+        /* 初期チェック: 全件で出した表か・本体につながっているか */
+        if (bar.getAttribute("data-filtered") === "1") {
+          disable("フィルター（絞り込み・行の非表示）適用中に出力した表です。検算の対象行を全件にそろえるため、アプリでフィルターを解除して価格チェック表を出力し直してください。");
+          return;
+        }
+        chk.disabled = true;
+        api("hello").then(function (hello) {
+          if (!hello.ok) { disable(hello.error); return; }
+          syncedVersion = hello.version;
+          chk.disabled = false;
+          bar.setAttribute("data-ready", "1");
+        });
+
+        chk.addEventListener("change", function () { setOn(chk.checked); });
+        /* 編集モード中はセルのクリックをマーク付けより先に受け取り、編集パネルを開く */
+        window.addEventListener("click", function (e) {
+          if (!on) return;
+          if (panel && panel.contains(e.target)) return;
+          var td = e.target.closest ? e.target.closest(SEL) : null;
+          if (!td) return;
+          e.stopPropagation();
+          e.preventDefault();
+          if (busy) return;
+          openPanel(td);
+        }, true);
+        document.addEventListener("keydown", function (e) { if (e.key === "Escape" && panel) closePanel(); });
+        document.getElementById("mxe-undo").addEventListener("click", async function () {
+          if (busy) return;
+          var res = await api("undo");
+          if (!res.ok) { say(res.error, "err"); if (res.noOpener) disable(res.error); return; }
+          await refreshTouched();
+          say("元に戻しました（アプリ本体の直前の操作を1つ戻しました）", "ok");
+        });
+        document.getElementById("mxe-export").addEventListener("click", async function () {
+          if (busy) return;
+          var res = await api("export");
+          if (!res.ok) { say(res.error, "err"); if (res.noOpener) disable(res.error); return; }
+          var cnt = updateBadges() || { ng: 0, miss: 0 };
+          var base = res.fileName || "data.tsv", dot = base.lastIndexOf(".");
+          var name = (dot > 0 ? base.slice(0, dot) : base) + "_UG修正済み" + (dot > 0 ? base.slice(dot) : ".tsv");
+          var d = res.diff || {};
+          var lines = ["修正済みTSVを出力します。", "",
+            "・全件 " + res.rows + " 行（通常行・UG行・特別条件行すべて）＋ヘッダー1行",
+            "・列順・文字コード（" + (res.encoding === "utf8bom" ? "UTF-8 BOM付き" : "UTF-8") + "）・改行（" + (res.newline === "crlf" ? "CRLF" : "LF") + "）は開いたファイルのまま", ""];
+          if (d.available) lines.push("開いた時点のファイルとの差分: 更新 " + d.changed + " 行 / 追加 " + d.added + " 行 / 削除 " + d.removed + " 行");
+          else lines.push("開いた時点のファイルとの差分: " + (d.reason || "算出できません"));
+          if (d.dupKeys) lines.push("※ 突合キーが重複している行が " + d.dupKeys + " 件あります（差分件数は目安）");
+          lines.push("このマトリクス上の残り: NG " + cnt.ng + " 件・登録漏れ?候補 " + cnt.miss + " 件");
+          lines.push("", "ファイル名: " + name, "", "出力しますか？");
+          if (!window.confirm(lines.join("\n"))) return;
+          var blob = new Blob([res.text], { type: "text/tab-separated-values;charset=utf-8" });
+          var a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = name;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+          var r2 = await api("exported", { fileName: name });
+          if (r2.ok) syncedVersion = r2.version;
+          say("出力しました: " + name + "（" + res.rows + "行）", "ok");
+        });
+        /* アプリ側で元に戻す・編集をしたら、このページで編集したセルを描き直す */
+        window.addEventListener("focus", async function () {
+          if (!on || busy) return;
+          var r = await api("version");
+          if (!r.ok || r.version === syncedVersion) return;
+          await refreshTouched();
+          say("アプリ側でデータが変わったため、このページで編集したセルを再判定しました。通常行など他の箇所を直した場合は、価格チェック表を出力し直してください。", "info");
+        });
+      }
+
       function _buildPriceCheckHtml(rowIndices, isFiltered, opt, dayCutoff) {
         // 列位置・席種エリアマスタ参照は UG席種マトリクス（HPチェック）と共通のヘルパーを使う
         const c = _priceCols(state.headers);
@@ -14574,23 +15532,7 @@ ${_sortableTable(labels, rowsHtml)}` };
         // --- UGマトリクス（販売条件ごと・席種でセル結合・凍結ヘッダー・俯瞰用） ---
         if (opt.matrix && ugs.length) {
           const period = periodOf; // 共通ヘルパーを使用
-          // ツールチップ用: 前売/当日それぞれの「登録／期待／先−元=差額」を1行で説明する。
-          // セルは略称（前売NG/当日NG）だけにし、なぜその期待値かはホバーで分かるようにするため
-          // （値下がりUGは不可理由を表示し、正の差額と手数料の根拠を確認できる）。
-          const _yen = (n) => n != null ? n.toLocaleString("ja-JP") + "円" : "?";
-          const winTipLine = (label, src, dst, exp, actual, ng, note) => {
-            // 期待値が出せない（価格不明 or ダミー価格）場合は、その理由（noteに「販売期間がかぶっているのに
-            // ダミー値のまま設定不可」等）をそのまま見せる。NGなのに「検算不能」とだけ出して誤解させない。
-            if (exp == null) return `${label}: ${note || "検算不能（通常価格が不明/ダミー）"}`;
-            let s = `${label}: 登録${_yen(actual)} / 期待${_yen(exp)}`;
-            if (src != null && dst != null) {
-              const raw = dst - src;
-              s += `（先${_yen(dst)} − 元${_yen(src)} = 差額${raw.toLocaleString("ja-JP")}円`;
-              s += "）";
-            }
-            if (ng) s += "  ← 不一致";
-            return s;
-          };
+          // セル（td）のHTMLは _ugMxCellHtml に集約（編集モードの再描画でも同じものを使うため。2026-10-13）
           // 条件ごとの通常価格マップ
           const normalsByCond = {};
           for (const row of normals) { const k = condOf(row); (normalsByCond[k] = normalsByCond[k] || []).push(row); }
@@ -14599,6 +15541,7 @@ ${_sortableTable(labels, rowsHtml)}` };
           for (const row of ugs) { const k = condOf(row); if (!byCond.has(k)) byCond.set(k, []); byCond.get(k).push(row); }
           let ngTotal = 0;
           let missingTotal = 0;
+          const shownMissing = new Set(); // 表のセルとして出した登録漏れ?候補（表に出せない候補を下に一覧するため）
           let mxBody = "";
           for (const [k, list] of byCond) {
             // 販売条件ブロックごとに「基本の販売期間」を決める: UG行の販売期間（開始,終了の組）の最頻値
@@ -14654,7 +15597,10 @@ ${_sortableTable(labels, rowsHtml)}` };
               if (!fromAges[fs].includes(fa)) fromAges[fs].push(fa);
               if (!toSeats.includes(ts)) { toSeats.push(ts); toAges[ts] = []; }
               if (!toAges[ts].includes(ta)) toAges[ts].push(ta);
-              map.set(fs + "|" + fa + "=>" + ts + "|" + ta, { row, chk });
+              // 期分け・経路違いで同じセルに複数のUG行があり得るので配列で持つ（編集モードで行ごとに直せるように）
+              const mk = fs + "|" + fa + "=>" + ts + "|" + ta;
+              if (!map.has(mk)) map.set(mk, []);
+              map.get(mk).push({ row, chk });
             }
             const sortAges = (arr) => arr.slice().sort((a, b) => String(ageKey(a)).localeCompare(String(ageKey(b)), "ja"));
             for (const s of fromSeats) fromAges[s] = sortAges(fromAges[s]);
@@ -14715,63 +15661,54 @@ ${_sortableTable(labels, rowsHtml)}` };
                   // 先側も席種が変わる最初の列を太線で区切る
                   const colSep = ts !== prevTsBody ? " mx-colsep" : "";
                   prevTsBody = ts;
-                  const e = map.get(fs + "|" + fa + "=>" + ts + "|" + ta);
-                  if (!e) {
-                    // UG登録が無いセル。UG席種マトリクスと同じ判定（buildUgMatrixModel: canUpgrade が可・値下がりしない）で
-                    // 「本来UGが成立しうるのに登録漏れの可能性」を目立たせる。2026-10-13: 同年齢ランク限定をやめ、
-                    // 同一席種内の子ども→大人・共通券・車いす指定席の座席移動など正本§14でUG可になる組合せ全般を対象にした。
-                    const missing = ugmxMissing.has([k, fs, fa, ts, ta].join("\u0001"));
-                    if (missing) missingTotal++;
-                    const missTip = "UG登録がありませんが、正本のUG可否（車椅子/エリア/年齢/§14の子ども→大人・共通券/その他席/駐車券/区画席など）で可、かつ前売・当日とも値下がりしない組合せのため、登録漏れの可能性があります（要確認）";
-                    bodyRows += missing
-                      ? `<td class="na mx-missing${colSep}" title="${escHtml(missTip)}">？<div class="rsn">登録漏れ?</div></td>`
-                      : `<td class="na${colSep}">—</td>`;
-                    continue;
-                  }
-                  const { row, chk } = e;
-                  // ホバーで見せる詳細（セル本体は略称のみ）。前売・当日それぞれの期待値の根拠を併記する。
-                  const tip = (chk.status === "invalid" ? chk.note
-                    : (chk.expected != null || chk.expectedDay != null)
-                      ? (chk.sameSeat ? "同席種・同年齢区分 = 一律500円（再発行等）\n" : "")
-                        + winTipLine("前売", chk.srcAdv, chk.dstAdv, chk.expected, chk.advActual, chk.advNg, chk.advNote) + "\n"
-                        + winTipLine("当日", chk.srcDay, chk.dstDay, chk.expectedDay, chk.dayActual, chk.dayNg, chk.dayNote)
-                      : "通常価格が見つからず検算不能")
-                    + `\n販売期間 ${v(row, c.start)} 〜 ${v(row, c.end)}`;
-                  const cls = (chk.status === "ng" || chk.status === "invalid") ? " mx-ng" : chk.status === "unknown" ? " mx-na" : "";
-                  const dg = chk.isDown ? '<div class="dg">▼UG不可</div>' : "";
-                  const mid = encodeURIComponent(["M", k, fs, fa, ts, ta].join("|"));
-                  // セル本体は略称のみ（前売NG/当日NG）。何が期待値でなぜNGかの詳細はホバー(title)で見せる。
-                  let reason = "";
-                  if (chk.status === "invalid") reason = `<div class="rsn">${escHtml((chk.problems || []).join("/"))}</div>`;
-                  else {
-                    const rs = [];
-                    if (chk.advNg) rs.push("前売NG");
-                    if (chk.dayNg) rs.push("当日NG");
-                    if (rs.length) reason = `<div class="rsn">${rs.join("・")}</div>`;
-                  }
-                  // 期待差額バッジ: 本来の差額（先−元）を表示する。先<元でマイナス等になり登録すべき額（期待）が
-                  // 本来差額と異なる場合は「本来差額→期待」を併記（例: 大人の差額200→手数料500）。
-                  const rawAdvDiff = (chk.dstAdv != null && chk.srcAdv != null) ? chk.dstAdv - chk.srcAdv : null;
-                  const expBadge = (chk.status !== "invalid" && chk.expected != null)
-                    ? `<div class="exp-badge">先－元 ${(!chk.sameSeat && rawAdvDiff != null && rawAdvDiff !== chk.expected)
-                        ? `${rawAdvDiff.toLocaleString("ja-JP")}→${chk.expected.toLocaleString("ja-JP")}`
-                        : chk.expected.toLocaleString("ja-JP")}</div>` : "";
-                  const diffPer = formatPeriodDiff(v(row, c.start), v(row, c.end), baseStartRaw, baseEndRaw);
-                  const perHtml = diffPer ? `<div class="per"><span class="per-diff">${escHtml(diffPer)}</span></div>` : "";
-                  const advHtml = `<div class="adv${chk.advNg ? " l-ng" : ""}"><span class="lbl">前売</span> <span class="val">${escHtml(money(v(row, c.adv)))}</span></div>`;
-                  const dayHtml = `<div class="day${chk.dayNg ? " l-ng" : ""}"><span class="lbl">当日</span> <span class="val">${escHtml(money(v(row, c.day)))}</span></div>`;
-                  bodyRows += `<td class="mxc${cls}${colSep}" data-mid="${mid}" title="${escHtml(tip)}">${expBadge}${advHtml}${dayHtml}${perHtml}${dg}${reason}</td>`;
+                  const entries = map.get(fs + "|" + fa + "=>" + ts + "|" + ta) || [];
+                  // UG登録が無いセル。UG席種マトリクスと同じ判定（buildUgMatrixModel: canUpgrade が可・値下がりしない）で
+                  // 「本来UGが成立しうるのに登録漏れの可能性」を目立たせる。2026-10-13: 同年齢ランク限定をやめ、
+                  // 同一席種内の子ども→大人・共通券・車いす指定席の座席移動など正本§14でUG可になる組合せ全般を対象にした。
+                  const missKey = [k, fs, fa, ts, ta].join("\u0001");
+                  const missing = !entries.length && ugmxMissing.has(missKey);
+                  if (missing) { missingTotal++; shownMissing.add(missKey); }
+                  bodyRows += _ugMxCellHtml({ k, fs, fa, ts, ta, colSep, entries, missing, baseStartRaw, baseEndRaw, c, v });
                 }
                 bodyRows += `</tr>`;
               });
             }
-            mxBody += `<div class="cond-block" data-cond="${escHtml(k)}"><h3>${escHtml(k)}</h3><div class="scroll mxscroll"><table class="mx">${head}${bodyRows}</table></div></div>`;
+            // 表に行・列の無い登録漏れ?候補（元または先の券種にUG行が1件も無く、上の表に出せない組合せ。例: 車いす席の座席移動）。
+            // 2026-10-14: 一覧にして、編集モードでここからもUG行を追加できるようにした（同じセル部品を使う）
+            const extraMiss = [];
+            if (ugmx) for (const g of ugmx.model.conds) {
+              if (g.cond !== k) continue;
+              for (const is of g.issues) {
+                if (is.item.state !== "missing") continue;
+                const key = [k, is.srcSeat, is.item.srcAge, is.dstSeat, is.item.dstAge].join("\u0001");
+                if (!shownMissing.has(key)) extraMiss.push({ fs: is.srcSeat, fa: is.item.srcAge, ts: is.dstSeat, ta: is.item.dstAge });
+              }
+            }
+            let extraHtml = "";
+            if (extraMiss.length) {
+              missingTotal += extraMiss.length;
+              extraHtml = `<div class="mx-extra"><div class="mx-extra-h">⚠ 上の表に行・列の無い登録漏れ?候補 ${extraMiss.length}件（元または先の券種にUG登録が1件も無いため表に出せない組合せ）</div>`
+                + `<table class="mx mx-extra-t"><tr><th>元（席種・券種）</th><th>先（席種・券種）</th><th>UG</th></tr>`
+                + extraMiss.map((m) => `<tr><td class="mx-extra-l">${escHtml(seatLabel(m.fs, seatCode[m.fs] || _seatCodeMap[m.fs]))} ${escHtml(ageLabel(m.fa))}</td>`
+                  + `<td class="mx-extra-l">${escHtml(seatLabel(m.ts, seatCode[m.ts] || _seatCodeMap[m.ts]))} ${escHtml(ageLabel(m.ta))}</td>`
+                  + _ugMxCellHtml({ k, fs: m.fs, fa: m.fa, ts: m.ts, ta: m.ta, colSep: "", entries: [], missing: true, baseStartRaw, baseEndRaw, c, v }) + `</tr>`).join("")
+                + `</table></div>`;
+            }
+            // data-bs/data-be: 基準の販売期間（編集モードでセルを描き直すとき、基準と違う期間の表示に使う）
+            mxBody += `<div class="cond-block" data-cond="${escHtml(k)}" data-bs="${escHtml(baseStartRaw)}" data-be="${escHtml(baseEndRaw)}"><h3>${escHtml(k)}</h3><div class="scroll mxscroll"><table class="mx">${head}${bodyRows}</table></div>${extraHtml}</div>`;
           }
           const ngBadge = ngTotal ? `　<span class="badge-ng">NG ${ngTotal}件</span>` : `　<span class="badge-ok">検算OK</span>`;
           const missingAll = ugmx ? ugmx.model.counts.missing : 0;
           const missingBadge = (missingTotal || missingAll) ? `　<span class="badge-ng" style="background:#b45309">登録漏れ?候補 ${missingTotal}件${missingAll > missingTotal ? `（この表に行・列の無い券種を含めると${missingAll}件）` : ""}</span>` : "";
-          sections.matrix = { title: "UGマトリクス", body: `<h2>🔢 アップグレードマトリクス（券種別・金額）${ngBadge}${missingBadge}</h2>
-${mxBody}` };
+          // 編集モード（2026-10-13）: ポップアップから本体(window.opener)の _ugMxEditApi を呼んで state.data を直す。
+          // フィルター適用中に出した表は検算の対象行が全件と違うため編集不可（全件で出し直してもらう）。
+          const editBar = `<div class="mxe-bar" id="mxe-bar" data-sid="${escHtml(_ugMxEditSid())}" data-cutoff="${dayCutoff == null ? "" : dayCutoff}" data-filtered="${isFiltered ? "1" : "0"}">`
+            + `<label class="mxe-toggle"><input type="checkbox" id="mxe-on"> ✏ 編集モード</label>`
+            + `<span class="mxe-tools" id="mxe-tools" style="display:none"><button type="button" id="mxe-undo" title="アプリ本体の「元に戻す」と同じ（直前の操作を1つ戻す）">↶ 元に戻す</button>`
+            + `<button type="button" id="mxe-export" class="mxe-primary" title="アプリ本体のデータ全件（通常行・UG行・特別条件行）を、元の列順・文字コード・改行でTSV出力します">📥 修正済みTSVを出力</button></span>`
+            + `<span class="mxe-msg" id="mxe-msg"></span></div>`;
+          sections.matrix = { title: "UGマトリクス", body: `<h2>🔢 アップグレードマトリクス（券種別・金額）<span id="mx-badges" data-missextra="${Math.max(0, missingAll - missingTotal)}">${ngBadge}${missingBadge}</span></h2>
+${editBar}${mxBody}` };
         }
 
         // --- UG席種マトリクス（元席種×先席種。券種ごとの判定を点で集約・違反/差額違い/設定漏れを俯瞰） ---
@@ -14896,6 +15833,7 @@ ${mxBody}` };
         const url = URL.createObjectURL(blob);
         // noopener指定だとBlob URLを新規タブが読み込めず、PDF印刷保存が空（0KB）になる不具合があるため外す
         const w = window.open(url, "_blank");
+        if (sections.matrix) _ugMxEditRegisterWin(w); // 券種別マトリクスの編集モードの要求を、このウィンドウからだけ受け付ける
         setTimeout(() => URL.revokeObjectURL(url), 60000);
         const names = order.map(k => tabLabels[k]).join("・");
         setStatus(w ? `価格チェックHTMLを出力しました（${names}）` : `ポップアップがブロックされました。ブラウザでこのサイトのポップアップを許可してください。`);
@@ -15058,7 +15996,12 @@ tr[data-mid]:hover td { outline: 1px solid #b8c4d4; outline-offset: -1px; }
 .seat-sep td, .seat-sep th { border-top: 2px solid #94a3b8 !important; }
 /* 席種の切れ目（通常価格表=席種／UG一覧=元席種）。表示中の行で付け直す（markSeatGroups） */
 table.sortable tr.grp-sep > td, table.sortable tr.grp-sep > th,
-table.uglist tr.grp-sep > td, table.uglist tr.grp-sep > th { border-top: 4px solid #334155 !important; }
+table.uglist tr.grp-sep > td, table.uglist tr.grp-sep > th { box-shadow: inset 0 1px 0 #334155; }
+/* 罫線は太さを変えず、セル上端に1pxの濃い線を重ねる（border-collapse では上の行の下線が優先され色が出ないため） */
+tr.grp-sep.miss-row > td.mk-cell { box-shadow: inset 3px 0 0 #d97706, inset 0 1px 0 #334155; }
+tr.grp-sep.ng-row > td.mk-cell { box-shadow: inset 3px 0 0 #dc2626, inset 0 1px 0 #334155; }
+/* 通常価格表は席種の切れ目だけで十分なので、初期描画の seat-sep（2px灰）は打ち消し、ほかの罫線と同じ1pxにそろえる（SHUN要望） */
+table.sortable tr.seat-sep:not(.grp-sep) > td, table.sortable tr.seat-sep:not(.grp-sep) > th { border-top: 1px solid #d8dde4 !important; }
 /* マトリクス: 先側の席種が変わる列の境目も太線で区切る（行のseat-sepと対になる列方向の区切り） */
 table.mx td.mx-colsep, table.mx th.mx-colsep { border-left: 2px solid #94a3b8 !important; }
 /* PDF保存（印刷）時: マーカー・NG色などの背景を保持し、絞り込み行/スクロール領域も全て展開して出力する */
@@ -15073,6 +16016,7 @@ table.mx td.mx-colsep, table.mx th.mx-colsep { border-left: 2px solid #94a3b8 !i
   tr { page-break-inside: avoid; }
 }
 html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+${panesHtml.indexOf('id="mxe-bar"') !== -1 ? _ugMxEditCss() : ""}
 ${panesHtml.indexOf('class="ugm"') !== -1 ? ugMatrixCss() : ""}
 </style></head><body>
 <div class="header"><h1>💴 ${fname} <span style="font-size:12px;color:#666;font-weight:400">価格チェック</span></h1>
@@ -15089,7 +16033,67 @@ ${panesHtml.indexOf('class="ugm"') !== -1 ? ugMatrixCss() : ""}
 </div>
 ${panesHtml.indexOf('class="ugm"') !== -1 ? `<` + `script>${ugMatrixMount.toString()}\nArray.prototype.forEach.call(document.querySelectorAll(".ugm"), ugMatrixMount);<` + `/script>` : ""}
 <` + `script>var DEFAULT_COND=${JSON.stringify(defaultCond || "")};${_priceCheckScript()}<` + `/script>
+${panesHtml.indexOf('id="mxe-bar"') !== -1 ? `<` + `script>(${_ugMxEditPopup.toString()})();<` + `/script>` : ""}
 </body></html>`;
+      }
+
+      // 券種別マトリクスの編集モード（_ugMxEditPopup）の見た目。OFF時はトグルの小さなバーだけで、マトリクス自体の見た目は変えない
+      function _ugMxEditCss() {
+        return `
+.mxe-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 2px 0 6px; font-size: 12px; }
+.mxe-toggle { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; cursor: pointer; color: #334155; }
+body.mx-editing .mxe-toggle { border-color: #217346; background: #eaf4ee; color: #14532d; font-weight: 700; }
+.mxe-toggle input:disabled + * { color: #9ca3af; }
+.mxe-tools button, .mxe-panel button { padding: 3px 10px; border: 1px solid #217346; color: #217346; background: #fff; border-radius: 5px; cursor: pointer; font-size: 12px; margin-right: 4px; }
+.mxe-tools button:hover, .mxe-panel button:hover { background: #eaf4ee; }
+.mxe-tools button.mxe-primary, .mxe-panel button.mxe-primary { background: #217346; color: #fff; }
+.mxe-panel button.mxe-danger { border-color: #dc2626; color: #dc2626; }
+.mxe-msg { color: #475569; line-height: 1.4; }
+.mxe-msg.mxe-err { color: #dc2626; font-weight: 600; }
+.mxe-msg.mxe-ok { color: #16a34a; font-weight: 600; }
+.mxe-msg.mxe-info { color: #1d4ed8; }
+body.mx-editing table.mx td.mxc, body.mx-editing table.mx td.mx-missing { cursor: cell; }
+body.mx-editing table.mx td.mxc:hover, body.mx-editing table.mx td.mx-missing:hover { outline: 2px solid #217346; outline-offset: -2px; }
+body.mx-editing table.mx td.mxc[data-n]::before { content: "×" attr(data-n) "行"; position: absolute; top: 0; left: 2px; font-size: 8px; color: #7c3aed; font-weight: 700; }
+table.mx td.mxe-touched { box-shadow: inset 0 0 0 2px #7c3aed; }
+table.mx td.mxe-cur { outline: 3px solid #217346 !important; outline-offset: -3px; }
+.mxe-panel { position: fixed; z-index: 40; width: 400px; max-width: calc(100vw - 16px); max-height: calc(100vh - 72px); overflow: auto; background: #fff; border: 1px solid #94a3b8; border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,.22); padding: 10px 12px; font-size: 12px; color: #1f2937; }
+.mxe-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; border-bottom: 1px solid #e2e8ee; padding-bottom: 6px; margin-bottom: 6px; font-size: 13px; }
+.mxe-head .mxe-arrow { color: #be185d; font-weight: 700; }
+.mxe-cond { font-size: 10.5px; color: #64748b; margin-top: 3px; line-height: 1.4; }
+.mxe-panel button.mxe-x { border: none; font-size: 18px; line-height: 1; padding: 0 4px; color: #64748b; }
+.mxe-ref { border-collapse: collapse; margin: 4px 0; font-size: 11.5px; }
+.mxe-ref th, .mxe-ref td { border: 1px solid #e2e8ee; padding: 2px 8px; text-align: right; }
+.mxe-ref th:first-child { text-align: left; background: #f8fafc; }
+.mxe-ref tr.mxe-exp td { font-weight: 700; color: #1d4ed8; }
+.mxe-note { font-size: 11px; color: #92400e; margin: 2px 0 4px; }
+.mxe-per { font-size: 11.5px; margin: 4px 0 6px; color: #334155; }
+.mxe-row { border: 1px solid #e2e8ee; border-radius: 6px; padding: 6px 8px; margin: 6px 0; background: #fafbfc; }
+.mxe-rowhead { font-weight: 700; margin-bottom: 4px; }
+.mxe-route { font-weight: 400; color: #64748b; font-size: 11px; }
+.mxe-st { display: inline-block; font-size: 11px; padding: 0 8px; border-radius: 999px; color: #fff; font-weight: 700; }
+.mxe-st-ok { background: #16a34a; } .mxe-st-ng { background: #dc2626; } .mxe-st-na { background: #9ca3af; }
+.mxe-probs { margin: 2px 0 6px 16px; color: #dc2626; font-size: 11.5px; font-weight: 600; }
+.mxe-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
+.mxe-f { display: flex; flex-direction: column; font-size: 11px; color: #475569; }
+.mxe-f input { font-size: 12.5px; padding: 3px 6px; border: 1px solid #cbd5e1; border-radius: 4px; font-variant-numeric: tabular-nums; }
+.mxe-f.mxe-fng input { border-color: #dc2626; color: #dc2626; font-weight: 700; background: #fef2f2; }
+.mxe-ferr { color: #dc2626; font-style: normal; font-size: 10.5px; font-weight: 600; min-height: 0; }
+.mxe-btns { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; }
+.mxe-miss { background: #fef3c7; border: 1px solid #fcd34d; color: #92400e; border-radius: 6px; padding: 6px 8px; margin: 6px 0; line-height: 1.5; }
+.mxe-plan { border-collapse: collapse; font-size: 11px; margin: 4px 0; }
+.mxe-plan th, .mxe-plan td { border: 1px solid #e2e8ee; padding: 2px 6px; }
+.mxe-flash { border-radius: 6px; padding: 5px 8px; margin: 4px 0 6px; font-weight: 700; }
+.mxe-flash-ok { background: #dcfce7; color: #15803d; }
+.mxe-flash-err { background: #fee2e2; color: #b91c1c; }
+.mxe-flash-info { background: #dbeafe; color: #1d4ed8; }
+.mxe-errbox { background: #fee2e2; color: #b91c1c; border-radius: 6px; padding: 6px 8px; margin: 6px 0; font-weight: 600; }
+.mxe-errt { color: #dc2626; font-weight: 700; }
+@media print { .mxe-bar, .mxe-panel { display: none !important; } }
+.mx-extra { margin: 6px 0 4px; }
+.mx-extra-h { font-size: 12px; color: #92400e; font-weight: 700; margin-bottom: 3px; }
+table.mx.mx-extra-t td.mx-extra-l { text-align: left; font-size: 11.5px; }
+`;
       }
 
       // 並べ替え/絞り込み対応テーブルのHTMLを組み立てる
