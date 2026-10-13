@@ -14501,12 +14501,46 @@
             return String(ageKey(v(x, c.age))).localeCompare(String(ageKey(v(y, c.age))), "ja");
           });
           const numOfCell = (val) => Number(String(val).replace(/,/g, "")) || 0;
+          // 券種抜けの検出（他マスタが無いため、データ内の券種から推定）。判定は detectMissingAgeTickets（純粋ロジック）。
+          // 共通券種・券種なし（駐車場等）の席種は比べない。同じ席種の販売条件間の差と、年齢別券種で売る席種どうしの差だけを出す。
+          // 2026-10-13: 上部の一覧ではなく、その席種の行のまとまりの直後に「抜けている券種」を要確認行として差し込む（SHUN要望）
+          const seatConds = {}; // seat -> { cond -> [age] }
+          const condSample = {}; // seat|cond -> 代表行（販売区分・会員ランク・販売経路の表示用）
+          for (const row of normals) {
+            const seat = v(row, c.seat), cond = condOf(row);
+            const byCond = seatConds[seat] || (seatConds[seat] = {});
+            (byCond[cond] || (byCond[cond] = [])).push(v(row, c.age));
+            if (!condSample[seat + "|" + cond]) condSample[seat + "|" + cond] = row;
+          }
+          const missingList = detectMissingAgeTickets(seatConds);
+          const missingBySeat = {};
+          for (const m of missingList) (missingBySeat[m.seat] || (missingBySeat[m.seat] = [])).push(m);
+          const missingRowsHtml = (seat) => (missingBySeat[seat] || []).map((m) => {
+            const why = [m.sameSeat ? "同じ席種の他の販売条件にはある" : "", m.otherSeats ? "年齢別に売る他の席種の多くにはある" : ""].filter(Boolean).join("・");
+            const sample = condSample[seat + "|" + m.cond];
+            const code = sample ? v(sample, c.seatCd) : "";
+            const cat = seatCat(code, seat);
+            const ages = m.ages.map(ageLabel).join("・");
+            const mid = encodeURIComponent(["PM", seat, m.cond, m.ages.join(",")].join("|"));
+            return `<tr data-mid="${mid}" data-cond="${escHtml(m.cond)}" data-chk="1" class="miss-row"><td class="mk-cell" title="クリックでマーク">✔</td>`
+              + `<td data-v="${escHtml(seatCodeSortKey(seat, code))}" style="background:${seatColor(seat)};font-weight:600" title="${escHtml(seat)}">${escHtml(seatLabel(seat, code))}</td>`
+              + `<td data-v="${escHtml(cat)}">${catBadge(cat)}</td>`
+              + `<td data-v="${escHtml(ageKey(m.ages[0] || ""))}" class="miss-age" title="${escHtml(why)}">⚠ ${escHtml(ages)}（抜け？）</td>`
+              + cell(sample ? v(sample, c.kbn) : m.cond, sample ? v(sample, c.kbn) : m.cond)
+              + cell(sample ? v(sample, c.rank) : "", sample ? v(sample, c.rank) : "")
+              + cell(sample ? v(sample, c.route) : "", sample ? v(sample, c.route) : "")
+              // 並べ替え(runSort)は全行に同じ列数のセルがある前提なので colspan は使わない
+              + `<td data-v="" class="miss-why" title="${escHtml(why)}">券種抜け？: ${escHtml(why)}</td><td data-v=""></td>`
+              + `<td data-v="" class="num">—</td><td data-v="" class="num">—</td>`
+              + `</tr>`;
+          }).join("");
           let rowsHtml = "";
           let prevSeat = null;
           for (const row of nsorted) {
             const mid = encodeURIComponent(["P", v(row, c.seat), v(row, c.age), condOf(row), v(row, c.route), v(row, c.start)].join("|"));
             const seat = v(row, c.seat), code = v(row, c.seatCd), sl = seatLabel(seat, code), al = ageLabel(v(row, c.age));
             const cat = seatCat(code, seat);
+            if (prevSeat !== null && prevSeat !== seat) rowsHtml += missingRowsHtml(prevSeat);
             const sep = (prevSeat !== null && prevSeat !== seat) ? " seat-sep" : ""; prevSeat = seat;
             const shared = `<td data-v="${escHtml(seatCodeSortKey(seat, code))}" style="background:${seatColor(seat)};font-weight:600" title="${escHtml(seat)}">${escHtml(sl)}</td>`
               + `<td data-v="${escHtml(cat)}">${catBadge(cat)}</td>`
@@ -14523,23 +14557,13 @@
               + cell(fmt(v(row, c.day)), numOfCell(v(row, c.day)), "num")
               + `</tr>`;
           }
-          // 券種抜けの検出（他マスタが無いため、データ内の券種から推定）。判定は detectMissingAgeTickets（純粋ロジック）。
-          // 共通券種・券種なし（駐車場等）の席種は比べない。同じ席種の販売条件間の差と、年齢別券種で売る席種どうしの差だけを出す
-          const seatConds = {}; // seat -> { cond -> [age] }
-          for (const row of normals) {
-            const seat = v(row, c.seat), cond = condOf(row);
-            const byCond = seatConds[seat] || (seatConds[seat] = {});
-            (byCond[cond] || (byCond[cond] = [])).push(v(row, c.age));
-          }
-          const missingWarn = detectMissingAgeTickets(seatConds).map((m) => {
-            const why = [m.sameSeat ? "同じ席種の他の販売条件にはある" : "", m.otherSeats ? "年齢別に売る他の席種の多くにはある" : ""].filter(Boolean).join("・");
-            return `${m.seat}（${m.cond}）: ${m.ages.map(ageLabel).join("・")}　← ${why}`;
-          });
-          const missBanner = missingWarn.length
-            ? `<div class="warn">⚠ 券種抜けの可能性（要確認）:<br>${missingWarn.slice(0, 30).map(escHtml).join("<br>")}${missingWarn.length > 30 ? `<br>…他${missingWarn.length - 30}件` : ""}<br><span style="font-size:11px">※共通券種（3歳以上共通等）・券種なし（駐車場等）の席種は対象外</span></div>`
+          if (prevSeat !== null) rowsHtml += missingRowsHtml(prevSeat);
+          const missBanner = missingList.length
+            ? `<div class="warn">⚠ 券種抜けの可能性（要確認）: ${missingList.length}件 — 該当する席種の行の直後に<b>黄色の「抜け？」行</b>で表示しています。<span style="font-size:11px">※共通券種（3歳以上共通等）・券種なし（駐車場等）の席種は対象外</span></div>`
             : "";
-          sections.normal = { title: "通常価格表", body: `<h2>📋 通常価格表（${normals.length}件）</h2>
+          sections.normal = { title: "通常価格表", body: `<h2>📋 通常価格表（${normals.length}件）${missingList.length ? `　<span class="badge-ng" style="background:#b45309">要確認 ${missingList.length}件</span>` : ""}</h2>
 <p class="legend">列見出しクリック、または下の「並び替え列を選択」（検索・チェックボックスで列を指定）で並べ替え。各列の入力欄で絞り込み（会員ランク・席種名・期間など）。席種は表示略称・券種は略称表示</p>${missBanner}
+<label class="chk-only-wrap"><input type="checkbox" class="chk-only"> ⚠ NG・要確認の行だけ表示</label>
 ${_sortableTable(labels, rowsHtml)}` };
         }
 
@@ -14803,7 +14827,8 @@ ${_sortableTable(labels, rowsHtml)}` };
               const fSeat = `${fsl} ${tsl} ${pc.fs} ${pc.ts}`;
               const fKen = `${ageLabel(v(row, c.ugAge))} ${ageLabel(v(row, c.age))}`;
               const fPeriod = periodOf(row);
-              bodyRows += `<tr data-mid="${mid}" data-cond="${escHtml(condOf(row))}" data-fseat="${escHtml(fSeat)}" data-fken="${escHtml(fKen)}" data-fperiod="${escHtml(fPeriod)}" data-fcmt="${escHtml(comment)}" class="${isNg ? "ng-row" : ""}${sep}"><td class="mk-cell" title="クリックでマーク">✔</td>`;
+              const needChk = isNg || chk.status === "unknown"; // 「NG・要確認の行だけ表示」の対象（差額NG・設定不可・価格不明）
+              bodyRows += `<tr data-mid="${mid}" data-cond="${escHtml(condOf(row))}"${needChk ? ' data-chk="1"' : ""} data-fseat="${escHtml(fSeat)}" data-fken="${escHtml(fKen)}" data-fperiod="${escHtml(fPeriod)}" data-fcmt="${escHtml(comment)}" class="${isNg ? "ng-row" : ""}${sep}"><td class="mk-cell" title="クリックでマーク">✔</td>`;
               if (i === 0) bodyRows += `<th class="rowh seatpair" rowspan="${list.length}" style="background:${seatColor(pc.fs)}" title="${escHtml(pc.fs + " ⇒ " + pc.ts)}"><b>${escHtml(fsl)}</b><span class="arrow">⇒</span><b>${escHtml(tsl)}</b></th>`;
               bodyRows += `<td class="kenpair">${escHtml(ageLabel(v(row, c.ugAge)))}<span class="arrow">⇒</span>${escHtml(ageLabel(v(row, c.age)))}</td>`
                 + `<td class="prices">${dual(money(chk.srcAdv != null ? chk.srcAdv : ""), money(chk.srcDay != null ? chk.srcDay : ""))}</td>`
@@ -14830,6 +14855,7 @@ ${_sortableTable(labels, rowsHtml)}` };
             + (na ? `　<span class="badge-na">価格不明 ${na}件</span>` : "");
           sections.ug = { title: "UG一覧", body: `<h2>🔀 アップグレード一覧（${ugs.length}件）${badges}</h2>
 <p class="legend">見出し下の入力欄で区間・券種・販売条件・販売期間・コメントを絞り込み。区間=元席種⇒先席種（セル結合）。期待差額=先−元（前売・当日とも）。同席種・同年齢区分は一律500。それ以外は<b>元と先が同額（差額0円）なら500円（席変更手数料）、差額があれば年齢区分を問わず実差額</b>（1〜499円も切り上げない・2026-10-13改訂）。<b>前売/当日いずれかの対象券種価格が先&lt;元なら、共通・子供・幼児・U23を含めUG不可（0円への丸め不可）</b>。車椅子は他席種との相互UG不可、席種最高額が先&lt;元のUGも不可。登録差額が期待と違う項目は文字が赤、コメント欄に理由。${seatMeta ? "席種は表示略称・" : ""}券種は略称</p>
+<label class="chk-only-wrap"><input type="checkbox" class="chk-only"> ⚠ NG・要確認の行だけ表示（差額NG・設定不可・価格不明）</label>
 <div class="scroll uglistscroll"><table class="uglist">${head}${bodyRows}</table></div>` };
         }
 
@@ -14936,6 +14962,11 @@ table.uglist td.cmt { max-width: 220px; white-space: normal; }
 table.uglist .cmt-ng { color: #dc2626; font-size: 11px; font-weight: 600; }
 tr.ng-row td { background: #fef2f2; }
 tr.ng-row td.mk-cell { box-shadow: inset 3px 0 0 #dc2626; }
+tr.miss-row td { background: #fef3c7 !important; }
+tr.miss-row td.mk-cell { box-shadow: inset 3px 0 0 #d97706; }
+td.miss-age { color: #92400e; font-weight: 700; }
+td.miss-why { color: #92400e; font-size: 11.5px; }
+.chk-only-wrap { display: inline-flex; align-items: center; gap: 6px; margin: 2px 0 8px; padding: 4px 10px; border: 1px solid #fcd34d; border-radius: 6px; background: #fffbeb; color: #92400e; font-size: 12px; cursor: pointer; }
 .mxscroll { max-height: calc(100vh - 210px); }
 table.mx { width: auto; border-collapse: separate; border-spacing: 0; }
 table.mx th, table.mx td { text-align: center; padding: 2px 6px; font-size: 11px; line-height: 1.25; }
@@ -15238,7 +15269,17 @@ ${panesHtml.indexOf('class="ugm"') !== -1 ? `<` + `script>${ugMatrixMount.toStri
     });
   }
 
+  // 「NG・要確認の行だけ表示」（通常価格表・UG一覧で共通。どちらかのチェックで両方切り替わる）
+  var chkOnly = false;
+  document.querySelectorAll('input.chk-only').forEach(function(inp){
+    inp.addEventListener('change', function(){
+      chkOnly = inp.checked;
+      document.querySelectorAll('input.chk-only').forEach(function(o){ o.checked = chkOnly; });
+      applyAll();
+    });
+  });
   function rowVisible(tr, inputs){
+    if (chkOnly && tr.getAttribute('data-chk') !== '1') return false;
     if (curCond !== '__all' && tr.getAttribute('data-cond') && tr.getAttribute('data-cond') !== curCond) return false;
     if (inputs) for (var i = 0; i < inputs.length; i++) {
       var q = inputs[i].value.trim().toLowerCase(); if (!q) continue;
@@ -15250,6 +15291,7 @@ ${panesHtml.indexOf('class="ugm"') !== -1 ? `<` + `script>${ugMatrixMount.toStri
   }
   // UG一覧専用: 区間セルがrowspanで全行に無いため、cells[index]ではなく行のデータ属性で照合する
   function ugRowVisible(tr, ufs){
+    if (chkOnly && tr.getAttribute('data-chk') !== '1') return false;
     if (curCond !== '__all' && tr.getAttribute('data-cond') && tr.getAttribute('data-cond') !== curCond) return false;
     for (var i = 0; i < ufs.length; i++) {
       var q = ufs[i].value.trim().toLowerCase(); if (!q) continue;
