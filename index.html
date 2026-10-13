@@ -1974,8 +1974,9 @@
           </div>
           <span class="rb-group-label">HP突合</span>
         </div>
-        <!-- Group: UGマトリクス（価格チェック表の「UG席種マトリクス」と同じ判定・同じ部品） -->
-        <div class="rb-group">
+        <!-- Group: UGマトリクス（価格チェック表の「UG席種マトリクス」と同じ判定・同じ部品）。
+             2026-10-13: 見にくいとのSHUN判断で非表示（券種別マトリクスに戻した）。onclick 登録が要素を参照するため要素は残す -->
+        <div class="rb-group" style="display:none">
           <div class="rb-buttons">
             <button class="rb-btn" id="btn-ug-matrix" title="経路価格スケジュールのUGを 元席種×先席種 のマトリクスで表示&#10;ルール違反・差額違い・設定漏れ（UG可能なのに登録なし）・正常をセルの色と点で表示&#10;判定は価格チェック表のUG検算と同じ（UG検算ルール正本）" aria-label="UGマトリクスを表示">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="1"></rect><line x1="3" y1="8" x2="21" y2="8"></line><line x1="8" y1="3" x2="8" y2="21"></line><circle cx="12" cy="12" r="1.3" fill="currentColor"></circle><circle cx="16.5" cy="12" r="1.3" fill="currentColor"></circle><circle cx="12" cy="16.5" r="1.3"></circle><circle cx="16.5" cy="16.5" r="1.3" fill="currentColor"></circle></svg></span>
@@ -4993,7 +4994,7 @@
         ov.className = "modal-overlay _hp-res-ov";
         ov.innerHTML = `<div class="modal-dialog" style="max-width:1180px;width:94vw;max-height:86vh;overflow:auto">
           <div class="modal-title">HP突合チェック結果</div>
-          ${kind === "price_schedule" ? `<div class="_hp-tabs" role="tablist" style="display:flex;gap:4px;margin:6px 0 8px;border-bottom:1px solid var(--border)">
+          ${kind === "price_schedule" ? `<div class="_hp-tabs" role="tablist" style="display:none;gap:4px;margin:6px 0 8px;border-bottom:1px solid var(--border)">
             <button type="button" class="_hp-tab" data-p="hp" role="tab" aria-selected="true" style="padding:5px 14px;border:1px solid #217346;border-bottom:none;background:#217346;color:#fff;font-size:12px;cursor:pointer;border-radius:4px 4px 0 0">HP突合結果</button>
             <button type="button" class="_hp-tab" data-p="ugm" role="tab" aria-selected="false" style="padding:5px 14px;border:1px solid var(--border);border-bottom:none;background:#eef2f6;color:#444;font-size:12px;cursor:pointer;border-radius:4px 4px 0 0">UGマトリクス（元席種×先席種）</button>
           </div>` : ""}
@@ -14353,7 +14354,6 @@
             <p style="font-size:12px;margin-bottom:14px;padding:6px 10px;border-radius:6px;background:#e8f7ee;color:#16a34a">✓ 席種エリアマスタ参照中（指定席/エリア/その他をマスタで判定・席種は表示略称）</p>
             <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px">
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="px-normal" checked> 📋 通常価格表（席種×券種の設定一覧）</label>
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="px-seatmx" checked> 🧭 UG席種マトリクス（元席種×先席種・違反/差額違い/設定漏れの俯瞰）</label>
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="px-matrix" checked> 🔢 アップグレードマトリクス（券種別・金額）</label>
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="px-ug" checked> 🔀 アップグレード一覧（検算・チェック用）</label>
             </div>
@@ -14380,7 +14380,8 @@
         ov.querySelector("#px-go").onclick = () => {
           const opt = {
             normal: ov.querySelector("#px-normal").checked,
-            seatmx: ov.querySelector("#px-seatmx").checked,
+            // 2026-10-13: UG席種マトリクス（元席種×先席種）は見にくいとのSHUN判断で出力から外し、券種別マトリクスに戻した
+            seatmx: false,
             matrix: ov.querySelector("#px-matrix").checked,
             ug: ov.querySelector("#px-ug").checked,
           };
@@ -14736,9 +14737,9 @@ ${_sortableTable(labels, rowsHtml)}` };
           }
           const ngBadge = ngTotal ? `　<span class="badge-ng">NG ${ngTotal}件</span>` : `　<span class="badge-ok">検算OK</span>`;
           const missingAll = ugmx ? ugmx.model.counts.missing : 0;
-          const missingBadge = (missingTotal || missingAll) ? `　<span class="badge-ng" style="background:#b45309">登録漏れ?候補 ${missingTotal}件${missingAll > missingTotal ? `（この表に行・列の無い券種を含めると${missingAll}件→UG席種マトリクス）` : ""}</span>` : "";
+          const missingBadge = (missingTotal || missingAll) ? `　<span class="badge-ng" style="background:#b45309">登録漏れ?候補 ${missingTotal}件${missingAll > missingTotal ? `（この表に行・列の無い券種を含めると${missingAll}件）` : ""}</span>` : "";
           sections.matrix = { title: "UGマトリクス", body: `<h2>🔢 アップグレードマトリクス（券種別・金額）${ngBadge}${missingBadge}</h2>
-<p class="legend">行=元席種/券種、列=先席種/券種（大人の前売価格の安い順）。基本の販売期間は各ブロック見出しに表示。席種は表示略称＋区分（<span class="catb cat-r">指定席</span><span class="catb cat-a">数在庫</span><span class="catb cat-o">その他</span>）。各セル: 先－元=期待差額（緑） / 前売・当日=実際の金額（数字太字） / 橙ラベル=基本と異なる販売期間（差分のみ短縮表示、見出しの通常価格も同様）。<b>期待差額</b>は同席種・同年齢区分なら一律500、それ以外は元と先が同額（差額0円）なら500（席変更手数料）・差額があれば年齢区分を問わず実差額（2026-10-13改訂）。前売/当日の対象券種価格が先&lt;元ならUG不可（0円に丸めない）。<b>不一致は文字が赤・セルが薄ピンク</b>。<b>「？」の橙セル</b>はUG登録が無いセルのうち、正本のUG可否で可（子ども→大人・共通券・車いす指定席の座席移動などを含む）かつ値下がりしないため登録漏れの可能性がある候補（推測なので必ず人が確認してください）。行・列はUG行に出てくる席種・券種だけなので、全体は「UG席種マトリクス」で確認。クリックでマーク</p>${mxBody}` };
+<p class="legend">行=元席種/券種、列=先席種/券種（大人の前売価格の安い順）。基本の販売期間は各ブロック見出しに表示。席種は表示略称＋区分（<span class="catb cat-r">指定席</span><span class="catb cat-a">数在庫</span><span class="catb cat-o">その他</span>）。各セル: 先－元=期待差額（緑） / 前売・当日=実際の金額（数字太字） / 橙ラベル=基本と異なる販売期間（差分のみ短縮表示、見出しの通常価格も同様）。<b>期待差額</b>は同席種・同年齢区分なら一律500、それ以外は元と先が同額（差額0円）なら500（席変更手数料）・差額があれば年齢区分を問わず実差額（2026-10-13改訂）。前売/当日の対象券種価格が先&lt;元ならUG不可（0円に丸めない）。<b>不一致は文字が赤・セルが薄ピンク</b>。<b>「？」の橙セル</b>はUG登録が無いセルのうち、正本のUG可否で可（子ども→大人・共通券・車いす指定席の座席移動などを含む）かつ値下がりしないため登録漏れの可能性がある候補（推測なので必ず人が確認してください）。行・列はUG行に出てくる席種・券種だけ。クリックでマーク</p>${mxBody}` };
         }
 
         // --- UG席種マトリクス（元席種×先席種。券種ごとの判定を点で集約・違反/差額違い/設定漏れを俯瞰） ---
