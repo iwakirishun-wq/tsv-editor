@@ -14526,7 +14526,7 @@
             const cat = seatCat(code, seat);
             const ages = m.ages.map(ageLabel).join("・");
             const mid = encodeURIComponent(["PM", seat, m.cond, m.ages.join(",")].join("|"));
-            return `<tr data-mid="${mid}" data-cond="${escHtml(m.cond)}" data-chk="1" class="miss-row"><td class="mk-cell" title="クリックでマーク">✔</td>`
+            return `<tr data-mid="${mid}" data-cond="${escHtml(m.cond)}" data-seat="${escHtml(seat)}" data-chk="1" class="miss-row"><td class="mk-cell" title="クリックでマーク">✔</td>`
               + `<td data-v="${escHtml(seatCodeSortKey(seat, code))}" style="background:${seatColor(seat)};font-weight:600" title="${escHtml(seat)}">${escHtml(seatLabel(seat, code))}</td>`
               + `<td data-v="${escHtml(cat)}">${catBadge(cat)}</td>`
               + `<td data-v="${escHtml(ageKey(m.ages[0] || ""))}" class="miss-age" title="${escHtml(why)}">⚠ ${escHtml(ages)}（抜け？）</td>`
@@ -14555,7 +14555,7 @@
               + cell(dt(v(row, c.start)), v(row, c.start), "dt")
               + cell(dt(v(row, c.end)), v(row, c.end), "dt");
             // 1席種×券種＝1行。前売・当日を別列に。
-            rowsHtml += `<tr data-mid="${mid}" data-cond="${escHtml(condOf(row))}" class="${sep.trim()}"><td class="mk-cell" title="クリックでマーク">✔</td>`
+            rowsHtml += `<tr data-mid="${mid}" data-cond="${escHtml(condOf(row))}" data-seat="${escHtml(seat)}" class="${sep.trim()}"><td class="mk-cell" title="クリックでマーク">✔</td>`
               + shared
               + cell(fmt(v(row, c.adv)), numOfCell(v(row, c.adv)), "num")
               + cell(fmt(v(row, c.day)), numOfCell(v(row, c.day)), "num")
@@ -14836,7 +14836,7 @@ ${mxBody}` };
               const fKen = `${ageLabel(v(row, c.ugAge))} ${ageLabel(v(row, c.age))}`;
               const fPeriod = periodOf(row);
               const needChk = isNg || chk.status === "unknown"; // 「NG・要確認の行だけ表示」の対象（差額NG・設定不可・価格不明）
-              bodyRows += `<tr data-mid="${mid}" data-cond="${escHtml(condOf(row))}"${needChk ? ' data-chk="1"' : ""} data-fseat="${escHtml(fSeat)}" data-fken="${escHtml(fKen)}" data-fperiod="${escHtml(fPeriod)}" data-fcmt="${escHtml(comment)}" class="${isNg ? "ng-row" : ""}${sep}"><td class="mk-cell" title="クリックでマーク">✔</td>`;
+              bodyRows += `<tr data-mid="${mid}" data-cond="${escHtml(condOf(row))}"${needChk ? ' data-chk="1"' : ""} data-seat="${escHtml(pc.fs)}" data-fseat="${escHtml(fSeat)}" data-fken="${escHtml(fKen)}" data-fperiod="${escHtml(fPeriod)}" data-fcmt="${escHtml(comment)}" class="${isNg ? "ng-row" : ""}${sep}"><td class="mk-cell" title="クリックでマーク">✔</td>`;
               if (i === 0) bodyRows += `<th class="rowh seatpair" rowspan="${list.length}" style="background:${seatColor(pc.fs)}" title="${escHtml(pc.fs + " ⇒ " + pc.ts)}"><b>${escHtml(fsl)}</b><span class="arrow">⇒</span><b>${escHtml(tsl)}</b></th>`;
               bodyRows += `<td class="kenpair">${escHtml(ageLabel(v(row, c.ugAge)))}<span class="arrow">⇒</span>${escHtml(ageLabel(v(row, c.age)))}</td>`
                 + `<td class="prices">${dual(money(chk.srcAdv != null ? chk.srcAdv : ""), money(chk.srcDay != null ? chk.srcDay : ""))}</td>`
@@ -15048,6 +15048,9 @@ tr[data-mid]:hover td { outline: 1px solid #b8c4d4; outline-offset: -1px; }
 .ppane { display: none; }
 .ppane.on { display: block; }
 .seat-sep td, .seat-sep th { border-top: 2px solid #94a3b8 !important; }
+/* 席種の切れ目（通常価格表=席種／UG一覧=元席種）。表示中の行で付け直す（markSeatGroups） */
+table.sortable tr.grp-sep > td, table.sortable tr.grp-sep > th,
+table.uglist tr.grp-sep > td, table.uglist tr.grp-sep > th { border-top: 4px solid #334155 !important; }
 /* マトリクス: 先側の席種が変わる列の境目も太線で区切る（行のseat-sepと対になる列方向の区切り） */
 table.mx td.mx-colsep, table.mx th.mx-colsep { border-left: 2px solid #94a3b8 !important; }
 /* PDF保存（印刷）時: マーカー・NG色などの背景を保持し、絞り込み行/スクロール領域も全て展開して出力する */
@@ -15181,6 +15184,7 @@ ${panesHtml.indexOf('class="ugm"') !== -1 ? `<` + `script>${ugMatrixMount.toStri
       return asc ? r : -r;
     });
     rows.forEach(function(r){ r.classList.remove('seat-sep'); tbody.appendChild(r); });
+    markSeatGroups();
   }
   document.querySelectorAll('table.sortable').forEach(function(tbl){
     var headRow = tbl.tHead.rows[0];
@@ -15326,6 +15330,23 @@ ${panesHtml.indexOf('class="ugm"') !== -1 ? `<` + `script>${ugMatrixMount.toStri
     fixUgRowspan();
     // マトリクスは販売条件ブロック単位で表示
     document.querySelectorAll('.cond-block').forEach(function(b){ b.style.display = (curCond === '__all' || b.getAttribute('data-cond') === curCond) ? '' : 'none'; });
+    markSeatGroups();
+  }
+  // 席種の切れ目に太線（grp-sep）。表示中の行だけを見て毎回付け直す（並べ替え・絞り込みで線が消えないように）。
+  // 通常価格表は席種、UG一覧は元席種が変わる行が対象
+  function markSeatGroups(){
+    var sets = [];
+    document.querySelectorAll('table.sortable').forEach(function(tbl){ sets.push(Array.prototype.slice.call(tbl.tBodies[0].rows)); });
+    document.querySelectorAll('table.uglist').forEach(function(tbl){ sets.push(Array.prototype.slice.call(tbl.querySelectorAll('tr[data-mid]'))); });
+    sets.forEach(function(rows){
+      var prev = null;
+      rows.forEach(function(tr){
+        if (tr.style.display === 'none') { tr.classList.remove('grp-sep'); return; }
+        var s = tr.getAttribute('data-seat');
+        tr.classList.toggle('grp-sep', prev !== null && s !== null && s !== prev);
+        if (s !== null) prev = s;
+      });
+    });
   }
 
   // 2段ヘッダーの2行目stickyオフセットを1行目の高さに合わせる（行が隠れないように）。
