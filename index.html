@@ -2986,6 +2986,49 @@
         const sp = ugAgeSpan(a);
         return sp.common ? 4 : sp.min === 0 ? 0 : sp.max;
       }
+      // 子ども系券種の対象年齢の上限（この歳未満）。共通券種の下限と重なるかを見るのに使う。判定不能=null。
+      //  U23=24 / 高校生=18 / 中学生まで=15 / 小学生まで=12 / 子ども(学年表記なし)=15 / 幼児・未就学=6
+      function ugYouthUpperAge(a) {
+        a = String(a || "").normalize("NFKC");
+        if (/U23|アンダー|23歳/i.test(a)) return 24;
+        if (/高校/.test(a)) return 18;
+        if (/中学/.test(a)) return 15;
+        if (/小学/.test(a)) return 12;
+        if (/子供|こども|子ども|CHILD/i.test(a)) return 15;
+        if (/幼児|未就学|INFANT/i.test(a)) return 6;
+        return null;
+      }
+      // 共通券種の対象年齢の下限（「8歳以上共通」=8 / 小学生以上=6 / 中学生以上=12 / 高校生以上=15 / 全年齢・3歳以上=3以下）
+      function ugCommonLowerAge(a) {
+        a = String(a || "").normalize("NFKC");
+        const m = a.match(/([0-9]+)\s*歳以上/);
+        if (m) return Number(m[1]);
+        if (/小学生以上|小学以上/.test(a)) return 6;
+        if (/中学生以上|中学以上/.test(a)) return 12;
+        if (/高校生以上|高校以上/.test(a)) return 15;
+        return 0;
+      }
+      // 子ども系券種（幼児・子ども・U23等＝大人扱いでない券種）から大人扱い券種への変更可否（2026-10-13 SHUN確定・正本§14）。
+      //  ・先が共通券種: 対象年齢が重なるときだけ可（幼児→8歳以上共通・中学生以上共通は不可、子ども(小中)→中学生以上共通は可）。席種を問わない
+      //  ・先が大人券（大人・高校生以上・中学生以上等）: 同一席種なら可。別席種は U23・高校生 → 高校生を含む大人券（大人(高校生以上)等）だけ横として可
+      //  大人扱い券種が元の場合（共通→共通等）は対象外。子ども系どうしは ugAgeSpanReason の範囲判定に任せる。戻り: null=可 / 不可理由
+      function ugYouthToAdultReason(srcSeat, srcAge, dstSeat, dstAge) {
+        if (!srcAge || !dstAge || srcAge === dstAge) return null;
+        if (ugIsAdultCategory(srcAge) || ugIsCompositeAgeTicket(srcAge)) return null;
+        if (!ugIsAdultCategory(dstAge)) return null;
+        const sc = ugAgeClass(srcAge);
+        if (!sc) return null;
+        const pair = "(" + srcAge + "→" + dstAge + ")";
+        if (/共通|全年齢/.test(String(dstAge).normalize("NFKC"))) {
+          const hi = ugYouthUpperAge(srcAge);
+          if (hi == null || hi > ugCommonLowerAge(dstAge)) return null;
+          return "共通券種の対象年齢外のためUG不可" + pair;
+        }
+        if (srcSeat === dstSeat) return null;
+        const d = ugAgeSpan(dstAge);
+        if (sc === 3 && d.min > 0 && d.min <= 3) return null;
+        return "別席種の大人券種へは子ども・U23券種から変更不可" + pair;
+      }
 
       // 大人・共通券種から子ども・若年限定券種への変更禁止理由
       function ugAdultToYouthDowngradeReason(srcAge, dstAge) {
@@ -3063,7 +3106,6 @@
         // そこで「そのキーが複数行だったか」と「全期の外枠（最早の開始〜最遅の終了）」も持つ。
         // 1行だけなら期間を厳密に照合でき、複数行なら外枠に収まっているかだけを見る。
         const multiNormal = new Set();
-        const ranksBySeat = new Map(); // 席種 -> 通常行に存在する年齢ランク(ugAgeRank)の集合
         const spanByCond = new Map(), spanAny = new Map();
         const bumpSpan = (map, key, rec) => {
           if (rec.start == null || rec.end == null) return;
@@ -3088,22 +3130,7 @@
           bumpSpan(spanAny, ak, rec);
           bumpMax(maxByCond, condKey(row) + "|" + seat, rec);
           bumpMax(maxAny, seat, rec);
-          const ac = ugAgeClass(age);
-          if (ac) { if (!ranksBySeat.has(seat)) ranksBySeat.set(seat, new Set()); ranksBySeat.get(seat).add(ac); }
         }
-        // 年齢別券種を2区分以上持つ席種（4券種・「3歳～中学生／大人」等の2券種）どうしの別席種UGは、
-        // 同じ年齢区分への変更（横）のみ可。子ども→大人等の年齢区分変更は同一席種内だけ（2026-10-13 SHUN確定・正本§14）。
-        // 区分は ugAgeClass（大人扱い券種=4）で比べる。共通券種だけの席種など1区分しかない席種が絡む組合せは従来どおり。
-        const isAgeSplitSeat = (seat) => { const s = ranksBySeat.get(seat); return !!s && s.size >= 2; };
-        const crossSeatAgeChangeBlocked = (srcSeat, srcAge, dstSeat, dstAge) => {
-          if (srcSeat === dstSeat || srcAge === dstAge) return false;
-          const sc = ugAgeClass(srcAge), dc = ugAgeClass(dstAge);
-          if (!sc || !dc || sc === dc) return false;
-          // 子ども系どうし（幼児→「3歳～中学生」等の範囲内）は横とみなし、従来の範囲判定（ugAgeSpanReason）に任せる。
-          // 止めるのは大人扱い券種との間の変更だけ（大人→子ども系は§13で別途不可）。
-          if (sc !== 4 && dc !== 4) return false;
-          return isAgeSplitSeat(srcSeat) && isAgeSplitSeat(dstSeat);
-        };
         // 元席種の最高額が先席種を上回る組合せは実質ダウングレード（前売・当日を別々に比較し、
         // どちらかで上回れば不可）。どちらかの席種で最高額が取れない場合は比較しない＝許可側。
         const isSeatDowngrade = (map, srcKey, dstKey) => {
@@ -3218,7 +3245,7 @@
           if (isUgExcludedSeat(srcSeat) || isUgExcludedSeat(dstSeat)) return false;
           const sameAgeCatPre = (sr !== 0 && sr === dr) || srcAge === dstAge;
           // 年齢別券種の席種どうしの別席種UGは横（同じ年齢区分）のみ（2026-10-13・正本§14）
-          if (crossSeatAgeChangeBlocked(srcSeat, srcAge, dstSeat, dstAge)) return false;
+          if (ugYouthToAdultReason(srcSeat, srcAge, dstSeat, dstAge)) return false;
           // 木曜日券・木・金曜日券は同一席種内の年齢区分変更のみ（2026-08-19ルール。VBA側から移植）
           if (isSameSeatOnlyUg(srcSeat) || isSameSeatOnlyUg(dstSeat)) {
             return srcSeat === dstSeat && !sameAgeCatPre;
@@ -3282,8 +3309,9 @@
             const ageReason = ugAgeSpanReason(srcAge, dstAge);
             if (adultYouthReason) problems.push(adultYouthReason);
             else if (ageReason) problems.push(ugAgeReasonMsg(ageReason, srcAge, dstAge));
-            else if (crossSeatAgeChangeBlocked(srcSeat, srcAge, dstSeat, dstAge)) {
-              problems.push("年齢別券種の席種どうしの別席種UGは同じ年齢区分のみ可(" + srcAge + "→" + dstAge + ")");
+            else {
+              const youthReason = ugYouthToAdultReason(srcSeat, srcAge, dstSeat, dstAge);
+              if (youthReason) problems.push(youthReason);
             }
           }
           // 公式HPでUG対象外と明示された席種（2026-08-18ルール。VBA側から2026-08-24に移植）

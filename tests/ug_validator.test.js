@@ -257,11 +257,11 @@ const SCENARIOS = [
   // --- 範囲券種（年齢レンジ）2026-07-07 ---
   {
     // 範囲券種でも→大人は可（同席種の大人化/別席種の昇格）。2026-07-08: 範囲外扱いで誤invalidにしていたのを修正
-    name: "範囲: 「幼児〜中学生」→大人(別席種) → OK（→大人は範囲券種でも可・実差額3000）",
+    // 2026-10-13 正本§14: 子ども系→別席種の大人は不可に変更（旧期待: ok・実差額3000）
+    name: "範囲: 「幼児〜中学生」→大人(別席種) → invalid（子ども系→別席種の大人券は不可）",
     // 元(RC席・幼児〜中学生)=5000/5300、先(S席・大人)=8000/8500 → 異区分diff>500→実差額3000/3200
     row: ugRow(SEAT_RC.name, SEAT_RC.cd, "幼児〜中学生", SEAT_S.name, SEAT_S.cd, "大人", 3000, 3200),
-    expectStatus: "ok",
-    expectExpected: 3000,
+    expectStatus: "invalid",
   },
   {
     name: "範囲: 「幼児〜中学生」→小学生(別席種・範囲内) → OK（可否が開くことの確認）",
@@ -443,7 +443,9 @@ eqSpan("3歳以上共通", 1, 4, true, "3歳以上共通=全年齢common");
 
 // --- canUpgrade: 範囲券種の両方向レンジ判定（2026-07-07）---
 eqCU(validate.canUpgrade("RC席", "RESV43", "幼児〜中学生", "子供席", "RESV60", "幼児"), true, "範囲元→範囲内(幼児)は可");
-eqCU(validate.canUpgrade("RC席", "RESV43", "幼児〜中学生", "大人席", "RESV61", "大人"), true, "範囲元→大人は可（範囲券種でも大人化は許可）");
+// 2026-10-13 正本§14: 子ども系→大人は同一席種内だけ。年齢範囲の判定を見るため同一席種で確認し、別席種は不可を確認する
+eqCU(validate.canUpgrade("RC席", "RESV43", "幼児〜中学生", "RC席", "RESV43", "大人"), true, "範囲元→大人は可（範囲券種でも同一席種の大人化は許可）");
+eqCU(validate.canUpgrade("RC席", "RESV43", "幼児〜中学生", "大人席", "RESV61", "大人"), false, "範囲元→別席種の大人は不可（§14）");
 eqCU(validate.canUpgrade("H席", "RESV41", "高校生以上", "U23席", "RESV62", "U23"), false, "高校生以上→U23は大人から若年限定への変更で不可");
 eqCU(validate.canUpgrade("H席", "RESV41", "高校生以上", "大人席", "RESV63", "大人"), true, "高校生以上→大人(範囲内)は可");
 eqCU(validate.canUpgrade("H席", "RESV41", "高校生以上", "小中席", "RESV64", "子供"), false, "高校生以上→小中(降格)は不可");
@@ -455,9 +457,9 @@ eqCU(validate.canUpgrade("U23席", "RESV67", "U23", "高校生以上席", "RESV8
 eqCU(validate.canUpgrade("小学生席", "RESV81", "小学生", "幼児中学生席", "RESV82", "幼児〜中学生"), true, "年齢: 小学生→「幼児〜中学生」は範囲内で可（逆方向）");
 
 // --- canUpgrade: 複合大人ラベル「大人（高校生以上）」= span[3,4]でも大人チケットとして常に先になれる（2026-07-18）---
-eqCU(validate.canUpgrade("RC席", "RESV43", "幼児〜中学生", "大人席", "RESV69", "大人（高校生以上）"), true, "範囲元(幼児〜中学生)→複合大人（高校生以上）は可");
-eqCU(validate.canUpgrade(SEAT_S.name, SEAT_S.cd, "子供", "大人席", "RESV69", "大人（高校生以上）"), true, "単一(子供)→複合大人（高校生以上）は可");
-eqCU(validate.canUpgrade(SEAT_S.name, SEAT_S.cd, "幼児", "大人席", "RESV69", "大人（高校生以上）"), true, "単一(幼児)→複合大人（高校生以上）は可");
+eqCU(validate.canUpgrade("RC席", "RESV43", "幼児〜中学生", "RC席", "RESV43", "大人（高校生以上）"), true, "範囲元(幼児〜中学生)→複合大人（高校生以上）は可");
+eqCU(validate.canUpgrade(SEAT_S.name, SEAT_S.cd, "子供", SEAT_S.name, SEAT_S.cd, "大人（高校生以上）"), true, "単一(子供)→複合大人（高校生以上）は可");
+eqCU(validate.canUpgrade(SEAT_S.name, SEAT_S.cd, "幼児", SEAT_S.name, SEAT_S.cd, "大人（高校生以上）"), true, "単一(幼児)→複合大人（高校生以上）は可");
 eqCU(validate.canUpgrade("RC席", "RESV43", "幼児〜中学生", "U23席", "RESV62", "U23（高校生〜23歳）"), false, "範囲元(幼児〜中学生)→U23（高校生〜23歳）は中間昇格のため不可のまま");
 
 // 大人料金ダウングレード判定が、条件(会員ランク/販売経路)の異なる無関係な価格を拾って
@@ -774,7 +776,7 @@ for (const s of CUTOFF_SCENARIOS) {
     eqCU(val.canUpgrade(LO.name, LO.cd, srcAge, HI.name, HI.cd, ADULT), false, `別席種の大人化 [${srcAge}→大人] は不可`);
     const chk = val(ugRow(LO.name, LO.cd, srcAge, HI.name, HI.cd, ADULT, 50000, 50000));
     eqCU(chk.status, "invalid", `validate 別席種の大人化 [${srcAge}→大人] はinvalid`);
-    eqCU(chk.problems.some((p) => p.includes("年齢別券種の席種どうしの別席種UGは同じ年齢区分のみ可")), true, `validate [${srcAge}→大人] の不可理由`);
+    eqCU(chk.problems.some((p) => p.includes("別席種の大人券種へは子ども・U23券種から変更不可")), true, `validate [${srcAge}→大人] の不可理由`);
   }
   {
     const chk = val(ugRow(LO.name, LO.cd, CHILD, HI.name, HI.cd, CHILD, 3000, 3000));
@@ -785,7 +787,7 @@ for (const s of CUTOFF_SCENARIOS) {
   for (const srcAge of [U23, CHILD, INF]) {
     eqCU(val.canUpgrade(HI.name, HI.cd, srcAge, HI.name, HI.cd, ADULT), true, `同一席種の大人化 [${srcAge}→大人] は可`);
     const chk = val(ugRow(HI.name, HI.cd, srcAge, HI.name, HI.cd, ADULT, 60000 - (srcAge === U23 ? 30000 : srcAge === CHILD ? 9000 : 4000), 62000 - (srcAge === U23 ? 31000 : srcAge === CHILD ? 9000 : 4000)));
-    eqCU(chk.problems.some((p) => p.includes("年齢別券種の席種どうし")), false, `validate 同一席種の大人化 [${srcAge}→大人] に新ルールの不可理由が出ない`);
+    eqCU(chk.problems.some((p) => p.includes("別席種の大人券種へは")), false, `validate 同一席種の大人化 [${srcAge}→大人] に新ルールの不可理由が出ない`);
   }
 
   // 3. 4券種がそろわない席種（共通券種だけ）が絡む組合せは従来どおり
@@ -827,10 +829,14 @@ for (const s of CUTOFF_SCENARIOS) {
     eqCU(chk.problems.some((p) => /年齢|若年/.test(p)), false, "幼児→別席種の3歳～中学生 は範囲内の子ども系どうしで年齢上は可");
   }
   eqCU(cu(E, "U23（高校生～23歳）", B, "3歳～中学生"), false, "U23→別席種の3歳～中学生 は年齢降格で不可");
-  eqCU(cu(E, "U23（高校生～23歳）", B, "大人（高校生以上）"), false, "U23→別席種の大人 は不可");
+  {
+    // E席の方が高いので価格条件では不可。年齢ルール上の不可理由が出ないことだけを見る（U23→大人(高校生以上)は横・2026-10-13確認1）
+    const chk = val(ugRow(E.name, E.cd, "U23（高校生～23歳）", B.name, B.cd, "大人（高校生以上）", 500, 500));
+    eqCU(chk.problems.some((p) => /年齢|若年|大人券種|対象年齢/.test(p)), false, "U23→別席種の大人(高校生以上) は年齢上は可");
+  }
   {
     const chk = val(ugRow(C2.name, C2.cd, "3歳～小学生", D.name, D.cd, "中学生以上", 9000, 9000));
-    eqCU(chk.problems.some((p) => p.includes("年齢別券種の席種どうしの別席種UGは同じ年齢区分のみ可")), true, "validate 3歳～小学生→別席種の中学生以上 の不可理由");
+    eqCU(chk.problems.some((p) => p.includes("別席種の大人券種へは子ども・U23券種から変更不可")), true, "validate 3歳～小学生→別席種の中学生以上 の不可理由");
   }
   // 同一席種内の大人化は可（3歳～小学生→中学生以上 の範囲外(上)誤判定の修正）
   eqCU(cu(C2, "3歳～小学生", C2, "中学生以上"), true, "同一席種 3歳～小学生→中学生以上 は可");
@@ -847,6 +853,58 @@ for (const s of CUTOFF_SCENARIOS) {
       eqCU(val2.canUpgrade(s, cd, s === "M_共通席" ? "中学生以上共通" : s === "M_共通席2" ? "8歳以上共通" : "3歳以上共通", E.name, E.cd, da), false, `${s}→${da} は不可のまま`);
     }
   }
+}
+
+// 2026-10-13 SHUN確定（正本§14 改訂）:
+//  確認1: U23 → 別席種の「大人(高校生以上)」等の高校生を含む大人券は横として可
+//  確認2: 子ども系 → 別席種の大人券は、先の席が大人券だけでも不可
+//  確認3: 子ども系 → 下限つき共通券は対象年齢が重なるときだけ可。3歳以上共通 → 8歳以上・中学生以上共通は可
+{
+  const LO = { name: "Q_自由席", cd: "QF0000001" };
+  const AD = { name: "Q_大人のみ席", cd: "QA0000001" };
+  const LG = { name: "Q_ラウンジ", cd: "QL0000001" };
+  const PC = { name: "Q_8歳以上共通席", cd: "QP0000001" };
+  const VP = { name: "Q_中学生以上共通席", cd: "QV0000001" };
+  const HS = { name: "Q_高校生以上共通席", cd: "QH0000001" };
+  const C3 = { name: "Q_3歳以上共通席", cd: "QC0000001" };
+  const ROWS = [
+    priceRow(LO.name, LO.cd, "大人（24歳以上）", 4000, 4000), priceRow(LO.name, LO.cd, "U23（高校生～23歳）", 3000, 3000),
+    priceRow(LO.name, LO.cd, "子ども（小学生・中学生）", 2000, 2000), priceRow(LO.name, LO.cd, "幼児（3歳～未就学児）", 1000, 1000),
+    priceRow(LO.name, LO.cd, "3歳～小学生", 1500, 1500), priceRow(LO.name, LO.cd, "3歳～中学生", 1800, 1800),
+    priceRow(AD.name, AD.cd, "大人（24歳以上）", 8000, 8000),
+    priceRow(LG.name, LG.cd, "大人（高校生以上）", 50000, 50000), priceRow(LG.name, LG.cd, "子ども(3歳～中学生)", 20000, 20000),
+    priceRow(PC.name, PC.cd, "8歳以上共通", 90000, 90000), priceRow(VP.name, VP.cd, "中学生以上共通", 80000, 80000),
+    priceRow(HS.name, HS.cd, "高校生以上共通", 70000, 70000), priceRow(C3.name, C3.cd, "3歳以上共通", 60000, 60000),
+  ];
+  const val = buildUgValidator(ROWS, c, v, null);
+  const cu = (s, sa, d, da) => val.canUpgrade(s.name, s.cd, sa, d.name, d.cd, da);
+  // 確認1
+  eqCU(cu(LO, "U23（高校生～23歳）", LG, "大人（高校生以上）"), true, "確認1: U23→別席種の大人(高校生以上) は可");
+  eqCU(cu(LO, "U23（高校生～23歳）", AD, "大人（24歳以上）"), false, "U23→別席種の大人(24歳以上) は不可");
+  eqCU(cu(LO, "子ども（小学生・中学生）", LG, "大人（高校生以上）"), false, "子ども→別席種の大人(高校生以上) は不可");
+  // 確認2
+  for (const a of ["子ども（小学生・中学生）", "幼児（3歳～未就学児）", "3歳～中学生"]) {
+    eqCU(cu(LO, a, AD, "大人（24歳以上）"), false, `確認2: ${a}→大人券だけの別席種 は不可`);
+    const chk = val(ugRow(LO.name, LO.cd, a, AD.name, AD.cd, "大人（24歳以上）", 6000, 6000));
+    eqCU(chk.problems.some((p) => p.includes("別席種の大人券種へは子ども・U23券種から変更不可")), true, `validate 確認2: ${a}→大人券だけの別席種 の不可理由`);
+  }
+  eqCU(cu(LO, "子ども（小学生・中学生）", LO, "大人（24歳以上）"), true, "同一席種の子ども→大人 は可のまま");
+  // 確認3: 子ども系 → 下限つき共通券
+  const expect3 = [
+    ["幼児（3歳～未就学児）", PC, "8歳以上共通", false], ["幼児（3歳～未就学児）", VP, "中学生以上共通", false], ["幼児（3歳～未就学児）", HS, "高校生以上共通", false],
+    ["子ども（小学生・中学生）", PC, "8歳以上共通", true], ["子ども（小学生・中学生）", VP, "中学生以上共通", true], ["子ども（小学生・中学生）", HS, "高校生以上共通", false],
+    ["3歳～小学生", PC, "8歳以上共通", true], ["3歳～小学生", VP, "中学生以上共通", false], ["3歳～中学生", VP, "中学生以上共通", true],
+    ["U23（高校生～23歳）", HS, "高校生以上共通", true], ["U23（高校生～23歳）", VP, "中学生以上共通", true],
+    ["幼児（3歳～未就学児）", C3, "3歳以上共通", true], ["子ども（小学生・中学生）", C3, "3歳以上共通", true],
+  ];
+  for (const [a, d, da, exp] of expect3) eqCU(cu(LO, a, d, da), exp, `確認3: ${a}→${da} は${exp ? "可" : "不可"}`);
+  {
+    const chk = val(ugRow(LO.name, LO.cd, "幼児（3歳～未就学児）", PC.name, PC.cd, "8歳以上共通", 89000, 89000));
+    eqCU(chk.problems.some((p) => p.includes("共通券種の対象年齢外のためUG不可")), true, "validate 確認3: 幼児→8歳以上共通 の不可理由");
+  }
+  // 確認3後段: 3歳以上共通 → 8歳以上共通・中学生以上共通 は可
+  eqCU(cu(C3, "3歳以上共通", PC, "8歳以上共通"), true, "3歳以上共通→8歳以上共通 は可");
+  eqCU(cu(C3, "3歳以上共通", VP, "中学生以上共通"), true, "3歳以上共通→中学生以上共通 は可");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
