@@ -3184,7 +3184,6 @@
       }
       // 子ども系券種の対象年齢の上限（この歳未満）。共通券種の下限と重なるかを見るのに使う。判定不能=null。
       //  U23=24 / 高校生=18 / 中学生まで=15 / 小学生まで=12 / 子ども(学年表記なし)=15 / 幼児・未就学=6
-      // ※2026-10-13（正本§15-1）以降、可否判定（ugYouthToAdultReason）では使っていない。VBA との対照・参考用に残す
       function ugYouthUpperAge(a) {
         a = ugNormAgeText(a);
         if (/U23|アンダー|23歳/i.test(a)) return 24;
@@ -3206,14 +3205,16 @@
         return 0;
       }
       // 全年齢の共通券（「共通」「全年齢」を含み、下限 ugCommonLowerAge が3歳以下＝3歳以上共通・3歳以上共通(ご招待)・全年齢共通 等）。
-      // 8歳以上共通・小学生以上共通・中学生以上共通・高校生以上共通 などの「下限つき共通券」は false（2026-10-13・正本§15-1）
+      // 8歳以上共通・小学生以上共通・中学生以上共通・高校生以上共通 などの「下限つき共通券」は false。
+      // 子ども系→全年齢共通は常に可、下限つき共通は ugYouthToAdultReason で対象年齢の重なりを見る（§14。§15-1 は2026-10-14撤回）
       function ugIsAllAgeCommon(a) {
         a = ugNormAgeText(a);
         return /共通|全年齢/.test(a) && !ugIsCompositeAgeTicket(a) && ugCommonLowerAge(a) <= 3;
       }
-      // 子ども系券種（幼児・子ども・U23等＝大人扱いでない券種）から大人扱い券種への変更可否（2026-10-13 SHUN確定・正本§14／§15で改訂）。
-      //  ・先が共通券種: 全年齢の共通券（3歳以上共通 等）だけ可。下限つき共通券（8歳以上・小学生以上・中学生以上・高校生以上共通 等）は
-      //    対象年齢が重なっていても不可（§15-1。§14 の「対象年齢が重なれば可」を廃止）。幼児(0歳～2歳)→3歳以上共通も可（§15-3）。席種を問わない
+      // 子ども系券種（幼児・子ども・U23等＝大人扱いでない券種）から大人扱い券種への変更可否（2026-10-13 SHUN確定・正本§14）。
+      //  ・先が共通券種: 全年齢の共通券（3歳以上共通 等）は常に可（幼児(0歳～2歳)→3歳以上共通も可＝§15-3）。下限つき共通券は
+      //    対象年齢が重なるときだけ可（ugYouthUpperAge(元) > ugCommonLowerAge(先)）。席種を問わない
+      //    ※2026-10-13 に一度入れた§15-1（下限つき共通は一律不可）は 2026-10-14 SHUN指摘で撤回
       //  ・先が大人券（大人・高校生以上・中学生以上等）: 同一席種なら可。別席種は U23・高校生 → 高校生を含む大人券（大人(高校生以上)等）だけ横として可
       //  大人扱い券種が元の場合（共通→共通等）は対象外。子ども系どうしは ugAgeSpanReason の範囲判定に任せる。戻り: null=可 / 不可理由
       function ugYouthToAdultReason(srcSeat, srcAge, dstSeat, dstAge) {
@@ -3224,8 +3225,13 @@
         if (!sc) return null;
         const pair = "(" + srcAge + "→" + dstAge + ")";
         if (/共通|全年齢/.test(ugNormAgeText(dstAge))) {
+          // 子ども系→共通券は対象年齢が重なれば可（§14確認3）。2026-10-14 SHUN指摘で§15-1（下限つき共通は一律不可）を撤回:
+          // 「共通が付く場合は大人以外不可」は共通券“から”の変更（§13）の意味だった。Paddock Club(8歳以上共通)・
+          // VIPスイート・プレミアム(中学生以上共通)へのU23・子どもからのUGは可。幼児→8歳以上共通 等の重ならない組は不可。
           if (ugIsAllAgeCommon(dstAge)) return null;
-          return "子ども・U23券種から下限つき共通券種へは変更不可" + pair;
+          const hi = ugYouthUpperAge(srcAge);
+          if (hi == null || hi > ugCommonLowerAge(dstAge)) return null;
+          return "共通券種の対象年齢外のためUG不可" + pair;
         }
         if (srcSeat === dstSeat) return null;
         const d = ugAgeSpan(dstAge);
