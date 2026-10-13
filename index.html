@@ -15002,17 +15002,19 @@ table.mx th.corner .corner-period b { font-size: 13px; font-weight: 800; white-s
 table.mx th.corner .corner-period .cp-arrow { font-size: 10px; color: #64748b; }
 table.mx .hp { font-size: 9px; font-weight: 400; color: #777; line-height: 1.15; margin-top: 1px; }
 table.mx .hp-period { color: #999; white-space: nowrap; }
-table.mx .hp-period-diff { display: inline-block; font-size: 8.5px; font-weight: 600; color: #c2410c; background: #ffedd5; border: 1px solid #fed7aa; border-radius: 3px; padding: 0 3px; line-height: 1.25; margin-top: 2px; }
+table.mx .hp-period-diff { display: inline-block; font-size: 8.5px; font-weight: 600; color: #5b21b6; background: #ede9fe; border: 1px solid #ddd6fe; border-radius: 3px; padding: 0 3px; line-height: 1.25; margin-top: 2px; }
 .cond-period { font-size: 11.5px; font-weight: 400; color: #4b5563; margin-left: 12px; }
 td.mxc { cursor: pointer; position: relative; min-width: 76px; }
 /* 差額(先−元)・前売・当日は読み比べやすいよう文字サイズを統一 */
 td.mxc .exp-badge { font-weight: 700; font-size: 11px; color: #1d4ed8; line-height: 1.2; }
 td.mxc .adv { font-size: 11px; color: #16a34a; line-height: 1.25; }
-td.mxc .day { font-size: 11px; color: #b45309; line-height: 1.25; }
+/* 当日料金はエラー(赤)・警告(橙)と見分けがつくよう青緑（2026-10-13 SHUN要望） */
+td.mxc .day { font-size: 11px; color: #0f766e; line-height: 1.25; }
 td.mxc .lbl { font-size: 9px; font-weight: 400; color: #78716c; margin-right: 2px; }
 td.mxc .val { font-weight: 700; }
 td.mxc .per { font-size: 9px; margin-top: 1px; }
-td.mxc .per-diff { display: inline-block; font-size: 8.5px; font-weight: 600; color: #c2410c; background: #ffedd5; border: 1px solid #fed7aa; border-radius: 3px; padding: 0 3px; line-height: 1.25; }
+/* 基準と違う販売期間は情報表示なので紫（エラー・警告の色と分ける） */
+td.mxc .per-diff { display: inline-block; font-size: 8.5px; font-weight: 600; color: #5b21b6; background: #ede9fe; border: 1px solid #ddd6fe; border-radius: 3px; padding: 0 3px; line-height: 1.25; }
 td.mxc .l-ng { color: #dc2626; }
 td.mxc .l-ng .lbl { color: #dc2626; }
 td.mxc .l-ng .val { color: #dc2626; font-weight: 800; }
