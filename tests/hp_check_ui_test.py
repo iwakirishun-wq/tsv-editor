@@ -12,7 +12,10 @@ with sync_playwright() as p:
     try:
         page.goto(INDEX.as_uri())
         page.wait_for_load_state("networkidle")
-        page.locator("#btn-hp-check").click()
+        # HPチェックのタブはGAS版だけ（google.script.run が無い file:// / GitHub Pages では出さない）。
+        # ボタン自体は残るので、以降は dispatch_event で直接押して挙動を確かめる
+        assert not page.locator('.rb-tab[data-tab="hp"]').is_visible()
+        page.locator("#btn-hp-check").dispatch_event("click")
         page.locator("._hp-notice-ov").wait_for(timeout=3000)
         assert "対象外" in page.locator("._hp-notice-ov").inner_text()
         page.locator("._hp-notice-close").click()
@@ -55,7 +58,7 @@ with sync_playwright() as p:
             this.ok({schema: 'hp_price_knowledge/1', event_key: 'test', label: 'テストイベント', items: []});
           };
         }""")
-        page.locator("#btn-hp-check").click()
+        page.locator("#btn-hp-check").dispatch_event("click")
         page.locator("._hp-res-ov").wait_for()
         assert "テストイベント" in page.locator("._hp-res-ov").inner_text()
         assert errors == [], errors
