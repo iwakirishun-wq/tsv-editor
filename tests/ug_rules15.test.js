@@ -292,13 +292,18 @@ both(S.PASS_PD, K.ADT24, S.PASS_PW, K.ADT24, false, "§15-5 パドックパス�
 hasMsg(S.PASS_PD, K.ADT24, A, K.ADT24, "パス系は他席種とのUG不可", "§15-5 パス→指定席");
 hasMsg(S.PASS_PD, K.ADT24, S.PASS_PD, K.ADT24, "パス系の同券種UG（座席移動）は設定不可", "§15-5 パス 同券種");
 hasMsg(S.PASS_PD, K.CH_3M, S.PASS_PD, K.INF, "パス系の年齢区分変更は大人の券種へのみ可", "§15-5 パス 子ども→幼児");
-// パス系でない「その他」（コード6桁目Oで名前に「パス」が無い。例: Tarpchair、IGTC26_ﾋﾟｯﾄｳｫｰｸ(土)）はUG対象外。
-// 2026-10-14 SHUN確認で「その他 かつ 名前にパス」に限定。2026-10-13 版では OTHER_O をパス系として同一席種→大人を可にしていた。
+// パス系でない「その他」（コード6桁目Oで名前に「パス」「ピットウォーク」が無い。例: Tarpchair）はUG対象外。
+// 2026-10-14 SHUN確認で「その他 かつ 名前にパス（またはピットウォーク）」に限定。2026-10-13 版では OTHER_O をパス系として同一席種→大人を可にしていた。
 // validate も canUpgrade と同じく不可（理由「その他の席種（パス以外）はUG対象外」）
 {
+  // 2026-10-14 SHUN確認「ピットウォークもパス」: 名前に「パス」が無いピットウォークもパス系（同一席種で大人の券種へのみ可）
   const PW_NOPASS = { name: "IGTC26_ﾋﾟｯﾄｳｫｰｸ(土)", cd: "SIGTCO26021" };
   META[PW_NOPASS.cd] = R("2", "2");
-  for (const s of [S.OTHER_O, PW_NOPASS]) {
+  both(PW_NOPASS, K.CH_3M, PW_NOPASS, K.ADT_HS, true, "§15-5 ピットウォーク(パス表記なし) 同一席種 子ども→大人 は可");
+  both(PW_NOPASS, K.U23, PW_NOPASS, K.ADT24, true, "§15-5 ピットウォーク(パス表記なし) 同一席種 U23→大人 は可");
+  both(PW_NOPASS, K.ADT24, A, K.ADT24, false, "§15-5 ピットウォーク(パス表記なし)→指定席 は不可");
+  hasMsg(PW_NOPASS, K.ADT24, A, K.ADT24, "パス系は他席種とのUG不可", "§15-5 ピットウォーク(パス表記なし) 他席種");
+  for (const s of [S.OTHER_O]) {
     both(s, K.CH_3M, s, K.ADT_HS, false, `§15-5 その他(パス以外) ${s.name} 同一席種 子ども→大人`);
     both(s, K.U23, s, K.ADT24, false, `§15-5 その他(パス以外) ${s.name} 同一席種 U23→大人`);
     both(s, K.C3, s, K.C3, false, `§15-5 その他(パス以外) ${s.name} 同券種`);

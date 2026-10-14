@@ -3448,7 +3448,8 @@
           const s = String(seat || "").normalize("NFKC");
           if (/ZERO円/i.test(s)) return false;
           if (/観戦券|観覧券/.test(s)) return false;
-          if (seatCat(code, seat) === "その他") return /パス/.test(s);
+          // 2026-10-14 SHUN確認: 名前に「パス」が無くてもピットウォークはパス系
+          if (seatCat(code, seat) === "その他") return /パス|ピットウォーク/.test(s);
           const m = seatMeta ? seatMeta(code, seat) : null;
           if (!String(code || "").trim() && !(m && m.found)) return /ピットウォーク|パドックパス|激感エリアパス|パークパスポート/.test(s);
           return false;
