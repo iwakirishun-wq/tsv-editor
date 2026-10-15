@@ -15724,7 +15724,8 @@ ${_sortableTable(labels, rowsHtml)}` };
           const missingBadge = (missingTotal || missingAll) ? `　<span class="badge-ng" style="background:#b45309">登録漏れ?候補 ${missingTotal}件${missingAll > missingTotal ? `（この表に行・列の無い券種を含めると${missingAll}件）` : ""}</span>` : "";
           // 編集モード（2026-10-13）: ポップアップから本体(window.opener)の _ugMxEditApi を呼んで state.data を直す。
           // フィルター適用中に出した表は検算の対象行が全件と違うため編集不可（全件で出し直してもらう）。
-          const editBar = `<div class="mxe-bar" id="mxe-bar" data-sid="${escHtml(_ugMxEditSid())}" data-cutoff="${dayCutoff == null ? "" : dayCutoff}" data-filtered="${isFiltered ? "1" : "0"}">`
+          // 2026-10-15 SHUN指示: 編集モードはGAS版だけ（GitHub版では不要）。編集バーが無ければ編集用のCSS・スクリプトも埋め込まれない
+          const editBar = !hpIsGas() ? "" : `<div class="mxe-bar" id="mxe-bar" data-sid="${escHtml(_ugMxEditSid())}" data-cutoff="${dayCutoff == null ? "" : dayCutoff}" data-filtered="${isFiltered ? "1" : "0"}">`
             + `<label class="mxe-toggle"><input type="checkbox" id="mxe-on"> ✏ 編集モード</label>`
             + `<span class="mxe-tools" id="mxe-tools" style="display:none"><button type="button" id="mxe-undo" title="アプリ本体の「元に戻す」と同じ（直前の操作を1つ戻す）">↶ 元に戻す</button>`
             + `<button type="button" id="mxe-export" class="mxe-primary" title="アプリ本体のデータ全件（通常行・UG行・特別条件行）を、元の列順・文字コード・改行でTSV出力します">📥 修正済みTSVを出力</button></span>`
