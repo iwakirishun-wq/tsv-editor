@@ -7398,7 +7398,12 @@
         state._placeholderRow = !state.data.length;
         if (state._placeholderRow)
           state.data = [new Array(state.headers.length).fill("")];
+        // resetState() は改行を LF に戻すため、読み込んだファイルの改行（CRLF等）を持ち越す。
+        // 戻すと CRLF のファイル（チケレボの出力）も LF で保存・出力されていた（2026-10-15 実データ確認で発見）
+        const detectedNewline = state.newline, detectedMixed = state.newlineMixed;
         resetState();
+        state.newline = detectedNewline;
+        state.newlineMixed = detectedMixed;
       }
 
       // ===== ヘッダー自動変換（席種エリアマスター対応）=====
@@ -7627,9 +7632,16 @@
         const nl = state.newline === "crlf" ? "\r\n" : "\n";
         const esc = (v) => {
           const s = String(v ?? "");
-          return s.includes(d) || s.includes('"') || s.includes("\n") || s.includes("\r")
-            ? '"' + s.replace(/"/g, '""') + '"'
-            : s;
+          const quoted = '"' + s.replace(/"/g, '""') + '"';
+          if (s.includes(d) || s.includes("\n") || s.includes("\r")) return quoted;
+          if (!s.includes('"')) return s;
+          // TSV: 引用符を含むだけの値は、そのまま書いても同じ値で読み戻せるなら元の見た目のまま書く
+          //（チケレボのTSVは "コカ·コーラ" 鈴鹿… をそのまま持つ。CSV は従来どおり標準のクオート）
+          if (d === "\t") {
+            const back = parseQuotedRows(s, d);
+            if (back.length === 1 && back[0].length === 1 && back[0][0] === s) return s;
+          }
+          return quoted;
         };
         // 仮想列（SEJ連携で追加したグループ名など）を除外
         const virtualSet = !includeVirtual && state.sejVirtualCols
@@ -11494,16 +11506,21 @@
       // クォート外の改行で行を区切る。parseData / parseDelimited の両方から使われる。
       function parseQuotedRows(text, delim) {
         const rows = [];
-        let row = [], cur = "", inQuote = false, fieldStarted = false;
+        let row = [], cur = "", inQuote = false, fieldStarted = false, quoteStart = -1;
         for (let i = 0; i < text.length; i++) {
           const c = text[i], next = text[i + 1];
           if (inQuote) {
             if (c === '"' && next === '"') { cur += '"'; i++; }
-            else if (c === '"') inQuote = false;
+            else if (c === '"') {
+              inQuote = false;
+              // 閉じ引用符の後に区切り・改行以外が続くなら、引用ではなく値の一部（例: "コカ·コーラ" 鈴鹿8耐…）。
+              // 引用符ごと元の文字のまま残す（外すと保存で全行の試合名が変わっていた。2026-10-15 実データ確認）
+              if (next !== undefined && next !== delim && next !== "\r" && next !== "\n") cur = text.slice(quoteStart, i + 1);
+            }
             else if (c === '\r') { cur += '\n'; if (next === '\n') i++; }
             else cur += c;
           } else {
-            if (c === '"' && !fieldStarted) { inQuote = true; fieldStarted = true; }
+            if (c === '"' && !fieldStarted) { inQuote = true; fieldStarted = true; quoteStart = i; }
             else if (c === delim) { row.push(cur); cur = ""; fieldStarted = false; }
             else if (c === "\r" || c === "\n") {
               if (c === "\r" && next === "\n") i++;
@@ -15799,8 +15816,9 @@
           var dlg = document.createElement("div");
           dlg.id = "mxe-save-dlg";
           dlg.setAttribute("style", "position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center");
-          dlg.innerHTML = "<div style=\"background:#fff;border-radius:8px;padding:16px 18px;max-width:600px;box-shadow:0 8px 30px rgba(0,0,0,.25);font-size:13px;line-height:1.6;color:#1a1a1a\">"
-            + "<div style=\"white-space:pre-wrap\">" + esc(lines.join("\n")) + "</div>"
+          /* 本文が長くても（無視したエラー一覧など）保存ボタンが画面外に出ないよう、枠の高さを抑えて本文だけスクロール（2026-10-15 実データ確認で発見） */
+          dlg.innerHTML = "<div style=\"background:#fff;border-radius:8px;padding:16px 18px;max-width:600px;width:90vw;max-height:85vh;display:flex;flex-direction:column;box-sizing:border-box;box-shadow:0 8px 30px rgba(0,0,0,.25);font-size:13px;line-height:1.6;color:#1a1a1a\">"
+            + "<div style=\"white-space:pre-wrap;overflow-y:auto;flex:1 1 auto;min-height:0\">" + esc(lines.join("\n")) + "</div>"
             + "<div style=\"display:flex;gap:8px;justify-content:flex-end;margin-top:14px\">"
             + "<button type=\"button\" id=\"mxe-save-cancel\" style=\"padding:6px 14px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;cursor:pointer;font-size:13px\">キャンセル</button>"
             + "<a id=\"mxe-save-go\" href=\"" + url + "\" download=\"" + esc(name) + "\" style=\"padding:6px 16px;background:#217346;color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:700\">📥 保存する</a>"

@@ -74,7 +74,10 @@ const ctx = vm.createContext({
   },
   els: {dirty: {classList: {add() {}}}}, document: {}, renderTabBar() {},
   saveCurrentTab() {}, renderHeader() {}, renderBody() {}, showTable() {},
-  resetState() {}, detectNewline() {}, clearAutoDropColumns() {},
+  // 改行は本物と同じ順序の作用を再現する（detectNewline で検出 → resetState で LF に戻る）
+  resetState() { state.newline = 'lf'; state.newlineMixed = false; },
+  detectNewline(text) { state.newline = /\r\n/.test(text) ? 'crlf' : 'lf'; state.newlineMixed = false; },
+  clearAutoDropColumns() {},
   askSaveScope: async () => scope, showSaveDiffDialog: async () => true,
   _ensureWritePermission: async () => true,
   _saveAsTypes: () => [],
@@ -361,6 +364,27 @@ async function main() {
     await call('doSaveFile()');
     load(fs.readFileSync(outputPath, 'utf8'), ',');
     assert.deepEqual(rows(), [['value'], ['']], 'saved CSV bytes retain one-column empty row');
+
+    // CRLF のファイル（チケレボの出力）は CRLF のまま書き出す（parseData 末尾の resetState で LF に戻っていた。2026-10-15 実データ確認）
+    load('A\tB\r\n1\t2\r\n3\t4\r\n');
+    assert.equal(state.newline, 'crlf', 'CRLF file is detected as crlf after parseData');
+    assert.equal(call('buildFileContent()'), 'A\tB\r\n1\t2\r\n3\t4', 'CRLF file is written back with CRLF');
+    load('A\tB\n1\t2\n');
+    assert.equal(state.newline, 'lf', 'LF file stays lf');
+
+    // 値の先頭が引用で始まっても、閉じ引用符の後に文字が続くなら引用符ごと値として残し、そのまま書き戻す
+    //（8耐の試合名 "コカ·コーラ" 鈴鹿… が保存で全行 コカ·コーラ 鈴鹿… に変わっていた。2026-10-15 実データ確認）
+    const quotedName = '試合名\t価格\r\n"コカ·コーラ" 鈴鹿8耐\t100\r\n"a""b" c\t200\r\n';
+    load(quotedName);
+    assert.deepEqual(rows(), [['"コカ·コーラ" 鈴鹿8耐', '100'], ['"a""b" c', '200']], 'leading quote followed by text is kept literally');
+    assert.equal(call('buildFileContent()'), quotedName.replace(/\r\n$/, ''), 'quoted name is written back byte-for-byte');
+    load('A\tB\n"x\ty"\t"he said ""hi"""\n');
+    assert.deepEqual(rows(), [['x\ty', 'he said "hi"']], 'proper quoted fields are still unquoted');
+    // タブを含む値は引用で囲む。引用符を途中に含むだけの値はチケレボのTSVと同じく引用なしで書き、同じ値で読み戻せる
+    const requoted = call('buildFileContent()');
+    assert.equal(requoted, 'A\tB\n"x\ty"\the said "hi"', 'tab value is quoted, inner-quote value is written raw like the system TSV');
+    load(requoted);
+    assert.deepEqual(rows(), [['x\ty', 'he said "hi"']], 'written values read back unchanged');
 
     // 途中の1列空行は ""（2文字）ではなくただの空行で書く（Gemini4指摘 2回目）
     outputPath = path.join(tempDir, 'output-mid.tsv');

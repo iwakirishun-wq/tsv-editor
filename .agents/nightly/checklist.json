@@ -3,25 +3,25 @@
     {
       "id": "price-schedule-dummy",
       "label": "価格スケジュール(ダミー): 通常価格表/UGマトリクス/UG一覧",
-      "lastChecked": "2026-10-15T13:20:15.114Z",
+      "lastChecked": "2026-10-15T14:30:47.583Z",
       "lastResult": "ok"
     },
     {
       "id": "sej-dummy",
       "label": "SEJデータ(ダミー): カナ検査・備考HTML変換・SEJチェック",
-      "lastChecked": "2026-10-15T13:20:15.114Z",
+      "lastChecked": "2026-10-15T14:30:47.583Z",
       "lastResult": "ok"
     },
     {
       "id": "ikkatsu-dummy",
       "label": "一括設定TSV(ダミー): 一括設定チェックのNG検出",
-      "lastChecked": "2026-10-15T13:32:38.063Z",
+      "lastChecked": "2026-10-15T14:33:53.113Z",
       "lastResult": "ok"
     },
     {
       "id": "html-save",
       "label": "HTML保存ボタンで非空ファイルが保存されるか",
-      "lastChecked": "2026-10-15T13:32:38.063Z",
+      "lastChecked": "2026-10-15T14:33:53.113Z",
       "lastResult": "ok"
     },
     {
@@ -1040,6 +1040,22 @@
       "focusAreas": [
         "large-data-perf",
         "real-data-optional"
+      ]
+    },
+    {
+      "date": "2026-10-15",
+      "status": "ok",
+      "focusAreas": [
+        "price-schedule-dummy",
+        "sej-dummy"
+      ]
+    },
+    {
+      "date": "2026-10-15",
+      "status": "ok",
+      "focusAreas": [
+        "ikkatsu-dummy",
+        "html-save"
       ]
     }
   ]
