@@ -4199,16 +4199,13 @@
             isUg ? (v(row, c.ugAgeCd) || v(row, c.ugAge)) : ""].join("\u0001");
         };
         const snapFps = snapshot && snapshot.rows ? new Set(snapshot.rows.map((r) => ugEditRowFp(r))) : null;
-        const snapDupKeys = new Set();
+        // 同じキーの行数を元ファイルと比べる。元ファイルの重複は警告、編集・追加で1行でも増えたらエラー
+        //（元から重複していたキーへ別の行を寄せた場合も見逃さない。Gemini4指摘 3回目）
+        const snapKeyCount = new Map(), curKeyCount = new Map();
         if (snapshot && snapshot.rows) {
-          const seen = new Set();
-          for (const r of snapshot.rows) {
-            if (!r) continue;
-            const k = keyOf(r);
-            if (seen.has(k)) snapDupKeys.add(k);
-            seen.add(k);
-          }
+          for (const r of snapshot.rows) { if (r) { const k = keyOf(r); snapKeyCount.set(k, (snapKeyCount.get(k) || 0) + 1); } }
         }
+        for (const r of rows) { if (r) { const k = keyOf(r); curKeyCount.set(k, (curKeyCount.get(k) || 0) + 1); } }
         const keySet = new Set();
         const H_len = H.length;
 
@@ -4237,7 +4234,7 @@
           const desc = `${kbn || "（区分なし）"} / ${seat || "（席種なし）"} / ${age || "（券種なし）"} / ${route || "（経路なし）"}`;
 
           // 必須値チェック
-          if (!route) soft({ rowIdx: i, type: "required", message: `${i + 1}行目（${desc}）: 販売経路区分が未入力です` });
+          if (c.route >= 0 && !route) soft({ rowIdx: i, type: "required", message: `${i + 1}行目（${desc}）: 販売経路区分が未入力です` });
           if (!seat) soft({ rowIdx: i, type: "required", message: `${i + 1}行目: 席種エリア名が未入力です` });
           if (!age) soft({ rowIdx: i, type: "required", message: `${i + 1}行目: 券種名が未入力です` });
           if (!start) soft({ rowIdx: i, type: "required", message: `${i + 1}行目（${desc}）: 販売開始日時が未入力です` });
@@ -4291,7 +4288,7 @@
           const uniqKey = keyOf(row);
           if (keySet.has(uniqKey)) {
             const dup = { rowIdx: i, type: "dup_key", message: `${i + 1}行目（${desc}）: 販売条件・販売経路・販売期間が重複する行が存在します` };
-            if (snapDupKeys.has(uniqKey)) warnings.push({ ...dup, message: dup.message + "（元ファイルにも同じ重複あり）" });
+            if (curKeyCount.get(uniqKey) <= (snapKeyCount.get(uniqKey) || 0)) warnings.push({ ...dup, message: dup.message + "（元ファイルにも同じ重複あり）" });
             else errors.push(dup);
           }
           keySet.add(uniqKey);
@@ -7867,7 +7864,8 @@
       // 開いた時点のファイル内容を、読み込み時と同じ解釈でパースする
       function _diffBaselineRows() {
         const tab = state.tabs[state.activeTab];
-        let text = tab && (tab._initialRawText ?? tab._rawText);
+        // 新規シートは開いた時点のファイルが無い（_initialRawText: null）。保存後の _rawText（仮想列込み）を基準にしない
+        let text = tab && ("_initialRawText" in tab ? tab._initialRawText : tab._rawText);
         if (typeof text !== "string") return null;
         if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
         const rows = parseQuotedRows(text, state.delimiter);
@@ -12508,6 +12506,7 @@
           dirty: false,
           cellColors: {},
           _isBlankSheet: true,
+          _initialRawText: null,
           _placeholderRow: true,
           originalRowCount: state.originalRowCount,
         };
@@ -15184,7 +15183,7 @@
         if (chk.advNote) notes.push(chk.advNote === chk.dayNote ? chk.advNote : "前売: " + chk.advNote);
         if (chk.dayNote && chk.dayNote !== chk.advNote) notes.push("当日: " + chk.dayNote);
         return {
-          fp: ugEditRowFp(row), cond: ugEditCondOf(row, c, v), route: v(row, c.route), adv: cur.adv, day: cur.day, start: v(row, c.start), end: v(row, c.end),
+          fp: ugEditRowFp(row), cond: ugEditCondOf(row, c, v), hasRoute: c.route >= 0, route: v(row, c.route), adv: cur.adv, day: cur.day, start: v(row, c.start), end: v(row, c.end),
           status: chk.status, problems: chk.problems || [], notes: chk.notes || [], note: notes.join(" / "),
           expected: chk.expected, expectedDay: chk.expectedDay, advNg: !!chk.advNg, dayNg: !!chk.dayNg,
           srcAdv: chk.srcAdv, srcDay: chk.srcDay, dstAdv: chk.dstAdv, dstDay: chk.dstDay,
@@ -15284,6 +15283,8 @@
           return { ok: true };
         }
         const ctx = _ugMxEditCtx(req.cutoff);
+        // 開いた時の hello が失敗していても（ヘッダー連番だった等）、最初の変更の前に基準を取る
+        if (req.op === "update" || req.op === "delete" || req.op === "add") _ugMxEditInitSnapshot();
         if (req.op === "export") {
           // 出力前に全件検証（2026-10-15追加確定: 全件欠落・誤設定の出力防止）
           const snap = _ugMxEditInitSnapshot();
@@ -15332,7 +15333,9 @@
         const stale = { ok: false, stale: true, error: "対象のUG行が見つかりません（アプリ側でデータが変わった可能性があります）。セルを開き直してください。" };
         // 書き換え後の判定: validate は通常行だけで索引を作るので、UG行の変更・追加・削除の前に作った ctx をそのまま使える
         if (req.op === "update") {
-          const inp = ugEditCheckInput(req.values || {});
+          const reqValues = Object.assign({}, req.values || {});
+          if (c.route < 0) delete reqValues.route;  // 販売経路列が無いファイルでは検査も書き込みもしない
+          const inp = ugEditCheckInput(reqValues);
           if (!inp.ok) return { ok: false, inputErrors: inp.errors, error: "入力に誤りがあります。" };
           const ri = findByFp();
           if (ri == null) return stale;
@@ -15537,7 +15540,7 @@
               if (r.advNg) probs.push("前売差額が期待（" + yen(r.expected) + "）と違います");
               if (r.dayNg) probs.push("当日差額が期待（" + yen(r.expectedDay) + "）と違います");
               if (probs.length) h += "<ul class=\"mxe-probs\">" + probs.map(function (p) { return "<li>" + esc(p) + "</li>"; }).join("") + "</ul>";
-              h += "<div class=\"mxe-grid\">" + field("route", "販売経路", r.route, false)
+              h += "<div class=\"mxe-grid\">" + (r.hasRoute === false ? "" : field("route", "販売経路", r.route, false))
                 + field("adv", "前売差額", r.adv, r.advNg) + field("day", "当日差額", r.day, r.dayNg)
                 + field("start", "販売開始", r.start, false) + field("end", "販売終了", r.end, false) + "</div>";
               h += "<div class=\"mxe-btns\"><button type=\"button\" data-act=\"set\" data-i=\"" + i + "\" title=\"期待差額と正しい販売期間を入力欄に入れます（まだ反映はしません）\">期待値をセット</button>"

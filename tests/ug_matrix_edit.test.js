@@ -303,6 +303,25 @@ const seatMeta = () => ({ found: true, isReserved: true, isFree: false, stockTyp
   const lostOne = fixedRows.concat([parking.slice(), ugRow(A, C, 7000, 8000)]);
   const r9 = L.ugEditValidateExport(H, lostOne, c, v, valFixed, snapTwo);
   ok(r9.errors.some((e) => e.type === "normal_row_missing"), "全件検証: 同一内容の通常行が1行だけ消えても欠落として検出");
+
+  // 10. 元から重複していたキーに、編集で3行目を寄せたらエラー（元の2行だけなら警告のまま）（Gemini4指摘 3回目）
+  const dupA = normal("SF1GPE27901", "駐車券", 3000, 3000, { "券種コード": "", "券種名": "", "販売価格種別名": "メモ1" });
+  const dupB = normal("SF1GPE27901", "駐車券", 3000, 3000, { "券種コード": "", "券種名": "", "販売価格種別名": "メモ2" });
+  const other = normal("SF1GPE27901", "駐車券", 3000, 3000, { "券種コード": "", "券種名": "", "販売経路区分": "窓口" });
+  const base10 = fixedRows.concat([dupA, dupB, other]);
+  const snap10 = { headers: H.slice(), rows: base10.map((r) => r.slice()), editedRows: new Set(), addedCount: 0, deletedCount: 0 };
+  const val10 = L.buildUgValidator(base10, c, v, westMeta, null);
+  const keep10 = L.ugEditValidateExport(H, base10, c, v, val10, snap10);
+  ok(!keep10.errors.some((e) => e.type === "dup_key") && keep10.warnings.some((w) => w.type === "dup_key"), "全件検証: 元ファイルのままの重複は警告");
+  const moved10 = base10.map((r) => r.slice());
+  moved10[moved10.length - 1][c.route] = "自社WEB";
+  const r10 = L.ugEditValidateExport(H, moved10, c, v, val10, snap10);
+  ok(r10.errors.some((e) => e.type === "dup_key"), "全件検証: 元から重複していたキーへ別の行を寄せたらブロック");
+
+  // 11. 販売経路列が無いファイルでは販売経路の未入力を問わない（Gemini4指摘 3回目）
+  const cNoRoute = Object.assign({}, c, { route: -1 });
+  const r11 = L.ugEditValidateExport(H, fixedRows, cNoRoute, v, valFixed, snapFixed);
+  ok(!r11.errors.concat(r11.warnings).some((e) => /販売経路区分が未入力/.test(e.message)), "全件検証: 販売経路列が無ければ未入力扱いにしない");
 }
 
 console.log(`${pass} passed, ${fail} failed`);

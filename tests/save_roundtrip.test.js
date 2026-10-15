@@ -128,6 +128,9 @@ async function main() {
   load('H\nvalue'); call('addNewSheet()');
   assert.equal(state._placeholderRow, true, 'new sheet has its own placeholder flag');
   assert.equal(state.originalRowCount, 0, 'new sheet has no data records');
+  // 新規シートは「開いた時点のファイル」が無い。保存後の復元用テキスト（仮想列込み）を差分の基準にしない（Gemini4指摘 3回目）
+  state.tabs[state.activeTab]._rawText = 'H\tグループ名\nv\tg';
+  assert.equal(call('_diffBaselineRows()'), null, 'new sheet has no save-diff baseline even after _rawText is set');
   load('A\tB');
   assert.deepEqual(rows(), [['', '']], 'header only still has editable template');
   state._placeholderRow = false; state.dirty = true;
