@@ -20,7 +20,8 @@ if (!m1 || !m2 || !m3) {
 }
 const lib = new Function(m1[1] + "\n" + m2[1] + "\n" + m3[1] + `
 return { buildUgValidator, ugEditIsUg, ugEditCondOf, ugEditRowSpec, ugEditSpecKey, ugEditRowFp, ugEditFindRows, ugEditParseDt, ugEditFormatDt,
-  ugEditCheckInput, ugEditNormalSpan, ugEditCorrectPeriod, ugEditExpected, ugEditApplyValues, ugEditPlanAdd };`)();
+  ugEditCheckInput, ugEditNormalSpan, ugEditCorrectPeriod, ugEditExpected, ugEditApplyValues, ugEditPlanAdd,
+  ugEditValidateExport: typeof ugEditValidateExport !== "undefined" ? ugEditValidateExport : undefined };`)();
 const L = lib;
 
 let pass = 0, fail = 0;
@@ -72,6 +73,13 @@ const seatMeta = () => ({ found: true, isReserved: true, isFree: false, stockTyp
   eq(L.ugEditCheckInput({ adv: "", day: "500", start: S0, end: E0 }).errors.adv, "金額が空です", "入力: 空欄はエラー");
   eq(L.ugEditParseDt("2026/02/29 10:00"), null, "日時: 2026/02/29 は実在しない");
   eq(L.ugEditFormatDt(L.ugEditParseDt("2027/4/1 0:00")), "2027/04/01 00:00", "日時: ゼロ埋め");
+  // 販売経路のチェック
+  const rRoute = L.ugEditCheckInput({ adv: "1000", day: "2000", start: S0, end: E0, route: "  自社WEB  " });
+  eq(rRoute.ok, true, "入力: 販売経路の前後の空白をトリムして受け付ける");
+  eq(rRoute.values.route, "自社WEB", "入力: 販売経路をvaluesに保持する");
+  const badRoute = L.ugEditCheckInput({ adv: "1000", day: "2000", start: S0, end: E0, route: "   " });
+  eq(badRoute.ok, false, "入力: 販売経路が空欄はエラー");
+  eq(badRoute.errors.route, "販売経路が空です", "入力: 販売経路エラーメッセージ");
 }
 
 // ===== セルの行の特定 =====
@@ -115,9 +123,9 @@ const seatMeta = () => ({ found: true, isReserved: true, isFree: false, stockTyp
   eq(L.ugEditExpected({ expected: 5000, expectedDay: null, dayDummy: true, srcDay: 12000, dstDay: 9999999 }, { day: "" }), { adv: "5000", day: "9999999" }, "期待値: ダミー窓で未設定なら通常価格のダミー値");
   eq(L.ugEditExpected({ expected: null, expectedDay: null }, null), { adv: null, day: null }, "期待値: 価格不明・UG不可は null");
   const orig = ugRow(A, B, 1, 2);
-  const next = L.ugEditApplyValues(orig, c, { adv: "5000", day: "6000", start: "2026/12/01 10:00", end: "2027/04/02 23:59" });
-  eq([v(next, c.adv), v(next, c.day), v(next, c.start), v(next, c.end)], ["5000", "6000", "2026/12/01 10:00", "2027/04/02 23:59"], "編集の適用: 4項目を差し替える");
-  eq([v(orig, c.adv), v(orig, c.start)], ["1", S0], "編集の適用: 元の行は変えない");
+  const next = L.ugEditApplyValues(orig, c, { adv: "5000", day: "6000", start: "2026/12/01 10:00", end: "2027/04/02 23:59", route: "電話" });
+  eq([v(next, c.adv), v(next, c.day), v(next, c.start), v(next, c.end), v(next, c.route)], ["5000", "6000", "2026/12/01 10:00", "2027/04/02 23:59", "電話"], "編集の適用: 4項目＋販売経路を差し替える");
+  eq([v(orig, c.adv), v(orig, c.start), v(orig, c.route)], ["1", S0, "自社WEB"], "編集の適用: 元の行は変えない");
 }
 
 // ===== 編集 → 再判定の流れ（判定は validate が正） =====
@@ -184,5 +192,112 @@ const seatMeta = () => ({ found: true, isReserved: true, isFree: false, stockTyp
   eq(p3.rows[0].row[H.length], "G-B", "追加: dstCols（仮想列）は先の通常行から");
 }
 
+// ===== 出力前全件検証（ugEditValidateExport） =====
+{
+  ok(typeof L.ugEditValidateExport === "function", "全件検証: ugEditValidateExport 関数が存在する");
+
+  const W = ["SF1GPE27099", "西エリアチケット"];
+  const westMeta = (code) => ({
+    found: true,
+    isReserved: code !== "SF1GPE27099",
+    isFree: code === "SF1GPE27099",
+    stockTyp: code === "SF1GPE27099" ? "2" : "1",
+    box: false,
+    dispAbb: code === "SF1GPE27099" ? "西エリア" : "A1"
+  });
+
+  // ダミーデータ: 通常行、UG行、特別条件行、西エリア通常行、西エリア自己UG
+  const baseRows = [
+    normal(A[0], A[1], 10000, 12000),
+    normal(B[0], B[1], 15000, 18000),
+    ugRow(A, B, 5000, 6000), // 正常なUG行
+    normal(W[0], W[1], 8000, 9000), // 西エリア通常行
+    ugRow(W, W, 0, 0), // 西エリア自己UG（業務ルール上設定不可・invalid）
+  ];
+
+  const val = L.buildUgValidator(baseRows, c, v, westMeta, null);
+  const snap = {
+    headers: H.slice(),
+    rows: baseRows.map((r) => r.slice()),
+    editedRows: new Set(),
+    addedCount: 0,
+    deletedCount: 0,
+  };
+
+  // 1. 西エリア自己UG（invalid）が存在する場合、確定エラーとして検出されブロック
+  const r1 = L.ugEditValidateExport(H, baseRows, c, v, val, snap);
+  eq(r1.ok, false, "全件検証: 設定不可(invalid)なUG行があればブロック (ok=false)");
+  ok(r1.errors.some((e) => e.rowIdx === 4 && e.type === "ug_rule"), "全件検証: 西エリア自己UGがエラー対象として検出される");
+
+  // 2. 西エリア自己UGを削除（deletedCount=1）した場合、正常に出力許可
+  const fixedRows = baseRows.slice(0, 4);
+  const snapFixed = {
+    headers: H.slice(),
+    rows: baseRows.map((r) => r.slice()),
+    editedRows: new Set(),
+    addedCount: 0,
+    deletedCount: 1,
+  };
+  const valFixed = L.buildUgValidator(fixedRows, c, v, westMeta, null);
+  const r2 = L.ugEditValidateExport(H, fixedRows, c, v, valFixed, snapFixed);
+  eq(r2.ok, true, "全件検証: 不可UG行を削除した後は検証通過 (ok=true)");
+  eq(r2.errors.length, 0, "全件検証: エラー件数は0");
+
+  // 3. 差額NGが存在する場合、ブロック
+  const badPriceRows = fixedRows.map((r, i) => (i === 2 ? L.ugEditApplyValues(r, c, { adv: "4000" }) : r));
+  const snapBadPrice = {
+    headers: H.slice(),
+    rows: baseRows.map((r) => r.slice()),
+    editedRows: new Set([2]),
+    addedCount: 0,
+    deletedCount: 1,
+  };
+  const r3 = L.ugEditValidateExport(H, badPriceRows, c, v, valFixed, snapBadPrice);
+  eq(r3.ok, false, "全件検証: 差額NGがあればブロック (ok=false)");
+  ok(r3.errors.some((e) => e.rowIdx === 2 && e.type === "ug_rule"), "全件検証: 差額NG行が検出される");
+
+  // 4. 未編集行の不整合・データ欠落がある場合、ブロック
+  const corruptedRows = fixedRows.map((r, i) => (i === 0 ? r.slice(0, -2) : r)); // 列欠落
+  const r4 = L.ugEditValidateExport(H, corruptedRows, c, v, valFixed, snapFixed);
+  eq(r4.ok, false, "全件検証: 列欠落・不整合があればブロック");
+
+  // 5. 不明（unknown: 比較元通常行なし）は警告として扱い、ブロック対象エラーにはしない
+  const unknownUg = ugRow(["UNKNOWN", "存在しない席"], B, 5000, 6000);
+  const withUnknown = fixedRows.concat([unknownUg]);
+  const snapUnknown = {
+    headers: H.slice(),
+    rows: fixedRows.map((r) => r.slice()),
+    editedRows: new Set(),
+    addedCount: 1,
+    deletedCount: 0,
+  };
+  const valUnknown = L.buildUgValidator(withUnknown, c, v, westMeta, null);
+  const r5 = L.ugEditValidateExport(H, withUnknown, c, v, valUnknown, snapUnknown);
+  eq(r5.errors.length, 0, "全件検証: unknown行は確定エラーにしない");
+  ok(r5.warnings.length > 0, "全件検証: unknown行は警告として記録");
+  eq(r5.ok, true, "全件検証: 警告のみの場合は出力可能 (ok=true)");
+
+  // 6. 元ファイルのままの行の空欄・既存重複は警告（券種なしの駐車場・クローク等で実ファイルが常に止まらないように）
+  const parking = normal("SF1GPE27901", "駐車券", 3000, 3000, { "券種コード": "", "券種名": "" });
+  const parkingDup = parking.slice();
+  const withParking = fixedRows.concat([parking, parkingDup]);
+  const snapParking = { headers: H.slice(), rows: withParking.map((r) => r.slice()), editedRows: new Set(), addedCount: 0, deletedCount: 0 };
+  const valParking = L.buildUgValidator(withParking, c, v, westMeta, null);
+  const r6 = L.ugEditValidateExport(H, withParking, c, v, valParking, snapParking);
+  eq(r6.errors.length, 0, "全件検証: 元ファイルのままの券種空欄・既存重複は確定エラーにしない");
+  ok(r6.warnings.some((w) => w.type === "required") && r6.warnings.some((w) => w.type === "dup_key"), "全件検証: 元ファイルのままの空欄・重複は警告に出す");
+
+  // 7. 編集した行の空欄・形式不正、編集で新たに生じた重複は確定エラー
+  const editedBlank = fixedRows.map((r, i) => (i === 2 ? L.ugEditApplyValues(r, c, { route: "" }) : r));
+  editedBlank[2][c.route] = "";
+  const r7 = L.ugEditValidateExport(H, editedBlank, c, v, valFixed, snapFixed);
+  ok(r7.errors.some((e) => e.rowIdx === 2 && e.type === "required"), "全件検証: 編集で販売経路を空にした行はブロック");
+  const newDup = fixedRows.concat([fixedRows[0].slice()]);
+  const snapNewDup = { headers: H.slice(), rows: fixedRows.map((r) => r.slice()), editedRows: new Set(), addedCount: 1, deletedCount: 0 };
+  const r8 = L.ugEditValidateExport(H, newDup, c, v, valFixed, snapNewDup);
+  ok(r8.errors.some((e) => e.type === "dup_key"), "全件検証: 編集で新たに生じた重複はブロック");
+}
+
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
+

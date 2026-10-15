@@ -3,50 +3,50 @@
     {
       "id": "price-schedule-dummy",
       "label": "価格スケジュール(ダミー): 通常価格表/UGマトリクス/UG一覧",
-      "lastChecked": "2026-10-09T18:00:44.557Z",
-      "lastResult": "ng"
+      "lastChecked": "2026-10-15T12:49:31.435Z",
+      "lastResult": "ok"
     },
     {
       "id": "sej-dummy",
       "label": "SEJデータ(ダミー): カナ検査・備考HTML変換・SEJチェック",
-      "lastChecked": "2026-10-09T18:00:44.557Z",
-      "lastResult": "ng"
+      "lastChecked": "2026-10-15T12:49:31.435Z",
+      "lastResult": "ok"
     },
     {
       "id": "ikkatsu-dummy",
       "label": "一括設定TSV(ダミー): 一括設定チェックのNG検出",
-      "lastChecked": "2026-10-10T18:00:34.866Z",
-      "lastResult": "ng"
+      "lastChecked": "2026-10-15T12:50:02.678Z",
+      "lastResult": "ok"
     },
     {
       "id": "html-save",
       "label": "HTML保存ボタンで非空ファイルが保存されるか",
-      "lastChecked": "2026-10-10T18:00:34.866Z",
-      "lastResult": "ng"
+      "lastChecked": "2026-10-15T12:50:02.678Z",
+      "lastResult": "ok"
     },
     {
       "id": "sort-filter",
       "label": "通常価格表の並べ替え/絞り込み（種別=前売/当日列含む）",
-      "lastChecked": "2026-10-11T18:00:30.177Z",
-      "lastResult": "ng"
+      "lastChecked": "2026-10-15T12:50:29.926Z",
+      "lastResult": "ok"
     },
     {
       "id": "master-unlinked",
       "label": "席種エリアマスタ未連携時の挙動・案内メッセージ",
-      "lastChecked": "2026-10-11T18:00:30.177Z",
-      "lastResult": "ng"
+      "lastChecked": "2026-10-15T12:50:29.926Z",
+      "lastResult": "ok"
     },
     {
       "id": "large-data-perf",
       "label": "大量行データでの表示・出力パフォーマンス",
-      "lastChecked": "2026-10-12T18:00:30.533Z",
-      "lastResult": "ng"
+      "lastChecked": "2026-10-15T12:56:59.555Z",
+      "lastResult": "ok"
     },
     {
       "id": "real-data-optional",
       "label": "MAIN内の実マスターが見つかった場合の参考チェック",
-      "lastChecked": "2026-10-12T18:00:30.533Z",
-      "lastResult": "ng"
+      "lastChecked": "2026-10-15T12:56:59.555Z",
+      "lastResult": "ok"
     }
   ],
   "history": [
@@ -941,6 +941,70 @@
     {
       "date": "2026-10-12",
       "status": "ng",
+      "focusAreas": [
+        "large-data-perf",
+        "real-data-optional"
+      ]
+    },
+    {
+      "date": "2026-10-13",
+      "status": "ng",
+      "focusAreas": [
+        "price-schedule-dummy",
+        "sej-dummy"
+      ]
+    },
+    {
+      "date": "2026-10-14",
+      "status": "ng",
+      "focusAreas": [
+        "ikkatsu-dummy",
+        "html-save"
+      ]
+    },
+    {
+      "date": "2026-10-15",
+      "status": "ok",
+      "focusAreas": [
+        "sort-filter",
+        "master-unlinked"
+      ]
+    },
+    {
+      "date": "2026-10-15",
+      "status": "ok",
+      "focusAreas": [
+        "large-data-perf",
+        "real-data-optional"
+      ]
+    },
+    {
+      "date": "2026-10-15",
+      "status": "ok",
+      "focusAreas": [
+        "price-schedule-dummy",
+        "sej-dummy"
+      ]
+    },
+    {
+      "date": "2026-10-15",
+      "status": "ok",
+      "focusAreas": [
+        "ikkatsu-dummy",
+        "html-save"
+      ]
+    },
+    {
+      "date": "2026-10-15",
+      "status": "ok",
+      "focusAreas": [
+        "sort-filter",
+        "master-unlinked"
+      ]
+    },
+    {
+      "date": "2026-10-15",
+      "status": "ok",
       "focusAreas": [
         "large-data-perf",
         "real-data-optional"

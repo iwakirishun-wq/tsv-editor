@@ -8,6 +8,7 @@
  * そちらは失敗してもダミーシナリオの合否には影響しない（実データは内容が変動するため）。
  *
  * 実行: node run_nightly_check.js
+ * 架空データのみ: TSV_NIGHTLY_DUMMY_ONLY=1 で実データ参考チェックを省く
  * 出力: .agents/nightly/log/<YYYY-MM-DD>.json と .md、checklist.json の更新
  */
 const fs = require("fs");
@@ -154,7 +155,16 @@ async function runPriceScheduleScenario(browser, today) {
     const actualNg = ngMatch ? Number(ngMatch[1]) : 0;
     const actualInvalid = invalidMatch ? Number(invalidMatch[1]) : 0;
     const expectedNgCount = 2; // S席→A席(0円登録/期待2000)、S席→Z席(当日23000登録/期待22500)
-    const expectedInvalidCount = 4; // エリア同席種、UG期間超過、年齢降格、大人ダウングレード(VC-2→A席)
+    // 現行UGルール（正本§12〜14）: 値下がり券種、子ども系→別席種の大人券も設定不可。
+    const expectedInvalidRows = [
+      ["自由エリア(大人)→自由エリア(大人)", "エリア席の同席種同券種UGは設定不可"],
+      ["PERIOD元(大人)→PERIOD先(大人)", "UGの販売終了が元・先の早いほうより後"],
+      ["S指定席(大人)→Aエリア席(S指定席_子供)", "大人・共通券種から子ども・若年限定券種への変更不可"],
+      ["S指定席(幼児)→Aエリア席(大人)", "別席種の大人券種へは子ども・U23券種から変更不可"],
+      ["VC-2(大人)→Aエリア席(大人)", "対象券種の前売・当日価格が先<元"],
+      ["X席(大人)→Y席(大人)", "対象券種の前売・当日価格が先<元"],
+    ];
+    const expectedInvalidCount = expectedInvalidRows.length;
     // 件数だけでは「UGルール変更で増えたのか回帰なのか」が判断できないため、NG行の中身も控える
     const ugNgRows = await popup.locator("tr.ng-row").evaluateAll((trs) => trs.map((tr) => {
       const [, from, to, fromAge, toAge] = decodeURIComponent(tr.getAttribute("data-mid") || "").split("|");
@@ -162,6 +172,11 @@ async function runPriceScheduleScenario(browser, today) {
     }));
     if (actualNg !== expectedNgCount) anomalies.push(`差額NG件数が期待と不一致: 期待${expectedNgCount} 実際${actualNg}`);
     if (actualInvalid !== expectedInvalidCount) anomalies.push(`設定不可件数が期待と不一致: 期待${expectedInvalidCount} 実際${actualInvalid}`);
+    for (const [pair, reason] of expectedInvalidRows) {
+      if (!ugNgRows.some((row) => row.startsWith(`${pair}: `) && row.includes(reason))) {
+        anomalies.push(`設定不可の対象・理由が見つからない: ${pair} / ${reason}`);
+      }
+    }
 
     // マトリクスの「登録漏れ?」候補は組み合わせ全体（cross product）に依存して変動しうるため、厳密な総数では
     // なく「1件以上検出され、かつ仕込んだVC-2→Z席が含まれる」ことだけを確認する
@@ -356,7 +371,7 @@ async function main() {
     scenarios.push(await runIkkatsuScenario(browser, today));
     scenarios.push(await runSeatMasterMainGridScenario(browser, today));
     scenarios.push(await runLargeGridScenario(browser, withPage, INDEX_HTML, LOG_DIR, today));
-    const real = await runRealDataScenarioIfAvailable(browser, today);
+    const real = process.env.TSV_NIGHTLY_DUMMY_ONLY === "1" ? null : await runRealDataScenarioIfAvailable(browser, today);
     if (real) scenarios.push(real);
   } catch (e) {
     fatalError = String((e && e.stack) || e);

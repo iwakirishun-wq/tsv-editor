@@ -3448,7 +3448,8 @@
           const s = String(seat || "").normalize("NFKC");
           if (/ZERO円/i.test(s)) return false;
           if (/観戦券|観覧券/.test(s)) return false;
-          if (seatCat(code, seat) === "その他") return /パス/.test(s);
+          // 2026-10-14 SHUN確認: 名前に「パス」が無くてもピットウォークはパス系
+          if (seatCat(code, seat) === "その他") return /パス|ピットウォーク/.test(s);
           const m = seatMeta ? seatMeta(code, seat) : null;
           if (!String(code || "").trim() && !(m && m.found)) return /ピットウォーク|パドックパス|激感エリアパス|パークパスポート/.test(s);
           return false;
@@ -4028,9 +4029,10 @@
         const d = new Date(ms), p = (n) => ("0" + n).slice(-2);
         return d.getFullYear() + "/" + p(d.getMonth() + 1) + "/" + p(d.getDate()) + " " + p(d.getHours()) + ":" + p(d.getMinutes());
       }
-      // 編集パネルの入力（前売差額・当日差額・販売開始・販売終了）を検査し、登録用の文字列に整える。
+      // 編集パネルの入力（前売差額・当日差額・販売開始・販売終了・販売経路）を検査し、登録用の文字列に整える。
       //  金額: 全角・カンマ可、0以上の整数（売止めダミーの全桁9も可）。日時: 年/月/日 時:分（時刻は必須）。開始≦終了。
-      //  戻り: { ok, values: { adv, day, start, end }, errors: { adv|day|start|end: 理由 } }
+      //  販売経路: 空欄不可・改行/タブ不可・トリム。
+      //  戻り: { ok, values: { adv, day, start, end, route }, errors: { adv|day|start|end|route: 理由 } }
       function ugEditCheckInput(input) {
         const errors = {}, values = {};
         const src = input || {};
@@ -4049,6 +4051,12 @@
           else { ms[k] = n; values[k] = ugEditFormatDt(n); }
         }
         if (ms.start != null && ms.end != null && ms.start > ms.end) errors.end = "販売終了が販売開始より前です";
+        if (src.route !== undefined) {
+          const r = String(src.route ?? "").trim();
+          if (r === "") errors.route = "販売経路が空です";
+          else if (/[\t\r\n]/.test(r)) errors.route = "販売経路に改行やタブは使えません";
+          else values.route = r;
+        }
         return { ok: !Object.keys(errors).length, values, errors };
       }
       // 通常行（UG以外）の販売期間。同じ条件キー（経路まで）の行を優先し、無ければ全条件から（validate の lookup と同じ優先順）。
@@ -4103,11 +4111,11 @@
           day: one(chk.expectedDay, chk.dayDummy, chk.srcDay, chk.dstDay, cur.day),
         };
       }
-      // 行の前売・当日・販売開始・販売終了を差し替えた新しい行（元の行は変えない）
+      // 行の前売・当日・販売開始・販売終了・販売経路を差し替えた新しい行（元の行は変えない）
       function ugEditApplyValues(row, c, values) {
         const r = (row || []).slice();
-        for (const [k, i] of [["adv", c.adv], ["day", c.day], ["start", c.start], ["end", c.end]]) {
-          if (i < 0 || values[k] == null) continue;
+        for (const [k, i] of [["adv", c.adv], ["day", c.day], ["start", c.start], ["end", c.end], ["route", c.route]]) {
+          if (i == null || i < 0 || values[k] == null) continue;
           while (r.length <= i) r.push("");
           r[i] = values[k];
         }
@@ -4155,6 +4163,156 @@
         }
         if (!out.length) return { rows: [], error: "元・先の通常行（同じ販売条件・販売経路）が見つからないため追加できません" };
         return { rows: out, error: null };
+      }
+      // 修正済みTSV出力前の全件検証（2026-10-15追加確定: 全件欠落・誤設定の出力防止）
+      // 編集箇所だけでなく既存を含む全件を検証する。明白なエラー（設定不可・差額NG・必須値欠落・日時逆転・重複等）が1件でもあればブロック。
+      // 比較元不足や価格不明（unknown）は警告/未検証として区別し、自動で不正と断定しない。
+      // 戻り: { ok: boolean, errors: Array<{ rowIdx, type, message }>, warnings: Array<{ rowIdx, type, message }> }
+      function ugEditValidateExport(headers, rows, c, v, validate, snapshot) {
+        const errors = [];
+        const warnings = [];
+        const H = (headers || []).map((h) => String(h).trim());
+
+        // 1. スナップショットの列数・行数整合性
+        if (snapshot) {
+          const expectedCols = (snapshot.headers || []).length;
+          if (H.length !== expectedCols) {
+            errors.push({ rowIdx: -1, type: "col_count", message: `列数が元データ（${expectedCols}列）と一致しません（現在 ${H.length}列）` });
+          }
+          const added = snapshot.addedCount || 0;
+          const deleted = snapshot.deletedCount || 0;
+          const origRowCount = (snapshot.rows || []).length;
+          const expectedRowCount = origRowCount + added - deleted;
+          if (rows.length !== expectedRowCount) {
+            errors.push({ rowIdx: -1, type: "row_count", message: `行数（${rows.length}行）が期待値（元${origRowCount}行 + 追加${added}行 - 削除${deleted}行 = ${expectedRowCount}行）と一致しません` });
+          }
+        }
+
+        // 2. 行ごとの整合性チェック
+        // 元ファイルのまま触っていない行の「空欄・形式・重複」は、元データ由来で正常なこともある
+        // （券種なしの駐車場・クローク等）ので警告に留める。編集・追加した行と、UGルール違反・差額NG・
+        // 日時の逆転・編集で新たに生じた重複は確定エラー。（2026-10-15 Claude検品で修正）
+        const keyOf = (row) => {
+          const isUg = ugEditIsUg(row, c, v);
+          return [v(row, c.kbn), v(row, c.rank), v(row, c.route), v(row, c.seatCd) || v(row, c.seat), v(row, c.ageCd) || v(row, c.age),
+            v(row, c.start), v(row, c.end), isUg ? "1" : "0", isUg ? (v(row, c.ugSeatCd) || v(row, c.ugSeat)) : "",
+            isUg ? (v(row, c.ugAgeCd) || v(row, c.ugAge)) : ""].join("\u0001");
+        };
+        const snapFps = snapshot && snapshot.rows ? new Set(snapshot.rows.map((r) => ugEditRowFp(r))) : null;
+        const snapDupKeys = new Set();
+        if (snapshot && snapshot.rows) {
+          const seen = new Set();
+          for (const r of snapshot.rows) {
+            if (!r) continue;
+            const k = keyOf(r);
+            if (seen.has(k)) snapDupKeys.add(k);
+            seen.add(k);
+          }
+        }
+        const keySet = new Set();
+        const H_len = H.length;
+
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          if (!row) {
+            errors.push({ rowIdx: i, type: "empty_row", message: `${i + 1}行目のデータが空です` });
+            continue;
+          }
+          if (row.length !== H_len) {
+            errors.push({ rowIdx: i, type: "col_mismatch", message: `${i + 1}行目の列数（${row.length}）がヘッダー列数（${H_len}）と一致しません` });
+          }
+          const untouched = !!(snapFps && snapFps.has(ugEditRowFp(row)));
+          const soft = (e) => (untouched ? warnings : errors).push(untouched ? { ...e, message: e.message + "（元ファイルのまま）" } : e);
+
+          const isUg = ugEditIsUg(row, c, v);
+          const route = v(row, c.route);
+          const kbn = v(row, c.kbn);
+          const seat = v(row, c.seat);
+          const age = v(row, c.age);
+          const start = v(row, c.start);
+          const end = v(row, c.end);
+          const adv = v(row, c.adv);
+          const day = v(row, c.day);
+
+          const desc = `${kbn || "（区分なし）"} / ${seat || "（席種なし）"} / ${age || "（券種なし）"} / ${route || "（経路なし）"}`;
+
+          // 必須値チェック
+          if (!route) soft({ rowIdx: i, type: "required", message: `${i + 1}行目（${desc}）: 販売経路区分が未入力です` });
+          if (!seat) soft({ rowIdx: i, type: "required", message: `${i + 1}行目: 席種エリア名が未入力です` });
+          if (!age) soft({ rowIdx: i, type: "required", message: `${i + 1}行目: 券種名が未入力です` });
+          if (!start) soft({ rowIdx: i, type: "required", message: `${i + 1}行目（${desc}）: 販売開始日時が未入力です` });
+          if (!end) soft({ rowIdx: i, type: "required", message: `${i + 1}行目（${desc}）: 販売終了日時が未入力です` });
+          if (adv === "") soft({ rowIdx: i, type: "required", message: `${i + 1}行目（${desc}）: 前売価格が未入力です` });
+          if (day === "") soft({ rowIdx: i, type: "required", message: `${i + 1}行目（${desc}）: 当日価格が未入力です` });
+
+          // 金額チェック（売止めダミー999999等も整数として許容）
+          if (adv !== "" && !/^\d+$/.test(adv.replace(/[,\s]/g, ""))) {
+            soft({ rowIdx: i, type: "format", message: `${i + 1}行目（${desc}）: 前売価格が0以上の整数ではありません (${adv})` });
+          }
+          if (day !== "" && !/^\d+$/.test(day.replace(/[,\s]/g, ""))) {
+            soft({ rowIdx: i, type: "format", message: `${i + 1}行目（${desc}）: 当日価格が0以上の整数ではありません (${day})` });
+          }
+
+          // 日時チェック
+          const sMs = ugEditParseDt(start);
+          const eMs = ugEditParseDt(end);
+          if (start && sMs == null) soft({ rowIdx: i, type: "date_format", message: `${i + 1}行目（${desc}）: 販売開始日時の形式が不正です (${start})` });
+          if (end && eMs == null) soft({ rowIdx: i, type: "date_format", message: `${i + 1}行目（${desc}）: 販売終了日時の形式が不正です (${end})` });
+          if (sMs != null && eMs != null && sMs > eMs) {
+            errors.push({ rowIdx: i, type: "date_reverse", message: `${i + 1}行目（${desc}）: 販売終了日時が開始日時より前です (${start} 〜 ${end})` });
+          }
+
+          // UG特有のチェック
+          if (isUg) {
+            const ugSeat = v(row, c.ugSeat);
+            const ugAge = v(row, c.ugAge);
+            if (!ugSeat) errors.push({ rowIdx: i, type: "required", message: `${i + 1}行目（${desc}）: アップグレード元席種エリア名が未入力です` });
+            if (!ugAge) errors.push({ rowIdx: i, type: "required", message: `${i + 1}行目（${desc}）: アップグレード元券種名が未入力です` });
+
+            if (typeof validate === "function") {
+              const chk = validate(row);
+              if (chk.status === "invalid") {
+                const prob = (chk.problems && chk.problems.length) ? chk.problems.join(", ") : "業務ルール上設定不可です";
+                errors.push({ rowIdx: i, type: "ug_rule", message: `${i + 1}行目（${ugSeat} → ${seat} / ${route}）: ${prob}` });
+              } else if (chk.status === "ng") {
+                const reasons = [];
+                if (chk.advNg) reasons.push(`前売差額NG (登録: ${adv}, 期待値: ${chk.expected})`);
+                if (chk.dayNg) reasons.push(`当日差額NG (登録: ${day}, 期待値: ${chk.expectedDay})`);
+                const prob = (chk.problems && chk.problems.length) ? chk.problems.join(", ") : reasons.join(" / ") || "差額が期待値と不一致です";
+                errors.push({ rowIdx: i, type: "ug_rule", message: `${i + 1}行目（${ugSeat} → ${seat} / ${route}）: ${prob}` });
+              } else if (chk.status === "unknown") {
+                const note = (chk.notes && chk.notes.length) ? chk.notes.join(", ") : "比較元の通常行または価格情報が不足しています";
+                warnings.push({ rowIdx: i, type: "ug_unknown", message: `${i + 1}行目（${ugSeat} → ${seat} / ${route}）: 価格検算が未検証です（${note}）` });
+              }
+            }
+          }
+
+          // 重複キーチェック（区分 + ランク + 経路 + 席種 + 券種 + 日時 + (UGなら元席種+元券種)）
+          const uniqKey = keyOf(row);
+          if (keySet.has(uniqKey)) {
+            const dup = { rowIdx: i, type: "dup_key", message: `${i + 1}行目（${desc}）: 販売条件・販売経路・販売期間が重複する行が存在します` };
+            if (snapDupKeys.has(uniqKey)) warnings.push({ ...dup, message: dup.message + "（元ファイルにも同じ重複あり）" });
+            else errors.push(dup);
+          }
+          keySet.add(uniqKey);
+        }
+
+        // 3. スナップショットの未編集行（通常行など）が壊れていないか検証
+        if (snapshot && snapshot.rows) {
+          const origFps = snapshot.rows.map((r) => ugEditRowFp(r));
+          const curFps = new Set(rows.map((r) => ugEditRowFp(r)));
+          snapshot.rows.forEach((origRow, origIdx) => {
+            const isOrigUg = ugEditIsUg(origRow, c, v);
+            if (!isOrigUg) {
+              const fp = origFps[origIdx];
+              if (!curFps.has(fp)) {
+                errors.push({ rowIdx: -1, type: "normal_row_missing", message: `元データの通常行（${origIdx + 1}行目: ${v(origRow, c.seat)} / ${v(origRow, c.age)}）が消失または変更されています` });
+              }
+            }
+          });
+        }
+
+        return { ok: errors.length === 0, errors, warnings };
       }
       // ===UG_MATRIX_EDIT_CORE_END===
       // ===MISSING_AGE_CORE_START=== UI/stateに依存しない純粋ロジック（tests/missing_age.test.js が抽出して検証する。ugAgeSpan を使う）
@@ -6060,6 +6218,8 @@
       let _dataVersion = 0; // ゴースト行キャッシュなどの無効化用
       function markDirty() {
         state.dirty = true;
+        if (state.data.length !== 1 || state.data[0].some(v => v !== ""))
+          state._placeholderRow = false;
         _dataVersion++;
         els.dirty.classList.add("show");
         document.title = "● TSV/CSV Editor";
@@ -6137,6 +6297,7 @@
         t.newlineMixed = state.newlineMixed;
         t.markedCells = new Set(state.markedCells);
         t.originalRowCount = state.originalRowCount;
+        t._placeholderRow = !!state._placeholderRow;
         // 検品トグルをタブごとに保存（タブ切り替えで外れないようにする）
         t.inspectFlags = {};
         for (const k of INSPECT_TAB_FLAGS) t.inspectFlags[k] = !!state[k];
@@ -6198,6 +6359,7 @@
           state.wrapRows = t.wrapRows ? new Set(t.wrapRows) : new Set();
           state.cellColors = t.cellColors ? { ...t.cellColors } : {};
           state.originalRowCount = Number.isInteger(t.originalRowCount) ? t.originalRowCount : state.data.length;
+          state._placeholderRow = !!t._placeholderRow;
           if (t.encoding) state.encoding = t.encoding;
           // filteredIndicesをレンダリングなしで再計算
           _visibleRowsCache = null;
@@ -7078,7 +7240,7 @@
         state.fileHandle = handle || null;
         state.delimiter = detectDelimiter(text, fileName);
         parseData(text);
-        state.originalRowCount = state.data.length; // 開いた直後の行数（保存時の予期せぬ増減チェック用）
+        state.originalRowCount = state._placeholderRow ? 0 : state.data.length; // 保存対象の実データ行数
         clearAutoDropColumns();
         applyHeaderMapping();
         // マスタ連携済みなら、開いたファイルにもグループ名仮想列を追加する
@@ -7121,7 +7283,9 @@
           headerMode: state.headerMode,
           encoding: state.encoding,
           dirty: false,
-          _rawText: text, // 遅延復元用にrawTextを保持
+          _rawText: text, // 遅延復元用。全行保存成功時に更新する
+          _initialRawText: text, // 保存差分の初回読込基準
+          _placeholderRow: !!state._placeholderRow,
           originalRowCount: state.originalRowCount,
         };
         // 現在のタブが空白シート（+ボタンで作成・未編集）なら上書き、それ以外は新タブ
@@ -7167,6 +7331,7 @@
         clearAutoDropColumns();
         tab.data = state.data;
         tab.headers = state.headers;
+        tab._placeholderRow = !!state._placeholderRow;
         state.delimiter = savedDelimiter;
         state.headerMode = savedHeaderMode;
       }
@@ -7199,6 +7364,7 @@
         if (!rows.length) {
           state.headers = ["A"];
           state.data = [[""]];
+          state._placeholderRow = true;
           return;
         }
         if (state.headerMode === "numbered") {
@@ -7229,7 +7395,8 @@
             return r;
           });
         }
-        if (!state.data.length)
+        state._placeholderRow = !state.data.length;
+        if (state._placeholderRow)
           state.data = [new Array(state.headers.length).fill("")];
         resetState();
       }
@@ -7455,7 +7622,7 @@
       }
 
       // allRows=true でフィルターを無視して全行を出力する
-      function buildFileContent({ allRows = false } = {}) {
+      function buildFileContent({ allRows = false, includeVirtual = false } = {}) {
         const d = state.delimiter;
         const nl = state.newline === "crlf" ? "\r\n" : "\n";
         const esc = (v) => {
@@ -7465,7 +7632,7 @@
             : s;
         };
         // 仮想列（SEJ連携で追加したグループ名など）を除外
-        const virtualSet = state.sejVirtualCols
+        const virtualSet = !includeVirtual && state.sejVirtualCols
           ? new Set(state.sejVirtualCols.indices)
           : null;
         const filterCols = (arr) =>
@@ -7474,13 +7641,20 @@
         const rows = state.filteredIndices && !allRows
           ? state.filteredIndices.map((i) => state.data[i])
           : state.data;
+        const outputRows = state._placeholderRow && rows.length === 1 &&
+          rows[0].every((v) => String(v ?? "") === "") ? [] : rows;
+        const serializeRow = (r) => {
+          const cells = filterCols(r);
+          // 1列の空行は末尾改行と区別できないため、空のquoted fieldにする。
+          if (cells.length === 1 && String(cells[0] ?? "") === "") return '""';
+          return cells.map(esc).join(d);
+        };
         if (state.headerMode === "numbered") {
-          return rows.map((r) => filterCols(r).map(esc).join(d)).join(nl);
+          return outputRows.map(serializeRow).join(nl);
         }
         return (
           filterCols(state.headers).map(esc).join(d) +
-          nl +
-          rows.map((r) => filterCols(r).map(esc).join(d)).join(nl)
+          (outputRows.length ? nl + outputRows.map(serializeRow).join(nl) : "")
         );
       }
 
@@ -7630,11 +7804,11 @@
             <div class="modal-title">フィルター中です。どちらを保存しますか？</div>
             <p style="font-size:13px;margin:8px 0 4px;line-height:1.6">
               全 <strong>${total}</strong> 行のうち <strong>${shown}</strong> 行が表示中です（非表示: ${total - shown} 行）。<br>
-              「表示中のみ」を選ぶと非表示の行はファイルから失われます。
+              「表示中のみ」は別ファイルに抽出します。元ファイルと非表示の行は保持されます。
             </p>
             <div class="modal-btns" style="flex-wrap:wrap">
               <button class="_ss-cancel btn-default">キャンセル</button>
-              <button class="_ss-filtered btn-default">表示中の ${shown} 行だけ保存</button>
+              <button class="_ss-filtered btn-default">表示中の ${shown} 行を別ファイルに保存</button>
               <button class="_ss-all btn-primary">全 ${total} 行を保存</button>
             </div>
           </div>`;
@@ -7654,8 +7828,7 @@
       // そのとき効いた検証（キー集合の増減・列ごとの変更件数・グループ別の変更件数）を
       // 保存経路に組み込んだもの。とくに「対象グループ以外に変更が出ていないか」が要。
       //
-      // 元データは タブの _rawText（開いた時点のファイル内容そのもの）。保存しても更新しないので、
-      // 何度保存しても比較の基準は「最初に開いたファイル」のまま。
+      // 保存差分の基準は初回読込内容。遅延復元用の _rawText とは独立させる。
 
       // 監査列。ULでは空欄でよく、システムが一括打刻するので差分として数えない。
       const DIFF_IGNORE_COLS = new Set(["create_dt", "update_dt", "create_user", "update_user"]);
@@ -7678,17 +7851,19 @@
         for (let i = 0; i < state.headers.length; i++) if (!virtualSet || !virtualSet.has(i)) keep.push(i);
         const headers = state.headerMode === "numbered"
           ? keep.map((_, i) => String(i + 1))
-          : keep.map((i) => String(state.headers[i] ?? "").trim());
+          : keep.map((i) => String(state.headers[i] ?? ""));
         const src = state.filteredIndices && !allRows
           ? state.filteredIndices.map((i) => state.data[i])
           : state.data;
-        return { headers, rows: src.map((r) => keep.map((i) => String(r[i] ?? ""))) };
+        const rows = state._placeholderRow && src.length === 1 &&
+          src[0].every((v) => String(v ?? "") === "") ? [] : src;
+        return { headers, rows: rows.map((r) => keep.map((i) => String(r[i] ?? ""))) };
       }
 
       // 開いた時点のファイル内容を、読み込み時と同じ解釈でパースする
       function _diffBaselineRows() {
         const tab = state.tabs[state.activeTab];
-        let text = tab && tab._rawText;
+        let text = tab && (tab._initialRawText ?? tab._rawText);
         if (typeof text !== "string") return null;
         if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
         const rows = parseQuotedRows(text, state.delimiter);
@@ -7701,7 +7876,7 @@
             rows: rows.map((r) => Array.from({ length: maxCols }, (_, i) => String(r[i] ?? ""))),
           };
         }
-        const headers = rows[0].map((h) => String(h ?? "").trim());
+        const headers = rows[0].map((h) => String(h ?? ""));
         const body = rows.slice(1);
         let maxCols = headers.length;
         body.forEach((r) => { if (r.length > maxCols) maxCols = r.length; });
@@ -7715,11 +7890,30 @@
         const cur = _diffCurrentRows(allRows);
 
         const baseIdx = new Map(), curIdx = new Map();
-        base.headers.forEach((h, i) => { if (h !== "" && !baseIdx.has(h)) baseIdx.set(h, i); });
-        cur.headers.forEach((h, i) => { if (h !== "" && !curIdx.has(h)) curIdx.set(h, i); });
-        const commonCols = [...curIdx.keys()].filter((h) => baseIdx.has(h) && !DIFF_IGNORE_COLS.has(h));
-        const addedCols = [...curIdx.keys()].filter((h) => !baseIdx.has(h));
-        const removedCols = [...baseIdx.keys()].filter((h) => !curIdx.has(h));
+        base.headers.forEach((h, i) => { const key = h.trim(); if (key && !baseIdx.has(key)) baseIdx.set(key, i); });
+        cur.headers.forEach((h, i) => { const key = h.trim(); if (key && !curIdx.has(key)) curIdx.set(key, i); });
+        const colLabel = (h, i) => (h === "" ? "(無名列)" : h) + `（${i + 1}列目）`;
+        const commonCols = [], addedCols = [], removedCols = [];
+        const indexedHeaders = (headers) => {
+          const seen = new Map(), columns = new Map();
+          headers.forEach((h, index) => {
+            const n = (seen.get(h) || 0) + 1;
+            seen.set(h, n);
+            columns.set(JSON.stringify([h, n]), { header: h, index });
+          });
+          return columns;
+        };
+        const baseCols = indexedHeaders(base.headers), curCols = indexedHeaders(cur.headers);
+        for (const [id, col] of curCols) {
+          const previous = baseCols.get(id);
+          if (!previous) addedCols.push(colLabel(col.header, col.index));
+          else if (!DIFF_IGNORE_COLS.has(col.header.trim()))
+            commonCols.push({ baseIndex: previous.index, curIndex: col.index,
+              label: colLabel(col.header, col.index) });
+        }
+        for (const [id, col] of baseCols) {
+          if (!curCols.has(id)) removedCols.push(colLabel(col.header, col.index));
+        }
 
         // キー列を決める。見つからない場合は行の並び順で突き合わせる（並べ替えると差分が出る）
         const keyCols = DIFF_KEY_SETS.find((set) => set.every((h) => baseIdx.has(h) && curIdx.has(h))) || null;
@@ -7744,9 +7938,12 @@
         const baseMap = new Map(), dupBase = new Set();
         base.rows.forEach((r, i) => {
           const k = keyCols ? keyOf(r, baseIdx) : String(i);
-          if (baseMap.has(k)) dupBase.add(k); else baseMap.set(k, r);
+          if (!baseMap.has(k)) baseMap.set(k, []);
+          const bucket = baseMap.get(k);
+          bucket.push(r);
+          if (bucket.length > 1) dupBase.add(k);
         });
-        const seenCur = new Set(), dupCur = new Set();
+        const seenCur = new Map(), dupCur = new Set();
         const byCol = new Map(), byGroup = new Map();
         const bump = (map, key, field) => {
           let m = map.get(key);
@@ -7758,37 +7955,40 @@
 
         cur.rows.forEach((r, i) => {
           const k = keyCols ? keyOf(r, curIdx) : String(i);
-          if (seenCur.has(k)) dupCur.add(k);
-          seenCur.add(k);
-          const b = baseMap.get(k);
+          const occurrence = seenCur.get(k) || 0;
+          seenCur.set(k, occurrence + 1);
+          if (occurrence) dupCur.add(k);
+          const bucket = baseMap.get(k);
+          const b = bucket && bucket[occurrence];
           const grp = groupOf(r, curIdx);
           if (!b) { added++; bump(byGroup, grp, "added"); return; }
           const diffCols = [];
-          for (const h of commonCols) {
-            if (String(r[curIdx.get(h)] ?? "") !== String(b[baseIdx.get(h)] ?? "")) diffCols.push(h);
+          for (const col of commonCols) {
+            if (String(r[col.curIndex] ?? "") !== String(b[col.baseIndex] ?? "")) diffCols.push(col);
           }
           if (!diffCols.length) { same++; return; }
           changed++;
           bump(byGroup, grp, "changed");
-          for (const h of diffCols) bump(byCol, h, "changed");
+          for (const col of diffCols) bump(byCol, col.label, "changed");
           if (samples.length < 20) {
             const h0 = diffCols[0];
             samples.push({
               group: grp,
               key: keyCols ? keyCols.map((h) => r[curIdx.get(h)] ?? "").join(" / ") : "行 " + (i + 1),
-              col: h0,
-              before: String(b[baseIdx.get(h0)] ?? ""),
-              after: String(r[curIdx.get(h0)] ?? ""),
+              col: h0.label,
+              before: String(b[h0.baseIndex] ?? ""),
+              after: String(r[h0.curIndex] ?? ""),
               more: diffCols.length - 1,
             });
           }
         });
 
         let removed = 0;
-        for (const [k, b] of baseMap) {
-          if (seenCur.has(k)) continue;
-          removed++;
-          bump(byGroup, groupOf(b, baseIdx), "removed");
+        for (const [k, bucket] of baseMap) {
+          for (const b of bucket.slice(seenCur.get(k) || 0)) {
+            removed++;
+            bump(byGroup, groupOf(b, baseIdx), "removed");
+          }
         }
 
         const total = added + removed + changed;
@@ -7799,7 +7999,7 @@
           byGroup: [...byGroup.entries()].map(([group, v]) => ({ group, ...v }))
             .sort((a, b) => (b.added + b.removed + b.changed) - (a.added + a.removed + a.changed)),
           samples,
-          dupKeys: dupBase.size + dupCur.size,
+          dupKeys: new Set([...dupBase, ...dupCur]).size,
           positional: !keyCols,
         };
       }
@@ -7812,7 +8012,7 @@
         lines.push(`突合キー: ${d.keyCols ? d.keyCols.join(" + ") : "キー列が見つからないため行の並び順で比較（並べ替えると全行が変更扱いになります）"}`);
         if (d.addedCols.length) lines.push(`追加された列: ${d.addedCols.join(", ")}`);
         if (d.removedCols.length) lines.push(`無くなった列: ${d.removedCols.join(", ")}`);
-        if (d.dupKeys) lines.push(`※ キーが重複している行が ${d.dupKeys} 件あります。突合結果は信用できません`);
+        if (d.dupKeys) lines.push(`※ 重複したキーが ${d.dupKeys} 種類あります。同じキーの行は出現順で突合するため、変更件数は曖昧です`);
         if (d.byGroup.length) {
           lines.push("");
           lines.push("グループ別:");
@@ -7842,7 +8042,7 @@
           const esc = escHtml;
           const warn = [];
           if (d.positional) warn.push("キー列が見つからないため<b>行の並び順</b>で比較しています。並べ替えていると全行が変更扱いになります。");
-          if (d.dupKeys) warn.push(`キーが重複している行が <b>${d.dupKeys}件</b> あります。突合結果は信用できません。`);
+          if (d.dupKeys) warn.push(`キーが重複しています（<b>${d.dupKeys}種類</b>）。同じキーの行は出現順で突合するため、変更件数は曖昧です。`);
           if (d.removed) warn.push(`<b>${d.removed}行が無くなります。</b>席種エリアコードの付け替えは「削除＋追加」として出るので、意図した付け替えか確認してください。`);
           if (d.byGroup.length > 1) warn.push(`変更が <b>${d.byGroup.length}グループ</b> にまたがっています。対象グループ以外に変更が出ていないか確認してください。`);
 
@@ -7907,6 +8107,9 @@
 
       // askLocation=true で「名前を付けて保存」（保存先フォルダとファイル名を毎回選ぶ）
       async function doSaveFile({ askLocation = false } = {}) {
+        const saveTab = state.tabs[state.activeTab];
+        const saveVersion = _dataVersion;
+        const stillCurrent = () => state.tabs[state.activeTab] === saveTab && _dataVersion === saveVersion;
         // フィルター中は「表示中のみ」か「フィルターを無視して全行」かを選ばせる
         let saveAllRows = false;
         if (state.filteredIndices) {
@@ -7921,8 +8124,11 @@
             saveAllRows = scope === "all";
           }
         }
+        if (!stillCurrent()) { setStatus("編集中のタブが変わりました。保存をやり直してください"); return; }
         const isFullSave = saveAllRows || !state.filteredIndices || state.filteredIndices.length === state.data.length;
-        const savedRows = isFullSave ? state.data.length : state.filteredIndices.length;
+        const savedRows = isFullSave
+          ? (state._placeholderRow ? 0 : state.data.length)
+          : state.filteredIndices.length;
         // 元データ（開いた時点のファイル内容）と突合して、何がどう変わるかを出す。
         // 差分がある場合だけダイアログを出し、無ければ黙って保存する。
         // 行数の増減だけを見ていた従来の確認は、この差分サマリに含まれるので置き換えた。
@@ -7951,47 +8157,95 @@
             return;
           }
         }
+        if (!stillCurrent()) { setStatus("編集中のタブが変わりました。保存をやり直してください"); return; }
+        const saveHandle = state.fileHandle;
+        const saveName = state.fileName;
+        const placeholderRow = !!state._placeholderRow;
         const virtualNote = state.sejVirtualCols ? "（仮想列は除外）" : "";
         const bom = state.encoding === "utf8bom" ? "﻿" : "";
         const txt = bom + buildFileContent({ allRows: saveAllRows });
+        const restoreText = bom + buildFileContent({ allRows: true, includeVirtual: true });
+
+        const makeExtractName = (name) => {
+          const cur = name || "data.tsv";
+          const dot = cur.lastIndexOf(".");
+          const base = dot >= 0 ? cur.slice(0, dot) : cur;
+          const ext = dot >= 0 ? cur.slice(dot) : ".tsv";
+          return `${base || "data"}_extract${ext}`;
+        };
 
         // 保存先の決定（デスクトップのエディタと同じ挙動）:
-        //  1) 保存先ハンドルがある（開いた/名前を付けて保存で確定済み）→ その場所へ静かに上書き
+        //  1) 保存先ハンドルがある（開いた/名前を付けて保存で確定済み）→ その場所へ静かに上書き（※全行保存時のみ。抽出保存は上書き禁止）
         //  2) File System Access API が使える → 保存ダイアログで保存先フォルダ＋名前を選ぶ（以後はそこへ上書き）
         //  3) いずれも不可（file://実行・非対応ブラウザ）→ 既定ダウンロードフォルダへ（従来動作。名前を付けて保存なら名前だけ指定可）
-        const canOverwrite = !askLocation && state.fileHandle && typeof state.fileHandle.createWritable === "function";
+        const canOverwrite = isFullSave && !askLocation && saveHandle && typeof saveHandle.createWritable === "function";
         let savedTo = "";
+        let savedSuccessfully = false;
         if (canOverwrite) {
-          if (!(await _ensureWritePermission(state.fileHandle))) {
+          if (!(await _ensureWritePermission(saveHandle))) {
             setStatus("保存先への書き込みが許可されませんでした（名前を付けて保存で場所を選び直せます）");
             return;
           }
           try {
-            await _writeToHandle(state.fileHandle, txt);
-            savedTo = state.fileHandle.name || state.fileName;
+            await _writeToHandle(saveHandle, txt);
+            savedTo = saveHandle.name || saveName;
+            savedSuccessfully = true;
           } catch (e) {
             if (e && e.name === "AbortError") { setStatus("保存をキャンセルしました"); return; }
             console.warn("上書き保存に失敗、ダウンロードにフォールバック:", e);
-            _downloadBlob(txt, state.fileName);
+            _downloadBlob(txt, saveName);
           }
         } else if (_canPickSave()) {
           try {
+            const suggestedName = !isFullSave ? makeExtractName(saveName) : (saveName || "data.tsv");
             const handle = await window.showSaveFilePicker({
-              suggestedName: state.fileName || "data.tsv",
-              types: _saveAsTypes(state.fileName),
+              suggestedName,
+              types: _saveAsTypes(saveName),
             });
-            state.fileHandle = handle;
-            _applySavedName(handle.name);
+            if (!isFullSave) {
+              let verifiedDistinct = false;
+              if (saveHandle && typeof saveHandle.isSameEntry === "function") {
+                try {
+                  const isSame = await saveHandle.isSameEntry(handle);
+                  if (isSame) {
+                    setStatus("元ファイルと同じファイルへの抽出保存はできません。別の保存先またはファイル名を指定してください");
+                    return;
+                  }
+                  verifiedDistinct = true;
+                } catch (e) {
+                  verifiedDistinct = false;
+                }
+              }
+              if (!verifiedDistinct) {
+                const origName = (saveHandle && saveHandle.name) || saveName || "";
+                if (origName && String(handle.name).toLowerCase() === String(origName).toLowerCase()) {
+                  setStatus("元ファイルと同名の抽出保存はできません。別のファイル名を指定してください");
+                  return;
+                }
+              }
+            }
             await _writeToHandle(handle, txt);
+            if (isFullSave) {
+              if (saveTab) { saveTab.fileHandle = handle; saveTab.fileName = handle.name; }
+              if (state.tabs[state.activeTab] === saveTab) {
+                state.fileHandle = handle;
+                _applySavedName(handle.name);
+              }
+            }
             savedTo = handle.name;
+            savedSuccessfully = true;
           } catch (e) {
             if (e && e.name === "AbortError") { setStatus("保存をキャンセルしました"); return; }
             console.warn("保存ダイアログに失敗、ダウンロードにフォールバック:", e);
-            _downloadBlob(txt, state.fileName);
+            const fallbackName = !isFullSave ? makeExtractName(saveName) : saveName;
+            _downloadBlob(txt, fallbackName);
           }
         } else {
           // File System Access API 非対応。保存先フォルダは選べないため既定のダウンロード先へ。
-          if (askLocation) {
+          let downloadName = saveName;
+          if (!isFullSave) {
+            downloadName = makeExtractName(saveName);
+          } else if (askLocation) {
             // せめてファイル名は指定できるようにする（従来の「名前を付けて保存」）
             const cur = state.fileName || "data.tsv";
             const dot = cur.lastIndexOf(".");
@@ -8002,13 +8256,30 @@
             if (!nn) { setStatus("保存をキャンセルしました"); return; }
             if (!nn.includes(".")) nn += ext;
             _applySavedName(nn);
+            downloadName = nn;
           }
-          _downloadBlob(txt, state.fileName);
+          _downloadBlob(txt, downloadName);
+          savedSuccessfully = true;
         }
 
-        markClean();
+        // 抽出保存では非表示行の編集がファイルに入らない。上書き失敗時の
+        // ダウンロードも元ファイルを更新していないため、編集状態を維持する。
+        if (savedSuccessfully && isFullSave && saveTab) {
+          saveTab._rawText = restoreText;
+          saveTab.originalRowCount = savedRows;
+          // 保存中の編集を保存済みにしない。他タブの状態にも触れない。
+          if (stillCurrent()) {
+            saveTab._placeholderRow = placeholderRow;
+            markClean();
+          } else {
+            saveTab.dirty = true;
+          }
+        } else if (savedSuccessfully && !isFullSave) {
+          if (saveTab) saveTab.dirty = true;
+          if (state.tabs[state.activeTab] === saveTab) markDirty();
+        }
         const rowNote = isFullSave && savedRows !== state.originalRowCount ? `（元 ${state.originalRowCount}行→保存 ${savedRows}行）` : "";
-        if (isFullSave) state.originalRowCount = savedRows; // 全行保存時のみ次回の基準を更新（フィルター保存では基準を保つ）
+        if (savedSuccessfully && isFullSave && state.tabs[state.activeTab] === saveTab) state.originalRowCount = savedRows;
         const locNote = savedTo ? ` → ${savedTo}` : "";
         const scopeNote = saveAllRows ? "・フィルター無視" : "";
         // 元データとの差分はダイアログで見せた後も、ステータスに残して後から確認できるようにする
@@ -8017,7 +8288,10 @@
               ? `｜元データから 追加${saveDiff.added}/削除${saveDiff.removed}/変更${saveDiff.changed}`
               : "｜元データから変更なし")
           : "";
-        setStatus(`保存しました（${savedRows}行${scopeNote}${virtualNote}）${locNote}${rowNote}${diffNote}`);
+        const resultNote = !savedSuccessfully ? `${isFullSave ? "元ファイル" : "抽出先"}への保存に失敗したため、ダウンロードしました。編集状態は保持しています` :
+          !isFullSave ? "表示中の行を別ファイルに保存しました。元ファイルと編集状態は保持しています" :
+          `保存しました（${savedRows}行${scopeNote}${virtualNote}）`;
+        setStatus(`${resultNote}${locNote}${rowNote}${diffNote}`);
       }
 
       async function saveFile() {
@@ -11218,7 +11492,7 @@
       // クォート外の改行で行を区切る。parseData / parseDelimited の両方から使われる。
       function parseQuotedRows(text, delim) {
         const rows = [];
-        let row = [], cur = "", inQuote = false;
+        let row = [], cur = "", inQuote = false, fieldStarted = false;
         for (let i = 0; i < text.length; i++) {
           const c = text[i], next = text[i + 1];
           if (inQuote) {
@@ -11227,15 +11501,15 @@
             else if (c === '\r') { cur += '\n'; if (next === '\n') i++; }
             else cur += c;
           } else {
-            if (c === '"') inQuote = true;
-            else if (c === delim) { row.push(cur); cur = ""; }
+            if (c === '"' && !fieldStarted) { inQuote = true; fieldStarted = true; }
+            else if (c === delim) { row.push(cur); cur = ""; fieldStarted = false; }
             else if (c === "\r" || c === "\n") {
               if (c === "\r" && next === "\n") i++;
-              row.push(cur); rows.push(row); row = []; cur = "";
-            } else cur += c;
+              row.push(cur); rows.push(row); row = []; cur = ""; fieldStarted = false;
+            } else { cur += c; fieldStarted = true; }
           }
         }
-        if (cur || row.length) { row.push(cur); rows.push(row); }
+        if (fieldStarted || row.length) { row.push(cur); rows.push(row); }
         return rows;
       }
 
@@ -11259,7 +11533,7 @@
             } else if (c === '"') inQuote = false;
             else cur += c;
           } else {
-            if (c === '"') inQuote = true;
+            if (c === '"' && cur === "") inQuote = true;
             else if (c === delim) {
               fields.push(cur);
               cur = "";
@@ -12214,7 +12488,8 @@
         state.delimiter = "\t";
         state.headerMode = "firstRow";
         state.encoding = "utf8";
-        state.originalRowCount = state.data.length;
+        state._placeholderRow = true;
+        state.originalRowCount = 0;
         const tab = {
           fileName: state.fileName,
           headers: [...state.headers],
@@ -12229,6 +12504,7 @@
           dirty: false,
           cellColors: {},
           _isBlankSheet: true,
+          _placeholderRow: true,
           originalRowCount: state.originalRowCount,
         };
         state.tabs.push(tab);
@@ -12581,6 +12857,7 @@
       function cloneState() {
         return {
           d: state.data.map((r) => [...r]),
+          placeholderRow: !!state._placeholderRow,
           h: [...state.headers],
           sortCol: state.sortCol,
           sortAsc: state.sortAsc,
@@ -12603,6 +12880,7 @@
       }
       function restoreState(s) {
         state.data = s.d;
+        state._placeholderRow = !!s.placeholderRow;
         state.headers = s.h;
         state.sortCol = s.sortCol;
         state.sortAsc = s.sortAsc;
@@ -14802,6 +15080,22 @@
         if (!h._ugMxSid) h._ugMxSid = "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
         return h._ugMxSid;
       }
+      // 出力前検証用の元全件データスナップショット（2026-10-15追加確定: 全件欠落・誤設定の出力防止）
+      function _ugMxEditInitSnapshot() {
+        const h = _ugMxEditHolder();
+        const sid = _ugMxEditSid();
+        if (!h._ugMxSnapshot || h._ugMxSnapshot.sid !== sid) {
+          h._ugMxSnapshot = {
+            sid: sid,
+            headers: (state.headers || []).slice(),
+            rows: (state.data || []).map((r) => r.slice()),
+            editedRows: new Set(),
+            addedCount: 0,
+            deletedCount: 0,
+          };
+        }
+        return h._ugMxSnapshot;
+      }
       // ポップアップとのやり取りは postMessage（file:// で開いたときは blob のポップアップが別オリジン扱いになり、
       // window.opener の関数を直接呼べないため）。受け付けるのは、このアプリが開いた価格チェック表のウィンドウからだけ。
       const _ugMxEditWins = new Set();
@@ -14862,7 +15156,7 @@
         if (chk.advNote) notes.push(chk.advNote === chk.dayNote ? chk.advNote : "前売: " + chk.advNote);
         if (chk.dayNote && chk.dayNote !== chk.advNote) notes.push("当日: " + chk.dayNote);
         return {
-          fp: ugEditRowFp(row), route: v(row, c.route), adv: cur.adv, day: cur.day, start: v(row, c.start), end: v(row, c.end),
+          fp: ugEditRowFp(row), cond: ugEditCondOf(row, c, v), route: v(row, c.route), adv: cur.adv, day: cur.day, start: v(row, c.start), end: v(row, c.end),
           status: chk.status, problems: chk.problems || [], notes: chk.notes || [], note: notes.join(" / "),
           expected: chk.expected, expectedDay: chk.expectedDay, advNg: !!chk.advNg, dayNg: !!chk.dayNg,
           srcAdv: chk.srcAdv, srcDay: chk.srcDay, dstAdv: chk.dstAdv, dstDay: chk.dstDay,
@@ -14945,14 +15239,34 @@
         if ([c.kbn, c.ugFlag, c.seat, c.age, c.ugSeat, c.ugAge, c.adv, c.day, c.start, c.end].some((i) => i === -1)) {
           return { ok: false, error: "経路価格スケジュール（BO-F-21030）形式の列がそろっていません。" };
         }
-        if (req.op === "hello") return { ok: true };
+        if (req.op === "hello") {
+          _ugMxEditInitSnapshot();
+          return { ok: true };
+        }
         if (req.op === "undo") {
           if (!state.undoStack.length) return { ok: false, error: "元に戻せる操作がありません。" };
           undo();
           setStatus("元に戻しました（価格チェック表の編集モードから）");
           return { ok: true };
         }
+        const ctx = _ugMxEditCtx(req.cutoff);
         if (req.op === "export") {
+          // 出力前に全件検証（2026-10-15追加確定: 全件欠落・誤設定の出力防止）
+          const snap = _ugMxEditInitSnapshot();
+          const valRes = ugEditValidateExport(state.headers, state.data, c, v, ctx.validate, snap);
+          // req.force: チェック側のロジック漏れで正しいデータが止まったときの逃げ道（2026-10-15 SHUN指示）。
+          // 確認ダイアログでエラー一覧を見て同意した場合だけ送られ、出力確認画面とステータスに無視した件数を残す。
+          if (!valRes.ok && !req.force) {
+            return {
+              ok: false,
+              blocked: true,
+              error: "出力前チェックで確定エラーが検出されたため、TSV出力を停止しました。",
+              errors: valRes.errors,
+              warnings: valRes.warnings
+            };
+          }
+          const forcedErrors = valRes.ok ? [] : valRes.errors;
+          if (forcedErrors.length) setStatus(`⚠ 出力前チェックのエラー ${forcedErrors.length} 件を無視して修正済みTSVを出力します`);
           // 既存の保存と同じ組み立て（buildFileContent: ヘッダー＋全行・元の区切り/改行・仮想列は除外、BOMは開いたファイルどおり）。
           // システムは全件入れ替え方式なので、フィルターに関係なく全件を出す。
           const bom = state.encoding === "utf8bom" ? "﻿" : "";
@@ -14960,7 +15274,8 @@
           let diff;
           try { diff = buildSaveDiff({ allRows: true }); } catch (e) { diff = { available: false, reason: "差分を算出できませんでした: " + e.message }; }
           return { ok: true, text, fileName: state.fileName || "data.tsv", rows: state.data.length, encoding: state.encoding, newline: state.newline,
-            diff: { available: !!diff.available, reason: diff.reason || "", added: diff.added || 0, removed: diff.removed || 0, changed: diff.changed || 0, dupKeys: diff.dupKeys || 0 } };
+            diff: { available: !!diff.available, reason: diff.reason || "", added: diff.added || 0, removed: diff.removed || 0, changed: diff.changed || 0, dupKeys: diff.dupKeys || 0 },
+            warnings: valRes.warnings, forcedErrors };
         }
         if (req.op === "exported") {
           // 保存（ダウンロード保存）と同じく未保存表示を消し、次回の行数比較の基準を更新する
@@ -14969,7 +15284,6 @@
           setStatus(`価格チェック表から修正済みTSVを出力しました（${state.data.length}行）→ ${req.fileName || ""}`);
           return { ok: true };
         }
-        const ctx = _ugMxEditCtx(req.cutoff);
         if (req.op === "cells") {
           const cells = [];
           for (const it of req.items || []) {
@@ -14990,10 +15304,23 @@
           const ri = findByFp();
           if (ri == null) return stale;
           const next = ugEditApplyValues(state.data[ri], c, inp.values);
-          const cols = [c.adv, c.day, c.start, c.end].filter((i) => String(state.data[ri][i] ?? "") !== String(next[i] ?? ""));
+          // 販売経路変更によるキー衝突チェック
+          if (c.route >= 0 && inp.values.route && inp.values.route !== v(state.data[ri], c.route)) {
+            const sameRouteExisting = ugEditFindRows(state.data, c, v, spec).find((otherIdx) => {
+              if (otherIdx === ri) return false;
+              const other = state.data[otherIdx];
+              return v(other, c.route) === inp.values.route && v(other, c.start) === next[c.start] && v(other, c.end) === next[c.end];
+            });
+            if (sameRouteExisting != null) {
+              return { ok: false, inputErrors: { route: "同じ販売経路・販売期間のUG行が既に存在します" }, error: "販売経路の変更により既存行と重複します。" };
+            }
+          }
+          const cols = [c.adv, c.day, c.start, c.end, c.route].filter((i) => i != null && i >= 0 && String(state.data[ri][i] ?? "") !== String(next[i] ?? ""));
           if (cols.length) {
             saveUndo();
             for (const i of cols) safeSet(ri, i, next[i]);
+            const snap = _ugMxEditHolder()._ugMxSnapshot;
+            if (snap && snap.editedRows) snap.editedRows.add(ri);
             _ugMxEditAfterChange(`価格チェック表からUG行を更新しました（${ri + 1}行目: ${cols.map((i) => state.headers[i]).join("・")}）`, false);
           }
           return Object.assign(_ugMxEditCellPayload(ctx, req, true), { changed: cols.length });
@@ -15003,6 +15330,8 @@
           if (ri == null) return stale;
           saveUndo();
           _ugMxEditDeleteRow(ri);
+          const snap = _ugMxEditHolder()._ugMxSnapshot;
+          if (snap) snap.deletedCount = (snap.deletedCount || 0) + 1;
           _ugMxEditAfterChange(`価格チェック表からUG行を削除しました（元の${ri + 1}行目）`, true);
           return Object.assign(_ugMxEditCellPayload(ctx, req, true), { deleted: 1 });
         }
@@ -15017,6 +15346,8 @@
             state.data.push(row);
             markForceVisible(state.data.length - 1, 1);
           }
+          const snap = _ugMxEditHolder()._ugMxSnapshot;
+          if (snap) snap.addedCount = (snap.addedCount || 0) + plan.rows.length;
           _ugMxEditAfterChange(`価格チェック表からUG行を${plan.rows.length}行追加しました（末尾）`, true);
           return Object.assign(_ugMxEditCellPayload(ctx, req, true), { added: plan.rows.length });
         }
@@ -15049,9 +15380,12 @@
         /* アプリ本体（window.opener）とは postMessage でやり取りする（ローカルファイルで開いたときも別オリジン扱いで止まらないように）。戻りは Promise */
         var seq = 0, waiting = {}, busy = 0;
         var NO_OPENER = "アプリ本体（この表を出力した tsv-editor の画面）につながっていません。アプリを閉じた・再読み込みした、またはHTML保存したファイルを開いた場合は、アプリから価格チェック表を出力し直してください。";
+        /* 通信相手: 別ウィンドウで開いたときは開いた元（window.opener）、アプリ内の枠（GAS版）で開いたときは親（window.parent）。
+           GAS版では Google 側のページ設定でポップアップと元画面のつながりが切れるため、アプリ内の枠で開く（2026-10-15） */
+        function host() { return window.opener || (window.parent !== window ? window.parent : null); }
         window.addEventListener("message", function (e) {
           var d = e.data;
-          if (!d || d.type !== "ugMxEditRes" || e.source !== window.opener || !waiting[d.id]) return;
+          if (!d || d.type !== "ugMxEditRes" || e.source !== host() || !waiting[d.id]) return;
           var cb = waiting[d.id];
           delete waiting[d.id];
           var res;
@@ -15064,7 +15398,7 @@
         }
         function api(op, data) {
           return new Promise(function (resolve) {
-            var o = window.opener;
+            var o = host();
             var closed = true;
             try { closed = !o || o.closed; } catch (e) { closed = true; }
             if (closed) { resolve({ ok: false, noOpener: true, error: NO_OPENER }); return; }
@@ -15158,12 +15492,16 @@
           }
           if (res.rows && res.rows.length) {
             res.rows.forEach(function (r, i) {
-              h += "<div class=\"mxe-row\" data-i=\"" + i + "\"><div class=\"mxe-rowhead\">" + (res.rows.length > 1 ? "UG行 " + (i + 1) + "/" + res.rows.length : "UG行") + "　" + stBadge(r.status) + (r.route ? " <span class=\"mxe-route\">" + esc(r.route) + "</span>" : "") + "</div>";
+              var routeBadge = r.route ? " <span class=\"mxe-route\">" + esc(r.route) + "</span>" : "";
+              var condBadge = r.cond ? " <span class=\"mxe-cond-tag\" style=\"font-size:10px;color:#475569;background:#f1f5f9;padding:1px 4px;border-radius:3px\">" + esc(r.cond) + "</span>" : "";
+              var spanBadge = (r.start && r.end) ? " <span style=\"font-size:10px;color:#64748b\">(" + esc(r.start) + "〜" + esc(r.end) + ")</span>" : "";
+              h += "<div class=\"mxe-row\" data-i=\"" + i + "\"><div class=\"mxe-rowhead\">" + (res.rows.length > 1 ? "UG行 " + (i + 1) + "/" + res.rows.length : "UG行") + "　" + stBadge(r.status) + routeBadge + condBadge + spanBadge + "</div>";
               var probs = (r.problems || []).slice();
               if (r.advNg) probs.push("前売差額が期待（" + yen(r.expected) + "）と違います");
               if (r.dayNg) probs.push("当日差額が期待（" + yen(r.expectedDay) + "）と違います");
               if (probs.length) h += "<ul class=\"mxe-probs\">" + probs.map(function (p) { return "<li>" + esc(p) + "</li>"; }).join("") + "</ul>";
-              h += "<div class=\"mxe-grid\">" + field("adv", "前売差額", r.adv, r.advNg) + field("day", "当日差額", r.day, r.dayNg)
+              h += "<div class=\"mxe-grid\">" + field("route", "販売経路", r.route, false)
+                + field("adv", "前売差額", r.adv, r.advNg) + field("day", "当日差額", r.day, r.dayNg)
                 + field("start", "販売開始", r.start, false) + field("end", "販売終了", r.end, false) + "</div>";
               h += "<div class=\"mxe-btns\"><button type=\"button\" data-act=\"set\" data-i=\"" + i + "\" title=\"期待差額と正しい販売期間を入力欄に入れます（まだ反映はしません）\">期待値をセット</button>"
                 + "<button type=\"button\" class=\"mxe-primary\" data-act=\"apply\" data-i=\"" + i + "\">反映</button>"
@@ -15269,7 +15607,14 @@
             if (name === "apply") {
               var req = reqOf(td, spec);
               req.fp = r.fp;
-              req.values = { adv: inp("adv").value, day: inp("day").value, start: inp("start").value, end: inp("end").value };
+              var routeInp = rowEl.querySelector("input[name=\"route\"]");
+              req.values = {
+                route: routeInp ? routeInp.value : r.route,
+                adv: inp("adv").value,
+                day: inp("day").value,
+                start: inp("start").value,
+                end: inp("end").value
+              };
               var res = await api("update", req);
               rowEl.querySelectorAll(".mxe-ferr").forEach(function (em) { em.textContent = ""; });
               if (res.inputErrors) {
@@ -15346,10 +15691,44 @@
           await refreshTouched();
           say("元に戻しました（アプリ本体の直前の操作を1つ戻しました）", "ok");
         });
-        document.getElementById("mxe-export").addEventListener("click", async function () {
+        document.getElementById("mxe-export").addEventListener("click", function () { runExport(false); });
+        /* force=true: 出力前チェックのエラーを確認のうえ無視して出力（チェック側のロジック漏れで作業が止まらないように） */
+        async function runExport(force) {
           if (busy) return;
-          var res = await api("export");
-          if (!res.ok) { say(res.error, "err"); if (res.noOpener) disable(res.error); return; }
+          var res = await api("export", force ? { force: true } : {});
+          if (!res.ok) {
+            /* 確定エラーによる出力ブロック（2026-10-15追加確定: 全件欠落・誤設定の出力防止） */
+            if (res.blocked && res.errors && res.errors.length) {
+              var old = document.getElementById("mxe-save-dlg");
+              if (old) old.remove();
+              var errLines = res.errors.map(function (e) {
+                return "・" + esc(e.message);
+              }).join("\n");
+              var warnLines = (res.warnings && res.warnings.length) ? "\n\n【未検証・警告】\n" + res.warnings.map(function (w) { return "△ " + esc(w.message); }).join("\n") : "";
+              var dlg = document.createElement("div");
+              dlg.id = "mxe-save-dlg";
+              dlg.setAttribute("style", "position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center");
+              dlg.innerHTML = "<div style=\"background:#fff;border-radius:8px;padding:18px 22px;max-width:680px;width:90vw;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 8px 30px rgba(0,0,0,.3);font-size:13px;line-height:1.6;color:#1a1a1a\">"
+                + "<div style=\"color:#dc2626;font-weight:700;font-size:15px;margin-bottom:8px;display:flex;align-items:center;gap:6px\">⛔ 修正済みTSVの出力をブロックしました</div>"
+                + "<div style=\"color:#4b5563;font-size:12px;margin-bottom:12px\">全件データ検証で確定エラーが " + res.errors.length + " 件検出されました。原則は一覧を確認し、マトリクス上のセルから修正してから出力してください。チェック側の誤判定と確認できた場合だけ、下のチェックを入れて無視して出力できます。</div>"
+                + "<div style=\"flex:1;overflow-y:auto;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:12px;white-space:pre-wrap;color:#991b1b\">" + errLines + (warnLines ? "<span style=\"color:#854d0e\">" + esc(warnLines) + "</span>" : "") + "</div>"
+                + "<label style=\"display:flex;align-items:flex-start;gap:6px;margin-top:12px;font-size:12px;color:#7c2d12;cursor:pointer\"><input type=\"checkbox\" id=\"mxe-force-ok\" style=\"margin-top:3px\">上のエラーはチェック側の誤判定で、このまま出力してよいことを確認しました（無視した件数は出力確認画面とアプリのステータスに残ります）</label>"
+                + "<div style=\"display:flex;gap:8px;justify-content:flex-end;margin-top:14px\">"
+                + "<button type=\"button\" id=\"mxe-force-go\" disabled style=\"padding:7px 14px;border:1px solid #fca5a5;background:#fff;color:#b91c1c;border-radius:6px;cursor:pointer;font-size:12px\">エラーを無視して出力</button>"
+                + "<button type=\"button\" id=\"mxe-save-cancel\" style=\"padding:7px 18px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600\">閉じて編集を続ける</button>"
+                + "</div></div>";
+              document.body.appendChild(dlg);
+              document.getElementById("mxe-save-cancel").addEventListener("click", function () { dlg.remove(); say("エラーを修正してから再度出力してください", "err"); });
+              var forceOk = document.getElementById("mxe-force-ok"), forceGo = document.getElementById("mxe-force-go");
+              forceOk.addEventListener("change", function () { forceGo.disabled = !forceOk.checked; });
+              forceGo.addEventListener("click", function () { if (!forceOk.checked) return; dlg.remove(); runExport(true); });
+              say("出力前チェックで " + res.errors.length + " 件のエラーが検出されたため出力を停止しました", "err");
+              return;
+            }
+            say(res.error, "err");
+            if (res.noOpener) disable(res.error);
+            return;
+          }
           var cnt = updateBadges() || { ng: 0, miss: 0 };
           var base = res.fileName || "data.tsv", dot = base.lastIndexOf(".");
           var name = (dot > 0 ? base.slice(0, dot) : base) + "_UG修正済み" + (dot > 0 ? base.slice(dot) : ".tsv");
@@ -15361,20 +15740,42 @@
           else lines.push("開いた時点のファイルとの差分: " + (d.reason || "算出できません"));
           if (d.dupKeys) lines.push("※ 突合キーが重複している行が " + d.dupKeys + " 件あります（差分件数は目安）");
           lines.push("このマトリクス上の残り: NG " + cnt.ng + " 件・登録漏れ?候補 " + cnt.miss + " 件");
-          lines.push("", "ファイル名: " + name, "", "出力しますか？");
-          if (!window.confirm(lines.join("\n"))) return;
+          if (res.warnings && res.warnings.length) {
+            lines.push("※ 価格未検証・警告が " + res.warnings.length + " 件あります（通常行不足等）");
+          }
+          if (res.forcedErrors && res.forcedErrors.length) {
+            lines.push("", "⚠ 出力前チェックのエラー " + res.forcedErrors.length + " 件を無視して出力します:");
+            res.forcedErrors.slice(0, 10).forEach(function (e) { lines.push("  ・" + e.message); });
+            if (res.forcedErrors.length > 10) lines.push("  …ほか " + (res.forcedErrors.length - 10) + " 件");
+          }
+          lines.push("", "ファイル名: " + name, "", "「📥 保存する」を押すと保存します。");
+          /* 保存は確認画面の「保存する」リンクを押した操作そのもので行う（GAS版のアプリ内の枠など、
+             ユーザー操作の外で始めたダウンロードをブラウザが止める環境があるため。confirm 後の自動クリックはやめた） */
+          var old = document.getElementById("mxe-save-dlg");
+          if (old) old.remove();
           var blob = new Blob([res.text], { type: "text/tab-separated-values;charset=utf-8" });
-          var a = document.createElement("a");
-          a.href = URL.createObjectURL(blob);
-          a.download = name;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
-          var r2 = await api("exported", { fileName: name });
-          if (r2.ok) syncedVersion = r2.version;
-          say("出力しました: " + name + "（" + res.rows + "行）", "ok");
-        });
+          var url = URL.createObjectURL(blob);
+          var dlg = document.createElement("div");
+          dlg.id = "mxe-save-dlg";
+          dlg.setAttribute("style", "position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center");
+          dlg.innerHTML = "<div style=\"background:#fff;border-radius:8px;padding:16px 18px;max-width:600px;box-shadow:0 8px 30px rgba(0,0,0,.25);font-size:13px;line-height:1.6;color:#1a1a1a\">"
+            + "<div style=\"white-space:pre-wrap\">" + esc(lines.join("\n")) + "</div>"
+            + "<div style=\"display:flex;gap:8px;justify-content:flex-end;margin-top:14px\">"
+            + "<button type=\"button\" id=\"mxe-save-cancel\" style=\"padding:6px 14px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;cursor:pointer;font-size:13px\">キャンセル</button>"
+            + "<a id=\"mxe-save-go\" href=\"" + url + "\" download=\"" + esc(name) + "\" style=\"padding:6px 16px;background:#217346;color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:700\">📥 保存する</a>"
+            + "</div></div>";
+          document.body.appendChild(dlg);
+          document.getElementById("mxe-save-cancel").addEventListener("click", function () { dlg.remove(); URL.revokeObjectURL(url); say("出力をキャンセルしました", "info"); });
+          document.getElementById("mxe-save-go").addEventListener("click", function () {
+            setTimeout(async function () {
+              dlg.remove();
+              URL.revokeObjectURL(url);
+              var r2 = await api("exported", { fileName: name });
+              if (r2.ok) syncedVersion = r2.version;
+              say("出力しました: " + name + "（" + res.rows + "行）" + (res.forcedErrors && res.forcedErrors.length ? "・チェックのエラー " + res.forcedErrors.length + " 件を無視" : ""), "ok");
+            }, 1500);
+          });
+        }
         /* アプリ側で元に戻す・編集をしたら、このページで編集したセルを描き直す */
         window.addEventListener("focus", async function () {
           if (!on || busy) return;
@@ -15383,6 +15784,42 @@
           await refreshTouched();
           say("アプリ側でデータが変わったため、このページで編集したセルを再判定しました。通常行など他の箇所を直した場合は、価格チェック表を出力し直してください。", "info");
         });
+      }
+
+      // 価格チェック表をアプリ内の全画面の枠（同一オリジンの iframe）で開く（GAS版用）。
+      // 編集モードは枠の親（このアプリ）と postMessage でやり取りするので、ポップアップのつながりに依存しない。
+      // 表示・印刷用には「別タブで開く」も残す（別タブでは編集モードは使えない場合がある）。
+      // 枠の中身は srcdoc で渡す（サンドボックス内の iframe では Blob URL の読み込みが拒否されエラーページになるため）。
+      // url（Blob URL）は「別タブで開く」用。
+      function _openPriceCheckInApp(html, url, names, withEdit) {
+        const prev = document.getElementById("pc-inapp");
+        if (prev) prev.remove();
+        const ov = document.createElement("div");
+        ov.id = "pc-inapp";
+        ov.style.cssText = "position:fixed;inset:0;z-index:3000;background:#fff;display:flex;flex-direction:column;";
+        const bar = document.createElement("div");
+        bar.style.cssText = "display:flex;align-items:center;gap:10px;padding:6px 12px;background:#217346;color:#fff;font-size:13px;flex:none;";
+        bar.innerHTML = `<b>価格チェック表</b><span style="opacity:.9">${escHtml(names)}${withEdit ? "　｜　編集モードの変更はアプリのデータに反映されます" : ""}</span><span style="flex:1"></span>`;
+        const btnCss = "padding:4px 12px;border:1px solid rgba(255,255,255,.7);background:transparent;color:#fff;border-radius:5px;cursor:pointer;font-size:12px;";
+        const popBtn = document.createElement("button");
+        popBtn.type = "button";
+        popBtn.textContent = "別タブで開く（表示・印刷用）";
+        popBtn.style.cssText = btnCss;
+        popBtn.onclick = () => { window.open(url, "_blank"); };
+        const closeBtn = document.createElement("button");
+        closeBtn.type = "button";
+        closeBtn.textContent = "閉じる ✕";
+        closeBtn.style.cssText = btnCss + "font-weight:700;";
+        closeBtn.onclick = () => { ov.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); };
+        bar.append(popBtn, closeBtn);
+        const fr = document.createElement("iframe");
+        fr.title = "価格チェック表";
+        fr.style.cssText = "flex:1;width:100%;border:0;";
+        fr.srcdoc = html;
+        ov.append(bar, fr);
+        document.body.appendChild(ov);
+        if (withEdit) _ugMxEditRegisterWin(fr.contentWindow);
+        setStatus(`価格チェックHTMLをアプリ内に表示しました（${names}）`);
       }
 
       function _buildPriceCheckHtml(rowIndices, isFiltered, opt, dayCutoff) {
@@ -15855,6 +16292,13 @@ ${editBar}${mxBody}` };
         const blob = new Blob([html], { type: "text/html;charset=utf-8" });
         const url = URL.createObjectURL(blob);
         // noopener指定だとBlob URLを新規タブが読み込めず、PDF印刷保存が空（0KB）になる不具合があるため外す
+        // GAS版では Google 側のページ設定でポップアップと元画面のつながり（window.opener）が切れ、
+        // 券種別マトリクスの編集モードが「使えません」になる（2026-10-15 SHUN報告）。GAS版はアプリ内の枠で開く。
+        if (hpIsGas()) {
+          _openPriceCheckInApp(html, url, names0(), !!sections.matrix);
+          return;
+        }
+        function names0() { return order.map(k => tabLabels[k]).join("・"); }
         const w = window.open(url, "_blank");
         if (sections.matrix) _ugMxEditRegisterWin(w); // 券種別マトリクスの編集モードの要求を、このウィンドウからだけ受け付ける
         setTimeout(() => URL.revokeObjectURL(url), 60000);
