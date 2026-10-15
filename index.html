@@ -15065,7 +15065,7 @@
         }
         function api(op, data) {
           return new Promise(function (resolve) {
-            var o = window.opener;
+            var o = host();
             var closed = true;
             try { closed = !o || o.closed; } catch (e) { closed = true; }
             if (closed) { resolve({ ok: false, noOpener: true, error: NO_OPENER }); return; }
@@ -15170,6 +15170,9 @@
                 + "<button type=\"button\" class=\"mxe-primary\" data-act=\"apply\" data-i=\"" + i + "\">反映</button>"
                 + "<button type=\"button\" class=\"mxe-danger\" data-act=\"del\" data-i=\"" + i + "\">この行を削除</button></div></div>";
             });
+        /* 通信相手: 別ウィンドウで開いたときは開いた元（window.opener）、アプリ内の枠（GAS版）で開いたときは親（window.parent）。
+           GAS版では Google 側のページ設定でポップアップと元画面のつながりが切れるため、アプリ内の枠で開く（2026-10-15） */
+        function host() { return window.opener || (window.parent !== window ? window.parent : null); }
           } else if (res.missing) {
             h += "<div class=\"mxe-miss\">UG登録がありません（登録漏れ候補）。期待差額と正しい販売期間でUG行を追加できます。列は同じ販売条件の既存UG行・元/先の通常行から引き継ぎます。</div>";
             if (res.plan && res.plan.length) {
@@ -15362,19 +15365,33 @@
           else lines.push("開いた時点のファイルとの差分: " + (d.reason || "算出できません"));
           if (d.dupKeys) lines.push("※ 突合キーが重複している行が " + d.dupKeys + " 件あります（差分件数は目安）");
           lines.push("このマトリクス上の残り: NG " + cnt.ng + " 件・登録漏れ?候補 " + cnt.miss + " 件");
-          lines.push("", "ファイル名: " + name, "", "出力しますか？");
-          if (!window.confirm(lines.join("\n"))) return;
+          lines.push("", "ファイル名: " + name, "", "「📥 保存する」を押すと保存します。");
+          /* 保存は確認画面の「保存する」リンクを押した操作そのもので行う（GAS版のアプリ内の枠など、
+             ユーザー操作の外で始めたダウンロードをブラウザが止める環境があるため。confirm 後の自動クリックはやめた） */
+          var old = document.getElementById("mxe-save-dlg");
+          if (old) old.remove();
           var blob = new Blob([res.text], { type: "text/tab-separated-values;charset=utf-8" });
-          var a = document.createElement("a");
-          a.href = URL.createObjectURL(blob);
-          a.download = name;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
-          var r2 = await api("exported", { fileName: name });
-          if (r2.ok) syncedVersion = r2.version;
-          say("出力しました: " + name + "（" + res.rows + "行）", "ok");
+          var url = URL.createObjectURL(blob);
+          var dlg = document.createElement("div");
+          dlg.id = "mxe-save-dlg";
+          dlg.setAttribute("style", "position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center");
+          dlg.innerHTML = "<div style=\"background:#fff;border-radius:8px;padding:16px 18px;max-width:600px;box-shadow:0 8px 30px rgba(0,0,0,.25);font-size:13px;line-height:1.6;color:#1a1a1a\">"
+            + "<div style=\"white-space:pre-wrap\">" + esc(lines.join("\n")) + "</div>"
+            + "<div style=\"display:flex;gap:8px;justify-content:flex-end;margin-top:14px\">"
+            + "<button type=\"button\" id=\"mxe-save-cancel\" style=\"padding:6px 14px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;cursor:pointer;font-size:13px\">キャンセル</button>"
+            + "<a id=\"mxe-save-go\" href=\"" + url + "\" download=\"" + esc(name) + "\" style=\"padding:6px 16px;background:#217346;color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:700\">📥 保存する</a>"
+            + "</div></div>";
+          document.body.appendChild(dlg);
+          document.getElementById("mxe-save-cancel").addEventListener("click", function () { dlg.remove(); URL.revokeObjectURL(url); say("出力をキャンセルしました", "info"); });
+          document.getElementById("mxe-save-go").addEventListener("click", function () {
+            setTimeout(async function () {
+              dlg.remove();
+              URL.revokeObjectURL(url);
+              var r2 = await api("exported", { fileName: name });
+              if (r2.ok) syncedVersion = r2.version;
+              say("出力しました: " + name + "（" + res.rows + "行）", "ok");
+            }, 1500);
+          });
         });
         /* アプリ側で元に戻す・編集をしたら、このページで編集したセルを描き直す */
         window.addEventListener("focus", async function () {
@@ -15506,6 +15523,42 @@
             const code = sample ? v(sample, c.seatCd) : "";
             const cat = seatCat(code, seat);
             const ages = m.ages.map(ageLabel).join("・");
+      // 価格チェック表をアプリ内の全画面の枠（同一オリジンの iframe）で開く（GAS版用）。
+      // 編集モードは枠の親（このアプリ）と postMessage でやり取りするので、ポップアップのつながりに依存しない。
+      // 表示・印刷用には「別タブで開く」も残す（別タブでは編集モードは使えない場合がある）。
+      // 枠の中身は srcdoc で渡す（サンドボックス内の iframe では Blob URL の読み込みが拒否されエラーページになるため）。
+      // url（Blob URL）は「別タブで開く」用。
+      function _openPriceCheckInApp(html, url, names, withEdit) {
+        const prev = document.getElementById("pc-inapp");
+        if (prev) prev.remove();
+        const ov = document.createElement("div");
+        ov.id = "pc-inapp";
+        ov.style.cssText = "position:fixed;inset:0;z-index:3000;background:#fff;display:flex;flex-direction:column;";
+        const bar = document.createElement("div");
+        bar.style.cssText = "display:flex;align-items:center;gap:10px;padding:6px 12px;background:#217346;color:#fff;font-size:13px;flex:none;";
+        bar.innerHTML = `<b>価格チェック表</b><span style="opacity:.9">${escHtml(names)}${withEdit ? "　｜　編集モードの変更はアプリのデータに反映されます" : ""}</span><span style="flex:1"></span>`;
+        const btnCss = "padding:4px 12px;border:1px solid rgba(255,255,255,.7);background:transparent;color:#fff;border-radius:5px;cursor:pointer;font-size:12px;";
+        const popBtn = document.createElement("button");
+        popBtn.type = "button";
+        popBtn.textContent = "別タブで開く（表示・印刷用）";
+        popBtn.style.cssText = btnCss;
+        popBtn.onclick = () => { window.open(url, "_blank"); };
+        const closeBtn = document.createElement("button");
+        closeBtn.type = "button";
+        closeBtn.textContent = "閉じる ✕";
+        closeBtn.style.cssText = btnCss + "font-weight:700;";
+        closeBtn.onclick = () => { ov.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); };
+        bar.append(popBtn, closeBtn);
+        const fr = document.createElement("iframe");
+        fr.title = "価格チェック表";
+        fr.style.cssText = "flex:1;width:100%;border:0;";
+        fr.srcdoc = html;
+        ov.append(bar, fr);
+        document.body.appendChild(ov);
+        if (withEdit) _ugMxEditRegisterWin(fr.contentWindow);
+        setStatus(`価格チェックHTMLをアプリ内に表示しました（${names}）`);
+      }
+
             const mid = encodeURIComponent(["PM", seat, m.cond, m.ages.join(",")].join("|"));
             return `<tr data-mid="${mid}" data-cond="${escHtml(m.cond)}" data-seat="${escHtml(seat)}" data-chk="1" class="miss-row"><td class="mk-cell" title="クリックでマーク">✔</td>`
               + `<td data-v="${escHtml(seatCodeSortKey(seat, code))}" style="background:${seatColor(seat)};font-weight:600" title="${escHtml(seat)}">${escHtml(seatLabel(seat, code))}</td>`
@@ -15975,6 +16028,13 @@ td.mxc .lbl { font-size: 9px; font-weight: 400; color: #78716c; margin-right: 2p
 td.mxc .val { font-weight: 700; }
 td.mxc .per { font-size: 9px; margin-top: 1px; }
 /* 基準と違う販売期間は情報表示なので紫（エラー・警告の色と分ける） */
+        // GAS版では Google 側のページ設定でポップアップと元画面のつながり（window.opener）が切れ、
+        // 券種別マトリクスの編集モードが「使えません」になる（2026-10-15 SHUN報告）。GAS版はアプリ内の枠で開く。
+        if (hpIsGas()) {
+          _openPriceCheckInApp(html, url, names0(), !!sections.matrix);
+          return;
+        }
+        function names0() { return order.map(k => tabLabels[k]).join("・"); }
 td.mxc .per-diff { display: inline-block; font-size: 8.5px; font-weight: 600; color: #5b21b6; background: #ede9fe; border: 1px solid #ddd6fe; border-radius: 3px; padding: 0 3px; line-height: 1.25; }
 td.mxc .l-ng { color: #dc2626; }
 td.mxc .l-ng .lbl { color: #dc2626; }
