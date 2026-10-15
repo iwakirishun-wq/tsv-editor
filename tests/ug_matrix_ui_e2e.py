@@ -335,6 +335,19 @@ def main():
             assert sess["hadSnap"] and sess["changed"] and sess["staleRejected"] and sess["fresh"] and sess["freshRows"] == sess["rows"], f"出力し直し時のセッションが不正: {sess}"
             print("[OK] Re-outputting the price check starts a fresh edit session")
 
+            # 13. 基準がまだ無い（開いた時の hello が失敗した）状態で編集モードの「元に戻す」を押しても、
+            #     価格チェック表を開く前の本体の操作は戻さない（Gemini4指摘 4回目）
+            guard = page.evaluate("""() => {
+                const h = state.tabs[state.activeTab] || state;
+                saveUndo();                       // 開く前の本体操作に相当する履歴
+                const depth = state.undoStack.length;
+                const sid = _ugMxEditNewSid();    // 出力し直し直後で、まだ hello していない
+                const res = _ugMxEditHandle({ op: "undo", sid });
+                return { ok: res.ok, depthKept: state.undoStack.length === depth, snapNull: h._ugMxSnapshot === null };
+            }""")
+            assert guard == {"ok": False, "depthKept": True, "snapNull": True}, f"基準なしの元に戻すが通っています: {guard}"
+            print("[OK] Matrix undo is refused before the first snapshot")
+
             print("[SUCCESS] All UI E2E test assertions passed successfully!")
 
 if __name__ == "__main__":

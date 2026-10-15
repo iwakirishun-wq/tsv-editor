@@ -39,13 +39,13 @@
     {
       "id": "large-data-perf",
       "label": "大量行データでの表示・出力パフォーマンス",
-      "lastChecked": "2026-10-15T12:56:59.555Z",
+      "lastChecked": "2026-10-15T14:00:45.787Z",
       "lastResult": "ok"
     },
     {
       "id": "real-data-optional",
       "label": "MAIN内の実マスターが見つかった場合の参考チェック",
-      "lastChecked": "2026-10-15T12:56:59.555Z",
+      "lastChecked": "2026-10-15T14:00:45.787Z",
       "lastResult": "ok"
     }
   ],
@@ -1032,6 +1032,14 @@
       "focusAreas": [
         "sort-filter",
         "master-unlinked"
+      ]
+    },
+    {
+      "date": "2026-10-15",
+      "status": "ok",
+      "focusAreas": [
+        "large-data-perf",
+        "real-data-optional"
       ]
     }
   ]

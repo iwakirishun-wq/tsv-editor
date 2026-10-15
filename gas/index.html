@@ -15275,7 +15275,8 @@
           // 価格チェック表を開く前の操作まで戻すと出力前チェックの基準とずれるので、ここからは戻さない（アプリ本体のCtrl+Zは従来どおり）
           const top = state.undoStack[state.undoStack.length - 1];
           const curSnap = _ugMxEditHolder()._ugMxSnapshot;
-          if (curSnap && !(top && top.ugMxCounts && top.ugMxCounts.snap === curSnap)) {
+          // 基準がまだ無い（開いた時の hello が失敗し、まだ変更していない）なら、開いてからの操作は0件（Gemini4指摘 4回目）
+          if (!curSnap || !(top && top.ugMxCounts && top.ugMxCounts.snap === curSnap)) {
             return { ok: false, error: "価格チェック表を開いてからの操作はもうありません（それより前の操作はアプリ本体で元に戻してください）。" };
           }
           undo();
