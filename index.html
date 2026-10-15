@@ -4299,13 +4299,16 @@
 
         // 3. スナップショットの未編集行（通常行など）が壊れていないか検証
         if (snapshot && snapshot.rows) {
-          const origFps = snapshot.rows.map((r) => ugEditRowFp(r));
-          const curFps = new Set(rows.map((r) => ugEditRowFp(r)));
+          // 同じ内容の通常行が複数あっても1行の欠落を見逃さないよう、出現回数で照合する
+          const curCount = new Map();
+          for (const r of rows) { if (!r) continue; const fp = ugEditRowFp(r); curCount.set(fp, (curCount.get(fp) || 0) + 1); }
           snapshot.rows.forEach((origRow, origIdx) => {
             const isOrigUg = ugEditIsUg(origRow, c, v);
             if (!isOrigUg) {
-              const fp = origFps[origIdx];
-              if (!curFps.has(fp)) {
+              const fp = ugEditRowFp(origRow);
+              const left = curCount.get(fp) || 0;
+              curCount.set(fp, left - 1);
+              if (left <= 0) {
                 errors.push({ rowIdx: -1, type: "normal_row_missing", message: `元データの通常行（${origIdx + 1}行目: ${v(origRow, c.seat)} / ${v(origRow, c.age)}）が消失または変更されています` });
               }
             }
@@ -12876,6 +12879,8 @@
             ? { indices: [...state.sejVirtualCols.indices], keys: [...state.sejVirtualCols.keys] }
             : null,
           markedCells: new Set(state.markedCells),
+          // 価格チェック表の編集モードの追加/削除件数（出力前チェックの行数照合用）。元に戻す/やり直しで一緒に戻す
+          ugMxCounts: _ugMxEditCountsGet(),
         };
       }
       function restoreState(s) {
@@ -12898,6 +12903,7 @@
           ? { indices: [...s.sejVirtualCols.indices], keys: [...s.sejVirtualCols.keys] }
           : null;
         if (s.markedCells) state.markedCells = new Set(s.markedCells);
+        _ugMxEditCountsSet(s.ugMxCounts);
         applyHeaderMapping();
         updateHeaderModeBtn();
       }
@@ -15080,6 +15086,19 @@
         if (!h._ugMxSid) h._ugMxSid = "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
         return h._ugMxSid;
       }
+      // 元に戻す履歴に載せる編集モードの件数。snap は同じ編集セッションかの照合に使う（参照比較）
+      function _ugMxEditCountsGet() {
+        const h = (state.tabs && state.activeTab >= 0 && state.tabs[state.activeTab]) || state;
+        const snap = h._ugMxSnapshot;
+        return snap ? { snap, added: snap.addedCount || 0, deleted: snap.deletedCount || 0 } : null;
+      }
+      function _ugMxEditCountsSet(counts) {
+        const h = (state.tabs && state.activeTab >= 0 && state.tabs[state.activeTab]) || state;
+        const snap = h._ugMxSnapshot;
+        if (!snap || !counts || counts.snap !== snap) return;
+        snap.addedCount = counts.added;
+        snap.deletedCount = counts.deleted;
+      }
       // 出力前検証用の元全件データスナップショット（2026-10-15追加確定: 全件欠落・誤設定の出力防止）
       function _ugMxEditInitSnapshot() {
         const h = _ugMxEditHolder();
@@ -15245,6 +15264,12 @@
         }
         if (req.op === "undo") {
           if (!state.undoStack.length) return { ok: false, error: "元に戻せる操作がありません。" };
+          // 価格チェック表を開く前の操作まで戻すと出力前チェックの基準とずれるので、ここからは戻さない（アプリ本体のCtrl+Zは従来どおり）
+          const top = state.undoStack[state.undoStack.length - 1];
+          const curSnap = _ugMxEditHolder()._ugMxSnapshot;
+          if (curSnap && !(top && top.ugMxCounts && top.ugMxCounts.snap === curSnap)) {
+            return { ok: false, error: "価格チェック表を開いてからの操作はもうありません（それより前の操作はアプリ本体で元に戻してください）。" };
+          }
           undo();
           setStatus("元に戻しました（価格チェック表の編集モードから）");
           return { ok: true };
@@ -15278,10 +15303,9 @@
             warnings: valRes.warnings, forcedErrors };
         }
         if (req.op === "exported") {
-          // 保存（ダウンロード保存）と同じく未保存表示を消し、次回の行数比較の基準を更新する
-          markClean();
-          state.originalRowCount = state.data.length;
-          setStatus(`価格チェック表から修正済みTSVを出力しました（${state.data.length}行）→ ${req.fileName || ""}`);
+          // 別名ファイルへの出力で、開いている元ファイルは保存していない。未保存表示は消さない
+          // （消すとタブ切替でデータが解放され、古い読込内容から復元されて編集が消える。Gemini4レビュー指摘 2026-10-15）
+          setStatus(`価格チェック表から修正済みTSVを出力しました（${state.data.length}行）→ ${req.fileName || ""}。開いている元ファイルは未保存のままです`);
           return { ok: true };
         }
         if (req.op === "cells") {
@@ -15304,15 +15328,18 @@
           const ri = findByFp();
           if (ri == null) return stale;
           const next = ugEditApplyValues(state.data[ri], c, inp.values);
-          // 販売経路変更によるキー衝突チェック
-          if (c.route >= 0 && inp.values.route && inp.values.route !== v(state.data[ri], c.route)) {
+          // 販売経路・販売期間の変更によるキー衝突チェック（期間だけ変えて同じセルの別行と重なる場合も含む）
+          const nextRoute = c.route >= 0 ? String(next[c.route] ?? "").trim() : "";
+          const keyChanged = c.route >= 0 && (nextRoute !== v(state.data[ri], c.route) ||
+            String(next[c.start] ?? "") !== v(state.data[ri], c.start) || String(next[c.end] ?? "") !== v(state.data[ri], c.end));
+          if (keyChanged) {
             const sameRouteExisting = ugEditFindRows(state.data, c, v, spec).find((otherIdx) => {
               if (otherIdx === ri) return false;
               const other = state.data[otherIdx];
-              return v(other, c.route) === inp.values.route && v(other, c.start) === next[c.start] && v(other, c.end) === next[c.end];
+              return v(other, c.route) === nextRoute && v(other, c.start) === String(next[c.start] ?? "") && v(other, c.end) === String(next[c.end] ?? "");
             });
             if (sameRouteExisting != null) {
-              return { ok: false, inputErrors: { route: "同じ販売経路・販売期間のUG行が既に存在します" }, error: "販売経路の変更により既存行と重複します。" };
+              return { ok: false, inputErrors: { route: "同じ販売経路・販売期間のUG行が既に存在します" }, error: "販売経路・販売期間の変更により同じセルの既存行と重複します。" };
             }
           }
           const cols = [c.adv, c.day, c.start, c.end, c.route].filter((i) => i != null && i >= 0 && String(state.data[ri][i] ?? "") !== String(next[i] ?? ""));

@@ -296,6 +296,13 @@ const seatMeta = () => ({ found: true, isReserved: true, isFree: false, stockTyp
   const snapNewDup = { headers: H.slice(), rows: fixedRows.map((r) => r.slice()), editedRows: new Set(), addedCount: 1, deletedCount: 0 };
   const r8 = L.ugEditValidateExport(H, newDup, c, v, valFixed, snapNewDup);
   ok(r8.errors.some((e) => e.type === "dup_key"), "全件検証: 編集で新たに生じた重複はブロック");
+
+  // 9. 同じ内容の通常行が2行あり、そのうち1行だけ消えて代わりにUG行が増えた（総行数は同じ）場合も欠落として止める（Gemini4指摘 2-3）
+  const twoParking = fixedRows.concat([parking, parking.slice()]);
+  const snapTwo = { headers: H.slice(), rows: twoParking.map((r) => r.slice()), editedRows: new Set(), addedCount: 1, deletedCount: 1 };
+  const lostOne = fixedRows.concat([parking.slice(), ugRow(A, C, 7000, 8000)]);
+  const r9 = L.ugEditValidateExport(H, lostOne, c, v, valFixed, snapTwo);
+  ok(r9.errors.some((e) => e.type === "normal_row_missing"), "全件検証: 同一内容の通常行が1行だけ消えても欠落として検出");
 }
 
 console.log(`${pass} passed, ${fail} failed`);

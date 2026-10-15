@@ -2,6 +2,7 @@
 ug_matrix_ui_e2e.py — 券種別マトリクスの販売経路編集・全件検証・TSV出力・再読込の実UI E2E回帰テスト
 実行: python tests/ug_matrix_ui_e2e.py
 """
+import time
 import os
 import sys
 import tempfile
@@ -75,6 +76,16 @@ def build_test_tsv():
         "西エリア自己UG", "メモ6"
     ]))
     return "\r\n".join(lines) + "\r\n"
+
+def wait_rows(page, n, timeout=5.0):
+    """state.data の行数が n になるまで待つ（ページのCSPで wait_for_function の文字列評価が使えない場面があるため）"""
+    end = time.time() + timeout
+    while time.time() < end:
+        if page.evaluate("() => (state.data || []).length") == n:
+            return
+        time.sleep(0.1)
+    raise AssertionError(f"state.data が {n} 行になりません: {page.evaluate('() => (state.data || []).length')}")
+
 
 def main():
     print("[TEST] Starting ug_matrix_ui_e2e...")
@@ -181,6 +192,21 @@ def main():
             frame.locator(".mxe-panel button[data-act='close']").click()
             print("[OK] Invalid West-area UG row deleted")
 
+            # 5b. 削除→編集バーの「元に戻す」→もう一度削除。削除件数が元に戻す履歴と連動していないと、
+            #     後の出力が行数不一致でブロックされる（Gemini4レビュー指摘 2-1 の回帰テスト）
+            frame.locator("#mxe-undo").click()
+            wait_rows(page, 6)
+            undo_counts = page.evaluate("() => { const s = (state.tabs[state.activeTab] || state)._ugMxSnapshot; return [s.addedCount, s.deletedCount]; }")
+            assert undo_counts == [0, 0], f"元に戻した後も削除件数が残っています: {undo_counts}"
+            west_cell.click()
+            frame.locator(".mxe-panel").wait_for(timeout=5000)
+            page.once("dialog", lambda d: d.accept())
+            frame.locator(".mxe-panel button[data-act='del']").click()
+            frame.locator(".mxe-panel .mxe-flash").wait_for(timeout=5000)
+            frame.locator(".mxe-panel button[data-act='close']").click()
+            wait_rows(page, 5)
+            print("[OK] Delete -> undo -> delete keeps the row counters in sync")
+
             # 6. A席→B席のセルを開き、販売経路を「自社WEB」から「電話予約」に書き換える
             ab_cell = None
             cells = frame.locator("table.mx td.mxc, table.mx td.mx-missing, table.mx td[data-mk]")
@@ -282,6 +308,17 @@ def main():
             assert wheel_row[HEADERS.index("販売価格区分")] == "一般"
             assert wheel_row[HEADERS.index("販売経路区分")] == "窓口"
             assert wheel_row[HEADERS.index("特記事項")] == "車いす特別行"
+
+            # 11. 再読込で別タブを開いた後、元のタブへ戻っても編集が残っていること。
+            #     出力で未保存表示を消すと、タブ切替でデータが解放され古い読込内容から復元されて編集が消える（Gemini4指摘 1-1）
+            first_tab = page.evaluate("() => state.tabs.findIndex((t, i) => i !== state.activeTab)")
+            assert first_tab >= 0, "元のタブが見つかりません"
+            page.evaluate(f"() => switchTab({first_tab})")
+            wait_rows(page, 5)
+            back = page.evaluate("() => state.data")
+            back_ug = [r for r in back if r[HEADERS.index("アップグレード該当フラグ")] == "該当"]
+            assert len(back_ug) == 1 and back_ug[0][HEADERS.index("販売経路区分")] == "電話予約", f"元のタブで編集が消えています: {back_ug}"
+            print("[OK] Edits survive switching back to the original tab after export")
 
             print("[SUCCESS] All UI E2E test assertions passed successfully!")
 
