@@ -359,6 +359,16 @@ async function main() {
     load(fs.readFileSync(outputPath, 'utf8'), ',');
     assert.deepEqual(rows(), [['value'], ['']], 'saved CSV bytes retain one-column empty row');
 
+    // 途中の1列空行は ""（2文字）ではなくただの空行で書く（Gemini4指摘 2回目）
+    outputPath = path.join(tempDir, 'output-mid.tsv');
+    load('H\nvalue'); state.data.push(['']); state.data.push(['x']); state.dirty = true;
+    state.fileHandle = fileHandle('output-mid.tsv');
+    state.filteredIndices = null;
+    await call('doSaveFile()');
+    assert.equal(fs.readFileSync(outputPath, 'utf8'), 'H\nvalue\n\nx', 'mid-file one-column empty row is a plain empty line');
+    load(fs.readFileSync(outputPath, 'utf8'));
+    assert.deepEqual(rows(), [['value'], [''], ['x']], 'mid-file one-column empty row reloads as empty');
+
     outputPath = path.join(tempDir, 'header-only.tsv');
     load('A\tB\n'); state.fileHandle = fileHandle('header-only.tsv');
     await call('doSaveFile()');

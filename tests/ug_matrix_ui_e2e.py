@@ -320,6 +320,21 @@ def main():
             assert len(back_ug) == 1 and back_ug[0][HEADERS.index("販売経路区分")] == "電話予約", f"元のタブで編集が消えています: {back_ug}"
             print("[OK] Edits survive switching back to the original tab after export")
 
+            # 12. 価格チェック表を出力し直すと新しい編集セッションになり、古いスナップショットを使い回さない（Gemini4指摘 2回目）
+            sess = page.evaluate("""() => {
+                const h = state.tabs[state.activeTab] || state;
+                const oldSid = h._ugMxSid, hadSnap = !!h._ugMxSnapshot;
+                state.data[0][0] = state.data[0][0];  // 本体側の編集があっても
+                const newSid = _ugMxEditNewSid();
+                const stale = _ugMxEditHandle({ op: "export", sid: oldSid });
+                _ugMxEditHandle({ op: "hello", sid: newSid });
+                const snap = h._ugMxSnapshot;
+                return { hadSnap, changed: oldSid !== newSid, staleRejected: stale.ok === false && !stale.blocked,
+                         freshRows: snap ? snap.rows.length : -1, rows: state.data.length, fresh: snap && snap.sid === newSid };
+            }""")
+            assert sess["hadSnap"] and sess["changed"] and sess["staleRejected"] and sess["fresh"] and sess["freshRows"] == sess["rows"], f"出力し直し時のセッションが不正: {sess}"
+            print("[OK] Re-outputting the price check starts a fresh edit session")
+
             print("[SUCCESS] All UI E2E test assertions passed successfully!")
 
 if __name__ == "__main__":

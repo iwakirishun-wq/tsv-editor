@@ -15,13 +15,13 @@
     {
       "id": "ikkatsu-dummy",
       "label": "一括設定TSV(ダミー): 一括設定チェックのNG検出",
-      "lastChecked": "2026-10-15T12:50:02.678Z",
+      "lastChecked": "2026-10-15T13:32:38.063Z",
       "lastResult": "ok"
     },
     {
       "id": "html-save",
       "label": "HTML保存ボタンで非空ファイルが保存されるか",
-      "lastChecked": "2026-10-15T12:50:02.678Z",
+      "lastChecked": "2026-10-15T13:32:38.063Z",
       "lastResult": "ok"
     },
     {
@@ -1016,6 +1016,14 @@
       "focusAreas": [
         "price-schedule-dummy",
         "sej-dummy"
+      ]
+    },
+    {
+      "date": "2026-10-15",
+      "status": "ok",
+      "focusAreas": [
+        "ikkatsu-dummy",
+        "html-save"
       ]
     }
   ]
