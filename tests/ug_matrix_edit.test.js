@@ -234,6 +234,7 @@ const seatMeta = () => ({ found: true, isReserved: true, isFree: false, stockTyp
   const snapFixed = {
     headers: H.slice(),
     rows: baseRows.map((r) => r.slice()),
+    expectedRows: fixedRows.map((r) => r.slice()),
     editedRows: new Set(),
     addedCount: 0,
     deletedCount: 1,
@@ -267,6 +268,7 @@ const seatMeta = () => ({ found: true, isReserved: true, isFree: false, stockTyp
   const snapUnknown = {
     headers: H.slice(),
     rows: fixedRows.map((r) => r.slice()),
+    expectedRows: withUnknown.map((r) => r.slice()),
     editedRows: new Set(),
     addedCount: 1,
     deletedCount: 0,
@@ -322,6 +324,34 @@ const seatMeta = () => ({ found: true, isReserved: true, isFree: false, stockTyp
   const cNoRoute = Object.assign({}, c, { route: -1 });
   const r11 = L.ugEditValidateExport(H, fixedRows, cNoRoute, v, valFixed, snapFixed);
   ok(!r11.errors.concat(r11.warnings).some((e) => /販売経路区分が未入力/.test(e.message)), "全件検証: 販売経路列が無ければ未入力扱いにしない");
+
+  // 12. 列数・行数・業務ルールが正常でも、未編集UGや未知列の破損は出力できない。
+  const snapIntegrity = {
+    headers: H.slice(), rows: fixedRows.map((r) => r.slice()), expectedRows: fixedRows.map((r) => r.slice()),
+    editedRows: new Set(), addedCount: 0, deletedCount: 0,
+  };
+  const corruptUg = fixedRows.map((r) => r.slice());
+  corruptUg[2][ix("抽選管理ID")] = "意図しない変更";
+  const corruptUgResult = L.ugEditValidateExport(H, corruptUg, c, v, valFixed, snapIntegrity);
+  ok(corruptUgResult.errors.some((e) => e.rowIdx === 2 && e.type === "unapproved_change"), "全件検証: 未編集UGの未知列だけ変わっても出力停止");
+
+  const approved = fixedRows.map((r) => r.slice());
+  approved[2][c.end] = "2027/04/10 16:00";
+  const snapApproved = { ...snapIntegrity, expectedRows: approved.map((r) => r.slice()), editedRows: new Set([2]) };
+  const approvedResult = L.ugEditValidateExport(H, approved, c, v, L.buildUgValidator(approved, c, v, westMeta, null), snapApproved);
+  ok(!approvedResult.errors.some((e) => e.type === "unapproved_change"), "全件検証: 承認されたUG期間変更は保持エラーにしない");
+  const corruptEdited = approved.map((r) => r.slice());
+  corruptEdited[2][ix("抽選管理ID")] = "意図しない変更";
+  const corruptEditedResult = L.ugEditValidateExport(H, corruptEdited, c, v, L.buildUgValidator(corruptEdited, c, v, westMeta, null), snapApproved);
+  ok(corruptEditedResult.errors.some((e) => e.rowIdx === 2 && e.type === "unapproved_change"), "全件検証: 編集済みUGでも未指定の未知列変更は出力停止");
+  const addedCorrupt = withUnknown.map((r) => r.slice());
+  addedCorrupt[addedCorrupt.length - 1][ix("抽選管理ID")] = "追加後の破損";
+  const addedCorruptResult = L.ugEditValidateExport(H, addedCorrupt, c, v, L.buildUgValidator(addedCorrupt, c, v, westMeta, null), snapUnknown);
+  ok(addedCorruptResult.errors.some((e) => e.type === "unapproved_change"), "全件検証: 追加行の未知列変更も出力停止");
+  const renamedHeaders = H.slice();
+  renamedHeaders[ix("抽選管理ID")] = "別の列名";
+  const renamedResult = L.ugEditValidateExport(renamedHeaders, fixedRows, c, v, valFixed, snapFixed);
+  ok(renamedResult.errors.some((e) => e.type === "unapproved_header_change"), "全件検証: 列数が同じでも元ヘッダーの変更を出力停止");
 }
 
 console.log(`${pass} passed, ${fail} failed`);

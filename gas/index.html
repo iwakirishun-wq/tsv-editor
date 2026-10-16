@@ -4294,7 +4294,37 @@
           keySet.add(uniqKey);
         }
 
-        // 3. スナップショットの未編集行（通常行など）が壊れていないか検証
+        // 3. 編集モードが変更した列だけを反映した期待値と、全行・全列を照合する。
+        // 行数が同じでも未編集UGや未知列が変われば、全件入替TSVに出してはいけない。
+        if (snapshot && snapshot.expectedRows) {
+          const expectedRows = snapshot.expectedRows;
+          if (rows.length !== expectedRows.length) {
+            errors.push({ rowIdx: -1, type: "expected_row_count", message: `編集モードの変更履歴と行数が一致しません（期待 ${expectedRows.length}行、現在 ${rows.length}行）` });
+          }
+          for (let i = 0; i < Math.min(rows.length, expectedRows.length); i++) {
+            const actual = rows[i], expected = expectedRows[i];
+            if (!Array.isArray(actual) || !Array.isArray(expected) || actual.length !== expected.length) {
+              errors.push({ rowIdx: i, type: "unapproved_change", message: `${i + 1}行目の列数が編集モードの変更履歴と一致しません` });
+              continue;
+            }
+            for (let j = 0; j < expected.length; j++) {
+              if (String(actual[j] ?? "") !== String(expected[j] ?? "")) {
+                errors.push({ rowIdx: i, type: "unapproved_change", message: `${i + 1}行目の「${headers[j] ?? j + 1}」が編集モードで指定した値と一致しません` });
+                break;
+              }
+            }
+          }
+          if (snapshot.headers) {
+            for (let j = 0; j < Math.min(headers.length, snapshot.headers.length); j++) {
+              if (String(headers[j]) !== String(snapshot.headers[j])) {
+                errors.push({ rowIdx: -1, type: "unapproved_header_change", message: `${j + 1}列目の見出しが元データと一致しません` });
+                break;
+              }
+            }
+          }
+        }
+
+        // 4. 旧スナップショットとの通常行照合も維持する
         if (snapshot && snapshot.rows) {
           // 同じ内容の通常行が複数あっても1行の欠落を見逃さないよう、出現回数で照合する
           const curCount = new Map();
@@ -15115,7 +15145,9 @@
       function _ugMxEditCountsGet() {
         const h = (state.tabs && state.activeTab >= 0 && state.tabs[state.activeTab]) || state;
         const snap = h._ugMxSnapshot;
-        return snap ? { snap, added: snap.addedCount || 0, deleted: snap.deletedCount || 0 } : null;
+        return snap ? { snap, added: snap.addedCount || 0, deleted: snap.deletedCount || 0,
+          expectedRows: snap.expectedRows ? snap.expectedRows.slice() : null,
+          editedRows: snap.editedRows ? new Set(snap.editedRows) : null } : null;
       }
       function _ugMxEditCountsSet(counts) {
         const h = (state.tabs && state.activeTab >= 0 && state.tabs[state.activeTab]) || state;
@@ -15123,16 +15155,21 @@
         if (!snap || !counts || counts.snap !== snap) return;
         snap.addedCount = counts.added;
         snap.deletedCount = counts.deleted;
+        if (counts.expectedRows) snap.expectedRows = counts.expectedRows.slice();
+        if (counts.editedRows) snap.editedRows = new Set(counts.editedRows);
       }
       // 出力前検証用の元全件データスナップショット（2026-10-15追加確定: 全件欠落・誤設定の出力防止）
       function _ugMxEditInitSnapshot() {
         const h = _ugMxEditHolder();
         const sid = _ugMxEditSid();
         if (!h._ugMxSnapshot || h._ugMxSnapshot.sid !== sid) {
+          const baselineRows = (state.data || []).map((r) => r.slice());
           h._ugMxSnapshot = {
             sid: sid,
             headers: (state.headers || []).slice(),
-            rows: (state.data || []).map((r) => r.slice()),
+            rows: baselineRows,
+            // 元行を共有し、編集時は対象行だけコピーして置換する（undo履歴も軽量に保つ）。
+            expectedRows: baselineRows.slice(),
             editedRows: new Set(),
             addedCount: 0,
             deletedCount: 0,
@@ -15378,7 +15415,12 @@
             saveUndo();
             for (const i of cols) safeSet(ri, i, next[i]);
             const snap = _ugMxEditHolder()._ugMxSnapshot;
-            if (snap && snap.editedRows) snap.editedRows.add(ri);
+            if (snap) {
+              const expected = snap.expectedRows[ri].slice();
+              for (const i of cols) expected[i] = next[i];
+              snap.expectedRows[ri] = expected;
+              if (snap.editedRows) snap.editedRows.add(ri);
+            }
             _ugMxEditAfterChange(`価格チェック表からUG行を更新しました（${ri + 1}行目: ${cols.map((i) => state.headers[i]).join("・")}）`, false);
           }
           return Object.assign(_ugMxEditCellPayload(ctx, req, true), { changed: cols.length });
@@ -15389,7 +15431,10 @@
           saveUndo();
           _ugMxEditDeleteRow(ri);
           const snap = _ugMxEditHolder()._ugMxSnapshot;
-          if (snap) snap.deletedCount = (snap.deletedCount || 0) + 1;
+          if (snap) {
+            snap.deletedCount = (snap.deletedCount || 0) + 1;
+            snap.expectedRows.splice(ri, 1);
+          }
           _ugMxEditAfterChange(`価格チェック表からUG行を削除しました（元の${ri + 1}行目）`, true);
           return Object.assign(_ugMxEditCellPayload(ctx, req, true), { deleted: 1 });
         }
@@ -15398,13 +15443,14 @@
           const plan = ugEditPlanAdd(state.headers, state.data, c, v, ctx.validate, spec, { dstCols: state.sejVirtualCols ? state.sejVirtualCols.indices : [] });
           if (plan.error) return { ok: false, error: plan.error };
           saveUndo();
+          const snap = _ugMxEditHolder()._ugMxSnapshot;
           for (const p of plan.rows) {
             const row = p.row.slice();
             while (row.length < state.headers.length) row.push("");
             state.data.push(row);
+            if (snap) snap.expectedRows.push(row.slice());
             markForceVisible(state.data.length - 1, 1);
           }
-          const snap = _ugMxEditHolder()._ugMxSnapshot;
           if (snap) snap.addedCount = (snap.addedCount || 0) + plan.rows.length;
           _ugMxEditAfterChange(`価格チェック表からUG行を${plan.rows.length}行追加しました（末尾）`, true);
           return Object.assign(_ugMxEditCellPayload(ctx, req, true), { added: plan.rows.length });

@@ -137,6 +137,21 @@ def main():
             frame.locator("#mxe-bar[data-ready='1']").wait_for(timeout=10000)
             print("[OK] Edit bar is ready in iframe")
 
+            # 行数・列数・業務ルールが正常でも、未編集UGの独自列だけの破損を検出する。
+            integrity = page.evaluate("""() => {
+                const h = state.tabs[state.activeTab] || state;
+                const snap = h._ugMxSnapshot;
+                const col = state.headers.indexOf('社内メモ');
+                const original = state.data[4][col];
+                state.data[4][col] = '不意の変更';
+                const res = _ugMxEditHandle({ op: 'export', sid: h._ugMxSid });
+                state.data[4][col] = original;
+                return { baseline: snap.expectedRows[4][col], blocked: res.blocked,
+                         error: res.errors && res.errors.some(e => e.type === 'unapproved_change' && e.rowIdx === 4) };
+            }""")
+            assert integrity == {"baseline": "メモ5", "blocked": True, "error": True}, f"未編集UGの未知列破損を検出できません: {integrity}"
+            print("[OK] Unedited UG unknown-column corruption blocks export")
+
             # 3. 編集モードON
             frame.locator("#mxe-on").click()
             print("[OK] Edit mode turned ON")
@@ -196,8 +211,16 @@ def main():
             #     後の出力が行数不一致でブロックされる（Gemini4レビュー指摘 2-1 の回帰テスト）
             frame.locator("#mxe-undo").click()
             wait_rows(page, 6)
-            undo_counts = page.evaluate("() => { const s = (state.tabs[state.activeTab] || state)._ugMxSnapshot; return [s.addedCount, s.deletedCount]; }")
-            assert undo_counts == [0, 0], f"元に戻した後も削除件数が残っています: {undo_counts}"
+            undo_counts = page.evaluate("() => { const s = (state.tabs[state.activeTab] || state)._ugMxSnapshot; return [s.addedCount, s.deletedCount, s.expectedRows.length, s.expectedRows[5][30]]; }")
+            assert undo_counts == [0, 0, 6, "西エリア自己UG"], f"元に戻した後の期待行が復元されていません: {undo_counts}"
+            redo_counts = page.evaluate("""() => {
+                redo();
+                const s = (state.tabs[state.activeTab] || state)._ugMxSnapshot;
+                return [s.addedCount, s.deletedCount, s.expectedRows.length, state.data.length];
+            }""")
+            assert redo_counts == [0, 1, 5, 5], f"やり直し後の期待行が復元されていません: {redo_counts}"
+            frame.locator("#mxe-undo").click()
+            wait_rows(page, 6)
             west_cell.click()
             frame.locator(".mxe-panel").wait_for(timeout=5000)
             page.once("dialog", lambda d: d.accept())
@@ -205,6 +228,8 @@ def main():
             frame.locator(".mxe-panel .mxe-flash").wait_for(timeout=5000)
             frame.locator(".mxe-panel button[data-act='close']").click()
             wait_rows(page, 5)
+            deleted_expected = page.evaluate("() => { const s = (state.tabs[state.activeTab] || state)._ugMxSnapshot; return [s.expectedRows.length, s.expectedRows.some(r => r[30] === '西エリア自己UG')]; }")
+            assert deleted_expected == [5, False], f"削除後の期待行が更新されていません: {deleted_expected}"
             print("[OK] Delete -> undo -> delete keeps the row counters in sync")
 
             # 6. A席→B席のセルを開き、販売経路を「自社WEB」から「電話予約」に書き換える
@@ -239,6 +264,8 @@ def main():
             flash_text = panel_el.locator(".mxe-flash").inner_text()
             print(f"[OK] Route edited to '電話予約', reflected: {flash_text}")
             panel_el.locator("button[data-act='close']").click()
+            approved_route = page.evaluate("() => { const s = (state.tabs[state.activeTab] || state)._ugMxSnapshot; return [s.expectedRows[4][5], s.expectedRows[4][31], s.rows[4][5]]; }")
+            assert approved_route == ["電話予約", "メモ5", "自社WEB"], f"承認済み列だけが期待行へ反映されていません: {approved_route}"
 
             # 7. 全件TSV出力（エラー解消後）
             frame.locator("#mxe-export").click()
@@ -330,9 +357,10 @@ def main():
                 _ugMxEditHandle({ op: "hello", sid: newSid });
                 const snap = h._ugMxSnapshot;
                 return { hadSnap, changed: oldSid !== newSid, staleRejected: stale.ok === false && !stale.blocked,
-                         freshRows: snap ? snap.rows.length : -1, rows: state.data.length, fresh: snap && snap.sid === newSid };
+                         freshRows: snap ? snap.rows.length : -1, rows: state.data.length, fresh: snap && snap.sid === newSid,
+                         expectedFresh: snap && snap.expectedRows.every((r, i) => r.every((cell, j) => cell === state.data[i][j])) };
             }""")
-            assert sess["hadSnap"] and sess["changed"] and sess["staleRejected"] and sess["fresh"] and sess["freshRows"] == sess["rows"], f"出力し直し時のセッションが不正: {sess}"
+            assert sess["hadSnap"] and sess["changed"] and sess["staleRejected"] and sess["fresh"] and sess["freshRows"] == sess["rows"] and sess["expectedFresh"], f"出力し直し時のセッションが不正: {sess}"
             print("[OK] Re-outputting the price check starts a fresh edit session")
 
             # 13. 基準がまだ無い（開いた時の hello が失敗した）状態で編集モードの「元に戻す」を押しても、
