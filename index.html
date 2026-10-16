@@ -15204,7 +15204,26 @@
       }
       function _ugMxEditCtx(cutoff) {
         const c = _priceCols(state.headers), v = _priceVal, seatMeta = _priceSeatMeta();
-        return { c, v, seatMeta, validate: buildUgValidator(state.data, c, v, seatMeta, cutoff == null ? null : cutoff) };
+        return { c, v, seatMeta, validate: buildUgValidator(state.data, c, v, seatMeta, cutoff == null ? null : cutoff), short: _ugMxShortNamesFn(c, v, seatMeta) };
+      }
+      // エラー・確認の文に出る席種名・券種名を、マトリクスの見出しと同じ略称にする
+      // （席種=席種エリアマスタの略称、券種=「鈴鹿_大人（24歳以上）」→「大人」。2026-10-16 SHUN指示: 長くて見づらい）
+      function _ugMxShortNamesFn(c, v, seatMeta) {
+        const seatLabel = _priceSeatLabelFn(seatMeta);
+        const pairs = new Map();
+        const add = (full, short) => { if (full && short && short !== full && !pairs.has(full)) pairs.set(full, short); };
+        for (const r of state.data) {
+          if (!r) continue;
+          add(v(r, c.seat), seatLabel(v(r, c.seat), v(r, c.seatCd)));
+          add(v(r, c.ugSeat), seatLabel(v(r, c.ugSeat), v(r, c.ugSeatCd)));
+          add(v(r, c.age), _priceAgeLabel(v(r, c.age)));
+          add(v(r, c.ugAge), _priceAgeLabel(v(r, c.ugAge)));
+        }
+        if (!pairs.size) return (m) => m;
+        // 長い名前から先に置き換える（「A1-2観戦券」を「A1」より先に）
+        const keys = [...pairs.keys()].sort((a, b) => b.length - a.length);
+        const re = new RegExp(keys.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"), "g");
+        return (m) => String(m == null ? "" : m).replace(re, (k) => pairs.get(k));
       }
       // 登録なしセルが「登録漏れ?」か。初回出力（ugMatrixBuild → buildUgMatrixModel）と同じ判定を、そのセルの元・先の通常行だけで行う
       function _ugMxEditIsMissing(ctx, spec) {
@@ -15238,7 +15257,7 @@
         if (chk.dayNote && chk.dayNote !== chk.advNote) notes.push("当日: " + chk.dayNote);
         return {
           fp: ugEditRowFp(row), cond: ugEditCondOf(row, c, v), hasRoute: c.route >= 0, route: v(row, c.route), adv: cur.adv, day: cur.day, start: v(row, c.start), end: v(row, c.end),
-          status: chk.status, problems: chk.problems || [], notes: chk.notes || [], note: notes.join(" / "),
+          status: chk.status, problems: (chk.problems || []).map(ctx.short), notes: (chk.notes || []).map(ctx.short), note: ctx.short(notes.join(" / ")),
           expected: chk.expected, expectedDay: chk.expectedDay, advNg: !!chk.advNg, dayNg: !!chk.dayNg,
           srcAdv: chk.srcAdv, srcDay: chk.srcDay, dstAdv: chk.dstAdv, dstDay: chk.dstDay,
           set: ugEditExpected(chk, cur), period: ugEditCorrectPeriod(state.data, c, v, row),
@@ -15352,12 +15371,12 @@
               blocked: true,
               error: "出力前チェックで確定エラーが検出されたため、TSV出力を停止しました。",
               // 一覧から該当セルへ移動できるよう、UG行のエラーにはマトリクスのセルの位置（spec）を付ける（2026-10-16 UIレビュー）
-              errors: valRes.errors.map((er) => (er.rowIdx >= 0 && state.data[er.rowIdx] && ugEditIsUg(state.data[er.rowIdx], c, v)
-                ? Object.assign({}, er, { spec: ugEditRowSpec(state.data[er.rowIdx], c, v) }) : er)),
-              warnings: valRes.warnings
+              errors: valRes.errors.map((er) => Object.assign({}, er, { message: ctx.short(er.message) },
+                er.rowIdx >= 0 && state.data[er.rowIdx] && ugEditIsUg(state.data[er.rowIdx], c, v) ? { spec: ugEditRowSpec(state.data[er.rowIdx], c, v) } : {})),
+              warnings: valRes.warnings.map((w) => Object.assign({}, w, { message: ctx.short(w.message) }))
             };
           }
-          const forcedErrors = valRes.ok ? [] : valRes.errors;
+          const forcedErrors = valRes.ok ? [] : valRes.errors.map((er) => Object.assign({}, er, { message: ctx.short(er.message) }));
           if (forcedErrors.length) setStatus(`⚠ 出力前チェックのエラー ${forcedErrors.length} 件を無視して修正済みTSVを出力します`);
           // 既存の保存と同じ組み立て（buildFileContent: ヘッダー＋全行・元の区切り/改行・仮想列は除外、BOMは開いたファイルどおり）。
           // システムは全件入れ替え方式なので、フィルターに関係なく全件を出す。
@@ -15367,7 +15386,7 @@
           try { diff = buildSaveDiff({ allRows: true }); } catch (e) { diff = { available: false, reason: "差分を算出できませんでした: " + e.message }; }
           return { ok: true, text, fileName: state.fileName || "data.tsv", rows: state.data.length, encoding: state.encoding, newline: state.newline,
             diff: { available: !!diff.available, reason: diff.reason || "", added: diff.added || 0, removed: diff.removed || 0, changed: diff.changed || 0, dupKeys: diff.dupKeys || 0 },
-            warnings: valRes.warnings, forcedErrors };
+            warnings: valRes.warnings.map((w) => Object.assign({}, w, { message: ctx.short(w.message) })), forcedErrors };
         }
         if (req.op === "exported") {
           // 別名ファイルへの出力で、開いている元ファイルは保存していない。未保存表示は消さない
@@ -15925,7 +15944,8 @@
             }
             if (name === "del") {
               var what = (r.route || "経路なし") + (r.start && r.end ? "・" + r.start + "〜" + r.end : "");
-              if (!window.confirm("このUG行を削除しますか？\n" + (spec ? spec.fs + " " + spec.fa + " → " + spec.ts + " " + spec.ta + "\n" : "") + what + "\n（アプリ本体のデータから1行消えます。「元に戻す」（Ctrl+Z）で戻せます）")) return false;
+              var LB = (res0 && res0.labels) || {};
+              if (!window.confirm("このUG行を削除しますか？\n" + (spec ? (LB.fs || spec.fs) + " " + (LB.fa || spec.fa) + " → " + (LB.ts || spec.ts) + " " + (LB.ta || spec.ta) + "\n" : "") + what + "\n（アプリ本体のデータから1行消えます。「元に戻す」（Ctrl+Z）で戻せます）")) return false;
               var dreq = reqOf(td, spec);
               dreq.fp = r.fp;
               var dres = await api("delete", dreq);

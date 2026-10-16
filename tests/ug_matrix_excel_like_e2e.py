@@ -170,8 +170,11 @@ def main():
             fl.locator("#mxe-export").click()
             fl.locator("#mxe-save-dlg").wait_for()
             assert fl.locator("#mxe-save-dlg .mxe-jump").count() >= 1, "一覧に「移動」がありません"
-            assert "大人" in fl.locator("#mxe-save-dlg").inner_text(), "エラー文に券種名がありません"
-            fl.locator("#mxe-save-dlg .mxe-errline:has-text('TEST_B1観戦券') .mxe-jump").first.click()
+            dlg_text = fl.locator("#mxe-save-dlg").inner_text()
+            assert "大人" in dlg_text, "エラー文に券種名がありません"
+            # 席種・券種は見出しと同じ略称（マスタの略称 B1、券種「大人」）で出す（2026-10-16 SHUN指示）
+            assert "TEST_B1観戦券" not in dlg_text and "テスト_大人（24歳以上）" not in dlg_text and "B1 大人 → A1 大人" in dlg_text, f"エラー文が略称になっていません: {dlg_text}"
+            fl.locator("#mxe-save-dlg .mxe-errline:has-text('B1 大人') .mxe-jump").first.click()
             fl.locator(".mxe-panel").wait_for()
             j = fr.evaluate("() => ({ dlg: !!document.getElementById('mxe-save-dlg'), ng: document.querySelector('td.mxe-sel').classList.contains('mx-ng'), b1: /TEST_B1観戦券/.test(document.querySelector('.mxe-panel').textContent) })")
             assert not j["dlg"] and j["ng"] and j["b1"], f"一覧から該当セルへ移動できません: {j}"
