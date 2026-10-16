@@ -3,13 +3,13 @@
     {
       "id": "price-schedule-dummy",
       "label": "価格スケジュール(ダミー): 通常価格表/UGマトリクス/UG一覧",
-      "lastChecked": "2026-10-15T14:30:47.583Z",
+      "lastChecked": "2026-10-16T03:38:06.022Z",
       "lastResult": "ok"
     },
     {
       "id": "sej-dummy",
       "label": "SEJデータ(ダミー): カナ検査・備考HTML変換・SEJチェック",
-      "lastChecked": "2026-10-15T14:30:47.583Z",
+      "lastChecked": "2026-10-16T03:38:06.022Z",
       "lastResult": "ok"
     },
     {
@@ -39,13 +39,13 @@
     {
       "id": "large-data-perf",
       "label": "大量行データでの表示・出力パフォーマンス",
-      "lastChecked": "2026-10-15T14:00:45.787Z",
+      "lastChecked": "2026-10-16T03:31:42.392Z",
       "lastResult": "ok"
     },
     {
       "id": "real-data-optional",
       "label": "MAIN内の実マスターが見つかった場合の参考チェック",
-      "lastChecked": "2026-10-15T14:00:45.787Z",
+      "lastChecked": "2026-10-16T03:31:42.392Z",
       "lastResult": "ok"
     }
   ],
@@ -1064,6 +1064,22 @@
       "focusAreas": [
         "sort-filter",
         "master-unlinked"
+      ]
+    },
+    {
+      "date": "2026-10-16",
+      "status": "ok",
+      "focusAreas": [
+        "large-data-perf",
+        "real-data-optional"
+      ]
+    },
+    {
+      "date": "2026-10-16",
+      "status": "ok",
+      "focusAreas": [
+        "price-schedule-dummy",
+        "sej-dummy"
       ]
     }
   ]
