@@ -196,7 +196,7 @@ def main():
                     west_cell = c
                     break
             assert west_cell is not None, "西エリアセルが見つかりません"
-            west_cell.click()
+            west_cell.dblclick()
             frame.locator(".mxe-panel").wait_for(timeout=5000)
 
             # 行削除のダイアログ承認リスナーを設定
@@ -221,7 +221,7 @@ def main():
             assert redo_counts == [0, 1, 5, 5], f"やり直し後の期待行が復元されていません: {redo_counts}"
             frame.locator("#mxe-undo").click()
             wait_rows(page, 6)
-            west_cell.click()
+            west_cell.dblclick()
             frame.locator(".mxe-panel").wait_for(timeout=5000)
             page.once("dialog", lambda d: d.accept())
             frame.locator(".mxe-panel button[data-act='del']").click()
@@ -244,7 +244,7 @@ def main():
                         ab_cell = c
                         break
             assert ab_cell is not None, "A→Bセルが見つかりません"
-            ab_cell.click()
+            ab_cell.dblclick()
             frame.locator(".mxe-panel").wait_for(timeout=5000)
 
             # 各行の識別表示（販売経路・条件・期間）と入力フィールドを確認

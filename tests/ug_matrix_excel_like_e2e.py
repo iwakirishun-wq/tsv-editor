@@ -91,20 +91,33 @@ def main():
                         time.sleep(0.3)
                 raise AssertionError(f"セルを押せません: {src}→{dst}")
 
-            # 1) クリック=選択。右端に固定した編集欄と、行・列見出しの強調
+            def dbl_cell(src, dst):
+                for _ in range(10):
+                    try:
+                        cell(src, dst).as_element().dblclick()
+                        return
+                    except Exception:
+                        time.sleep(0.3)
+                raise AssertionError(f"セルをダブルクリックできません: {src}→{dst}")
+
+            # 1) クリック=選択だけ（編集欄は開かない＝誤操作防止）。ダブルクリックで右端の編集欄が開き入力開始（2026-10-16 SHUN指示）
             click_cell("TEST_A2観戦券", "TEST_A1観戦券")
+            time.sleep(0.4)
+            st0 = fr.evaluate("() => ({ panel: !!document.querySelector('.mxe-panel'), hl: document.querySelectorAll('th.mxe-hl').length, sel: !!document.querySelector('td.mxe-sel') })")
+            assert not st0["panel"] and st0["sel"] and st0["hl"] >= 3, f"クリックは選択と見出し強調だけのはず: {st0}"
+            dbl_cell("TEST_A2観戦券", "TEST_A1観戦券")
             fl.locator(".mxe-panel").wait_for()
             st = fr.evaluate("""() => { const p = document.querySelector('.mxe-panel').getBoundingClientRect();
                 return { docked: document.body.classList.contains('mxe-docked'), right: Math.round(innerWidth - p.right), rows: document.querySelectorAll('.mxe-panel .mxe-row').length,
-                         hl: document.querySelectorAll('th.mxe-hl').length, sel: !!document.querySelector('td.mxe-sel'),
-                         focusInInput: document.activeElement && document.activeElement.tagName === 'INPUT' }; }""")
+                         focus: document.activeElement && document.activeElement.name }; }""")
             assert st["docked"] and st["right"] <= 16, f"編集欄が右端に固定されていません: {st}"
             assert st["rows"] == 2, f"1セル2行の表示になっていません: {st}"
-            assert st["hl"] >= 3 and st["sel"], f"選択セル・行列見出しが強調されていません: {st}"
-            assert not st["focusInInput"], "クリック（選択）だけで入力欄にフォーカスが移っています"
-            print("[OK] Click selects; pane docked right; row/column headers highlighted")
+            assert st["focus"] == "adv", f"ダブルクリックで前売差額の入力が始まりません: {st}"
+            page.keyboard.press("Escape")
+            time.sleep(0.2)
+            print("[OK] Click only selects; double-click opens the docked pane and starts input")
 
-            # 2) 矢印キーで移動し、戻る
+            # 2) 矢印キーで移動し、戻る（移動は選択だけ。開いていた編集欄は閉じる）
             before = fr.evaluate("() => document.querySelector('td.mxe-sel').getAttribute('data-mid') || document.querySelector('td.mxe-sel').textContent")
             page.keyboard.press("ArrowDown")
             time.sleep(0.4)
@@ -114,6 +127,7 @@ def main():
             time.sleep(0.4)
             back = fr.evaluate("() => document.querySelector('td.mxe-sel').getAttribute('data-mid') || document.querySelector('td.mxe-sel').textContent")
             assert back == before, "矢印キーで元のセルに戻れません"
+            assert not fr.evaluate("() => !!document.querySelector('.mxe-panel')"), "矢印キーの移動で編集欄が開いたままです"
             print("[OK] Arrow keys move the selection")
 
             # 3) Enter で入力開始（前売差額を全選択、カンマなし）
@@ -202,7 +216,7 @@ def main():
             page.keyboard.press("Enter")
             fr.wait_for_function("() => /反映しました/.test((document.querySelector('.mxe-flash') || {}).textContent || '')")
             fr.evaluate("() => document.activeElement && document.activeElement.blur && document.activeElement.blur()")
-            fl.locator("table.mx td.mx-extra-l").first.click()
+            fl.locator("table.mx td.mx-extra-l").first.dblclick()
             fl.locator(".mxe-panel:has-text('対象外')").wait_for()
             fl.locator("#mxe-undo").click()
             wait("() => state.data.some(r => r[5] === '自社WEB' && r[11] === 'TEST_A1観戦券' && r[26] === 'TEST_A2観戦券' && r[21] === '4000')", page, what="元に戻す")
@@ -233,6 +247,34 @@ def main():
             assert page.evaluate("() => !state.data.some(r => r[21] === '4600')"), "破棄した入力がデータに入っています"
             print("[OK] App-side close asks about unapplied input; Tab stays inside the dialog")
             b.close()
+
+        # 12) 値の無いセルに、値を手入力してUG行を追加できる（2026-10-16 SHUN指示: ロジック外の設定もできるように）
+        with sync_playwright() as p:
+            b = p.chromium.launch(headless=True)
+            page = b.new_page(viewport={"width": 1366, "height": 768})
+            page.goto(INDEX.as_uri())
+            page.wait_for_load_state("networkidle")
+            page.locator("#file-input").set_input_files(str(f))
+            wait("() => (state.data || []).length === 7", page)
+            page.evaluate("""() => { window.google = { script: { run: {} } };
+                _buildPriceCheckHtml(state.data.map((_, i) => i), false, { normal: false, seatmx: false, matrix: true, ug: false }, null); }""")
+            page.wait_for_selector("#pc-inapp iframe")
+            fr = [x for x in page.frames if x != page.main_frame][0]
+            fl = page.frame_locator("#pc-inapp iframe")
+            fl.locator("label.mxe-toggle").click()
+            fr.wait_for_function("() => document.body.classList.contains('mx-editing')")
+            before = page.evaluate("() => state.data.length")
+            fl.locator("table.mx td.mx-missing").first.dblclick()
+            fl.locator(".mxe-panel .mxe-addrow").first.wait_for()
+            adv = fl.locator(".mxe-panel .mxe-addrow input[name='adv']").first
+            adv.fill("1234")
+            page.keyboard.press("Enter")
+            wait(f"() => state.data.length === {before + 1}", page, what="手入力の値でUG行を追加")
+            added = page.evaluate("() => { const r = state.data[state.data.length - 1]; return [r[24], r[21]]; }")
+            assert added == ["該当", "1234"], f"手入力の値で追加されていません: {added}"
+            fr.wait_for_function("() => /追加しました/.test((document.querySelector('.mxe-flash') || {}).textContent || '')")
+            b.close()
+        print("[OK] Typed values add a UG row to an empty cell")
     print("[SUCCESS] Excel-like matrix editing E2E passed")
 
 

@@ -178,6 +178,20 @@ const seatMeta = () => ({ found: true, isReserved: true, isFree: false, stockTyp
   eq(rows.length, 4, "追加: 元の行配列は変えない");
   eq(L.ugEditPlanAdd(H, rows, c, v, validate, Object.assign({}, spec, { ts: "存在しない席" }), null).error != null, true, "追加: 先の通常行が無ければエラー");
   eq(L.ugEditPlanAdd(H, rows, c, v, validate, Object.assign({}, spec, { cond: "一般" }), null).error != null, true, "追加: その販売条件にUG行が無ければエラー（引き継ぎ元なし）");
+  // ルール外の手入力追加（allowNormalTemplate）: UG行の無い販売条件でも、先の通常行を土台にUG行を作れる（2026-10-16 SHUN指示）
+  {
+    const GEN = { "販売価格区分": "一般", "会員ランク区分": "", "会員ランク名": "", "販売経路区分": "窓口" };
+    const rowsG = rows.concat([normal(A[0], A[1], 9000, 9900, GEN), normal(B[0], B[1], 14000, 15400, GEN)]);
+    const vG = L.buildUgValidator(rowsG, c, v, seatMeta, null);
+    const specG = { cond: "一般", fs: A[1], fa: ADULT, ts: B[1], ta: ADULT };
+    const pG = L.ugEditPlanAdd(H, rowsG, c, v, vG, specG, { allowNormalTemplate: true });
+    eq([pG.error, pG.rows.length], [null, 1], "手入力追加: UG行の無い販売条件でも1行作れる");
+    const rg = pG.rows[0].row, gg = (n) => rg[ix(n)];
+    eq([gg("販売価格区分"), gg("販売経路区分"), gg("アップグレード該当フラグ")], ["一般", "窓口", "該当"], "手入力追加: 条件は先の通常行、フラグは既存UG行の表記");
+    eq([gg("席種エリア名"), gg("アップグレード元席種エリア名")], [B[1], A[1]], "手入力追加: 先・元の席種");
+    eq(L.ugEditSpecKey(L.ugEditRowSpec(rg, c, v)), L.ugEditSpecKey(specG), "手入力追加: 作った行はそのセルに入る");
+    eq(L.ugEditPlanAdd(H, rowsG, c, v, vG, specG, null).error != null, true, "手入力追加: 既定（オプションなし）は従来どおりエラー");
+  }
   // 経路が2つあれば経路ごとに1行。元・先の通常行がその経路に無い経路は作らない
   const tel = { "販売経路区分": "電話" };
   const rows2 = rows.concat([normal(A[0], A[1], 11000, 13000, tel), normal(B[0], B[1], 16000, 19000, tel), ugRow(A, C, 1, 1, tel)]);

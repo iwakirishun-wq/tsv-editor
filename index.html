@@ -4139,6 +4139,21 @@
           const fc = ugEditFullCond(row, c, v);
           if (!templates.has(fc)) templates.set(fc, row);
         }
+        // ルール外の手入力追加（opt.allowNormalTemplate）: この販売条件にUG行が1件も無ければ、先の通常行を土台にする
+        //（2026-10-16 SHUN指示: 値の無いセルにも追加できるように）。UGフラグは既存UG行の表記、無ければ「該当」
+        if (!templates.size && opt && opt.allowNormalTemplate) {
+          const anyUg = rows.find((row) => row && ugEditIsUg(row, c, v));
+          const flag = anyUg ? String(anyUg[c.ugFlag] ?? "") : "該当";
+          for (const row of rows) {
+            if (!row || ugEditIsUg(row, c, v) || ugEditCondOf(row, c, v) !== spec.cond) continue;
+            if (v(row, c.seat) !== spec.ts || v(row, c.age) !== spec.ta) continue;
+            const fc = ugEditFullCond(row, c, v);
+            if (templates.has(fc)) continue;
+            const tpl = row.slice();
+            if (c.ugFlag >= 0) tpl[c.ugFlag] = flag;
+            templates.set(fc, tpl);
+          }
+        }
         if (!templates.size) return { rows: [], error: "この販売条件に既存のUG行が無いため、列の引き継ぎ元がありません" };
         const findNormal = (fc, seat, age) => rows.find((row) => row && !ugEditIsUg(row, c, v)
           && ugEditFullCond(row, c, v) === fc && v(row, c.seat) === seat && v(row, c.age) === age) || null;
@@ -15277,15 +15292,15 @@
         if (!detail) return { ok: true, html };
         const rows = entries.map((e) => _ugMxEditRowInfo(ctx, e.row, e.chk));
         let plan = null, planError = null;
-        if (!entries.length && missing) {
-          const p = ugEditPlanAdd(state.headers, state.data, c, v, validate, spec, { dstCols: state.sejVirtualCols ? state.sejVirtualCols.indices : [] });
+        if (!entries.length) {
+          const p = ugEditPlanAdd(state.headers, state.data, c, v, validate, spec, { dstCols: state.sejVirtualCols ? state.sejVirtualCols.indices : [], allowNormalTemplate: true });
           plan = p.rows.map((x) => _ugMxEditRowInfo(ctx, x.row, x.chk));
           planError = p.error;
         }
         const first = rows[0] || (plan && plan[0]) || null;
         const seatLabel = _priceSeatLabelFn(ctx.seatMeta);
         return {
-          ok: true, html, missing, rows, plan, planError,
+          ok: true, html, missing, manual: !entries.length && !missing, rows, plan, planError,
           ref: first ? { srcAdv: first.srcAdv, srcDay: first.srcDay, dstAdv: first.dstAdv, dstDay: first.dstDay, set: first.set, period: first.period, note: first.note } : null,
           labels: { fs: seatLabel(spec.fs, first ? first.srcCode : ""), fa: _priceAgeLabel(spec.fa), ts: seatLabel(spec.ts, first ? first.dstCode : ""), ta: _priceAgeLabel(spec.ta) },
         };
@@ -15461,20 +15476,37 @@
         }
         if (req.op === "add") {
           if (ugEditFindRows(state.data, c, v, spec).length) return { ok: false, error: "このセルには既にUG行があります。セルを開き直してください。" };
-          const plan = ugEditPlanAdd(state.headers, state.data, c, v, ctx.validate, spec, { dstCols: state.sejVirtualCols ? state.sejVirtualCols.indices : [] });
+          const plan = ugEditPlanAdd(state.headers, state.data, c, v, ctx.validate, spec, { dstCols: state.sejVirtualCols ? state.sejVirtualCols.indices : [], allowNormalTemplate: true });
           if (plan.error) return { ok: false, error: plan.error };
+          // 編集欄で選んだ行だけを、入力した値で追加する（指定が無ければ従来どおり案の全行を期待値で追加）
+          let chosen = plan.rows;
+          if (Array.isArray(req.items)) {
+            const inputErrors = {};
+            chosen = [];
+            for (const it of req.items) {
+              const base = plan.rows[Number(it && it.i)];
+              if (!base) return { ok: false, stale: true, error: "追加する行の案が変わりました。セルを開き直してください。" };
+              const vals = Object.assign({}, (it && it.values) || {});
+              if (c.route < 0) delete vals.route;
+              const inp = ugEditCheckInput(vals);
+              if (!inp.ok) { inputErrors[it.i] = inp.errors; continue; }
+              chosen.push({ row: ugEditApplyValues(base.row, c, inp.values) });
+            }
+            if (Object.keys(inputErrors).length) return { ok: false, addInputErrors: inputErrors, error: "入力に誤りがあります。" };
+            if (!chosen.length) return { ok: false, error: "追加する行が選ばれていません。" };
+          }
           saveUndo();
           const snap = _ugMxEditHolder()._ugMxSnapshot;
-          for (const p of plan.rows) {
+          for (const p of chosen) {
             const row = p.row.slice();
             while (row.length < state.headers.length) row.push("");
             state.data.push(row);
             if (snap) snap.expectedRows.push(row.slice());
             markForceVisible(state.data.length - 1, 1);
           }
-          if (snap) snap.addedCount = (snap.addedCount || 0) + plan.rows.length;
-          _ugMxEditAfterChange(`価格チェック表からUG行を${plan.rows.length}行追加しました（末尾）`, true);
-          return Object.assign(_ugMxEditCellPayload(ctx, req, true), { added: plan.rows.length });
+          if (snap) snap.addedCount = (snap.addedCount || 0) + chosen.length;
+          _ugMxEditAfterChange(`価格チェック表からUG行を${chosen.length}行追加しました（末尾）`, true);
+          return Object.assign(_ugMxEditCellPayload(ctx, req, true), { added: chosen.length });
         }
         return { ok: false, error: "不明な操作です: " + req.op };
       }
@@ -15565,13 +15597,21 @@
           document.body.classList.toggle("mx-editing", on);
           tools.style.display = on ? "" : "none";
           if (!on) { closePanel(); clearSel(); say(""); }
-          else say("クリックで選択・ダブルクリック／Enter／F2で入力、矢印・Tabで移動、Enterで反映（Ctrl+Enterで全行）、Escで取消、Ctrl+Zで元に戻す、F8で次のNG。直した内容はアプリ本体のデータに反映されます（TSVは「修正済みTSVを出力」で書き出し）。", "info");
+          else say("クリックで選択・ダブルクリック／Enter／F2で編集欄を開いて入力、矢印・Tabで移動、Enterで反映（Ctrl+Enterで全行）、Escで取消、Ctrl+Zで元に戻す、F8で次のNG。直した内容はアプリ本体のデータに反映されます（TSVは「修正済みTSVを出力」で書き出し）。", "info");
         }
         function specOf(td) {
           var mk = td.getAttribute("data-mk");
           if (mk) { try { var a = JSON.parse(mk); return { cond: a[0], fs: a[1], fa: a[2], ts: a[3], ta: a[4] }; } catch (e) { return null; } }
           var mid = td.getAttribute("data-mid");
-          if (!mid) return null;
+          if (!mid) {
+            /* 「—」セル: 行（元）と列見出し（先）と販売条件のブロックから組み立てる */
+            var tr = td.parentNode, tb = td.closest("table.mx"), blk = td.closest(".cond-block");
+            if (!tr || !tb || !blk || !tr.getAttribute("data-fs")) return null;
+            var k = Array.prototype.indexOf.call(tr.querySelectorAll(":scope > td"), td);
+            var ah = tb.rows[1] ? tb.rows[1].querySelectorAll(":scope > th")[k] : null;
+            if (!ah || !ah.getAttribute("data-ts")) return null;
+            return { cond: blk.getAttribute("data-cond") || "", fs: tr.getAttribute("data-fs"), fa: tr.getAttribute("data-fa"), ts: ah.getAttribute("data-ts"), ta: ah.getAttribute("data-ta") };
+          }
           var p = decodeURIComponent(mid).split("|");
           if (p.length !== 6 || p[0] !== "M") return null;
           return { cond: p[1], fs: p[2], fa: p[3], ts: p[4], ta: p[5] };
@@ -15665,15 +15705,21 @@
                 + "<button type=\"button\" data-act=\"set\" data-i=\"" + i + "\" title=\"期待差額と正しい販売期間を入力欄に入れます（まだ反映はしません）\">期待値（差額・期間）を入力</button>"
                 + "<button type=\"button\" class=\"mxe-danger\" data-act=\"del\" data-i=\"" + i + "\">この行を削除</button></div></div>";
             });
-          } else if (res.missing) {
-            h += "<div class=\"mxe-miss\">UG登録がありません（登録漏れ候補）。期待差額と正しい販売期間でUG行を追加できます。列は同じ販売条件の既存UG行・元/先の通常行から引き継ぎます。</div>";
-            if (res.plan && res.plan.length) {
-              h += "<table class=\"mxe-plan\"><tr><th>販売経路</th><th>前売</th><th>当日</th><th>販売期間</th><th>判定</th></tr>"
-                + res.plan.map(function (p) { return "<tr><td>" + esc(p.route) + "</td><td>" + yen(p.adv) + "</td><td>" + yen(p.day) + "</td><td>" + esc(p.start) + "<br>〜 " + esc(p.end) + "</td><td>" + stBadge(p.status) + "</td></tr>"; }).join("")
-                + "</table><div class=\"mxe-btns\"><button type=\"button\" class=\"mxe-primary\" data-act=\"add\">＋ UG行を追加</button></div>";
-            } else h += "<div class=\"mxe-errbox\">" + esc(res.planError || "追加する行を作れません") + "</div>";
           } else {
-            h += "<div class=\"mxe-miss\">UG登録はありません（登録漏れ候補でもありません）。</div>";
+            /* 値の無いセル: 登録漏れ?候補なら期待値で、それ以外（ルール外）も手入力で追加できる（2026-10-16 SHUN指示） */
+            h += res.missing
+              ? "<div class=\"mxe-miss\">UG登録がありません（登録漏れ候補）。期待差額と正しい販売期間を入れてあります。必要なら直して追加してください。</div>"
+              : "<div class=\"mxe-miss mxe-manual\">UG登録はありません。業務ルール上は対象外の組合せですが、<b>ルール外の設定として手入力で追加</b>できます（追加した行は出力前チェックでエラーになることがあります）。</div>";
+            if (res.plan && res.plan.length) {
+              res.plan.forEach(function (p, i) {
+                h += "<div class=\"mxe-row mxe-addrow\" data-add=\"" + i + "\"><div class=\"mxe-rowhead\"><label class=\"mxe-addchk\"><input type=\"checkbox\" name=\"use\"" + (res.missing || res.plan.length === 1 ? " checked" : "") + "> 追加する</label> "
+                  + routePill(p.route) + " " + stBadge(p.status) + (p.cond ? " <span class=\"mxe-cond-tag\">" + esc(p.cond) + "</span>" : "") + "</div>"
+                  + "<div class=\"mxe-grid\">" + field("adv", "前売差額", p.adv, false) + field("day", "当日差額", p.day, false)
+                  + field("start", "販売開始", p.start, false) + field("end", "販売終了", p.end, false)
+                  + (p.hasRoute === false ? "" : field("route", "販売経路", p.route, false)) + "</div></div>";
+              });
+              h += "<div class=\"mxe-btns\"><button type=\"button\" class=\"mxe-primary\" data-act=\"add\" title=\"入力欄で Enter でも追加します\">＋ 選んだ行を追加（Enter）</button></div>";
+            } else h += "<div class=\"mxe-errbox\">" + esc(res.planError || "追加する行を作れません") + "</div>";
           }
           return h;
         }
@@ -15706,12 +15752,12 @@
           return Object.keys(vals).some(function (k) { return normVal(k, vals[k]) !== normVal(k, r[k]); });
         }
         function dirtyRows() {
-          return panel ? Array.prototype.slice.call(panel.querySelectorAll(".mxe-row")).filter(isRowDirty) : [];
+          return panel ? Array.prototype.slice.call(panel.querySelectorAll(".mxe-row:not(.mxe-addrow)")).filter(isRowDirty) : [];
         }
         function refreshDirty() {
           if (!panel) return;
           var n = 0;
-          panel.querySelectorAll(".mxe-row").forEach(function (rowEl) {
+          panel.querySelectorAll(".mxe-row:not(.mxe-addrow)").forEach(function (rowEl) {
             var d = isRowDirty(rowEl), r = rowInfo(rowEl);
             rowEl.classList.toggle("mxe-dirty", d);
             if (d) n++;
@@ -15852,6 +15898,8 @@
         function focusFirst() {
           if (!panel) return;
           var x = panel.querySelector(".mxe-row input[name=adv]") || panel.querySelector("[data-act=add]");
+          var ad = panel.querySelector(".mxe-addrow input[name=use]:checked");
+          if (ad) { var ai = ad.closest(".mxe-addrow").querySelector("input[name=adv]"); if (ai) x = ai; }
           if (x) { x.focus(); if (x.select) x.select(); }
         }
         async function openPanel(td, flash, keep) {
@@ -15954,7 +16002,27 @@
             }
           }
           if (name === "add") {
-            var ares = await api("add", reqOf(td, spec));
+            var areq = reqOf(td, spec), items = [];
+            panel.querySelectorAll(".mxe-addrow").forEach(function (el) {
+              var use = el.querySelector("input[name=use]");
+              if (use && !use.checked) return;
+              var vals = {};
+              el.querySelectorAll(".mxe-grid input[name]").forEach(function (x) { vals[x.name] = x.value; });
+              items.push({ i: Number(el.getAttribute("data-add")), values: vals });
+            });
+            if (panel.querySelector(".mxe-addrow")) {
+              if (!items.length) { say("追加する行にチェックを入れてください", "err"); return false; }
+              areq.items = items;
+            }
+            panel.querySelectorAll(".mxe-addrow .mxe-ferr").forEach(function (em) { em.textContent = ""; });
+            var ares = await api("add", areq);
+            if (ares.addInputErrors) {
+              Object.keys(ares.addInputErrors).forEach(function (ri) {
+                var el = panel.querySelector(".mxe-addrow[data-add=\"" + ri + "\"]"), errs = ares.addInputErrors[ri];
+                if (el) Object.keys(errs).forEach(function (k) { var em = el.querySelector(".mxe-ferr[data-for=\"" + k + "\"]"); if (em) em.textContent = errs[k]; });
+              });
+              return false;
+            }
             afterChange(ares, ares.ok ? resultFlash(ares, "UG行を" + (ares.added || 0) + "行追加しました") : null);
             return !!ares.ok;
           }
@@ -16013,12 +16081,21 @@
            矢印・Tab=セル移動／入力欄で Enter=その行を反映・Ctrl+Enter=未反映を全部反映・Esc=入力を元に戻す
            表で Esc=選択解除／Ctrl+Z=元に戻す／F8・Shift+F8=次・前のNGセル */
         var DATA_TD = "table.mx td";
-        async function selectCell(td, edit) {
+        /* mode: false=選ぶだけ（クリック・矢印。誤操作を防ぐため編集欄は開かない）／"open"=編集欄を開く（F8・一覧の移動）／
+           true=編集欄を開いて入力開始（ダブルクリック・Enter・F2）。2026-10-16 SHUN指示: ダブルクリックで編集欄 */
+        async function selectCell(td, mode) {
           if (!td || busy) return;
-          if (panel && panel._td === td) { if (edit) focusFirst(); return; }
+          if (!mode) {
+            if (panel && panel._td !== td) { if (!(await guardDirty())) return; closePanel(); }
+            markSel(td);
+            if (td.scrollIntoView) td.scrollIntoView({ block: "nearest", inline: "nearest" });
+            blurToGrid();
+            return;
+          }
+          if (panel && panel._td === td) { if (mode === true) focusFirst(); return; }
           if (!(await guardDirty())) return;
-          if (td.matches(SEL)) await openPanel(td); else showNaPanel(td);
-          if (edit) focusFirst(); else blurToGrid();
+          if (td.matches(SEL) || specOf(td)) await openPanel(td); else showNaPanel(td);
+          if (mode === true) focusFirst(); else blurToGrid();
         }
         function moveSel(dr, dk) {
           if (!sel) return null;
@@ -16051,7 +16128,7 @@
           }
           if (i < 0) i = list.length - 1;
           if (i >= list.length) i = 0;
-          selectCell(list[i]);
+          selectCell(list[i], "open");
           say("NG " + (i + 1) + " / " + list.length + " 件目（F8: 次へ　Shift+F8: 前へ）", "info");
         }
         /* 編集モード中はセルのクリックをマーク付けより先に受け取る */
@@ -16080,8 +16157,11 @@
           if (topDlg) { if (!topDlg.contains(e.target)) trapTab(topDlg, e); return; }
           var t = e.target;
           var inInput = !!(panel && t && t.tagName === "INPUT" && panel.contains(t));
+          if (inInput && t.closest(".mxe-addrow") && e.key === "Enter" && !e.isComposing && e.keyCode !== 229 && t.type !== "checkbox") {
+            e.preventDefault(); act("add"); return;
+          }
           if (inInput) {
-            var rowEl = t.closest(".mxe-row");
+            var rowEl = t.closest(".mxe-row:not(.mxe-addrow)");
             if (e.key === "Enter" && !e.isComposing && e.keyCode !== 229) {
               e.preventDefault();
               if (e.ctrlKey || e.metaKey) { act("applyall"); return; }
@@ -16113,7 +16193,7 @@
           if (e.key === "Tab") mv = [0, e.shiftKey ? -1 : 1];
           if (mv) { e.preventDefault(); var nx = moveSel(mv[0], mv[1]); if (nx) selectCell(nx, false); return; }
           if (e.key === "Enter" || e.key === "F2") { e.preventDefault(); selectCell(sel, true); return; }
-          if (e.key === "Escape") { e.preventDefault(); act("close"); }
+          if (e.key === "Escape") { e.preventDefault(); if (panel) act("close"); else clearSel(); }
         });
         var prevNg = document.getElementById("mxe-prevng"), nextNg = document.getElementById("mxe-nextng");
         if (prevNg) prevNg.addEventListener("click", function () { jumpNg(-1); });
@@ -16136,7 +16216,7 @@
             var sp = specOf(cells[i]);
             if (sp && keyOf(sp) === k) {
               cells[i].scrollIntoView({ block: "center", inline: "center" });
-              selectCell(cells[i], false);
+              selectCell(cells[i], "open");
               return true;
             }
           }
@@ -16588,7 +16668,7 @@ ${_sortableTable(labels, rowsHtml)}` };
               const pr = p ? `<div class="hp">前${money(p.adv)}<br>当${money(p.day)}${periodHeaderHtml(p)}</div>` : "";
               const colSep = ts !== prevTsHead ? " mx-colsep" : "";
               prevTsHead = ts;
-              head += `<th class="agehdr${colSep}">${escHtml(ageLabel(ta))}${pr}</th>`;
+              head += `<th class="agehdr${colSep}" data-ts="${escHtml(ts)}" data-ta="${escHtml(ta)}">${escHtml(ageLabel(ta))}${pr}</th>`;
             }
             head += `</tr>`;
 
@@ -16596,7 +16676,7 @@ ${_sortableTable(labels, rowsHtml)}` };
             for (const fs of fromSeats) {
               fromAges[fs].forEach((fa, i) => {
                 // 席種ブロックの境目を太線で区切る（席種が変わる最初の年齢行）
-                bodyRows += `<tr${i === 0 ? ' class="seat-sep"' : ""}>`;
+                bodyRows += `<tr${i === 0 ? ' class="seat-sep"' : ""} data-fs="${escHtml(fs)}" data-fa="${escHtml(fa)}">`;
                 // rowspanにすると縦スクロールでブロック先頭行が画面外に出た瞬間に席種名が見えなくなるため、
                 // 各行に複製して常に表示する（見た目のグループ分けは背景色とseat-sep枠線で行う）
                 bodyRows += `<th class="rowh seatrow" style="background:${seatColor(fs)}">${escHtml(seatLabel(fs, seatCode[fs]))}${catBadge(seatCat(seatCode[fs], fs))}</th>`;
@@ -17041,6 +17121,9 @@ body.mx-editing table.mx td.mxc[data-n] { padding-top: 12px; }
 .mxe-dirtybar { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 6px; padding: 5px 8px; margin: 6px 0; font-weight: 700; color: #92400e; }
 .mxe-dirtybar[hidden] { display: none; }
 .mxe-f.mxe-wide { grid-column: 1 / -1; }
+.mxe-miss.mxe-manual { background: #eef2ff; border-color: #a5b4fc; color: #3730a3; }
+.mxe-addrow { background: #f8fafc; }
+.mxe-addchk { font-weight: 700; color: #217346; cursor: pointer; }
 .mxe-f input.mxe-num { text-align: right; }
 .mxe-f.mxe-changed input { background: #fef9c3; border-color: #eab308; }
 .mxe-tools button.mxe-pending { background: #b45309; border-color: #b45309; color: #fff; }
