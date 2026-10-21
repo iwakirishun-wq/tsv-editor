@@ -71,7 +71,8 @@ try {
     try {
         $deploymentJson = & clasp list-deployments --json
         if ($LASTEXITCODE -ne 0) { throw 'Cannot read GAS deployments.' }
-        $deployment = @($deploymentJson | ConvertFrom-Json) | Where-Object { $_.deploymentId -eq $target.deploymentId }
+        $deployments = $deploymentJson | ConvertFrom-Json
+        $deployment = $deployments | Where-Object { $_.deploymentId -eq $target.deploymentId }
     } finally { Pop-Location }
     if (-not $deployment.versionNumber) { throw 'Existing GAS deployment has no published version.' }
     $verificationDir = Join-Path $repo ('.agents/publish-verification/' + [guid]::NewGuid().ToString('N'))
