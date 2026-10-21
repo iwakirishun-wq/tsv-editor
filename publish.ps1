@@ -24,8 +24,8 @@ try {
     $commit = (& git rev-parse HEAD).Trim()
     $remote = (& git remote get-url origin).Trim()
     if ($LASTEXITCODE -ne 0 -or $remote -notmatch 'github\.com[:/]iwakirishun-wq/tsv-editor(?:\.git)?$') { throw 'Unexpected GitHub origin; stopping.' }
-    $target = Get-Content -LiteralPath 'gas/deploy_target.json' -Raw | ConvertFrom-Json
-    $config = Get-Content -LiteralPath 'gas/.clasp.json' -Raw | ConvertFrom-Json
+    $target = Get-Content -LiteralPath 'gas/deploy_target.json' -Raw -Encoding UTF8 | ConvertFrom-Json
+    $config = Get-Content -LiteralPath 'gas/.clasp.json' -Raw -Encoding UTF8 | ConvertFrom-Json
     if (-not $target.deploymentId -or -not $config.scriptId) { throw 'Existing GAS target is missing.' }
     $pagesJson = & gh api repos/iwakirishun-wq/tsv-editor/pages
     if ($LASTEXITCODE -ne 0) { throw 'Cannot read GitHub Pages configuration.' }
