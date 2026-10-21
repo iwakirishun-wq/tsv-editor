@@ -32,3 +32,6 @@ tools/diagnose_test.js
 
 __pycache__/
 *.pyc
+
+# Temporary immutable GAS release verification
+.agents/publish-verification/
