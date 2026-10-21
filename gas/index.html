@@ -3024,12 +3024,19 @@
         if (/大人|ADULT|高校/i.test(a)) return 4;
         return 0; // 共通・不明はランク判定しない
       }
+      // もてぎ「小学生以上」（KEN309）は、大人扱いの業務分類でも小学生以上の共通券（2026-10-21 SHUN確認）。
+      // 「大人(小学生以上)」や複合券種まで共通券へ広げない。既存の共通・全年齢券は従来どおり。
+      function ugIsCommonAgeTicket(a) {
+        a = ugNormAgeText(a);
+        if (ugIsCompositeAgeTicket(a)) return false;
+        return /共通|全年齢/.test(a) || (/小学(?:生)?以上/.test(a) && !/大人|ADULT/i.test(a));
+      }
       // 年齢区分を「範囲」[min,max]ランクで返す（範囲券種対応・2026-07-07追加）。
       //  common=true: 「3歳以上共通」等の全年齢券種（年齢制限なし）／ min=0: 判定不能。
       //  単一ラベルは min===max。範囲例:「幼児〜中学生」「3歳〜中学生」=[1,2]／「高校生以上」「高校生〜大人」=[3,4]。
       function ugAgeSpan(a) {
         a = ugNormAgeText(a);
-        if (/共通|全年齢/.test(a)) return { min: 1, max: 4, common: true };
+        if (ugIsCommonAgeTicket(a)) return { min: 1, max: 4, common: true };
         const ranks = [];
         if (/幼児|未就学|INFANT/i.test(a)) ranks.push(1);
         // 「3歳〜」等、先頭付近の小さい歳(3〜6)は幼児からの範囲とみなす（「24歳」等の大人表記は数字直後なので除外）
@@ -3225,7 +3232,7 @@
         const sc = ugAgeClass(srcAge);
         if (!sc) return null;
         const pair = "(" + srcAge + "→" + dstAge + ")";
-        if (/共通|全年齢/.test(ugNormAgeText(dstAge))) {
+        if (ugIsCommonAgeTicket(dstAge)) {
           // 子ども系→共通券は対象年齢が重なれば可（§14確認3）。2026-10-14 SHUN指摘で§15-1（下限つき共通は一律不可）を撤回:
           // 「共通が付く場合は大人以外不可」は共通券“から”の変更（§13）の意味だった。Paddock Club(8歳以上共通)・
           // VIPスイート・プレミアム(中学生以上共通)へのU23・子どもからのUGは可。幼児→8歳以上共通 等の重ならない組は不可。

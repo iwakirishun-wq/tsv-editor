@@ -430,7 +430,7 @@ eq(core.ugSameTicket("", K.ADT24), false, "ugSameTicket 空/大人");
 
 // C2（変更なし）: 大人(高校生以上)・高校生以上 → 中学生以上（共通なし）は「年齢降格」で不可が正しい
 both(A, K.ADT_HS, B, K.MS_UP, false, "C2 大人(高校生以上)→中学生以上 は不可のまま");
-both(A, K.HS_UP, B, K.SH_UP, false, "C2 高校生以上→小学生以上 は不可のまま");
+both(A, K.HS_UP, B, K.SH_UP, true, "2026-10-21 小学生以上は共通券: 高校生以上→小学生以上 は可");
 both(A, K.ADT24, B, K.MS_UP, true, "C2 対照: 大人(24歳以上)→中学生以上 は可");
 
 // =============================================================
@@ -475,6 +475,19 @@ for (const u of ["U-23（高校生～23歳）", "U－23（高校生～23歳）",
   both(A, u, B, "25歳以上共通", false, `表記ゆれ ${u}→25歳以上共通 は対象年齢外で不可`);
 }
 eq(JSON.stringify(core.ugAgeSpan("U-23")), JSON.stringify({ min: 3, max: 3, common: false }), "ugAgeSpan U-23 単独=[3,3]");
+
+// 2026-10-21 SHUN確認: もてぎ「小学生以上」は小学生以上の共通券。大人扱いの分類だけで別席種UGを除外しない。
+for (const target of ["小学生以上", "もてぎ_小学生以上", "小学以上"]) {
+  eq(core.ugIsAdultCategory(target), true, target + " は業務上の大人扱いを維持");
+  for (const src of [K.CH_S, K.MS, K.CH_SM, K.CH_3S, K.U23, K.HS]) {
+    both(A, src, B, target, true, src + "→" + target + " 別席種でも対象年齢が重なる");
+  }
+  for (const src of [K.INF, K.INF02, K.M_3P]) {
+    both(A, src, A, target, false, src + "→" + target + " 同席種でも対象年齢外");
+    both(A, src, B, target, false, src + "→" + target + " 別席種でも対象年齢外");
+  }
+  both(A, target, B, K.CH_S, false, target + "→小学生 は共通券から若年券への変更禁止を維持");
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

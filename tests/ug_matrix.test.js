@@ -205,5 +205,20 @@ eq(cellCC[1].find((it) => it[0] === 2 && it[1] === 0).slice(2, 7), [1, 500, 500,
 eq(pc.counts, g.counts, "表示データの件数はモデルと同じ");
 eq(pc.cells["2,0"], undefined, "UGの無い組合せはセルなし");
 
+// 2026-10-21 もてぎ「小学生以上」共通券: HTMLマトリクス用モデルに、子どもからの設定漏れと差額を出す。
+const motegiTarget = "もてぎ_小学生以上";
+const motegiSrc = "もてぎ_通常指定席", motegiDst = "もてぎ_上位指定席";
+const motegiNormals = [
+  normal(motegiSrc, "M1", CHILD, 2000, 2500), normal(motegiSrc, "M1", INFANT, 1000, 1500),
+  normal(motegiDst, "M2", motegiTarget, 6000, 7000),
+];
+const motegiMissing = run(motegiNormals, [ug(motegiDst, "M2", motegiTarget, motegiDst, "M2", motegiTarget, 500, 500)]);
+const motegiCell = motegiMissing.conds.find(g => g.cond === COND).cells.get(key(motegiSrc, motegiDst));
+eq(motegiCell.items.map(i => [i.srcAge, i.dstAge, i.state, i.expAdv, i.expDay]),
+  [[CHILD, motegiTarget, "missing", 4000, 4500]], "小学生以上の共通券は子どもからのUG設定漏れを表示し、幼児は含めない");
+const motegiRegistered = run(motegiNormals, [ug(motegiSrc, "M1", CHILD, motegiDst, "M2", motegiTarget, 4000, 4500)]);
+eq(items(motegiRegistered, COND, motegiSrc, motegiDst),
+  ["子ども（小学生・中学生）>もてぎ_小学生以上:ok"], "小学生以上共通券への実差額UGは正常");
+
 console.log(`ug_matrix: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
