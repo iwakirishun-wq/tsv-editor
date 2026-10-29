@@ -105,6 +105,19 @@ async function withPage(browser, fn) {
   }
 }
 
+// 価格チェック表は全環境でアプリ内の全画面の枠（#pc-inapp の iframe、index.html の _openPriceCheckInApp）で開く
+// （2026-10-29 PR #27 以降。それまではポップアップで開いていた）。
+// 枠の中のフレームを返す（以前のポップアップのページと同じように locator で中身を確認できる）。枠内のコンソールエラー・ページエラーは withPage の page 側の記録に入る。
+async function openPriceCheckInApp(page, goBtn) {
+  await goBtn.click();
+  const frameEl = await page.waitForSelector("#pc-inapp iframe", { state: "attached", timeout: 10000 });
+  const frame = await frameEl.contentFrame();
+  if (!frame) throw new Error("価格チェック表の枠(#pc-inapp iframe)の中身が取得できない");
+  await frame.waitForLoadState("domcontentloaded");
+  await frame.waitForSelector(".ptab", { timeout: 10000 });
+  return frame;
+}
+
 // --- シナリオ1: 価格スケジュール(ダミー) ---
 async function runPriceScheduleScenario(browser, today) {
   return withPage(browser, async (page) => {
@@ -130,23 +143,19 @@ async function runPriceScheduleScenario(browser, today) {
     // ダミーデータは既知のイベント最終日に合わせて境界日時を固定する（結果を安定させるため自動候補は使わない）
     await page.fill("#px-cutoff-date", dummy.DAY_CUTOFF_DATE);
     await page.fill("#px-cutoff-time", dummy.DAY_CUTOFF_TIME);
-    const [popup] = await Promise.all([page.waitForEvent("popup"), goBtn.click()]);
-    await popup.waitForLoadState("domcontentloaded");
-    const popupErrors = [];
-    popup.on("console", (msg) => { if (msg.type() === "error") popupErrors.push(msg.text()); });
-    popup.on("pageerror", (err) => popupErrors.push(String(err)));
-    await popup.waitForTimeout(600);
+    const pcFrame = await openPriceCheckInApp(page, goBtn);
+    await pcFrame.waitForTimeout(600);
 
-    const bodyText = await popup.locator("body").innerText();
+    const bodyText = await pcFrame.locator("body").innerText();
     for (const pat of ["NaN", "undefined", "[object Object]"]) {
       if (bodyText.includes(pat)) anomalies.push(`本文に "${pat}" が出現`);
     }
 
     // UG一覧タブで既知の差額NG/設定不可/登録漏れ?候補の件数を確認する
-    const ugListTab = popup.locator(".ptab", { hasText: "UG一覧" });
+    const ugListTab = pcFrame.locator(".ptab", { hasText: "UG一覧" });
     await ugListTab.click();
-    await popup.waitForTimeout(300);
-    const ugBadges = await popup.locator(".badge-ng, .badge-ok, .badge-na").allInnerTexts();
+    await pcFrame.waitForTimeout(300);
+    const ugBadges = await pcFrame.locator(".badge-ng, .badge-ok, .badge-na").allInnerTexts();
 
     // UG一覧の差額NG/設定不可は、仕込んだ行を手で数えた既知の期待値と比較する（厳密一致）
     const ugBadgeText = ugBadges.join(" ");
@@ -166,7 +175,7 @@ async function runPriceScheduleScenario(browser, today) {
     ];
     const expectedInvalidCount = expectedInvalidRows.length;
     // 件数だけでは「UGルール変更で増えたのか回帰なのか」が判断できないため、NG行の中身も控える
-    const ugNgRows = await popup.locator("tr.ng-row").evaluateAll((trs) => trs.map((tr) => {
+    const ugNgRows = await pcFrame.locator("tr.ng-row").evaluateAll((trs) => trs.map((tr) => {
       const [, from, to, fromAge, toAge] = decodeURIComponent(tr.getAttribute("data-mid") || "").split("|");
       return `${from}(${fromAge})→${to}(${toAge}): ${tr.getAttribute("data-fcmt") || ""}`;
     }));
@@ -180,11 +189,11 @@ async function runPriceScheduleScenario(browser, today) {
 
     // マトリクスの「登録漏れ?」候補は組み合わせ全体（cross product）に依存して変動しうるため、厳密な総数では
     // なく「1件以上検出され、かつ仕込んだVC-2→Z席が含まれる」ことだけを確認する
-    const matrixTab = popup.locator(".ptab", { hasText: "マトリクス" });
+    const matrixTab = pcFrame.locator(".ptab", { hasText: "マトリクス" });
     await matrixTab.click();
-    await popup.waitForTimeout(300);
-    const matrixBadges = await popup.locator(".badge-ng, .badge-ok").allInnerTexts();
-    const missingCells = await popup.locator("td.mx-missing").all();
+    await pcFrame.waitForTimeout(300);
+    const matrixBadges = await pcFrame.locator(".badge-ng, .badge-ok").allInnerTexts();
+    const missingCells = await pcFrame.locator("td.mx-missing").all();
     let foundVcToZ = false;
     for (const cell of missingCells) {
       const rowLabel = await cell.evaluate((td) => td.closest("tr")?.querySelector("th.rowh")?.textContent || "");
@@ -194,15 +203,15 @@ async function runPriceScheduleScenario(browser, today) {
     if (!foundVcToZ) anomalies.push("VC-2発の登録漏れ?候補（VC-2→Z席を想定）が見つからなかった");
 
     // 通常価格表（前売/当日 行分割レイアウト）も一応開いてエラーが出ないか確認
-    const normalTab = popup.locator(".ptab", { hasText: "通常価格表" });
+    const normalTab = pcFrame.locator(".ptab", { hasText: "通常価格表" });
     await normalTab.click();
-    await popup.waitForTimeout(300);
+    await pcFrame.waitForTimeout(300);
 
     // HTML保存ボタンの動作確認
     let htmlSaveSizeBytes = null;
-    const htmlBtn = popup.locator("#mk-html");
+    const htmlBtn = pcFrame.locator("#mk-html");
     if (await htmlBtn.count()) {
-      const [download] = await Promise.all([popup.waitForEvent("download"), htmlBtn.click()]);
+      const [download] = await Promise.all([page.waitForEvent("download"), htmlBtn.click()]);
       const savePath = path.join(LOG_DIR, `${today}_price-schedule-dummy_saved.html`);
       await download.saveAs(savePath);
       htmlSaveSizeBytes = fs.statSync(savePath).size;
@@ -213,7 +222,7 @@ async function runPriceScheduleScenario(browser, today) {
 
     return {
       name: "price-schedule-dummy",
-      anomalies: anomalies.concat(popupErrors.map((e) => "[popup] " + e)),
+      anomalies,
       ngBadges: { ug: ugBadges, matrix: matrixBadges },
       counts: { actualNg, actualInvalid, missingCount: missingCells.length },
       ugNgRows,
@@ -335,14 +344,13 @@ async function runRealDataScenarioIfAvailable(browser, today) {
     const goBtn = page.locator("#px-go");
     await goBtn.waitFor({ state: "visible", timeout: 5000 });
     const dayCutoffUsed = await page.locator("#px-cutoff-date").inputValue().catch(() => null);
-    const [popup] = await Promise.all([page.waitForEvent("popup"), goBtn.click()]);
-    await popup.waitForLoadState("domcontentloaded");
-    await popup.waitForTimeout(800);
-    const bodyText = await popup.locator("body").innerText();
+    const pcFrame = await openPriceCheckInApp(page, goBtn);
+    await pcFrame.waitForTimeout(800);
+    const bodyText = await pcFrame.locator("body").innerText();
     for (const pat of ["NaN", "undefined", "[object Object]"]) {
       if (bodyText.includes(pat)) anomalies.push(`本文に "${pat}" が出現`);
     }
-    const ngBadges = await popup.locator(".badge-ng").allInnerTexts();
+    const ngBadges = await pcFrame.locator(".badge-ng").allInnerTexts();
     return {
       name: "real-data-optional",
       anomalies,
