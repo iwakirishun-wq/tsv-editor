@@ -62,8 +62,8 @@ def main():
             page.wait_for_load_state("networkidle")
             page.locator("#file-input").set_input_files(str(f))
             wait("() => (state.data || []).length === 7", page)
+            # 前半は GitHub版（google.script なし）、後半（空セルへの追加）は GAS版の条件で動かす（2026-10-29 編集モードを両方で使えるようにした）
             page.evaluate("""() => {
-                window.google = { script: { run: {} } };
                 state.sejMaster = { fileName: "dummy.tsv", byCode: {
                     "TEST27011": { rsve_unrsve_kbn: "1", seattype_stock_control_typ: "1", box_seat_flg: "0", disp_abb: "A1", seat_type_area_disp_nm: "TEST_A1観戦券" },
                     "TEST27012": { rsve_unrsve_kbn: "1", seattype_stock_control_typ: "1", box_seat_flg: "0", disp_abb: "A2", seat_type_area_disp_nm: "TEST_A2観戦券" },
