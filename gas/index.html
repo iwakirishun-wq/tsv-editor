@@ -16344,7 +16344,7 @@
         });
       }
 
-      // 価格チェック表をアプリ内の全画面の枠（同一オリジンの iframe）で開く（GAS版用）。
+      // 価格チェック表をアプリ内の全画面の枠（同一オリジンの iframe）で開く（全環境。2026-10-15 はGAS版用、2026-10-29 からGitHub版・デスクトップ版も）。
       // 編集モードは枠の親（このアプリ）と postMessage でやり取りするので、ポップアップのつながりに依存しない。
       // 表示・印刷用には「別タブで開く」も残す（別タブでは編集モードは使えない場合がある）。
       // 枠の中身は srcdoc で渡す（サンドボックス内の iframe では Blob URL の読み込みが拒否されエラーページになるため）。
@@ -16736,8 +16736,9 @@ ${_sortableTable(labels, rowsHtml)}` };
           const missingBadge = (missingTotal || missingAll) ? `　<span class="badge-ng" style="background:#b45309">登録漏れ?候補 ${missingTotal}件${missingAll > missingTotal ? `（この表に行・列の無い券種を含めると${missingAll}件）` : ""}</span>` : "";
           // 編集モード（2026-10-13）: ポップアップから本体(window.opener)の _ugMxEditApi を呼んで state.data を直す。
           // フィルター適用中に出した表は検算の対象行が全件と違うため編集不可（全件で出し直してもらう）。
-          // 2026-10-15 SHUN指示: 編集モードはGAS版だけ（GitHub版では不要）。編集バーが無ければ編集用のCSS・スクリプトも埋め込まれない
-          const editBar = !hpIsGas() ? "" : `<div class="mxe-bar" id="mxe-bar" data-sid="${escHtml(_ugMxEditNewSid())}" data-cutoff="${dayCutoff == null ? "" : dayCutoff}" data-filtered="${isFiltered ? "1" : "0"}">`
+          // 2026-10-15 は GAS版だけにしていたが、2026-10-29 SHUN要望で GitHub版（デスクトップ版）でも使えるようにした。
+          // どの環境でもアプリ内の枠（_openPriceCheckInApp）で開き、親（このアプリ）と postMessage でやり取りする
+          const editBar = `<div class="mxe-bar" id="mxe-bar" data-sid="${escHtml(_ugMxEditNewSid())}" data-cutoff="${dayCutoff == null ? "" : dayCutoff}" data-filtered="${isFiltered ? "1" : "0"}">`
             + `<label class="mxe-toggle"><input type="checkbox" id="mxe-on"> ✏ 編集モード</label>`
             + `<span class="mxe-tools" id="mxe-tools" style="display:none"><button type="button" id="mxe-undo" title="アプリ本体の「元に戻す」と同じ（直前の操作を1つ戻す）">↶ 元に戻す（Ctrl+Z）</button>`
             + `<button type="button" id="mxe-prevng" title="前のNGセルへ（Shift+F8）">▲ 前のNG</button><button type="button" id="mxe-nextng" title="次のNGセルへ（F8）">▼ 次のNG</button>`
@@ -16870,16 +16871,8 @@ ${editBar}${mxBody}` };
         // noopener指定だとBlob URLを新規タブが読み込めず、PDF印刷保存が空（0KB）になる不具合があるため外す
         // GAS版では Google 側のページ設定でポップアップと元画面のつながり（window.opener）が切れ、
         // 券種別マトリクスの編集モードが「使えません」になる（2026-10-15 SHUN報告）。GAS版はアプリ内の枠で開く。
-        if (hpIsGas()) {
-          _openPriceCheckInApp(html, url, names0(), !!sections.matrix);
-          return;
-        }
-        function names0() { return order.map(k => tabLabels[k]).join("・"); }
-        const w = window.open(url, "_blank");
-        if (sections.matrix) _ugMxEditRegisterWin(w); // 券種別マトリクスの編集モードの要求を、このウィンドウからだけ受け付ける
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
-        const names = order.map(k => tabLabels[k]).join("・");
-        setStatus(w ? `価格チェックHTMLを出力しました（${names}）` : `ポップアップがブロックされました。ブラウザでこのサイトのポップアップを許可してください。`);
+        // 2026-10-29: GitHub版・デスクトップ版でも編集モードを使えるよう、全環境でアプリ内の枠で開く（ポップアップブロックの影響も受けない）
+        _openPriceCheckInApp(html, url, order.map(k => tabLabels[k]).join("・"), !!sections.matrix);
       }
 
       // 価格チェック用HTML文書（1タブ＝サブタブ切替）。ヘッダー固定・条件セレクタ付き。
