@@ -3237,6 +3237,12 @@
           // 「共通が付く場合は大人以外不可」は共通券“から”の変更（§13）の意味だった。Paddock Club(8歳以上共通)・
           // VIPスイート・プレミアム(中学生以上共通)へのU23・子どもからのUGは可。幼児→8歳以上共通 等の重ならない組は不可。
           if (ugIsAllAgeCommon(dstAge)) return null;
+          // 2026-10-31 SHUN確認: 「小学生以上」（名前に共通なし・§16）へは、同一席種なら未就学児からも年齢変更として可
+          // （もてぎパークパスポート 3歳～未就学児→小学生以上）。別席種は下の重なり判定のまま不可。幼児(0歳～2歳)は§15-3どおり不可。
+          if (srcSeat === dstSeat && !/共通|全年齢/.test(ugNormAgeText(dstAge))) {
+            const st = ugYouthStage(srcAge);
+            if (st && st.hi >= 1) return null;
+          }
           const hi = ugYouthUpperAge(srcAge);
           if (hi == null || hi > ugCommonLowerAge(dstAge)) return null;
           return "共通券種の対象年齢外のためUG不可" + pair;

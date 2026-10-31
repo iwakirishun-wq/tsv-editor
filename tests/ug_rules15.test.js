@@ -483,7 +483,9 @@ for (const target of ["小学生以上", "もてぎ_小学生以上", "小学以
     both(A, src, B, target, true, src + "→" + target + " 別席種でも対象年齢が重なる");
   }
   for (const src of [K.INF, K.INF02, K.M_3P]) {
-    both(A, src, A, target, false, src + "→" + target + " 同席種でも対象年齢外");
+    // 2026-10-31 SHUN確認: 同一席種なら未就学児→小学生以上は年齢変更として可（もてぎパークパスポート）。0～2歳は§15-3どおり不可
+    const same = src !== K.INF02;
+    both(A, src, A, target, same, src + "→" + target + (same ? " 同席種は年齢変更として可" : " 0～2歳は同席種でも不可"));
     both(A, src, B, target, false, src + "→" + target + " 別席種でも対象年齢外");
   }
   both(A, target, B, K.CH_S, false, target + "→小学生 は共通券から若年券への変更禁止を維持");
