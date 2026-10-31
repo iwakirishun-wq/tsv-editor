@@ -1054,6 +1054,108 @@
         left: auto;
         right: 100%;
       }
+
+      /* ===== 2026-10-29 UI改善: 右クリックメニュー（Excel準拠の見え方） ===== */
+      #context-menu, .ctx-submenu {
+        border-color: #c8c8c8;
+        border-radius: 6px;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
+        padding: 4px 0;
+      }
+      .ctx-item, .ctx-group-label { padding: 6px 16px; font-size: 13px; }
+      .ctx-item:hover, .ctx-item:focus, .ctx-group-label:hover { background: rgba(33, 115, 70, 0.12); }
+      /* サブメニューを開いている親項目は、開いている間ずっと色を付けておく（どこを開いているか分かるように） */
+      .ctx-group-label[aria-expanded="true"] {
+        background: rgba(33, 115, 70, 0.18);
+        color: #14532d;
+        font-weight: 600;
+        box-shadow: inset 3px 0 0 var(--range-line);
+      }
+      .ctx-group-label[aria-expanded="true"] .ctx-arrow,
+      .ctx-group-label[aria-expanded="true"] .ctx-group-icon { color: var(--range-line); }
+
+      /* ===== 2026-10-29 UI改善: 絞り込み（フィルター）の見える化 ===== */
+      .filter-btn.active { color: #fff; background: #d97706; }
+      .filter-btn.active:hover { background: #b45309; color: #fff; }
+      .filter-btn svg { display: block; }
+      th.col-filtered {
+        background: linear-gradient(rgba(217, 119, 6, 0.14), rgba(217, 119, 6, 0.14)), var(--header-bg);
+        box-shadow: inset 0 3px 0 #d97706;
+      }
+      th.col-filtered .th-label { color: #92400e; font-weight: 700; }
+      #filter-bar {
+        display: none;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 4px 10px;
+        background: #fff7e6;
+        border-bottom: 1px solid #f5c26b;
+        color: #78350f;
+        font-size: 12px;
+        flex-shrink: 0;
+      }
+      #filter-bar.fb-visible { display: flex; }
+      #filter-bar .fb-title { font-weight: 700; white-space: nowrap; }
+      #filter-bar .fb-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        max-width: 420px;
+        background: #fff;
+        border: 1px solid #f0a73a;
+        border-radius: 999px;
+        padding: 1px 2px 1px 10px;
+        cursor: pointer;
+        font: inherit;
+        color: inherit;
+      }
+      #filter-bar .fb-chip:hover { background: #fdecc8; }
+      #filter-bar .fb-txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      #filter-bar .fb-x {
+        border: none;
+        background: transparent;
+        color: #92400e;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 14px;
+        line-height: 1;
+        flex-shrink: 0;
+      }
+      #filter-bar .fb-x:hover { background: #f5c26b; }
+      #filter-bar .fb-clear {
+        margin-left: auto;
+        border: 1px solid #d97706;
+        background: #fff;
+        color: #92400e;
+        border-radius: 4px;
+        padding: 2px 10px;
+        cursor: pointer;
+        font: inherit;
+      }
+      #filter-bar .fb-clear:hover { background: #fdecc8; }
+      .filter-dropdown .fd-current {
+        padding: 6px 8px;
+        margin-bottom: 6px;
+        border-radius: 4px;
+        font-size: 12px;
+        line-height: 1.5;
+        white-space: normal;
+      }
+      .filter-dropdown .fd-current.on { background: #fff7e6; border: 1px solid #f0a73a; color: #78350f; }
+      .filter-dropdown .fd-current.off { background: #f5f5f5; border: 1px solid #e5e5e5; color: #737373; }
+      .filter-dropdown .fd-section-on { outline: 2px solid #d97706; outline-offset: 1px; border-radius: 4px; }
+      .filter-dropdown .fd-badge {
+        display: inline-block;
+        margin-left: 6px;
+        padding: 0 6px;
+        border-radius: 3px;
+        background: #d97706;
+        color: #fff;
+        font-size: 11px;
+      }
       @media (pointer: coarse) {
         .ctx-item,
         .ctx-group-label {
@@ -2003,6 +2105,9 @@
         <input id="fbar-val" type="text" aria-label="セル内容を入力" spellcheck="false" tabindex="-1">
       </div>
     </div>
+
+    <!-- 絞り込み中バー: どの列にどんな条件が掛かっているかを常に表示（updateFilterBar） -->
+    <div id="filter-bar" role="status" aria-live="polite"></div>
 
     <div id="main">
       <div id="drop-zone">
@@ -8568,6 +8673,14 @@
         );
         dd.setAttribute("aria-modal", "true");
 
+        // いま効いている条件（何も効いていなければその旨）を先頭に出す
+        const curBox = document.createElement("div");
+        curBox.className = "fd-current " + (cur ? "on" : "off");
+        curBox.textContent = cur
+          ? `いま適用中: ${describeFilter(cur)}`
+          : "いまは絞り込みなし（全件表示）";
+        dd.appendChild(curBox);
+
         // テキスト検索
         const textInput = document.createElement("input");
         textInput.className = "fd-search";
@@ -8595,6 +8708,7 @@
           e.stopPropagation();
         };
         dd.appendChild(applyTextBtn);
+        if (cur?.type === "text") textInput.classList.add("fd-section-on");
 
         // 範囲条件UI
         const rangeDivider = document.createElement("div");
@@ -8625,6 +8739,10 @@
         rangeRow.appendChild(rangeTo);
         rangeRow.appendChild(rangeMax);
         dd.appendChild(rangeRow);
+        if (cur?.type === "range") {
+          rangeRow.classList.add("fd-section-on");
+          rangeDivider.insertAdjacentHTML("beforeend", '<span class="fd-badge">適用中</span>');
+        }
         const applyRangeBtn = document.createElement("button");
         applyRangeBtn.type = "button";
         applyRangeBtn.className = "fd-apply-btn";
@@ -8701,6 +8819,10 @@
           checkboxes.push(cb);
         });
         dd.appendChild(list);
+        if (cur?.type === "values") {
+          list.classList.add("fd-section-on");
+          divider.insertAdjacentHTML("beforeend", '<span class="fd-badge">適用中</span>');
+        }
 
         cbSearch.onkeydown = (e) => {
           if (e.key === "Escape") closeFilterDropdown();
@@ -8819,6 +8941,12 @@
             state.sortCol === i ? (state.sortAsc ? "▲" : "▼") : "⇅";
           const sortActive = state.sortCol === i ? "active" : "";
           const fltActive = state.columnFilters[i] ? "active" : "";
+          // 絞り込み中の列は見出しをオレンジにし、▼をじょうごに変えて条件をツールチップに出す
+          const fltOn = !!state.columnFilters[i];
+          const fltIcon = fltOn
+            ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 4h18l-7 8.5V19l-4 2v-8.5z"/></svg>'
+            : "▼";
+          const fltTitle = fltOn ? `絞り込み中: ${describeFilter(state.columnFilters[i])}（クリックで変更）` : "フィルター";
           const frozen = i < state.freezeCols ? "frozen-col" : "";
           const freezeBorder =
             i === state.freezeCols - 1 ? "freeze-border" : "";
@@ -8831,13 +8959,13 @@
           // コメントツールチップ（アイコンなし、ホバーで表示）
           const hasComment = !!comment;
           const tooltipHtml = hasComment ? `<div class="th-tooltip visible">${escHtml(comment)}</div>` : `<div class="th-tooltip" data-tooltip-col="${i}"></div>`;
-          html += `<th scope="col" aria-label="${escHtml(displayH)}" style="${w}${freezeLeft}" data-col="${i}" aria-colindex="${i + 2}" class="${active} ${frozen} ${freezeBorder} ${hasComment ? 'has-comment' : ''}" aria-sort="${sortDir}" data-comment-col="${i}">
+          html += `<th scope="col" aria-label="${escHtml(displayH)}" style="${w}${freezeLeft}" data-col="${i}" aria-colindex="${i + 2}" class="${active} ${frozen} ${freezeBorder} ${hasComment ? 'has-comment' : ''} ${fltOn ? 'col-filtered' : ''}" aria-sort="${sortDir}" data-comment-col="${i}">
       <div class="th-inner">
         <span class="th-col-letter" aria-hidden="true">${colIndexToLetter(i)}</span>
         <span class="th-label" title="${escHtml(labelTitle)}">${escHtml(displayH)}</span>
         <div class="th-controls">
           <span class="sort-arrow ${sortActive}" data-sort="${i}" title="ソート" role="button" tabindex="0" aria-label="${escHtml(displayH)}列でソート">${sortIcon}</span>
-          <span class="filter-btn ${fltActive}" data-filter="${i}" title="フィルター" aria-label="${escHtml(displayH)}列をフィルター" role="button" tabindex="0">▼</span>
+          <span class="filter-btn ${fltActive}" data-filter="${i}" title="${escHtml(fltTitle)}" aria-label="${escHtml(displayH)}列をフィルター${fltOn ? "（絞り込み中）" : ""}" role="button" tabindex="0">${fltIcon}</span>
         </div>
       </div>
       ${tooltipHtml}
@@ -12398,12 +12526,35 @@
         els.ctxMenu.innerHTML = html;
         els.ctxMenu.style.display = "block";
 
-        // サブメニュー位置調整（右に収まらない場合は左に）
-        // サブメニューをJSで制御（hover消えバグを防ぐ）
+        // サブメニューの開閉（2026-10-29 Excel準拠に変更）
+        // ・別の項目に触れても即座には切り替えない（少し止まってから切り替える）
+        // ・開いているサブメニューへ斜めに向かう途中なら、通り道の項目では切り替えない
+        // ・カーソルがメニューの外へ少しはみ出しても閉じない（閉じるのは外側クリック・Esc・項目の選択）
         let _subTimer = null;
+        let _openSub = null;
+        const _trail = [];
+        els.ctxMenu.onmousemove = (ev) => {
+          _trail.push({ x: ev.clientX, y: ev.clientY });
+          if (_trail.length > 4) _trail.shift();
+        };
+        // 直近の動きが「開いているサブメニューの方向」かどうか（前の位置とサブメニューの手前の辺で作る三角形の中か）
+        const aimingAtOpenSub = () => {
+          if (!_openSub || _trail.length < 2) return false;
+          const r = _openSub.getBoundingClientRect();
+          const p0 = _trail[0], p = _trail[_trail.length - 1];
+          const toLeft = _openSub.classList.contains("open-left");
+          const ex = toLeft ? r.right : r.left;
+          if (toLeft ? p.x > p0.x : p.x < p0.x) return false;
+          const a = { x: ex, y: r.top - 6 }, c = { x: ex, y: r.bottom + 6 };
+          const s = (u, v, w) => (u.x - w.x) * (v.y - w.y) - (v.x - w.x) * (u.y - w.y);
+          const d1 = s(p, p0, a), d2 = s(p, a, c), d3 = s(p, c, p0);
+          const neg = d1 < 0 || d2 < 0 || d3 < 0, pos = d1 > 0 || d2 > 0 || d3 > 0;
+          return !(neg && pos);
+        };
         els.ctxMenu.querySelectorAll(".ctx-group").forEach((grp) => {
           const sub = grp.querySelector(".ctx-submenu");
           if (!sub) return;
+          const label = sub.previousElementSibling;
           const openSub = () => {
             clearTimeout(_subTimer);
             // 他のサブメニューを全て閉じる
@@ -12419,6 +12570,7 @@
               sub.classList.add("open-left");
             else sub.classList.remove("open-left");
             sub.classList.add("open");
+            _openSub = sub;
             // 下端補正: サブメニューが画面外に出る場合は上にずらす
             requestAnimationFrame(() => {
               const subRect = sub.getBoundingClientRect();
@@ -12430,22 +12582,29 @@
                 sub.style.bottom = "";
               }
             });
-            const openLabel = sub.previousElementSibling;
-            if (openLabel) openLabel.setAttribute("aria-expanded", "true");
+            if (label) label.setAttribute("aria-expanded", "true");
           };
-          const closeSub = () => {
-            _subTimer = setTimeout(() => {
-              sub.classList.remove("open");
-              const closeLabel = sub.previousElementSibling;
-              if (closeLabel) closeLabel.setAttribute("aria-expanded", "false");
-            }, 200);
-          };
-          grp.addEventListener("mouseenter", openSub);
-          grp.addEventListener("mouseleave", closeSub);
+          grp.addEventListener("mouseenter", () => {
+            clearTimeout(_subTimer);
+            if (_openSub === sub) return;
+            // 何も開いていなければすぐ開く。別のサブメニューが開いていれば、
+            // そちらへ向かう途中は長めに待ち、止まったら切り替える（Excelと同じ）
+            const wait = !_openSub ? 0 : aimingAtOpenSub() ? 400 : 150;
+            const tryOpen = () => { if (grp.matches(":hover")) openSub(); };
+            if (wait) _subTimer = setTimeout(tryOpen, wait);
+            else openSub();
+          });
+          // 親項目の上で止まっていれば（斜め移動の途中でなければ）切り替えを早める
+          grp.addEventListener("mousemove", () => {
+            if (_openSub && _openSub !== sub && !aimingAtOpenSub()) {
+              clearTimeout(_subTimer);
+              _subTimer = setTimeout(() => { if (grp.matches(":hover")) openSub(); }, 120);
+            }
+          });
+          // サブメニューに入ったら、通り道の項目で予約された切り替えは取り消す
           sub.addEventListener("mouseenter", () => clearTimeout(_subTimer));
-          sub.addEventListener("mouseleave", closeSub);
-          // コンテキストメニュー本体に戻った時も閉じタイマーをキャンセル
-          els.ctxMenu.addEventListener("mouseenter", () => clearTimeout(_subTimer));
+          // クリック（タッチ）でもすぐ開く
+          if (label) label.addEventListener("click", (ev) => { ev.stopPropagation(); openSub(); });
         });
 
         // リーフアイテムのクリック・キーボードハンドラ
@@ -13350,7 +13509,82 @@
         els.statusFilter.textContent = [filterPart, hiddenPart]
           .filter(Boolean)
           .join(" | ");
+        updateFilterBar();
       }
+
+      // ===== 絞り込みの見える化（2026-10-29） =====
+      // 条件を人が読める文にする（見出しのツールチップ・絞り込み中バー・フィルター設定画面で共通）
+      function describeFilter(f) {
+        if (!f) return "";
+        if (f.type === "text") return `「${f.query}」を含む`;
+        if (f.type === "range") {
+          if (f.min !== null && f.max !== null) return `${f.min} 以上 ${f.max} 以下`;
+          return f.min !== null ? `${f.min} 以上` : `${f.max} 以下`;
+        }
+        if (f.type === "values") {
+          const vals = [...f.values].map((v) => (v === "" ? "(空白)" : v));
+          const head = vals.slice(0, 2).map((v) => `「${v}」`).join("・");
+          return vals.length > 2 ? `${head} ほか（${vals.length}件の値）` : `${head} のどれか`;
+        }
+        return "";
+      }
+      let _filterBarSig = null;
+      function updateFilterBar() {
+        const bar = $("filter-bar");
+        if (!bar) return;
+        const keys = Object.keys(state.columnFilters)
+          .map(Number)
+          .filter((c) => c < state.headers.length)
+          .sort((a, b) => a - b);
+        // 見出しの強調も条件が変わったときだけ描き直す
+        const sig = keys.map((c) => c + ":" + describeFilter(state.columnFilters[c])).join("|");
+        if (sig !== _filterBarSig) {
+          _filterBarSig = sig;
+          if (state.headers.length) renderHeader();
+        }
+        if (!keys.length || !state.filteredIndices) {
+          bar.classList.remove("fb-visible");
+          bar.innerHTML = "";
+          return;
+        }
+        const chips = keys.map((c) => {
+          const name = getDisplayHeader(c) || `列${c + 1}`;
+          const text = `${colIndexToLetter(c)}列 ${name}: ${describeFilter(state.columnFilters[c])}`;
+          return `<span class="fb-chip" data-fb-col="${c}" role="button" tabindex="0" title="${escHtml(text)}（クリックで条件を変更）">`
+            + `<span class="fb-txt">${escHtml(text)}</span>`
+            + `<button type="button" class="fb-x" data-fb-x="${c}" title="この列の絞り込みを解除" aria-label="${escHtml(name)}列の絞り込みを解除">×</button></span>`;
+        }).join("");
+        bar.innerHTML = `<span class="fb-title">🔍 絞り込み中 ${state.filteredIndices.length.toLocaleString()} / ${state.data.length.toLocaleString()}行</span>`
+          + chips
+          + `<button type="button" class="fb-clear" title="すべての絞り込みを解除して全件を表示">すべて解除</button>`;
+        bar.classList.add("fb-visible");
+      }
+      // バーの操作（イベント委譲で1回だけ設定）
+      document.addEventListener("click", (e) => {
+        const bar = e.target.closest && e.target.closest("#filter-bar");
+        if (!bar) return;
+        const x = e.target.closest("[data-fb-x]");
+        if (x) {
+          e.stopPropagation();
+          delete state.columnFilters[x.dataset.fbX];
+          resetForceVisible();
+          applyFilters();
+          return;
+        }
+        if (e.target.closest(".fb-clear")) { clearAllFilters(); return; }
+        const chip = e.target.closest("[data-fb-col]");
+        if (chip) {
+          e.stopPropagation();
+          const c = Number(chip.dataset.fbCol);
+          const btn = document.querySelector(`#thead .filter-btn[data-filter="${c}"]`);
+          openFilterDropdown(c, btn || chip);
+        }
+      });
+      document.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        const chip = e.target.closest && e.target.closest("#filter-bar [data-fb-col]");
+        if (chip && e.target === chip) { e.preventDefault(); chip.click(); }
+      });
 
       function gotoRow(val) {
         const n = parseInt(val);
@@ -16363,7 +16597,7 @@
         });
       }
 
-      // 価格チェック表をアプリ内の全画面の枠（同一オリジンの iframe）で開く（GAS版用）。
+      // 価格チェック表をアプリ内の全画面の枠（同一オリジンの iframe）で開く（全環境。2026-10-15 はGAS版用、2026-10-29 からGitHub版・デスクトップ版も）。
       // 編集モードは枠の親（このアプリ）と postMessage でやり取りするので、ポップアップのつながりに依存しない。
       // 表示・印刷用には「別タブで開く」も残す（別タブでは編集モードは使えない場合がある）。
       // 枠の中身は srcdoc で渡す（サンドボックス内の iframe では Blob URL の読み込みが拒否されエラーページになるため）。
@@ -16755,8 +16989,9 @@ ${_sortableTable(labels, rowsHtml)}` };
           const missingBadge = (missingTotal || missingAll) ? `　<span class="badge-ng" style="background:#b45309">登録漏れ?候補 ${missingTotal}件${missingAll > missingTotal ? `（この表に行・列の無い券種を含めると${missingAll}件）` : ""}</span>` : "";
           // 編集モード（2026-10-13）: ポップアップから本体(window.opener)の _ugMxEditApi を呼んで state.data を直す。
           // フィルター適用中に出した表は検算の対象行が全件と違うため編集不可（全件で出し直してもらう）。
-          // 2026-10-15 SHUN指示: 編集モードはGAS版だけ（GitHub版では不要）。編集バーが無ければ編集用のCSS・スクリプトも埋め込まれない
-          const editBar = !hpIsGas() ? "" : `<div class="mxe-bar" id="mxe-bar" data-sid="${escHtml(_ugMxEditNewSid())}" data-cutoff="${dayCutoff == null ? "" : dayCutoff}" data-filtered="${isFiltered ? "1" : "0"}">`
+          // 2026-10-15 は GAS版だけにしていたが、2026-10-29 SHUN要望で GitHub版（デスクトップ版）でも使えるようにした。
+          // どの環境でもアプリ内の枠（_openPriceCheckInApp）で開き、親（このアプリ）と postMessage でやり取りする
+          const editBar = `<div class="mxe-bar" id="mxe-bar" data-sid="${escHtml(_ugMxEditNewSid())}" data-cutoff="${dayCutoff == null ? "" : dayCutoff}" data-filtered="${isFiltered ? "1" : "0"}">`
             + `<label class="mxe-toggle"><input type="checkbox" id="mxe-on"> ✏ 編集モード</label>`
             + `<span class="mxe-tools" id="mxe-tools" style="display:none"><button type="button" id="mxe-undo" title="アプリ本体の「元に戻す」と同じ（直前の操作を1つ戻す）">↶ 元に戻す（Ctrl+Z）</button>`
             + `<button type="button" id="mxe-prevng" title="前のNGセルへ（Shift+F8）">▲ 前のNG</button><button type="button" id="mxe-nextng" title="次のNGセルへ（F8）">▼ 次のNG</button>`
@@ -16889,16 +17124,8 @@ ${editBar}${mxBody}` };
         // noopener指定だとBlob URLを新規タブが読み込めず、PDF印刷保存が空（0KB）になる不具合があるため外す
         // GAS版では Google 側のページ設定でポップアップと元画面のつながり（window.opener）が切れ、
         // 券種別マトリクスの編集モードが「使えません」になる（2026-10-15 SHUN報告）。GAS版はアプリ内の枠で開く。
-        if (hpIsGas()) {
-          _openPriceCheckInApp(html, url, names0(), !!sections.matrix);
-          return;
-        }
-        function names0() { return order.map(k => tabLabels[k]).join("・"); }
-        const w = window.open(url, "_blank");
-        if (sections.matrix) _ugMxEditRegisterWin(w); // 券種別マトリクスの編集モードの要求を、このウィンドウからだけ受け付ける
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
-        const names = order.map(k => tabLabels[k]).join("・");
-        setStatus(w ? `価格チェックHTMLを出力しました（${names}）` : `ポップアップがブロックされました。ブラウザでこのサイトのポップアップを許可してください。`);
+        // 2026-10-29: GitHub版・デスクトップ版でも編集モードを使えるよう、全環境でアプリ内の枠で開く（ポップアップブロックの影響も受けない）
+        _openPriceCheckInApp(html, url, order.map(k => tabLabels[k]).join("・"), !!sections.matrix);
       }
 
       // 価格チェック用HTML文書（1タブ＝サブタブ切替）。ヘッダー固定・条件セレクタ付き。
