@@ -971,5 +971,21 @@ for (const s of CUTOFF_SCENARIOS) {
   }
 }
 
+// 2026-10-31: UG行と通常行で席種名の表記が違っても、席種エリアコードが同じなら通常価格を引ける（冬花火27 車椅子 同伴）
+{
+  const CD = "MHANAE27112";
+  const ROWS = [
+    priceRow("冬花火27_車椅子同伴A席上段ｴﾘｱ観覧券", CD, "もてぎ_高校生以上", 4000, 999999),
+    priceRow("冬花火27_車椅子同伴A席上段ｴﾘｱ観覧券", CD, "もてぎ_中学生", 3000, 999999),
+  ];
+  const val = buildUgValidator(ROWS, c, v, null);
+  const ugName = "冬花火27_車椅子 同伴A席上段ｴﾘｱ観覧券";
+  const chk = val(ugRow(ugName, CD, "もてぎ_中学生", ugName, CD, "もてぎ_高校生以上", 1000, 999999));
+  eqCU(chk.status, "ok", "席種名の表記違い: コードで通常価格を引いて検算OK");
+  eqCU(chk.expected, 1000, "席種名の表記違い: 期待差額（前売）1,000");
+  const chk2 = val(ugRow(ugName, "", "もてぎ_中学生", ugName, "", "もてぎ_高校生以上", 1000, 999999));
+  eqCU(chk2.status, "unknown", "コードが無く名前も違えば従来どおり価格不明");
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

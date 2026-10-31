@@ -3358,6 +3358,16 @@
           const ak = seat + "|" + age;
           if (any.has(ak)) multiNormal.add("ANY|" + ak);
           else any.set(ak, rec);
+          // 2026-10-31: 席種エリアコードでも引けるようにする（キーは「#コード」）。UG行と通常行で席種名の表記
+          // （空白・全角半角）が少しでも違うと名前では通常価格が見つからず「価格不明」になっていた（冬花火27 車椅子 同伴）
+          const seatCd = c.seatCd ? v(row, c.seatCd).trim() : "";
+          if (seatCd) {
+            const ckc = condKey(row) + "|#" + seatCd + "|" + age, akc = "#" + seatCd + "|" + age;
+            if (byCond.has(ckc)) multiNormal.add(ckc);
+            byCond.set(ckc, rec);
+            if (any.has(akc)) multiNormal.add("ANY|" + akc);
+            else any.set(akc, rec);
+          }
           bumpSpan(spanByCond, ck, rec);
           bumpSpan(spanAny, ak, rec);
           bumpMax(maxByCond, condKey(row) + "|" + seat, rec);
@@ -3494,11 +3504,14 @@
           return false;
         };
         const isDummyPrice = ugIsDummyPrice; // 売止め等のダミー価格判定（純粋ロジックを委譲）
-        const lookup = (ck, seat, age) => byCond.get(ck + "|" + seat + "|" + age) || any.get(seat + "|" + age) || null;
+        // code（席種エリアコード）があればコードで先に引き、無ければ席種名で引く
+        const lookup = (ck, seat, age, code) => (code && (byCond.get(ck + "|#" + code + "|" + age) || any.get("#" + code + "|" + age)))
+          || byCond.get(ck + "|" + seat + "|" + age) || any.get(seat + "|" + age) || null;
         // lookup が返した通常行が「その席種×券種で唯一の行」だったか。
         // 期分け（同一キーに複数行）だと lookup は1行しか返せず、その行の期間は
         // UG行の期間と一致しないのが当たり前なので、厳密一致で判定してはいけない。
-        const isUniqueNormal = (ck, seat, age) => {
+        const isUniqueNormal = (ck, seat, age, code) => {
+          if (code && (byCond.has(ck + "|#" + code + "|" + age) || any.has("#" + code + "|" + age))) seat = "#" + code;
           const k = ck + "|" + seat + "|" + age;
           if (byCond.has(k)) return !multiNormal.has(k);
           return any.has(seat + "|" + age) && !multiNormal.has("ANY|" + seat + "|" + age);
@@ -3652,7 +3665,7 @@
           // 0円商品はUGの元にも先にもできない（VBAから2026-08-25移植）
           {
             const ck0 = condKey(row);
-            if (hasZeroPrice(lookup(ck0, srcSeat, srcAge)) || hasZeroPrice(lookup(ck0, dstSeat, dstAge))) {
+            if (hasZeroPrice(lookup(ck0, srcSeat, srcAge, srcCode)) || hasZeroPrice(lookup(ck0, dstSeat, dstAge, dstCode))) {
               problems.push("0円商品はUG不可");
             }
           }
@@ -3660,7 +3673,7 @@
           // 0円に丸めて登録する旧例外は廃止し、正規に除外される券種を登録漏れ候補にも含めない。
           {
             const ck = condKey(row);
-            const windows = ticketDowngradeWindows(lookup(ck, srcSeat, srcAge), lookup(ck, dstSeat, dstAge));
+            const windows = ticketDowngradeWindows(lookup(ck, srcSeat, srcAge, srcCode), lookup(ck, dstSeat, dstAge, dstCode));
             if (windows.length) problems.push("対象券種の" + windows.map((w) => w === "adv" ? "前売" : "当日").join("・") + "価格が先<元のためUG不可（0円への丸め不可）");
           }
           // 席種ごとの最高額（前売/当日それぞれ・ダミー除外）を比較した実質ダウングレードは不可。
@@ -3688,7 +3701,7 @@
             const ugStart = parseDt(v(row, c.start)), ugEnd = parseDt(v(row, c.end));
             if (ugStart != null && ugEnd != null) {
               const ckP = condKey(row);
-              const srcNormal = lookup(ckP, srcSeat, srcAge), dstNormal = lookup(ckP, dstSeat, dstAge);
+              const srcNormal = lookup(ckP, srcSeat, srcAge, srcCode), dstNormal = lookup(ckP, dstSeat, dstAge, dstCode);
               // 厳密な一致判定は「元・先とも通常行が一意に引き当てられる」ときだけ。
               // 期分けがあると lookup は複数ある期のうち1つしか返せないため、
               // 一致判定にすると期分けのある席種のUG行が軒並み invalid になる（正本§7-1）。
@@ -3696,7 +3709,7 @@
               const bothDates = srcNormal && dstNormal &&
                 srcNormal.start != null && srcNormal.end != null &&
                 dstNormal.start != null && dstNormal.end != null &&
-                isUniqueNormal(ckP, srcSeat, srcAge) && isUniqueNormal(ckP, dstSeat, dstAge);
+                isUniqueNormal(ckP, srcSeat, srcAge, srcCode) && isUniqueNormal(ckP, dstSeat, dstAge, dstCode);
               if (bothDates) {
                 const wantStart = Math.max(srcNormal.start, dstNormal.start);
                 const wantEnd = Math.min(srcNormal.end, dstNormal.end);
@@ -3737,7 +3750,7 @@
           const calc = (which) => {
             if (sameSeat) return { exp: PRICE_RULES.SEAT_CHANGE_FEE, note: "同席種・同年齢区分=一律500（再発行等）", dummy: false };
             const ck = condKey(row);
-            const s = lookup(ck, srcSeat, srcAge), d = lookup(ck, dstSeat, dstAge);
+            const s = lookup(ck, srcSeat, srcAge, srcCode), d = lookup(ck, dstSeat, dstAge, dstCode);
             const sp = s ? s[which] : null, dp = d ? d[which] : null;
             if (sp == null || dp == null) return { exp: null, note: "価格不明", dummy: false };
             if (isDummyPrice(sp) || isDummyPrice(dp)) {
