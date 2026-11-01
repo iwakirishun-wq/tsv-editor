@@ -15157,6 +15157,10 @@
         });
       }
 
+      // UG行だけで通常価格の行が無いと、差額の検算ができず全件「価格不明」になる（2026-11-02 SHUN指示: UGファイルだけならエラー）
+      const UG_ONLY_ERROR = "UG行（アップグレード該当フラグ=該当）だけで、通常価格の行がありません。\n" +
+        "UGの差額は、元席種・先席種の通常価格から検算するため、通常価格の行が必要です。\n" +
+        "経路価格スケジュールを通常価格の行ごと全件読み込んでください（フィルターでUG行だけに絞っている場合は解除してください）。";
       // 経路価格スケジュール（今の表示行）から UG席種マトリクスを作って、アプリ内のダイアログで見せる（HPチェックのタブから使う）
       function ugMatrixFromState() {
         const c = _priceCols(state.headers);
@@ -15168,6 +15172,7 @@
         const normals = [], ugs = [];
         for (const row of rows) { const f = v(row, c.ugFlag); (f === "該当" || f === "1" ? ugs : normals).push(row); }
         if (!ugs.length) return { error: "表示中の行にUG行（アップグレード該当フラグ=該当）がありません。" };
+        if (!normals.length) return { error: UG_ONLY_ERROR };
         const seatMeta = _priceSeatMeta();
         // 当日/前売の境界日時は価格チェック表と同じ推定値（999999ダミーの窓かぶり判定に使う）
         const cand = estimateDayCutoffCandidate(state.headers, rows);
@@ -16670,6 +16675,7 @@
           const flag = v(row, c.ugFlag);
           (flag === "該当" || flag === "1" ? ugs : normals).push(row);
         }
+        if (ugs.length && !normals.length && (opt.matrix || opt.ug || opt.seatmx)) { alert(UG_ONLY_ERROR); return; }
         const validate = buildUgValidator(normals.concat(ugs), c, v, seatMeta, dayCutoff);
         // UG席種マトリクスの集約（設定漏れの判定は券種別マトリクスの「？」セルと共通）
         const ugmx = (opt.seatmx || opt.matrix) && ugs.length ? ugMatrixBuild({ normals, ugs, c, v, validate, seatMeta }) : null;
