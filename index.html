@@ -218,6 +218,10 @@
         overflow: hidden;
         font-family: var(--font-ui);
       }
+      /* ボタン名は単語の途中で折らない。改行したい所はラベルに改行（&#10; / "\n"）を入れ、
+         長いものはボタンの幅を広げて1行に収める（2026-11-15 UI改善: 「マスタチェッ/ク」のような折れを解消） */
+      .rb-btn { width: auto; min-width: 64px; }
+      .rb-btn > span:not(.rb-icon) { white-space: pre; }
       .rb-btn:hover {
         background: var(--rb-bg-hover);
         border-color: var(--rb-border);
@@ -1178,7 +1182,7 @@
           padding-bottom: 8px;
         }
         .rb-group { flex-shrink: 0; }
-        .rb-btn { width: 56px; height: 64px; font-size: 11px; }
+        .rb-btn { width: auto; min-width: 56px; height: 64px; font-size: 11px; }
       }
       .ctx-tag {
         font-size: 10px;
@@ -1830,7 +1834,7 @@
             </button>
             <button class="rb-btn" id="btn-save-as" title="保存先フォルダとファイル名を選んで保存します&#10;ショートカット: Ctrl+Shift+S" aria-label="名前を付けて保存">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><path d="M13.5 3.5l3 3L9 14l-3.3.6L6.3 11l7.2-7.5z"></path></svg></span>
-              <span>名前を付けて保存</span>
+              <span>名前を付けて&#10;保存</span>
             </button>
             <button class="rb-btn" id="btn-export-filtered" style="display:none" title="フィルターで絞り込んだ行だけを&#10;新しいファイルとして保存します" aria-label="フィルター結果のみを保存">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="13" x2="12" y2="19"></line><polyline points="9 16 12 13 15 16"></polyline></svg></span>
@@ -1966,7 +1970,7 @@
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="1"></rect><line x1="3" y1="13" x2="21" y2="13"></line><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line><path d="M6 5v6M12 5v6M18 5v6" stroke-width="2"></path></svg></span>
               <span>縦ヘッダー</span>
             </button>
-            <label class="rb-btn" id="vheader-height-wrap" title="縦書きヘッダーの行高さをpxで調整&#10;ヘッダー文字が見切れる場合はここで広げてください" style="cursor:pointer">
+            <label class="rb-btn" id="vheader-height-wrap" title="縦書きヘッダーの行高さ(px)&#10;ふだんは一番長い列名に合わせて自動で決まります&#10;数値を入れるとその高さに固定して次回も使います（空欄にすると自動に戻ります）" style="cursor:pointer">
               <input type="number" id="vheader-height" min="60" max="300" step="10" value="120" aria-label="縦書きヘッダーの高さ(px)" style="width:48px;border:1px solid var(--border,#ccc);border-radius:4px;padding:1px 2px;font-size:11px;text-align:center;background:var(--bg-elev,#fff);color:inherit;">
               <span>行高(px)</span>
             </label>
@@ -1997,11 +2001,11 @@
           <div class="rb-buttons">
             <button class="rb-btn" id="btn-sej-link" title="席種エリアマスタを連携&#10;SEJ設定・価格経路スケジュールのチェック/HTML出力に必須&#10;クリック: マスタファイル(TSV)を選択／もう一度押すと解除&#10;このボタンにファイルをドラッグ&ドロップしても連携できます" aria-label="席種エリアマスタ連携">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></span>
-              <span>席種エリアマスタ連携</span>
+              <span>席種エリア&#10;マスタ連携</span>
             </button>
             <button class="rb-btn" id="btn-price-link" title="価格経路スケジュールを連携&#10;席種一括設定のリセール上限検算に必要&#10;クリック: 価格マスタファイル(TSV/CSV)を選択／もう一度押すと解除&#10;このボタンにファイルをドラッグ&ドロップしても連携できます" aria-label="価格マスタ連携">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="2"></rect><line x1="8" y1="2" x2="8" y2="6"></line><line x1="16" y1="2" x2="16" y2="6"></line><path d="M12 10a2 2 0 1 0 0 4h1a2 2 0 1 1 0 4H9"></path><line x1="12" y1="9" x2="12" y2="19"></line></svg></span>
-              <span>価格マスタ連携</span>
+              <span>価格マスタ&#10;連携</span>
             </button>
           </div>
           <span class="rb-group-label">マスタ連携</span>
@@ -2012,7 +2016,7 @@
             <div class="rb-btn-wrap">
               <button class="rb-btn" id="btn-seatmaster-check" title="席種エリアマスタに関連するチェックをまとめて切り替えます&#10;カラー表示・ゲート表示・駐車券検査・単日入場検査・区画席検査・カナ検査・備考HTML変換&#10;旧形式（英語見出し・1/0）と新形式（日本語見出し・「駐車券/駐車券以外」等）の両方に対応&#10;前提条件を満たさない項目（ゲート対応表なし等）は自動でスキップされます" aria-label="席種エリアマスタチェックの切り替え" aria-pressed="false">
                 <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="3" y1="12" x2="21" y2="12"></line><line x1="12" y1="3" x2="12" y2="21"></line><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor"></circle><circle cx="16.5" cy="7.5" r="1.2" fill="currentColor"></circle><circle cx="7.5" cy="16.5" r="1.2" fill="currentColor"></circle><circle cx="16.5" cy="16.5" r="1.2" fill="currentColor"></circle></svg></span>
-                <span>席種エリアマスタチェック</span>
+                <span>席種エリア&#10;マスタチェック</span>
               </button>
               <button class="rb-caret" id="caret-seatmaster-check" type="button" title="個別に機能を選んでON/OFF" aria-label="席種エリアマスタチェックの詳細設定を開く" aria-expanded="false">▾</button>
               <div class="rb-dropdown" id="dd-seatmaster-check">
@@ -2038,7 +2042,7 @@
             </div>
             <button class="rb-btn" id="btn-ikkatsu-check" title="席種一括設定TSV(23列)の設定整合チェックを表にインライン表示（切り替え）&#10;NG（赤）: マスタ未登録・席種名不一致・指定席整合・上限9+リセール可・リセール下限1321・購入限定あり+単体不可・P+他種混在&#10;注意（橙）: 上限9+SEJ可&#10;席種エリアマスタを連携すると席種名/指定席チェックも有効になります" aria-label="席種一括設定チェックの切り替え" aria-pressed="false">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"></path><rect x="9" y="3" width="6" height="4" rx="1"></rect><path d="M9 12l2 2 4-4"></path></svg></span>
-              <span>一括設定チェック</span>
+              <span>一括設定&#10;チェック</span>
             </button>
           </div>
           <span class="rb-group-label">検品</span>
@@ -2058,7 +2062,7 @@
           <div class="rb-buttons">
             <button class="rb-btn" id="btn-price-sheet" title="開いているファイルに応じてチェック用HTMLを自動切替で出力&#10;・経路価格スケジュール（BO-F-21030）→ 価格チェック表（通常価格表/UGマトリクス/UG一覧、UG差額は自動検算）&#10;・SEJデータ → マスタ照合カード&#10;・席種一括設定 → チェックレポート&#10;※席種エリアマスタ連携が必須" aria-label="チェック用HTMLを出力">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="17" rx="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="8" y1="4" x2="8" y2="2"></line><line x1="16" y1="4" x2="16" y2="2"></line><path d="M7 13h4M7 17h7"></path><circle cx="16.5" cy="15" r="2.5"></circle><path d="M16.5 14v1l.8.8"></path></svg></span>
-              <span>価格チェック表</span>
+              <span>価格&#10;チェック表</span>
             </button>
           </div>
           <span class="rb-group-label">HTML出力</span>
@@ -2170,7 +2174,7 @@
     </div>
 
     <div id="statusbar" role="status" aria-label="ステータスバー">
-      <span id="status-main" aria-live="polite" aria-atomic="true">Ready</span>
+      <span id="status-main" aria-live="polite" aria-atomic="true">準備完了</span>
       <span id="status-filter" aria-live="polite"></span>
       <span id="status-stats" aria-live="off"></span>
       <span id="status-pos" aria-live="off"></span>
@@ -2547,7 +2551,8 @@
         sejWordLenCheck: false, // SEJのword1〜7が50字超(全角・半角とも1字)のときエラー表記（SEJデータ時。マスタ不要）
         spaceCheck: false,   // セル値の前後空白検査（マスタ非依存・全列対象）
         verticalHeader: true, // ヘッダー縦書き表示（既定でON・列幅節約）
-        vHeaderHeight: 230, // 縦書きヘッダーの行高さ(px・手動調整可能)
+        vHeaderHeight: 230, // 縦書きヘッダーの行高さ(px)。既定は列名に合わせて自動（autoFitVHeader）
+        vHeaderManual: false, // 「行高(px)」を手で入れたら true（その値を優先・localStorageに保存）
         originalRowCount: 0, // ファイルを開いた直後の行数（保存時の予期せぬ増減チェック用）
         markerColor: "#facc15", // マーカー色（localStorageに保存）
         _lastAction: null,   // F4 繰り返し用 { type, payload }
@@ -6982,11 +6987,25 @@
         // 縦書きヘッダー
         $("btn-vertical-header").onclick = toggleVerticalHeader;
         // 縦書きヘッダーの行高さ（手動調整）
+        // 既定は列名の長さに合わせて自動。手で数値を入れたらその値を優先して覚える（空欄にすると自動に戻る）
+        try {
+          const saved = parseInt(localStorage.getItem("tsvEditor.vHeaderHeight") || "", 10);
+          if (saved >= 60 && saved <= 300) { state.vHeaderHeight = saved; state.vHeaderManual = true; }
+        } catch (_) { /* 保存できない環境では毎回自動 */ }
         document.documentElement.style.setProperty("--vheader-h", state.vHeaderHeight + "px");
         $("vheader-height").value = state.vHeaderHeight;
         $("vheader-height").oninput = (e) => {
-          const v = Math.max(60, Math.min(300, parseInt(e.target.value, 10) || 120));
+          const raw = String(e.target.value || "").trim();
+          if (!raw) {
+            state.vHeaderManual = false;
+            try { localStorage.removeItem("tsvEditor.vHeaderHeight"); } catch (_) {}
+            autoFitVHeader();
+            return;
+          }
+          const v = Math.max(60, Math.min(300, parseInt(raw, 10) || 120));
           state.vHeaderHeight = v;
+          state.vHeaderManual = true;
+          try { localStorage.setItem("tsvEditor.vHeaderHeight", String(v)); } catch (_) {}
           document.documentElement.style.setProperty("--vheader-h", v + "px");
         };
         // データ整理（空行削除・トリム）
@@ -7851,7 +7870,7 @@
         const btn = $("btn-header-mode");
         if (!btn) return;
         const isFirstRow = state.headerMode === "firstRow";
-        setRbLabel(btn, isFirstRow ? "ヘッダー:1行目" : "ヘッダー:連番");
+        setRbLabel(btn, isFirstRow ? "ヘッダー\n1行目" : "ヘッダー\n連番");
         btn.classList.toggle("active-state", isFirstRow);
         btn.setAttribute("aria-pressed", String(isFirstRow));
         setRbTip(btn, isFirstRow
@@ -8916,6 +8935,30 @@
       }
 
       // ===== 描画 =====
+      // 縦書きヘッダーの高さを、表示中の列名で一番長いものに合わせる（60〜230px）。
+      // 固定230pxだと短い列名のTSVでも見出しが画面の約3割を占めていた（2026-11-15 UI改善）。
+      // 手で「行高(px)」を入れたとき（state.vHeaderManual）はその値を使う。
+      var _vhMeasureCtx = null;
+      function autoFitVHeader() {
+        if (state.vHeaderManual || !state.verticalHeader) return;
+        const label = els.thead && els.thead.querySelector(".th-label");
+        if (!label) return;
+        if (!_vhMeasureCtx) _vhMeasureCtx = document.createElement("canvas").getContext("2d");
+        const cs = getComputedStyle(label);
+        _vhMeasureCtx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+        let maxW = 0;
+        els.thead.querySelectorAll(".th-label").forEach((el) => {
+          const w = _vhMeasureCtx.measureText(el.textContent || "").width;
+          if (w > maxW) maxW = w;
+        });
+        // ラベル以外（列文字・並べ替え/絞り込みボタン・余白）に約56px
+        const h = Math.max(72, Math.min(230, Math.ceil(maxW + 56)));
+        if (h === state.vHeaderHeight) return;
+        state.vHeaderHeight = h;
+        document.documentElement.style.setProperty("--vheader-h", h + "px");
+        const inp = $("vheader-height");
+        if (inp && document.activeElement !== inp) inp.value = h;
+      }
       function renderHeader() {
         const visCols = getVisibleCols();
         let html = `<tr><th scope="col" class="row-num-header" id="th-corner" title="全選択 (Ctrl+A)" aria-label="行番号（クリックで全選択）">#</th>`;
@@ -8982,6 +9025,7 @@
 
         const totalW = 40 + visCols.reduce((sum, i) => sum + (state.colWidths[i] || 80), 0);
         $("main-table").style.width = totalW + "px";
+        autoFitVHeader();
 
         // ヘッダーの動的要素はイベント委譲で処理（setupTheadDelegation で一度だけ設定）
       }
@@ -13094,7 +13138,7 @@
              state.priceMaster = null;
              const btn = document.getElementById("btn-price-link");
              if (btn) btn.classList.remove("active-state");
-             setRbLabel("btn-price-link", "価格マスタ連携");
+             setRbLabel("btn-price-link", "価格マスタ\n連携");
              setStatus("価格経路スケジュール連携を解除しました");
           };
           _ov.onkeydown = (e) => { if (e.key === "Escape") _ov.remove(); };
@@ -13667,7 +13711,7 @@
         els.status.textContent = msg;
         if (_statusTimer) clearTimeout(_statusTimer);
         _statusTimer = setTimeout(() => {
-          els.status.textContent = "Ready";
+          els.status.textContent = "準備完了";
           _statusTimer = null;
         }, 3000);
       }
@@ -13948,7 +13992,7 @@
           setStatus(`価格経路スケジュール(${file.name})を連携しました`);
           const btn = document.getElementById("btn-price-link");
           if (btn) btn.classList.add("active-state");
-          setRbLabel("btn-price-link", "価格マスタ連携中");
+          setRbLabel("btn-price-link", "価格マスタ\n連携中");
           if (onDone) onDone();
         };
         r.readAsText(file, _encoding || "utf-8");
@@ -14149,7 +14193,7 @@
         }
         state.sejMaster = null;
         $("btn-sej-link").classList.remove("active-state");
-        setRbLabel("btn-sej-link", "マスタ連携");
+        setRbLabel("btn-sej-link", "席種エリア\nマスタ連携");
         state.forceRender = true;
         renderHeader();
         renderBody();
