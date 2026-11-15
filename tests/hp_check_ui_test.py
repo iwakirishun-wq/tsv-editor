@@ -17,7 +17,9 @@ with sync_playwright() as p:
         assert not page.locator('.rb-tab[data-tab="hp"]').is_visible()
         page.locator("#btn-hp-check").dispatch_event("click")
         page.locator("._hp-notice-ov").wait_for(timeout=3000)
-        assert "対象外" in page.locator("._hp-notice-ov").inner_text()
+        # ファイル未読込時は「対応ファイルを開くと照合できる」案内と、架空データでのJev接続テストを出す
+        assert "を開くとHPとの照合ができます" in page.locator("._hp-notice-ov").inner_text()
+        assert "Jev接続テスト" in page.locator("._hp-notice-ov").inner_text()
         page.locator("._hp-notice-close").click()
         page.evaluate("""() => {
           state.headers = ['販売開始日時', '前売価格'];
