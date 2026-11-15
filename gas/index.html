@@ -1803,6 +1803,477 @@
           scroll-behavior: auto !important;
         }
       }
+      /* ===TSV差分比較=== */
+.cmp-overlay[hidden] {
+  display: none !important;
+}
+
+.cmp-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9000;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.cmp-dialog {
+  background: #ffffff;
+  color: #222222;
+  border: 1px solid #c8d1dc;
+  border-radius: 4px;
+  width: min(1240px, 96vw);
+  height: min(880px, 92vh);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
+  font-size: 13px;
+}
+
+.cmp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--header-bg, #f4f6f9);
+  border-bottom: 1px solid #d0d7de;
+}
+
+.cmp-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cmp-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1a56a8;
+}
+
+.cmp-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid #1a56a8;
+  color: #1a56a8;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: help;
+  user-select: none;
+}
+
+.cmp-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cmp-label {
+  color: #1a56a8;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.cmp-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.cmp-input-card {
+  border: 1px solid #d0d7de;
+  border-radius: 4px;
+  padding: 8px 10px;
+  background: #fafbfc;
+}
+
+.cmp-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  min-height: 24px;
+}
+
+.cmp-dropzone {
+  position: relative;
+  border: 1px dashed #9aa7b8;
+  border-radius: 4px;
+  padding: 12px 10px;
+  text-align: center;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.cmp-dropzone.cmp-dragover {
+  border-color: #1a56a8;
+  background: #eef4fc;
+}
+
+.cmp-file-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+}
+
+.cmp-drop-text {
+  color: var(--text-dim, #666666);
+  font-size: 12px;
+}
+
+.cmp-file-name {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #222222;
+  word-break: break-all;
+}
+
+.cmp-run-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.cmp-check-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.cmp-btn {
+  border: 1px solid #b8c2cc;
+  border-radius: 3px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  background: #ffffff;
+  color: #222222;
+}
+
+.cmp-btn:hover {
+  background: #f0f3f7;
+}
+
+.cmp-btn-primary {
+  background: #1a56a8;
+  border-color: #1a56a8;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.cmp-btn-primary:hover {
+  background: #144587;
+}
+
+.cmp-btn-small {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+.cmp-error {
+  padding: 8px 10px;
+  border: 1px solid #cf222e;
+  background: #ffebe9;
+  color: #cf222e;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.cmp-results {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  flex: 1;
+}
+
+.cmp-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 8px 10px;
+  background: var(--header-bg, #f4f6f9);
+  border: 1px solid #d0d7de;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.cmp-stat {
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.cmp-stat-add {
+  color: #1a7f37;
+  background: #dafbe1;
+}
+
+.cmp-stat-del {
+  color: #cf222e;
+  background: #ffebe9;
+}
+
+.cmp-stat-chg {
+  color: #9a6700;
+  background: #fff8c5;
+}
+
+.cmp-stat-same {
+  color: var(--text-dim, #666666);
+  background: #eaeef2;
+}
+
+.cmp-warn {
+  color: #9a6700;
+  background: #fff8c5;
+  border: 1px solid #d4a72c;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+.cmp-meta {
+  color: var(--text-dim, #666666);
+}
+
+.cmp-by-col-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.cmp-by-col {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.cmp-col-pill {
+  border: 1px solid #c8d1dc;
+  background: #ffffff;
+  border-radius: 3px;
+  padding: 2px 7px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.cmp-col-pill.cmp-col-pill-active {
+  border-color: #1a56a8;
+  background: #e7f0fb;
+  color: #1a56a8;
+  font-weight: 700;
+}
+
+.cmp-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cmp-chips {
+  display: flex;
+  gap: 4px;
+}
+
+.cmp-chip {
+  border: 1px solid #c8d1dc;
+  background: #ffffff;
+  border-radius: 3px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.cmp-chip-active {
+  border-color: #1a56a8;
+  background: #1a56a8;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.cmp-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.cmp-filter-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cmp-input {
+  border: 1px solid #c8d1dc;
+  border-radius: 3px;
+  padding: 3px 7px;
+  font-size: 12px;
+  width: 150px;
+}
+
+.cmp-exports {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cmp-copy-msg {
+  font-size: 12px;
+  color: #1a7f37;
+  font-weight: 600;
+}
+
+.cmp-table-wrap {
+  flex: 1;
+  min-height: 200px;
+  overflow: auto;
+  border: 1px solid #d0d7de;
+  border-radius: 4px;
+}
+
+.cmp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.cmp-table th,
+.cmp-table td {
+  border: 1px solid #e1e6eb;
+  padding: 4px 7px;
+  vertical-align: top;
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.cmp-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--header-bg, #f4f6f9);
+  color: #1a56a8;
+  font-weight: 700;
+  z-index: 1;
+}
+
+.cmp-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.cmp-badge-added {
+  color: #1a7f37;
+  background: #dafbe1;
+}
+
+.cmp-badge-removed {
+  color: #cf222e;
+  background: #ffebe9;
+}
+
+.cmp-badge-changed {
+  color: #9a6700;
+  background: #fff8c5;
+}
+
+.cmp-badge-same {
+  color: var(--text-dim, #666666);
+  background: #eaeef2;
+}
+
+.cmp-row-added {
+  background: #f4fbf6;
+}
+
+.cmp-row-removed {
+  background: #fff6f6;
+}
+
+.cmp-cell-diff {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cmp-val-before {
+  color: #cf222e;
+  text-decoration: line-through;
+}
+
+.cmp-val-before strong {
+  background: rgba(207, 34, 46, 0.16);
+  font-weight: 700;
+}
+
+.cmp-val-after {
+  color: #1a7f37;
+}
+
+.cmp-val-after strong {
+  background: rgba(26, 127, 55, 0.18);
+  font-weight: 700;
+}
+
+.cmp-val-dim {
+  color: var(--text-dim, #888888);
+}
+
+.cmp-more-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 6px 0;
+}
+
+body.vertical-headers .cmp-table thead tr:first-child th {
+  height: auto;
+  vertical-align: middle;
+}
+
+.cmp-more-wrap[hidden],
+.cmp-error[hidden],
+.cmp-results[hidden],
+.cmp-by-col-wrap[hidden],
+.cmp-copy-msg[hidden],
+.cmp-btn[hidden] {
+  display: none !important;
+}
+
+@media (max-width: 760px) {
+  .cmp-inputs {
+    grid-template-columns: 1fr;
+  }
+}
+
     </style>
   </head>
   <body>
@@ -1835,6 +2306,10 @@
             <button class="rb-btn" id="btn-save-as" title="保存先フォルダとファイル名を選んで保存します&#10;ショートカット: Ctrl+Shift+S" aria-label="名前を付けて保存">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><path d="M13.5 3.5l3 3L9 14l-3.3.6L6.3 11l7.2-7.5z"></path></svg></span>
               <span>名前を付けて&#10;保存</span>
+            </button>
+            <button class="rb-btn" id="btn-compare" title="元のTSVと変更後(アップロード予定)のTSVを比べて&#10;どの行・セル・列が違うかを表示します" aria-label="TSV差分比較">
+              <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="7" height="16" rx="1"></rect><rect x="14" y="4" width="7" height="16" rx="1"></rect><path d="M5.5 9h2M5.5 13h2M16.5 9h2M16.5 13h2"></path></svg></span>
+              <span>TSV差分&#10;比較</span>
             </button>
             <button class="rb-btn" id="btn-export-filtered" style="display:none" title="フィルターで絞り込んだ行だけを&#10;新しいファイルとして保存します" aria-label="フィルター結果のみを保存">
               <span class="rb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="13" x2="12" y2="19"></line><polyline points="9 16 12 13 15 16"></polyline></svg></span>
@@ -2472,6 +2947,111 @@
         </p>
       </div>
     </div>
+
+    <!-- TSV差分比較 -->
+<div id="cmp-overlay" class="modal-overlay cmp-overlay" hidden>
+  <div class="cmp-dialog" role="dialog" aria-modal="true" aria-labelledby="cmp-title">
+    <div class="cmp-header">
+      <div class="cmp-title-wrap">
+        <h2 id="cmp-title" class="cmp-title">TSV差分比較</h2>
+        <span
+          class="cmp-help"
+          title="キー列(tenant_cd等・席種エリアコード等)を自動検出し、行・セル・列の差分を比較します。create_dt/update_dt/create_user/update_user は既定で無視します。"
+        >?</span>
+      </div>
+      <button type="button" id="cmp-close" class="cmp-btn cmp-btn-secondary">閉じる</button>
+    </div>
+
+    <div class="cmp-body">
+      <div class="cmp-inputs">
+        <div class="cmp-input-card">
+          <div class="cmp-card-head">
+            <span class="cmp-label">元のTSV（アップロード前）</span>
+            <button type="button" id="cmp-tab-base" class="cmp-btn cmp-btn-small" hidden>開いているタブを使う</button>
+          </div>
+          <div id="cmp-drop-base" class="cmp-dropzone" tabindex="0">
+            <input type="file" id="cmp-file-base" class="cmp-file-input" accept=".tsv,.txt,.csv">
+            <div class="cmp-drop-text">ファイルをドロップ、またはクリックして選択</div>
+            <div id="cmp-name-base" class="cmp-file-name">未選択</div>
+          </div>
+        </div>
+
+        <div class="cmp-input-card">
+          <div class="cmp-card-head">
+            <span class="cmp-label">変更後のTSV（アップロード予定）</span>
+            <button type="button" id="cmp-tab-cur" class="cmp-btn cmp-btn-small" hidden>開いているタブを使う</button>
+          </div>
+          <div id="cmp-drop-cur" class="cmp-dropzone" tabindex="0">
+            <input type="file" id="cmp-file-cur" class="cmp-file-input" accept=".tsv,.txt,.csv">
+            <div class="cmp-drop-text">ファイルをドロップ、またはクリックして選択</div>
+            <div id="cmp-name-cur" class="cmp-file-name">未選択</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cmp-run-bar">
+        <label class="cmp-check-label">
+          <input type="checkbox" id="cmp-opt-trim">
+          <span>前後空白を無視</span>
+        </label>
+        <button type="button" id="cmp-run-btn" class="cmp-btn cmp-btn-primary">比較実行</button>
+      </div>
+
+      <div id="cmp-error" class="cmp-error" hidden></div>
+
+      <div id="cmp-results" class="cmp-results" hidden>
+        <div id="cmp-summary" class="cmp-summary"></div>
+
+        <div id="cmp-by-col-wrap" class="cmp-by-col-wrap" hidden>
+          <span class="cmp-label cmp-by-col-title">列ごとの変更件数</span>
+          <span class="cmp-help" title="列名をクリックすると、その列の差分だけに絞り込みます。再クリックで解除します。">?</span>
+          <div id="cmp-by-col" class="cmp-by-col"></div>
+        </div>
+
+        <div class="cmp-toolbar">
+          <div class="cmp-chips" id="cmp-status-chips">
+            <button type="button" class="cmp-chip cmp-chip-active" data-status="all">すべて</button>
+            <button type="button" class="cmp-chip" data-status="changed">変更</button>
+            <button type="button" class="cmp-chip" data-status="added">追加</button>
+            <button type="button" class="cmp-chip" data-status="removed">削除</button>
+          </div>
+
+          <div class="cmp-filters">
+            <label class="cmp-filter-item">
+              <span class="cmp-label">列名</span>
+              <input type="text" id="cmp-col-filter" class="cmp-input" placeholder="列名で絞り込み">
+            </label>
+            <label class="cmp-check-label">
+              <input type="checkbox" id="cmp-only-changed-cells">
+              <span>変更のあるセルだけ表示</span>
+            </label>
+            <label class="cmp-check-label">
+              <input type="checkbox" id="cmp-show-all-cols">
+              <span>全列表示</span>
+            </label>
+          </div>
+
+          <div class="cmp-exports">
+            <button type="button" id="cmp-copy-report" class="cmp-btn cmp-btn-secondary">レポートをコピー</button>
+            <button type="button" id="cmp-download-tsv" class="cmp-btn cmp-btn-secondary">差分TSVをダウンロード</button>
+            <span id="cmp-copy-msg" class="cmp-copy-msg" hidden>コピーしました</span>
+          </div>
+        </div>
+
+        <div class="cmp-table-wrap">
+          <table class="cmp-table" id="cmp-table">
+            <thead id="cmp-thead"></thead>
+            <tbody id="cmp-tbody"></tbody>
+          </table>
+        </div>
+
+        <div id="cmp-more-wrap" class="cmp-more-wrap" hidden>
+          <button type="button" id="cmp-show-more" class="cmp-btn cmp-btn-secondary">さらに表示</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
     <script>
       // ===== 目次（このファイル内を `// ===== 名前 =====` で検索すると各セクション先頭へジャンプできる）=====
@@ -18532,5 +19112,1332 @@ ${findings.length
 
     </script>
 
+
+    <script>
+      window.TsvCompareEngine = (function () {
+        var module = { exports: {} };
+(function (root) {
+  "use strict";
+
+  var DEFAULT_IGNORE_COLUMNS = [
+    "create_dt",
+    "update_dt",
+    "create_user",
+    "update_user"
+  ];
+
+  var KEY_CANDIDATES = [
+    ["tenant_cd", "club_cd", "seat_type_area_cd"],
+    [
+      "席種エリアコード",
+      "券種コード",
+      "販売価格区分",
+      "会員ランク区分",
+      "販売経路区分",
+      "アップグレード元席種エリアコード",
+      "アップグレード元券種コード"
+    ],
+    ["seat_type_area_cd"],
+    ["席種エリアコード", "券種コード", "販売価格区分"],
+    ["席種エリアコード"]
+  ];
+
+  var MAX_LCS_CELLS = 40000;
+
+  /**
+   * TSVテキストをパースしてヘッダーと行配列を返す。
+   * BOM除去・クォート対応(セル内改行・""エスケープ)・最大列数へのパディングを行う。
+   */
+  function parseTsvForCompare(text, delim) {
+    if (delim === undefined) delim = "\t";
+    if (text === null || text === undefined) {
+      return { headers: [], rows: [] };
+    }
+    var src = String(text);
+    if (src.charCodeAt(0) === 0xfeff) {
+      src = src.slice(1);
+    }
+    if (src.length === 0) {
+      return { headers: [], rows: [] };
+    }
+
+    var records = [];
+    var row = [];
+    var cell = "";
+    var inQuotes = false;
+    var i = 0;
+    var len = src.length;
+
+    while (i < len) {
+      var ch = src[i];
+      if (inQuotes) {
+        if (ch === '"') {
+          if (i + 1 < len && src[i + 1] === '"') {
+            cell += '"';
+            i += 2;
+          } else {
+            inQuotes = false;
+            i += 1;
+          }
+        } else {
+          cell += ch;
+          i += 1;
+        }
+      } else {
+        if (ch === '"' && cell.length === 0) {
+          inQuotes = true;
+          i += 1;
+        } else if (ch === delim) {
+          row.push(cell);
+          cell = "";
+          i += 1;
+        } else if (ch === "\r") {
+          if (i + 1 < len && src[i + 1] === "\n") {
+            i += 2;
+          } else {
+            i += 1;
+          }
+          row.push(cell);
+          records.push(row);
+          row = [];
+          cell = "";
+        } else if (ch === "\n") {
+          i += 1;
+          row.push(cell);
+          records.push(row);
+          row = [];
+          cell = "";
+        } else {
+          cell += ch;
+          i += 1;
+        }
+      }
+    }
+
+    if (cell.length > 0 || row.length > 0) {
+      row.push(cell);
+      records.push(row);
+    }
+
+    if (records.length === 0) {
+      return { headers: [], rows: [] };
+    }
+
+    var maxCols = 0;
+    for (var r = 0; r < records.length; r++) {
+      if (records[r].length > maxCols) {
+        maxCols = records[r].length;
+      }
+    }
+
+    var headers = records[0].slice();
+    while (headers.length < maxCols) {
+      headers.push("");
+    }
+
+    var rows = [];
+    for (var r2 = 1; r2 < records.length; r2++) {
+      var padded = records[r2].slice();
+      while (padded.length < maxCols) {
+        padded.push("");
+      }
+      rows.push(padded);
+    }
+
+    return { headers: headers, rows: rows };
+  }
+
+  function hasAllHeaders(headers, candidate) {
+    var set = Object.create(null);
+    for (var i = 0; i < headers.length; i++) {
+      set[headers[i]] = true;
+    }
+    for (var j = 0; j < candidate.length; j++) {
+      if (!set[candidate[j]]) return false;
+    }
+    return true;
+  }
+
+  function resolveKeyColumns(baseHeaders, curHeaders, optKeyCols) {
+    if (optKeyCols !== undefined) {
+      if (optKeyCols === null || optKeyCols.length === 0) {
+        return { keyCols: [], positional: true };
+      }
+      if (
+        hasAllHeaders(baseHeaders, optKeyCols) &&
+        hasAllHeaders(curHeaders, optKeyCols)
+      ) {
+        return { keyCols: optKeyCols.slice(), positional: false };
+      }
+      return { keyCols: [], positional: true };
+    }
+
+    for (var i = 0; i < KEY_CANDIDATES.length; i++) {
+      var cand = KEY_CANDIDATES[i];
+      if (
+        hasAllHeaders(baseHeaders, cand) &&
+        hasAllHeaders(curHeaders, cand)
+      ) {
+        return { keyCols: cand.slice(), positional: false };
+      }
+    }
+    return { keyCols: [], positional: true };
+  }
+
+  function buildColumnDescriptors(headers, ignoreSet) {
+    var seen = Object.create(null);
+    var list = [];
+    for (var i = 0; i < headers.length; i++) {
+      var raw = headers[i];
+      if (ignoreSet[raw]) continue;
+      var occ = seen[raw] || 0;
+      seen[raw] = occ + 1;
+      var display = occ === 0 ? raw : raw + " (" + (occ + 1) + ")";
+      list.push({
+        raw: raw,
+        occ: occ,
+        id: raw + "\u0000" + occ,
+        header: display,
+        index: i
+      });
+    }
+    return list;
+  }
+
+  function findHeaderIndices(headers, keyCols) {
+    var indices = [];
+    for (var i = 0; i < keyCols.length; i++) {
+      indices.push(headers.indexOf(keyCols[i]));
+    }
+    return indices;
+  }
+
+  function normalizeVal(val, trim) {
+    var s = val === null || val === undefined ? "" : String(val);
+    return trim ? s.trim() : s;
+  }
+
+  function makeRowKey(row, keyIndices, trim) {
+    var internalParts = [];
+    var displayParts = [];
+    for (var i = 0; i < keyIndices.length; i++) {
+      var idx = keyIndices[i];
+      var raw = idx >= 0 && idx < row.length ? row[idx] : "";
+      var v = normalizeVal(raw, trim);
+      internalParts.push(v);
+      displayParts.push(v);
+    }
+    return {
+      internal: internalParts.join("\u001F"),
+      display: displayParts.join(" / ")
+    };
+  }
+
+  /**
+   * 2つのテーブル({headers, rows})を比較し、行・セル・列ごとの差分を返す。
+   */
+  function compareTables(base, cur, opts) {
+    var safeBase = base || { headers: [], rows: [] };
+    var safeCur = cur || { headers: [], rows: [] };
+    var baseHeaders = safeBase.headers || [];
+    var curHeaders = safeCur.headers || [];
+    var baseRows = safeBase.rows || [];
+    var curRows = safeCur.rows || [];
+    var options = opts || {};
+    var trim = Boolean(options.trim);
+
+    var ignoreList =
+      options.ignoreColumns !== undefined
+        ? options.ignoreColumns
+        : DEFAULT_IGNORE_COLUMNS;
+    var ignoreSet = Object.create(null);
+    for (var ig = 0; ig < ignoreList.length; ig++) {
+      ignoreSet[ignoreList[ig]] = true;
+    }
+
+    var keyInfo = resolveKeyColumns(baseHeaders, curHeaders, options.keyColumns);
+    var keyCols = keyInfo.keyCols;
+    var positional = keyInfo.positional;
+
+    var baseDescs = buildColumnDescriptors(baseHeaders, ignoreSet);
+    var curDescs = buildColumnDescriptors(curHeaders, ignoreSet);
+
+    var curDescMap = Object.create(null);
+    for (var c = 0; c < curDescs.length; c++) {
+      curDescMap[curDescs[c].id] = curDescs[c];
+    }
+    var baseDescMap = Object.create(null);
+    for (var b = 0; b < baseDescs.length; b++) {
+      baseDescMap[baseDescs[b].id] = baseDescs[b];
+    }
+
+    var commonCols = [];
+    var removedCols = [];
+    var addedCols = [];
+
+    for (var b2 = 0; b2 < baseDescs.length; b2++) {
+      var bd = baseDescs[b2];
+      var cd = curDescMap[bd.id];
+      if (cd) {
+        commonCols.push({
+          header: bd.header,
+          baseIndex: bd.index,
+          curIndex: cd.index
+        });
+      } else {
+        removedCols.push({
+          header: bd.header,
+          index: bd.index
+        });
+      }
+    }
+
+    for (var c2 = 0; c2 < curDescs.length; c2++) {
+      var cd2 = curDescs[c2];
+      if (!baseDescMap[cd2.id]) {
+        addedCols.push({
+          header: cd2.header,
+          index: cd2.index
+        });
+      }
+    }
+
+    var colChangeCounts = new Array(commonCols.length);
+    for (var k = 0; k < commonCols.length; k++) {
+      colChangeCounts[k] = 0;
+    }
+
+    var resultRows = [];
+    var counts = { added: 0, removed: 0, changed: 0, same: 0 };
+    var dupKeys = 0;
+
+    function buildMatchedRow(keyDisplay, baseRow, baseRowNo, curRow, curRowNo) {
+      var cells = [];
+      var anyChanged = false;
+      for (var ci = 0; ci < commonCols.length; ci++) {
+        var col = commonCols[ci];
+        var rawB =
+          col.baseIndex < baseRow.length ? String(baseRow[col.baseIndex]) : "";
+        var rawC =
+          col.curIndex < curRow.length ? String(curRow[col.curIndex]) : "";
+        var isChanged = normalizeVal(rawB, trim) !== normalizeVal(rawC, trim);
+        if (isChanged) {
+          anyChanged = true;
+          colChangeCounts[ci] += 1;
+        }
+        cells.push({
+          header: col.header,
+          before: rawB,
+          after: rawC,
+          changed: isChanged
+        });
+      }
+      var status = anyChanged ? "changed" : "same";
+      counts[status] += 1;
+      return {
+        status: status,
+        key: keyDisplay,
+        baseRowNo: baseRowNo,
+        curRowNo: curRowNo,
+        cells: cells
+      };
+    }
+
+    function buildAddedRow(keyDisplay, curRow, curRowNo) {
+      var cells = [];
+      for (var ci = 0; ci < commonCols.length; ci++) {
+        var col = commonCols[ci];
+        var rawC =
+          col.curIndex < curRow.length ? String(curRow[col.curIndex]) : "";
+        cells.push({
+          header: col.header,
+          before: null,
+          after: rawC,
+          changed: false
+        });
+      }
+      counts.added += 1;
+      return {
+        status: "added",
+        key: keyDisplay,
+        baseRowNo: null,
+        curRowNo: curRowNo,
+        cells: cells
+      };
+    }
+
+    function buildRemovedRow(keyDisplay, baseRow, baseRowNo) {
+      var cells = [];
+      for (var ci = 0; ci < commonCols.length; ci++) {
+        var col = commonCols[ci];
+        var rawB =
+          col.baseIndex < baseRow.length ? String(baseRow[col.baseIndex]) : "";
+        cells.push({
+          header: col.header,
+          before: rawB,
+          after: null,
+          changed: false
+        });
+      }
+      counts.removed += 1;
+      return {
+        status: "removed",
+        key: keyDisplay,
+        baseRowNo: baseRowNo,
+        curRowNo: null,
+        cells: cells
+      };
+    }
+
+    if (positional) {
+      var maxLen = Math.max(baseRows.length, curRows.length);
+      for (var i = 0; i < maxLen; i++) {
+        var rowKey = String(i + 1);
+        if (i < baseRows.length && i < curRows.length) {
+          resultRows.push(
+            buildMatchedRow(rowKey, baseRows[i], i + 1, curRows[i], i + 1)
+          );
+        } else if (i < curRows.length) {
+          resultRows.push(buildAddedRow(rowKey, curRows[i], i + 1));
+        } else {
+          resultRows.push(buildRemovedRow(rowKey, baseRows[i], i + 1));
+        }
+      }
+    } else {
+      var baseKeyIdx = findHeaderIndices(baseHeaders, keyCols);
+      var curKeyIdx = findHeaderIndices(curHeaders, keyCols);
+
+      var baseMap = Object.create(null);
+      var keyOrder = [];
+      var seenKeys = Object.create(null);
+
+      for (var bi = 0; bi < baseRows.length; bi++) {
+        var bk = makeRowKey(baseRows[bi], baseKeyIdx, trim);
+        if (!seenKeys[bk.internal]) {
+          seenKeys[bk.internal] = true;
+          keyOrder.push({ internal: bk.internal, display: bk.display });
+        }
+        if (!baseMap[bk.internal]) {
+          baseMap[bk.internal] = [];
+        }
+        baseMap[bk.internal].push({ row: baseRows[bi], rowNo: bi + 1 });
+      }
+
+      var curMap = Object.create(null);
+      for (var cri = 0; cri < curRows.length; cri++) {
+        var ck = makeRowKey(curRows[cri], curKeyIdx, trim);
+        if (!seenKeys[ck.internal]) {
+          seenKeys[ck.internal] = true;
+          keyOrder.push({ internal: ck.internal, display: ck.display });
+        }
+        if (!curMap[ck.internal]) {
+          curMap[ck.internal] = [];
+        }
+        curMap[ck.internal].push({ row: curRows[cri], rowNo: cri + 1 });
+      }
+
+      for (var ki = 0; ki < keyOrder.length; ki++) {
+        var kObj = keyOrder[ki];
+        var bList = baseMap[kObj.internal] || [];
+        var cList = curMap[kObj.internal] || [];
+        if (bList.length > 1 || cList.length > 1) {
+          dupKeys += 1;
+        }
+        var pairLen = Math.max(bList.length, cList.length);
+        for (var p = 0; p < pairLen; p++) {
+          if (p < bList.length && p < cList.length) {
+            resultRows.push(
+              buildMatchedRow(
+                kObj.display,
+                bList[p].row,
+                bList[p].rowNo,
+                cList[p].row,
+                cList[p].rowNo
+              )
+            );
+          } else if (p < cList.length) {
+            resultRows.push(
+              buildAddedRow(kObj.display, cList[p].row, cList[p].rowNo)
+            );
+          } else {
+            resultRows.push(
+              buildRemovedRow(kObj.display, bList[p].row, bList[p].rowNo)
+            );
+          }
+        }
+      }
+    }
+
+    var byColumn = [];
+    for (var bc = 0; bc < commonCols.length; bc++) {
+      if (colChangeCounts[bc] > 0) {
+        byColumn.push({
+          header: commonCols[bc].header,
+          n: colChangeCounts[bc]
+        });
+      }
+    }
+    byColumn.sort(function (x, y) {
+      return y.n - x.n;
+    });
+
+    return {
+      keyCols: keyCols,
+      positional: positional,
+      addedCols: addedCols,
+      removedCols: removedCols,
+      commonCols: commonCols,
+      rows: resultRows,
+      counts: counts,
+      byColumn: byColumn,
+      dupKeys: dupKeys
+    };
+  }
+
+  function pushOp(ops, t, s) {
+    if (!s) return;
+    if (ops.length > 0 && ops[ops.length - 1].t === t) {
+      ops[ops.length - 1].s += s;
+    } else {
+      ops.push({ t: t, s: s });
+    }
+  }
+
+  /**
+   * 2つの文字列の文字単位差分を返す。
+   * 戻り値: [{t:"eq"|"del"|"ins", s:string}]
+   */
+  function charDiff(a, b) {
+    var sa = a === null || a === undefined ? "" : String(a);
+    var sb = b === null || b === undefined ? "" : String(b);
+
+    if (sa === sb) {
+      return sa.length > 0 ? [{ t: "eq", s: sa }] : [];
+    }
+
+    var minLen = Math.min(sa.length, sb.length);
+    var prefix = 0;
+    while (prefix < minLen && sa.charCodeAt(prefix) === sb.charCodeAt(prefix)) {
+      prefix += 1;
+    }
+
+    var suffix = 0;
+    var remA = sa.length - prefix;
+    var remB = sb.length - prefix;
+    var maxSuffix = Math.min(remA, remB);
+    while (
+      suffix < maxSuffix &&
+      sa.charCodeAt(sa.length - 1 - suffix) ===
+        sb.charCodeAt(sb.length - 1 - suffix)
+    ) {
+      suffix += 1;
+    }
+
+    var prefixStr = sa.slice(0, prefix);
+    var suffixStr = suffix > 0 ? sa.slice(sa.length - suffix) : "";
+    var midA = sa.slice(prefix, sa.length - suffix);
+    var midB = sb.slice(prefix, sb.length - suffix);
+
+    var ops = [];
+    pushOp(ops, "eq", prefixStr);
+
+    if (midA.length === 0) {
+      pushOp(ops, "ins", midB);
+    } else if (midB.length === 0) {
+      pushOp(ops, "del", midA);
+    } else if (midA.length * midB.length > MAX_LCS_CELLS) {
+      pushOp(ops, "del", midA);
+      pushOp(ops, "ins", midB);
+    } else {
+      var m = midA.length;
+      var n = midB.length;
+      var cols = n + 1;
+      var dp = new Int32Array((m + 1) * cols);
+
+      for (var i = m - 1; i >= 0; i--) {
+        var rowOff = i * cols;
+        var nextOff = (i + 1) * cols;
+        var ca = midA.charCodeAt(i);
+        for (var j = n - 1; j >= 0; j--) {
+          if (ca === midB.charCodeAt(j)) {
+            dp[rowOff + j] = 1 + dp[nextOff + j + 1];
+          } else {
+            var down = dp[nextOff + j];
+            var right = dp[rowOff + j + 1];
+            dp[rowOff + j] = down >= right ? down : right;
+          }
+        }
+      }
+
+      var ii = 0;
+      var jj = 0;
+      while (ii < m && jj < n) {
+        if (midA.charCodeAt(ii) === midB.charCodeAt(jj)) {
+          pushOp(ops, "eq", midA[ii]);
+          ii += 1;
+          jj += 1;
+        } else if (dp[(ii + 1) * cols + jj] >= dp[ii * cols + jj + 1]) {
+          pushOp(ops, "del", midA[ii]);
+          ii += 1;
+        } else {
+          pushOp(ops, "ins", midB[jj]);
+          jj += 1;
+        }
+      }
+      if (ii < m) {
+        pushOp(ops, "del", midA.slice(ii));
+      }
+      if (jj < n) {
+        pushOp(ops, "ins", midB.slice(jj));
+      }
+    }
+
+    pushOp(ops, "eq", suffixStr);
+    return ops;
+  }
+
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = {
+      compareTables: compareTables,
+      charDiff: charDiff,
+      parseTsvForCompare: parseTsvForCompare
+    };
+  }
+})(typeof globalThis !== "undefined" ? globalThis : this);
+
+        return module.exports;
+      })();
+    </script>
+    <script>
+(function () {
+  "use strict";
+
+  var BATCH_SIZE = 200;
+
+  var state = {
+    initialized: false,
+    getCurrentTab: null,
+    baseText: null,
+    baseName: "",
+    baseDelim: "\t",
+    curText: null,
+    curName: "",
+    curDelim: "\t",
+    result: null,
+    statusFilter: "all",
+    colFilter: "",
+    selectedCol: "",
+    onlyChangedCells: false,
+    showAllCols: false,
+    renderedCount: 0,
+    filteredRows: [],
+    visibleColIndices: []
+  };
+
+  function el(id) {
+    return document.getElementById(id);
+  }
+
+  function showError(msg) {
+    var box = el("cmp-error");
+    if (!box) return;
+    if (msg) {
+      box.textContent = msg;
+      box.hidden = false;
+    } else {
+      box.textContent = "";
+      box.hidden = true;
+    }
+  }
+
+  function decodeBuffer(buf) {
+    var utf8 = new TextDecoder("utf-8").decode(buf);
+    if (utf8.indexOf("\uFFFD") !== -1) {
+      try {
+        return new TextDecoder("shift_jis").decode(buf);
+      } catch (e) {
+        return utf8;
+      }
+    }
+    return utf8;
+  }
+
+  function readFileSide(file, side) {
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      var text = decodeBuffer(reader.result);
+      setSideData(side, file.name, text);
+    };
+    reader.onerror = function () {
+      showError("ファイルの読み込みに失敗しました: " + file.name);
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function setSideData(side, name, text, delim) {
+    var d = delim || (/\.csv$/i.test(name || "") ? "," : "\t");
+    if (side === "base") {
+      state.baseDelim = d;
+      state.baseName = name || "元のTSV";
+      state.baseText = text;
+      el("cmp-name-base").textContent = state.baseName;
+    } else {
+      state.curDelim = d;
+      state.curName = name || "変更後のTSV";
+      state.curText = text;
+      el("cmp-name-cur").textContent = state.curName;
+    }
+    showError("");
+  }
+
+  function bindDropZone(dropId, inputId, side) {
+    var drop = el(dropId);
+    var input = el(inputId);
+    if (!drop || !input) return;
+
+    input.addEventListener("change", function () {
+      if (input.files && input.files[0]) {
+        readFileSide(input.files[0], side);
+      }
+    });
+
+    drop.addEventListener("dragover", function (e) {
+      e.preventDefault();
+      drop.classList.add("cmp-dragover");
+    });
+
+    drop.addEventListener("dragleave", function () {
+      drop.classList.remove("cmp-dragover");
+    });
+
+    drop.addEventListener("drop", function (e) {
+      e.preventDefault();
+      drop.classList.remove("cmp-dragover");
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+        readFileSide(e.dataTransfer.files[0], side);
+      }
+    });
+  }
+
+  function closeModal() {
+    var overlay = el("cmp-overlay");
+    if (overlay) overlay.hidden = true;
+  }
+
+  function runCompare() {
+    var engine = window.TsvCompareEngine;
+    if (
+      !engine ||
+      typeof engine.parseTsvForCompare !== "function" ||
+      typeof engine.compareTables !== "function" ||
+      typeof engine.charDiff !== "function"
+    ) {
+      showError(
+        "比較エンジン (window.TsvCompareEngine) が読み込まれていません。"
+      );
+      return;
+    }
+
+    if (state.baseText === null || state.curText === null) {
+      showError("元のTSVと変更後のTSVの両方を指定してください。");
+      return;
+    }
+
+    showError("");
+    var baseTable = engine.parseTsvForCompare(state.baseText, state.baseDelim);
+    var curTable = engine.parseTsvForCompare(state.curText, state.curDelim);
+    var trim = Boolean(el("cmp-opt-trim") && el("cmp-opt-trim").checked);
+
+    state.result = engine.compareTables(baseTable, curTable, { trim: trim });
+    state.selectedCol = "";
+    renderSummary();
+    renderByColumn();
+    applyFiltersAndRender(true);
+    el("cmp-results").hidden = false;
+  }
+
+  function appendSpan(parent, cls, text) {
+    var s = document.createElement("span");
+    if (cls) s.className = cls;
+    s.textContent = text;
+    parent.appendChild(s);
+    return s;
+  }
+
+  function renderSummary() {
+    var box = el("cmp-summary");
+    var res = state.result;
+    if (!box || !res) return;
+    box.innerHTML = "";
+
+    appendSpan(box, "cmp-stat cmp-stat-add", "追加 " + res.counts.added + "行");
+    appendSpan(box, "cmp-stat cmp-stat-del", "削除 " + res.counts.removed + "行");
+    appendSpan(box, "cmp-stat cmp-stat-chg", "変更 " + res.counts.changed + "行");
+    appendSpan(box, "cmp-stat cmp-stat-same", "変更なし " + res.counts.same + "行");
+
+    if (res.positional) {
+      var w = appendSpan(box, "cmp-warn", "行順で比較");
+      w.title =
+        "共通のキー列候補が見つからないため、行番号順(1行目同士…)で突合しています。";
+    } else {
+      appendSpan(box, "cmp-meta", "キー列: " + res.keyCols.join(", "));
+    }
+
+    if (res.dupKeys > 0) {
+      var dw = appendSpan(
+        box,
+        "cmp-warn",
+        "重複キー " + res.dupKeys + "件（出現順で突合）"
+      );
+      dw.title = "同じキーを持つ行が複数あるため、出現順に突合しています。";
+    }
+
+    if (res.addedCols.length > 0) {
+      appendSpan(
+        box,
+        "cmp-meta",
+        "追加列: " +
+          res.addedCols
+            .map(function (c) {
+              return c.header;
+            })
+            .join(", ")
+      );
+    }
+    if (res.removedCols.length > 0) {
+      appendSpan(
+        box,
+        "cmp-meta",
+        "削除列: " +
+          res.removedCols
+            .map(function (c) {
+              return c.header;
+            })
+            .join(", ")
+      );
+    }
+  }
+
+  function renderByColumn() {
+    var wrap = el("cmp-by-col-wrap");
+    var box = el("cmp-by-col");
+    var res = state.result;
+    if (!wrap || !box || !res) return;
+
+    box.innerHTML = "";
+    if (!res.byColumn || res.byColumn.length === 0) {
+      wrap.hidden = true;
+      return;
+    }
+
+    wrap.hidden = false;
+    for (var i = 0; i < res.byColumn.length; i++) {
+      (function (item) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className =
+          "cmp-col-pill" +
+          (state.selectedCol === item.header ? " cmp-col-pill-active" : "");
+        btn.textContent = item.header + " (" + item.n + ")";
+        btn.addEventListener("click", function () {
+          state.selectedCol =
+            state.selectedCol === item.header ? "" : item.header;
+          renderByColumn();
+          applyFiltersAndRender(true);
+        });
+        box.appendChild(btn);
+      })(res.byColumn[i]);
+    }
+  }
+
+  function computeVisibleColumns() {
+    var res = state.result;
+    if (!res) return [];
+    var changedSet = Object.create(null);
+    for (var i = 0; i < res.byColumn.length; i++) {
+      changedSet[res.byColumn[i].header] = true;
+    }
+
+    var filterText = state.colFilter.trim().toLowerCase();
+    var hasChanges = res.byColumn.length > 0;
+    var indices = [];
+
+    for (var c = 0; c < res.commonCols.length; c++) {
+      var header = res.commonCols[c].header;
+      if (state.selectedCol && header !== state.selectedCol) continue;
+      if (filterText && header.toLowerCase().indexOf(filterText) === -1) {
+        continue;
+      }
+      if (!state.showAllCols && hasChanges && !changedSet[header]) {
+        continue;
+      }
+      indices.push(c);
+    }
+    return indices;
+  }
+
+  function computeFilteredRows(visibleColIndices) {
+    var res = state.result;
+    if (!res) return [];
+    var out = [];
+    for (var i = 0; i < res.rows.length; i++) {
+      var r = res.rows[i];
+      if (state.statusFilter !== "all" && r.status !== state.statusFilter) {
+        continue;
+      }
+      if (state.selectedCol && r.status === "changed") {
+        var matched = false;
+        for (var vi = 0; vi < visibleColIndices.length; vi++) {
+          var cell = r.cells[visibleColIndices[vi]];
+          if (cell && cell.changed) {
+            matched = true;
+            break;
+          }
+        }
+        if (!matched) continue;
+      }
+      out.push(r);
+    }
+    return out;
+  }
+
+  function applyFiltersAndRender(resetCount) {
+    if (!state.result) return;
+    state.visibleColIndices = computeVisibleColumns();
+    state.filteredRows = computeFilteredRows(state.visibleColIndices);
+    if (resetCount) {
+      state.renderedCount = 0;
+      el("cmp-tbody").innerHTML = "";
+    }
+    renderTableHeader();
+    renderNextBatch();
+  }
+
+  function renderTableHeader() {
+    var thead = el("cmp-thead");
+    var res = state.result;
+    if (!thead || !res) return;
+    thead.innerHTML = "";
+
+    var tr = document.createElement("tr");
+    var fixed = ["状態", "キー", "行番号"];
+    for (var f = 0; f < fixed.length; f++) {
+      var thF = document.createElement("th");
+      thF.textContent = fixed[f];
+      tr.appendChild(thF);
+    }
+
+    for (var i = 0; i < state.visibleColIndices.length; i++) {
+      var colIdx = state.visibleColIndices[i];
+      var th = document.createElement("th");
+      th.textContent = res.commonCols[colIdx].header;
+      tr.appendChild(th);
+    }
+    thead.appendChild(tr);
+  }
+
+  function renderCharDiffNodes(parent, ops, targetType) {
+    for (var i = 0; i < ops.length; i++) {
+      var op = ops[i];
+      if (op.t === "eq") {
+        parent.appendChild(document.createTextNode(op.s));
+      } else if (op.t === targetType) {
+        var strong = document.createElement("strong");
+        strong.textContent = op.s;
+        parent.appendChild(strong);
+      }
+    }
+  }
+
+  function statusLabel(status) {
+    if (status === "added") return "追加";
+    if (status === "removed") return "削除";
+    if (status === "changed") return "変更";
+    return "変更なし";
+  }
+
+  function renderNextBatch() {
+    var tbody = el("cmp-tbody");
+    var moreWrap = el("cmp-more-wrap");
+    var moreBtn = el("cmp-show-more");
+    var engine = window.TsvCompareEngine;
+    if (!tbody || !engine) return;
+
+    var start = state.renderedCount;
+    var end = Math.min(start + BATCH_SIZE, state.filteredRows.length);
+    var frag = document.createDocumentFragment();
+
+    for (var i = start; i < end; i++) {
+      var r = state.filteredRows[i];
+      var tr = document.createElement("tr");
+      if (r.status === "added") tr.className = "cmp-row-added";
+      else if (r.status === "removed") tr.className = "cmp-row-removed";
+
+      var tdStatus = document.createElement("td");
+      var badge = document.createElement("span");
+      badge.className = "cmp-badge cmp-badge-" + r.status;
+      badge.textContent = statusLabel(r.status);
+      tdStatus.appendChild(badge);
+      tr.appendChild(tdStatus);
+
+      var tdKey = document.createElement("td");
+      tdKey.textContent = r.key;
+      tr.appendChild(tdKey);
+
+      var tdNo = document.createElement("td");
+      var bNo = r.baseRowNo !== null ? String(r.baseRowNo) : "-";
+      var cNo = r.curRowNo !== null ? String(r.curRowNo) : "-";
+      tdNo.textContent = bNo + " -> " + cNo;
+      tr.appendChild(tdNo);
+
+      for (var vi = 0; vi < state.visibleColIndices.length; vi++) {
+        var cell = r.cells[state.visibleColIndices[vi]];
+        var td = document.createElement("td");
+
+        if (!cell) {
+          tr.appendChild(td);
+          continue;
+        }
+
+        if (r.status === "added") {
+          var addSpan = document.createElement("span");
+          addSpan.className = "cmp-val-after";
+          addSpan.textContent = cell.after || "";
+          td.appendChild(addSpan);
+        } else if (r.status === "removed") {
+          var delSpan = document.createElement("span");
+          delSpan.className = "cmp-val-before";
+          delSpan.textContent = cell.before || "";
+          td.appendChild(delSpan);
+        } else if (cell.changed) {
+          var wrap = document.createElement("div");
+          wrap.className = "cmp-cell-diff";
+          var ops = engine.charDiff(cell.before, cell.after);
+
+          var divBefore = document.createElement("div");
+          divBefore.className = "cmp-val-before";
+          renderCharDiffNodes(divBefore, ops, "del");
+          wrap.appendChild(divBefore);
+
+          var divAfter = document.createElement("div");
+          divAfter.className = "cmp-val-after";
+          renderCharDiffNodes(divAfter, ops, "ins");
+          wrap.appendChild(divAfter);
+
+          td.appendChild(wrap);
+        } else if (state.onlyChangedCells) {
+          var dim = document.createElement("span");
+          dim.className = "cmp-val-dim";
+          dim.textContent = "-";
+          td.appendChild(dim);
+        } else {
+          td.textContent = cell.after !== null ? cell.after : "";
+        }
+
+        tr.appendChild(td);
+      }
+
+      frag.appendChild(tr);
+    }
+
+    tbody.appendChild(frag);
+    state.renderedCount = end;
+
+    var remaining = state.filteredRows.length - state.renderedCount;
+    if (remaining > 0) {
+      moreWrap.hidden = false;
+      moreBtn.textContent = "さらに表示（残り " + remaining + "行）";
+    } else {
+      moreWrap.hidden = true;
+    }
+  }
+
+  function buildReportText() {
+    var res = state.result;
+    if (!res) return "";
+    var lines = [];
+    lines.push("【TSV差分比較レポート】");
+    lines.push("元: " + state.baseName);
+    lines.push("後: " + state.curName);
+    lines.push(
+      "追加: " +
+        res.counts.added +
+        "行 / 削除: " +
+        res.counts.removed +
+        "行 / 変更: " +
+        res.counts.changed +
+        "行 / 変更なし: " +
+        res.counts.same +
+        "行"
+    );
+    lines.push(
+      res.positional
+        ? "突合: 行順"
+        : "キー列: " + res.keyCols.join(", ")
+    );
+    if (res.dupKeys > 0) {
+      lines.push("重複キー: " + res.dupKeys + "件");
+    }
+    lines.push("");
+    lines.push("■ 変更セル一覧");
+
+    for (var i = 0; i < res.rows.length; i++) {
+      var r = res.rows[i];
+      if (r.status === "same") continue;
+      if (r.status === "added" || r.status === "removed") {
+        lines.push(
+          "[" +
+            statusLabel(r.status) +
+            "] キー=" +
+            r.key +
+            " (行: " +
+            (r.baseRowNo || "-") +
+            " -> " +
+            (r.curRowNo || "-") +
+            ")"
+        );
+      } else {
+        for (var c = 0; c < r.cells.length; c++) {
+          var cell = r.cells[c];
+          if (!cell.changed) continue;
+          lines.push(
+            "[変更] キー=" +
+              r.key +
+              " | " +
+              cell.header +
+              ": " +
+              cell.before +
+              " -> " +
+              cell.after
+          );
+        }
+      }
+    }
+    return lines.join("\n");
+  }
+
+  function copyReport() {
+    var text = buildReportText();
+    if (!text) return;
+    var msg = el("cmp-copy-msg");
+
+    function showCopied() {
+      if (!msg) return;
+      msg.hidden = false;
+      setTimeout(function () {
+        msg.hidden = true;
+      }, 2000);
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(showCopied, fallbackCopy);
+    } else {
+      fallbackCopy();
+    }
+
+    function fallbackCopy() {
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand("copy");
+        showCopied();
+      } catch (e) {
+        showError("クリップボードへのコピーに失敗しました。");
+      }
+      document.body.removeChild(ta);
+    }
+  }
+
+  function tsvEscape(val) {
+    var s = val === null || val === undefined ? "" : String(val);
+    if (
+      s.indexOf("\t") !== -1 ||
+      s.indexOf("\n") !== -1 ||
+      s.indexOf("\r") !== -1 ||
+      s.indexOf('"') !== -1
+    ) {
+      return '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
+  }
+
+  function downloadDiffTsv() {
+    var res = state.result;
+    if (!res) return;
+    var lines = [];
+    lines.push(["状態", "キー", "列名", "元の値", "変更後の値"].join("\t"));
+
+    for (var i = 0; i < res.rows.length; i++) {
+      var r = res.rows[i];
+      if (r.status === "same") continue;
+      var label = statusLabel(r.status);
+
+      if (r.status === "changed") {
+        for (var c = 0; c < r.cells.length; c++) {
+          var cell = r.cells[c];
+          if (!cell.changed) continue;
+          lines.push(
+            [
+              tsvEscape(label),
+              tsvEscape(r.key),
+              tsvEscape(cell.header),
+              tsvEscape(cell.before),
+              tsvEscape(cell.after)
+            ].join("\t")
+          );
+        }
+      } else {
+        var emitted = false;
+        for (var c2 = 0; c2 < r.cells.length; c2++) {
+          var cell2 = r.cells[c2];
+          var val = r.status === "added" ? cell2.after : cell2.before;
+          if (val !== null && val !== "") {
+            emitted = true;
+            lines.push(
+              [
+                tsvEscape(label),
+                tsvEscape(r.key),
+                tsvEscape(cell2.header),
+                tsvEscape(r.status === "removed" ? val : ""),
+                tsvEscape(r.status === "added" ? val : "")
+              ].join("\t")
+            );
+          }
+        }
+        if (!emitted) {
+          lines.push(
+            [tsvEscape(label), tsvEscape(r.key), "(空行)", "", ""].join("\t")
+          );
+        }
+      }
+    }
+
+    var content = "\uFEFF" + lines.join("\r\n");
+    var blob = new Blob([content], { type: "text/tab-separated-values;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "tsv_diff_result.tsv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function initOnce() {
+    if (state.initialized) return;
+    state.initialized = true;
+
+    bindDropZone("cmp-drop-base", "cmp-file-base", "base");
+    bindDropZone("cmp-drop-cur", "cmp-file-cur", "cur");
+
+    el("cmp-close").addEventListener("click", closeModal);
+    el("cmp-run-btn").addEventListener("click", runCompare);
+    el("cmp-show-more").addEventListener("click", renderNextBatch);
+    el("cmp-copy-report").addEventListener("click", copyReport);
+    el("cmp-download-tsv").addEventListener("click", downloadDiffTsv);
+
+    el("cmp-tab-base").addEventListener("click", function () {
+      if (typeof state.getCurrentTab !== "function") return;
+      var tab = state.getCurrentTab();
+      if (tab && typeof tab.text === "string") {
+        setSideData("base", tab.fileName || "現在のタブ", tab.text, tab.delim || "\t");
+      }
+    });
+
+    el("cmp-tab-cur").addEventListener("click", function () {
+      if (typeof state.getCurrentTab !== "function") return;
+      var tab = state.getCurrentTab();
+      if (tab && typeof tab.text === "string") {
+        setSideData("cur", tab.fileName || "現在のタブ", tab.text, tab.delim || "\t");
+      }
+    });
+
+    el("cmp-status-chips").addEventListener("click", function (e) {
+      var btn = e.target.closest("[data-status]");
+      if (!btn) return;
+      state.statusFilter = btn.getAttribute("data-status") || "all";
+      var all = el("cmp-status-chips").querySelectorAll(".cmp-chip");
+      for (var i = 0; i < all.length; i++) {
+        all[i].classList.toggle("cmp-chip-active", all[i] === btn);
+      }
+      applyFiltersAndRender(true);
+    });
+
+    el("cmp-col-filter").addEventListener("input", function (e) {
+      state.colFilter = e.target.value || "";
+      applyFiltersAndRender(true);
+    });
+
+    el("cmp-only-changed-cells").addEventListener("change", function (e) {
+      state.onlyChangedCells = Boolean(e.target.checked);
+      applyFiltersAndRender(true);
+    });
+
+    el("cmp-show-all-cols").addEventListener("change", function (e) {
+      state.showAllCols = Boolean(e.target.checked);
+      applyFiltersAndRender(true);
+    });
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") {
+        var overlay = el("cmp-overlay");
+        if (overlay && !overlay.hidden) {
+          closeModal();
+        }
+      }
+    });
+  }
+
+  function open(opts) {
+    var overlay = el("cmp-overlay");
+    if (!overlay) return;
+    initOnce();
+
+    state.getCurrentTab =
+      opts && typeof opts.getCurrentTab === "function" ? opts.getCurrentTab : null;
+
+    var hasTabFn = Boolean(state.getCurrentTab);
+    el("cmp-tab-base").hidden = !hasTabFn;
+    el("cmp-tab-cur").hidden = !hasTabFn;
+
+    overlay.hidden = false;
+  }
+
+  if (typeof window !== "undefined") {
+    window.TsvCompare = { open: open };
+  }
+})();
+
+    </script>
+    <script>
+      (function () {
+        var b = document.getElementById("btn-compare");
+        if (!b) return;
+        function cell(v) {
+          v = String(v == null ? "" : v);
+          return /[\t\r\n"]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+        }
+        b.addEventListener("click", function () {
+          window.TsvCompare.open({
+            getCurrentTab: function () {
+              try {
+                var tab = state.tabs[state.activeTab];
+                if (!tab || !state.headers || !state.headers.length) return null;
+                var cur = _diffCurrentRows(true);
+                var lines = [cur.headers.map(cell).join("\t")];
+                cur.rows.forEach(function (r) { lines.push(r.map(cell).join("\t")); });
+                return { fileName: tab.fileName || "現在のタブ", text: lines.join("\n"), delim: "\t" };
+              } catch (e) { return null; }
+            }
+          });
+        });
+      })();
+    </script>
   </body>
 </html>

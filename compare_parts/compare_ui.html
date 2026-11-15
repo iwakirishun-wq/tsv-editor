@@ -1,0 +1,103 @@
+<div id="cmp-overlay" class="modal-overlay cmp-overlay" hidden>
+  <div class="cmp-dialog" role="dialog" aria-modal="true" aria-labelledby="cmp-title">
+    <div class="cmp-header">
+      <div class="cmp-title-wrap">
+        <h2 id="cmp-title" class="cmp-title">TSV差分比較</h2>
+        <span
+          class="cmp-help"
+          title="キー列(tenant_cd等・席種エリアコード等)を自動検出し、行・セル・列の差分を比較します。create_dt/update_dt/create_user/update_user は既定で無視します。"
+        >?</span>
+      </div>
+      <button type="button" id="cmp-close" class="cmp-btn cmp-btn-secondary">閉じる</button>
+    </div>
+
+    <div class="cmp-body">
+      <div class="cmp-inputs">
+        <div class="cmp-input-card">
+          <div class="cmp-card-head">
+            <span class="cmp-label">元のTSV（アップロード前）</span>
+            <button type="button" id="cmp-tab-base" class="cmp-btn cmp-btn-small" hidden>開いているタブを使う</button>
+          </div>
+          <div id="cmp-drop-base" class="cmp-dropzone" tabindex="0">
+            <input type="file" id="cmp-file-base" class="cmp-file-input" accept=".tsv,.txt,.csv">
+            <div class="cmp-drop-text">ファイルをドロップ、またはクリックして選択</div>
+            <div id="cmp-name-base" class="cmp-file-name">未選択</div>
+          </div>
+        </div>
+
+        <div class="cmp-input-card">
+          <div class="cmp-card-head">
+            <span class="cmp-label">変更後のTSV（アップロード予定）</span>
+            <button type="button" id="cmp-tab-cur" class="cmp-btn cmp-btn-small" hidden>開いているタブを使う</button>
+          </div>
+          <div id="cmp-drop-cur" class="cmp-dropzone" tabindex="0">
+            <input type="file" id="cmp-file-cur" class="cmp-file-input" accept=".tsv,.txt,.csv">
+            <div class="cmp-drop-text">ファイルをドロップ、またはクリックして選択</div>
+            <div id="cmp-name-cur" class="cmp-file-name">未選択</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cmp-run-bar">
+        <label class="cmp-check-label">
+          <input type="checkbox" id="cmp-opt-trim">
+          <span>前後空白を無視</span>
+        </label>
+        <button type="button" id="cmp-run-btn" class="cmp-btn cmp-btn-primary">比較実行</button>
+      </div>
+
+      <div id="cmp-error" class="cmp-error" hidden></div>
+
+      <div id="cmp-results" class="cmp-results" hidden>
+        <div id="cmp-summary" class="cmp-summary"></div>
+
+        <div id="cmp-by-col-wrap" class="cmp-by-col-wrap" hidden>
+          <span class="cmp-label cmp-by-col-title">列ごとの変更件数</span>
+          <span class="cmp-help" title="列名をクリックすると、その列の差分だけに絞り込みます。再クリックで解除します。">?</span>
+          <div id="cmp-by-col" class="cmp-by-col"></div>
+        </div>
+
+        <div class="cmp-toolbar">
+          <div class="cmp-chips" id="cmp-status-chips">
+            <button type="button" class="cmp-chip cmp-chip-active" data-status="all">すべて</button>
+            <button type="button" class="cmp-chip" data-status="changed">変更</button>
+            <button type="button" class="cmp-chip" data-status="added">追加</button>
+            <button type="button" class="cmp-chip" data-status="removed">削除</button>
+          </div>
+
+          <div class="cmp-filters">
+            <label class="cmp-filter-item">
+              <span class="cmp-label">列名</span>
+              <input type="text" id="cmp-col-filter" class="cmp-input" placeholder="列名で絞り込み">
+            </label>
+            <label class="cmp-check-label">
+              <input type="checkbox" id="cmp-only-changed-cells">
+              <span>変更のあるセルだけ表示</span>
+            </label>
+            <label class="cmp-check-label">
+              <input type="checkbox" id="cmp-show-all-cols">
+              <span>全列表示</span>
+            </label>
+          </div>
+
+          <div class="cmp-exports">
+            <button type="button" id="cmp-copy-report" class="cmp-btn cmp-btn-secondary">レポートをコピー</button>
+            <button type="button" id="cmp-download-tsv" class="cmp-btn cmp-btn-secondary">差分TSVをダウンロード</button>
+            <span id="cmp-copy-msg" class="cmp-copy-msg" hidden>コピーしました</span>
+          </div>
+        </div>
+
+        <div class="cmp-table-wrap">
+          <table class="cmp-table" id="cmp-table">
+            <thead id="cmp-thead"></thead>
+            <tbody id="cmp-tbody"></tbody>
+          </table>
+        </div>
+
+        <div id="cmp-more-wrap" class="cmp-more-wrap" hidden>
+          <button type="button" id="cmp-show-more" class="cmp-btn cmp-btn-secondary">さらに表示</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
