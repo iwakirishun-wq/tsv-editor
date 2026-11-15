@@ -1811,20 +1811,21 @@
 .cmp-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 9000;
+  z-index: 1200;
   padding: 16px;
   box-sizing: border-box;
 }
 
 .cmp-dialog {
-  background: #ffffff;
-  color: #222222;
-  border: 1px solid #c8d1dc;
-  border-radius: 4px;
+  font-family: var(--font-ui);
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 0;
   width: min(1240px, 96vw);
   height: min(880px, 92vh);
   display: flex;
@@ -1838,8 +1839,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 10px 14px;
-  background: var(--header-bg, #f4f6f9);
-  border-bottom: 1px solid #d0d7de;
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--border);
 }
 
 .cmp-title-wrap {
@@ -1852,7 +1853,7 @@
   margin: 0;
   font-size: 15px;
   font-weight: 700;
-  color: #1a56a8;
+  color: var(--accent);
 }
 
 .cmp-help {
@@ -1862,8 +1863,8 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  border: 1px solid #1a56a8;
-  color: #1a56a8;
+  border: 1px solid var(--accent);
+  color: var(--accent);
   font-size: 11px;
   font-weight: 700;
   cursor: help;
@@ -1881,7 +1882,7 @@
 }
 
 .cmp-label {
-  color: #1a56a8;
+  color: var(--accent);
   font-weight: 700;
   font-size: 12px;
 }
@@ -1893,10 +1894,10 @@
 }
 
 .cmp-input-card {
-  border: 1px solid #d0d7de;
-  border-radius: 4px;
+  border: 1px solid var(--border);
+  border-radius: 0;
   padding: 8px 10px;
-  background: #fafbfc;
+  background: var(--surface2);
 }
 
 .cmp-card-head {
@@ -1909,17 +1910,17 @@
 
 .cmp-dropzone {
   position: relative;
-  border: 1px dashed #9aa7b8;
-  border-radius: 4px;
+  border: 1px dashed var(--header-border);
+  border-radius: 0;
   padding: 12px 10px;
   text-align: center;
-  background: #ffffff;
+  background: var(--surface);
   cursor: pointer;
 }
 
 .cmp-dropzone.cmp-dragover {
-  border-color: #1a56a8;
-  background: #eef4fc;
+  border-color: var(--accent);
+  background: var(--selected);
 }
 
 .cmp-file-input {
@@ -1932,7 +1933,7 @@
 }
 
 .cmp-drop-text {
-  color: var(--text-dim, #666666);
+  color: var(--text-dim);
   font-size: 12px;
 }
 
@@ -1940,7 +1941,7 @@
   margin-top: 4px;
   font-size: 12px;
   font-weight: 600;
-  color: #222222;
+  color: var(--text);
   word-break: break-all;
 }
 
@@ -1961,28 +1962,28 @@
 }
 
 .cmp-btn {
-  border: 1px solid #b8c2cc;
-  border-radius: 3px;
+  border: 1px solid var(--header-border);
+  border-radius: 0;
   padding: 5px 12px;
   font-size: 12px;
   cursor: pointer;
-  background: #ffffff;
-  color: #222222;
+  background: var(--surface);
+  color: var(--text);
 }
 
 .cmp-btn:hover {
-  background: #f0f3f7;
+  background: var(--header-bg);
 }
 
 .cmp-btn-primary {
-  background: #1a56a8;
-  border-color: #1a56a8;
-  color: #ffffff;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--surface);
   font-weight: 600;
 }
 
 .cmp-btn-primary:hover {
-  background: #144587;
+  background: var(--accent-hover);
 }
 
 .cmp-btn-small {
@@ -1995,7 +1996,7 @@
   border: 1px solid #cf222e;
   background: #ffebe9;
   color: #cf222e;
-  border-radius: 4px;
+  border-radius: 0;
   font-size: 12px;
 }
 
@@ -2013,16 +2014,16 @@
   align-items: center;
   gap: 8px 14px;
   padding: 8px 10px;
-  background: var(--header-bg, #f4f6f9);
-  border: 1px solid #d0d7de;
-  border-radius: 4px;
+  background: var(--header-bg);
+  border: 1px solid var(--border);
+  border-radius: 0;
   font-size: 12px;
 }
 
 .cmp-stat {
   font-weight: 700;
   padding: 2px 6px;
-  border-radius: 3px;
+  border-radius: 0;
 }
 
 .cmp-stat-add {
@@ -2041,8 +2042,8 @@
 }
 
 .cmp-stat-same {
-  color: var(--text-dim, #666666);
-  background: #eaeef2;
+  color: var(--text-dim);
+  background: var(--header-bg);
 }
 
 .cmp-warn {
@@ -2050,12 +2051,12 @@
   background: #fff8c5;
   border: 1px solid #d4a72c;
   padding: 2px 6px;
-  border-radius: 3px;
+  border-radius: 0;
   font-size: 11px;
 }
 
 .cmp-meta {
-  color: var(--text-dim, #666666);
+  color: var(--text-dim);
 }
 
 .cmp-by-col-wrap {
@@ -2072,18 +2073,18 @@
 }
 
 .cmp-col-pill {
-  border: 1px solid #c8d1dc;
-  background: #ffffff;
-  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 0;
   padding: 2px 7px;
   font-size: 11px;
   cursor: pointer;
 }
 
 .cmp-col-pill.cmp-col-pill-active {
-  border-color: #1a56a8;
-  background: #e7f0fb;
-  color: #1a56a8;
+  border-color: var(--accent);
+  background: var(--selected);
+  color: var(--accent);
   font-weight: 700;
 }
 
@@ -2101,18 +2102,18 @@
 }
 
 .cmp-chip {
-  border: 1px solid #c8d1dc;
-  background: #ffffff;
-  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 0;
   padding: 4px 10px;
   font-size: 12px;
   cursor: pointer;
 }
 
 .cmp-chip-active {
-  border-color: #1a56a8;
-  background: #1a56a8;
-  color: #ffffff;
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--surface);
   font-weight: 600;
 }
 
@@ -2130,8 +2131,8 @@
 }
 
 .cmp-input {
-  border: 1px solid #c8d1dc;
-  border-radius: 3px;
+  border: 1px solid var(--border);
+  border-radius: 0;
   padding: 3px 7px;
   font-size: 12px;
   width: 150px;
@@ -2153,8 +2154,8 @@
   flex: 1;
   min-height: 200px;
   overflow: auto;
-  border: 1px solid #d0d7de;
-  border-radius: 4px;
+  border: 1px solid var(--border);
+  border-radius: 0;
 }
 
 .cmp-table {
@@ -2165,7 +2166,7 @@
 
 .cmp-table th,
 .cmp-table td {
-  border: 1px solid #e1e6eb;
+  border: 1px solid var(--border);
   padding: 4px 7px;
   vertical-align: top;
   text-align: left;
@@ -2176,8 +2177,8 @@
 .cmp-table thead th {
   position: sticky;
   top: 0;
-  background: var(--header-bg, #f4f6f9);
-  color: #1a56a8;
+  background: var(--header-bg);
+  color: var(--accent);
   font-weight: 700;
   z-index: 1;
 }
@@ -2185,7 +2186,7 @@
 .cmp-badge {
   display: inline-block;
   padding: 1px 6px;
-  border-radius: 3px;
+  border-radius: 0;
   font-size: 11px;
   font-weight: 700;
   white-space: nowrap;
@@ -2207,8 +2208,8 @@
 }
 
 .cmp-badge-same {
-  color: var(--text-dim, #666666);
-  background: #eaeef2;
+  color: var(--text-dim);
+  background: var(--header-bg);
 }
 
 .cmp-row-added {
@@ -2245,7 +2246,7 @@
 }
 
 .cmp-val-dim {
-  color: var(--text-dim, #888888);
+  color: var(--text-dim);
 }
 
 .cmp-more-wrap {
@@ -2273,7 +2274,6 @@ body.vertical-headers .cmp-table thead tr:first-child th {
     grid-template-columns: 1fr;
   }
 }
-
     </style>
   </head>
   <body>
@@ -2819,6 +2819,7 @@ body.vertical-headers .cmp-table thead tr:first-child th {
           <div class="man-btn-row"><span class="man-btn-label">開く</span><span class="man-btn-desc">TSV・CSV・TXT・Excel(.xlsx/.xlsm/.xls)を開く。画面へのドラッグ&amp;ドロップでも可。Excelはシートごとに別タブでTSVへ変換して開き、値は文字列のまま（日付は表示どおり、数値は桁区切りなしの生の値、先頭0も保持）。元のExcelを上書きしないよう保存先は未設定になります。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">保存</span><span class="man-btn-desc">上書き保存（Ctrl+S）。タブの赤い●は未保存の印。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">名前を付けて保存</span><span class="man-btn-desc">ファイル名を指定して別名で保存（Ctrl+Shift+S）。以降の保存は新しい名前になります。</span></div>
+          <div class="man-btn-row"><span class="man-btn-label">TSV差分比較</span><span class="man-btn-desc">元のTSV（アップロード前）と変更後のTSV（アップロード予定）を比べ、<b>追加・削除・変更された行</b>と、変更セルの<b>元の値→変更後の値</b>（変わった文字を太字）、列ごとの変更件数を表示します。開いているタブも片側に指定できます。キー列（席種エリアコード等）で行を突き合わせ、見つからないときは行順で比較します。create_dt / update_dt / create_user / update_user は除外。結果は「レポートをコピー」「差分TSVをダウンロード」で出せます。</span></div>
           <div class="man-btn-row"><span class="man-btn-label">絞込保存</span><span class="man-btn-desc">フィルターで絞り込んだ行だけを別ファイルに保存。</span></div>
         </div>
 
