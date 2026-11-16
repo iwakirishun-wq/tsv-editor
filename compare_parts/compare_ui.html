@@ -78,11 +78,15 @@
               <input type="checkbox" id="cmp-show-all-cols">
               <span>全列表示</span>
             </label>
+            <select id="cmp-col-jump" class="cmp-select" aria-label="列へ移動">
+              <option value="">列へ移動…</option>
+            </select>
           </div>
 
           <div class="cmp-exports">
             <button type="button" id="cmp-copy-report" class="cmp-btn cmp-btn-secondary">レポートをコピー</button>
             <button type="button" id="cmp-download-tsv" class="cmp-btn cmp-btn-secondary">差分TSVをダウンロード</button>
+            <button type="button" id="cmp-download-html" class="cmp-btn cmp-btn-secondary">HTMLレポートを保存</button>
             <span id="cmp-copy-msg" class="cmp-copy-msg" hidden>コピーしました</span>
           </div>
         </div>

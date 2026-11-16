@@ -4,7 +4,8 @@ const assert = require("assert");
 const {
   compareTables,
   charDiff,
-  parseTsvForCompare
+  parseTsvForCompare,
+  buildHtmlReport
 } = require("../compare_parts/compare_engine.js");
 
 let passed = 0;
@@ -276,6 +277,59 @@ test("charDiff: eq+del=元 / eq+ins=後 の往復検証", () => {
     assert.strictEqual(reconA, a, `reconA mismatch for ${a.slice(0, 20)}`);
     assert.strictEqual(reconB, b, `reconB mismatch for ${b.slice(0, 20)}`);
   }
+});
+
+// 12. buildHtmlReport: HTML escape, all diff rows (>200), excludes 'same' rows, self-contained
+test("buildHtmlReport: HTMLエスケープ・全行出力・変更なし除外・自己完結", () => {
+  const header = "seat_type_area_cd\tname\tnote\n";
+  const baseLines = [header];
+  const curLines = [header];
+
+  // Add 1 'same' row that must NOT appear in table rows
+  baseLines.push("SAME_KEY_000\tUNCHANGED_NAME\tkeep\n");
+  curLines.push("SAME_KEY_000\tUNCHANGED_NAME\tkeep\n");
+
+  // Add 250 changed rows (>200 limit) including XSS payload
+  baseLines.push('XSS_KEY\t"<script>alert(1)</script>"\told_note\n');
+  curLines.push('XSS_KEY\t"<script>alert(2)</script>"\tnew_note\n');
+
+  for (let i = 1; i <= 250; i++) {
+    baseLines.push(`K${i}\tname_${i}\tv1\n`);
+    curLines.push(`K${i}\tname_${i}\tv2\n`);
+  }
+
+  // Add 1 added row and 1 removed row
+  baseLines.push("DEL_KEY\tdel_name\tdel_v\n");
+  curLines.push("ADD_KEY\tadd_name\tadd_v\n");
+
+  const res = compareTables(
+    parseTsvForCompare(baseLines.join("")),
+    parseTsvForCompare(curLines.join(""))
+  );
+  const html = buildHtmlReport(res, {
+    baseName: '<img src=x onerror="alert(1)">base.tsv',
+    curName: "cur.tsv",
+    generatedAt: "2026-11-16 11:10"
+  });
+
+  // Self-contained: no external http:// or https://
+  assert.strictEqual(html.indexOf("http://"), -1);
+  assert.strictEqual(html.indexOf("https://"), -1);
+  assert.ok(html.includes('<meta charset="utf-8">'));
+
+  // HTML escaping: raw <script>alert or <img src=x must not appear
+  assert.strictEqual(html.indexOf("<script>alert"), -1);
+  assert.strictEqual(html.indexOf("<img src=x"), -1);
+  assert.ok(html.includes("&lt;script&gt;alert("));
+
+  // Same row excluded from body table, but count shown in summary
+  assert.ok(html.includes("変更なし 1行"));
+  assert.strictEqual(html.indexOf("SAME_KEY_000"), -1);
+
+  // All 251 changed + 1 added + 1 removed = 253 rows included (no 200-row cap)
+  assert.ok(html.includes("K250"));
+  assert.ok(html.includes("ADD_KEY"));
+  assert.ok(html.includes("DEL_KEY"));
 });
 
 if (failed > 0) {

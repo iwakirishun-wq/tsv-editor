@@ -300,7 +300,57 @@
       el("cmp-tbody").innerHTML = "";
     }
     renderTableHeader();
+    updateColJumpOptions();
     renderNextBatch();
+  }
+
+  function updateColJumpOptions() {
+    var sel = el("cmp-col-jump");
+    var res = state.result;
+    if (!sel || !res) return;
+    sel.innerHTML = "";
+    var placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "列へ移動…";
+    sel.appendChild(placeholder);
+
+    for (var i = 0; i < state.visibleColIndices.length; i++) {
+      var colIdx = state.visibleColIndices[i];
+      var opt = document.createElement("option");
+      opt.value = String(colIdx);
+      opt.textContent = res.commonCols[colIdx].header;
+      sel.appendChild(opt);
+    }
+  }
+
+  function jumpToColumn(colIdxStr) {
+    if (!colIdxStr) return;
+    var wrap = document.querySelector(".cmp-table-wrap");
+    var thead = el("cmp-thead");
+    if (!wrap || !thead) return;
+
+    var ths = thead.querySelectorAll("th[data-col-idx]");
+    var targetTh = null;
+    for (var i = 0; i < ths.length; i++) {
+      if (ths[i].getAttribute("data-col-idx") === colIdxStr) {
+        targetTh = ths[i];
+        break;
+      }
+    }
+    if (!targetTh) return;
+
+    var stickyThs = thead.querySelectorAll("th.cmp-sticky-col");
+    var fixedWidth = 0;
+    for (var s = 0; s < stickyThs.length; s++) {
+      fixedWidth += stickyThs[s].offsetWidth;
+    }
+
+    var targetLeft = Math.max(0, targetTh.offsetLeft - fixedWidth - 8);
+    if (typeof wrap.scrollTo === "function") {
+      wrap.scrollTo({ left: targetLeft, behavior: "smooth" });
+    } else {
+      wrap.scrollLeft = targetLeft;
+    }
   }
 
   function renderTableHeader() {
@@ -310,16 +360,23 @@
     thead.innerHTML = "";
 
     var tr = document.createElement("tr");
-    var fixed = ["状態", "キー", "行番号"];
+    var fixed = [
+      { label: "状態", cls: "cmp-sticky-col cmp-col-status" },
+      { label: "キー", cls: "cmp-sticky-col cmp-col-key" },
+      { label: "行番号", cls: "cmp-sticky-col cmp-col-rowno" }
+    ];
     for (var f = 0; f < fixed.length; f++) {
       var thF = document.createElement("th");
-      thF.textContent = fixed[f];
+      thF.className = fixed[f].cls;
+      thF.textContent = fixed[f].label;
       tr.appendChild(thF);
     }
 
     for (var i = 0; i < state.visibleColIndices.length; i++) {
       var colIdx = state.visibleColIndices[i];
       var th = document.createElement("th");
+      th.className = "cmp-col-data";
+      th.setAttribute("data-col-idx", String(colIdx));
       th.textContent = res.commonCols[colIdx].header;
       tr.appendChild(th);
     }
@@ -364,6 +421,7 @@
       else if (r.status === "removed") tr.className = "cmp-row-removed";
 
       var tdStatus = document.createElement("td");
+      tdStatus.className = "cmp-sticky-col cmp-col-status";
       var badge = document.createElement("span");
       badge.className = "cmp-badge cmp-badge-" + r.status;
       badge.textContent = statusLabel(r.status);
@@ -371,10 +429,12 @@
       tr.appendChild(tdStatus);
 
       var tdKey = document.createElement("td");
+      tdKey.className = "cmp-sticky-col cmp-col-key";
       tdKey.textContent = r.key;
       tr.appendChild(tdKey);
 
       var tdNo = document.createElement("td");
+      tdNo.className = "cmp-sticky-col cmp-col-rowno";
       var bNo = r.baseRowNo !== null ? String(r.baseRowNo) : "-";
       var cNo = r.curRowNo !== null ? String(r.curRowNo) : "-";
       tdNo.textContent = bNo + " -> " + cNo;
@@ -383,6 +443,7 @@
       for (var vi = 0; vi < state.visibleColIndices.length; vi++) {
         var cell = r.cells[state.visibleColIndices[vi]];
         var td = document.createElement("td");
+        td.className = "cmp-col-data";
 
         if (!cell) {
           tr.appendChild(td);
@@ -607,15 +668,67 @@
     }
 
     var content = "\uFEFF" + lines.join("\r\n");
-    var blob = new Blob([content], { type: "text/tab-separated-values;charset=utf-8" });
+    triggerBlobDownload(
+      content,
+      "text/tab-separated-values;charset=utf-8",
+      "tsv_diff_result.tsv"
+    );
+  }
+
+  function triggerBlobDownload(content, mimeType, fileName) {
+    var blob = new Blob([content], { type: mimeType });
     var url = URL.createObjectURL(blob);
     var a = document.createElement("a");
     a.href = url;
-    a.download = "tsv_diff_result.tsv";
+    a.download = fileName;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  }
+
+  function pad2(n) {
+    return n < 10 ? "0" + n : String(n);
+  }
+
+  function downloadHtmlReport() {
+    var res = state.result;
+    var engine = window.TsvCompareEngine;
+    if (!res) return;
+    if (!engine || typeof engine.buildHtmlReport !== "function") {
+      showError("HTMLレポート生成機能 (buildHtmlReport) が読み込まれていません。");
+      return;
+    }
+
+    var now = new Date();
+    var stamp =
+      now.getFullYear() +
+      pad2(now.getMonth() + 1) +
+      pad2(now.getDate()) +
+      "_" +
+      pad2(now.getHours()) +
+      pad2(now.getMinutes());
+    var generatedAt =
+      now.getFullYear() +
+      "-" +
+      pad2(now.getMonth() + 1) +
+      "-" +
+      pad2(now.getDate()) +
+      " " +
+      pad2(now.getHours()) +
+      ":" +
+      pad2(now.getMinutes());
+
+    var html = engine.buildHtmlReport(res, {
+      baseName: state.baseName,
+      curName: state.curName,
+      generatedAt: generatedAt
+    });
+    triggerBlobDownload(
+      html,
+      "text/html;charset=utf-8",
+      "tsv_diff_report_" + stamp + ".html"
+    );
   }
 
   function initOnce() {
@@ -630,6 +743,7 @@
     el("cmp-show-more").addEventListener("click", renderNextBatch);
     el("cmp-copy-report").addEventListener("click", copyReport);
     el("cmp-download-tsv").addEventListener("click", downloadDiffTsv);
+    el("cmp-download-html").addEventListener("click", downloadHtmlReport);
 
     el("cmp-tab-base").addEventListener("click", function () {
       if (typeof state.getCurrentTab !== "function") return;
@@ -671,6 +785,10 @@
     el("cmp-show-all-cols").addEventListener("change", function (e) {
       state.showAllCols = Boolean(e.target.checked);
       applyFiltersAndRender(true);
+    });
+
+    el("cmp-col-jump").addEventListener("change", function (e) {
+      jumpToColumn(e.target.value);
     });
 
     document.addEventListener("keydown", function (e) {

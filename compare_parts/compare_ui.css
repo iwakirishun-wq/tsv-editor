@@ -332,8 +332,19 @@
   width: 150px;
 }
 
+.cmp-select {
+  border: 1px solid var(--border);
+  border-radius: 0;
+  padding: 3px 7px;
+  font-size: 12px;
+  background: var(--surface, #ffffff);
+  color: var(--text);
+  max-width: 180px;
+}
+
 .cmp-exports {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
 }
@@ -345,6 +356,7 @@
 }
 
 .cmp-table-wrap {
+  position: relative;
   flex: 1;
   min-height: 200px;
   overflow: auto;
@@ -353,14 +365,18 @@
 }
 
 .cmp-table {
-  width: 100%;
-  border-collapse: collapse;
+  width: max-content;
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 12px;
 }
 
 .cmp-table th,
 .cmp-table td {
-  border: 1px solid var(--border);
+  box-sizing: border-box;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
   padding: 4px 7px;
   vertical-align: top;
   text-align: left;
@@ -371,10 +387,48 @@
 .cmp-table thead th {
   position: sticky;
   top: 0;
-  background: var(--header-bg);
+  background: var(--header-bg, #f6f8fa);
   color: var(--accent);
   font-weight: 700;
+  z-index: 2;
+}
+
+.cmp-table .cmp-sticky-col {
+  position: sticky;
   z-index: 1;
+  background: var(--surface, #ffffff);
+}
+
+.cmp-table thead th.cmp-sticky-col {
+  z-index: 4;
+  background: var(--header-bg, #f6f8fa);
+}
+
+.cmp-table .cmp-col-status {
+  left: 0;
+  width: 68px;
+  min-width: 68px;
+  max-width: 68px;
+}
+
+.cmp-table .cmp-col-key {
+  left: 68px;
+  width: 180px;
+  min-width: 180px;
+  max-width: 180px;
+}
+
+.cmp-table .cmp-col-rowno {
+  left: 248px;
+  width: 92px;
+  min-width: 92px;
+  max-width: 92px;
+  border-right: 1px solid var(--header-border);
+}
+
+.cmp-table .cmp-col-data {
+  min-width: 140px;
+  max-width: 360px;
 }
 
 .cmp-badge {
@@ -406,11 +460,13 @@
   background: var(--header-bg);
 }
 
-.cmp-row-added {
+.cmp-row-added,
+.cmp-table tbody tr.cmp-row-added td.cmp-sticky-col {
   background: #f4fbf6;
 }
 
-.cmp-row-removed {
+.cmp-row-removed,
+.cmp-table tbody tr.cmp-row-removed td.cmp-sticky-col {
   background: #fff6f6;
 }
 
