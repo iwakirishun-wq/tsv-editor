@@ -59,9 +59,9 @@ const num = (s) => { const t = String(s).trim(); return t === "" ? null : Number
 function run(normals, ugs) {
   const validate = buildUgValidator(normals.concat(ugs), c, v, seatMeta, null);
   return buildUgMatrixModel({
-    normals: normals.map((r) => ({ cond: condOf(r), seat: v(r, c.seat), code: v(r, c.seatCd), age: v(r, c.age), adv: num(v(r, c.adv)), day: num(v(r, c.day)) })),
+    normals: normals.map((r) => ({ cond: condOf(r), fullCond: [r.kbn, r.rank, r.route].join("|"), seat: v(r, c.seat), code: v(r, c.seatCd), age: v(r, c.age), adv: num(v(r, c.adv)), day: num(v(r, c.day)) })),
     ugs: ugs.map((r) => ({ cond: condOf(r), srcSeat: v(r, c.ugSeat), srcCode: v(r, c.ugSeatCd), srcAge: v(r, c.ugAge), dstSeat: v(r, c.seat), dstCode: v(r, c.seatCd), dstAge: v(r, c.age), chk: validate(r), ref: r })),
-    canUpgrade: validate.canUpgrade,
+    canUpgrade: validate.canUpgrade, normalSpan: validate.normalSpan,
     isUgCond: (k) => /会員/.test(k),
   });
 }
@@ -171,6 +171,56 @@ const ugs2 = ugs.concat([ug(C, C, ADULT, E, E, ADULT, 1234, 1234)]);
 const model2 = run(normals, ugs2);
 const it2 = model2.conds.find((x) => x.cond === COND).cells.get(key(C, E)).items.find((it) => it.srcAge === ADULT && it.dstAge === ADULT);
 eq([it2.rows.length, it2.state], [2, "ng"], "同じ券種の組の複数行は1点にまとめて重いほう");
+
+const period = ugMatrixPayload(model2).conds.find((x) => x.cond === COND);
+const srcIndex = period.seats.findIndex((s) => s.n === C);
+const dstIndex = period.seats.findIndex((s) => s.n === E);
+const periodItem = period.cells[srcIndex + "," + dstIndex][1].find(([a, b]) =>
+  period.seats[srcIndex].af[a] === ADULT && period.seats[dstIndex].af[b] === ADULT);
+eq(periodItem.slice(3, 5), [1234, 1234], "期分けで後の行だけNGならその行の登録価格を表示");
+
+// 実在UGの検算が0円で不可となる組を、未登録時にも候補にしない。
+for (const [seat, code] of [["木曜日券", "RESV71"], ["パドックパス", "SIGTCO26011"], ["車いす指定席", "RESV72"]]) {
+  const rows = [normal(seat, code, CHILD, 0, 1200), normal(seat, code, ADULT, 3000, 3500)];
+  const registered = ug(seat, code, CHILD, seat, code, ADULT, 3000, 2300);
+  const validate = buildUgValidator(rows, c, v, seatMeta, null);
+  eq(validate(registered).problems.includes("0円商品はUG不可"), true, seat + "の登録済み0円UGは不可");
+  const pending = run(rows.concat(normals), ugs);
+  const cell = pending.conds[0].cells.get(key(seat, seat));
+  eq(!!cell?.items.some((it) => it.srcAge === CHILD && it.dstAge === ADULT), false, seat + "の0円UGを漏れ候補にしない");
+}
+
+// 同じ席種・券種の0円・値下がり・席種最高額は、現在の販売条件と経路だけで判定する。
+for (const [kind, childPrice, adultPrice] of [["無料", 0, 5000], ["券種値下がり", 4000, 5000], ["席種最高額", 1000, 12000]]) {
+  const src = "合成A", dst = "合成B";
+  function group(rank, route, child, adult) {
+    const tag = (r) => ({ ...r, rank, route });
+    return {
+      normals: [normal(src, "RESVA1", CHILD, child, child), normal(src, "RESVA1", ADULT, adult, adult),
+        normal(dst, "RESVB2", CHILD, 3000, 3000), normal(dst, "RESVB2", ADULT, 8000, 8000)].map(tag),
+      ugs: [tag(ug(dst, "RESVB2", ADULT, dst, "RESVB2", ADULT, 500, 500))],
+    };
+  }
+  for (const sameRank of [false, true]) {
+    const good = group("会員A", "WEB", 1000, 5000);
+    const bad = group(sameRank ? "会員A" : "会員B", "窓口", childPrice, adultPrice);
+    for (const groups of [[good, bad], [bad, good]]) {
+      const model = run(groups.flatMap((g) => g.normals), groups.flatMap((g) => g.ugs));
+      const pending = (rank) => model.conds.find((g) => g.cond === KBN + "・" + rank).cells.get(key(src, dst))
+        ?.items.find((it) => it.srcAge === CHILD && it.dstAge === CHILD);
+      eq(pending("会員A")?.expAdv, 2000, kind + " 別条件・別経路に影響されず有料条件の候補を表示");
+      if (!sameRank) eq(!!pending("会員B"), false, kind + " 不可条件は登録漏れにしない");
+    }
+  }
+}
+
+// 販売期間が接するだけなら漏れ候補に出さず、1分の重複は残す。
+for (const [start, possible] of [["2027/01/01 10:00", false], ["2027/01/01 09:59", true]]) {
+  const rows = [Object.assign(normal(C, C, ADULT, 10000, 10000), { end: "2027/01/01 10:00" }),
+    Object.assign(normal(E, E, ADULT, 11000, 11000), { start })];
+  const pending = run(rows, [ug(C, C, ADULT, C, C, ADULT, 500, 500)]);
+  eq(pending.conds[0].cells.has(key(C, E)), possible, "販売開始 " + start + " の漏れ候補");
+}
 
 // すべて正しく登録すれば問題0件（27F1修正後の全件ファイルと同じ状態）
 const fixedUgs = [];

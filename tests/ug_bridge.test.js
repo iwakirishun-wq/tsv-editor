@@ -81,6 +81,19 @@ const ROWS = [
   eq(r[5], "0\t\t", "エリア席の同席種同券種は不可");
 }
 
+// 特殊席の年齢変更でも元・先の0円は不可。ブリッジは期待差額を出さない。
+{
+  const rows = [], pairs = [];
+  for (const [seat, code] of [["木曜日券", "RESV71"], ["パドックパス", "SIGTCO26011"], ["車いす指定席", "RESV72"]]) {
+    rows.push(row(seat, code, "子供", 0, 1200), row(seat, code, "大人", 3000, 3500));
+    pairs.push([seat, code, "子供", seat, code, "大人"]);
+  }
+  rows.push(row("車いす指定席B", "RESV73", "大人", 3000, 0));
+  pairs.push(["車いす指定席B", "RESV73", "大人", "車いす指定席B", "RESV73", "大人"]);
+  const result = run(rows, pairs);
+  pairs.forEach((p, i) => eq(result[i], "0\t\t", p[0] + "の0円通常価格でUGは生成不可"));
+}
+
 // --- ダミー価格の扱い（全桁9は実価格でない・高額の実価格はダミーにしない） ---
 {
   const ROWS_D = [

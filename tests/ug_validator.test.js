@@ -547,6 +547,11 @@ const NORMALS_CUTOFF = [
 const validateCutoff = buildUgValidator(NORMALS_CUTOFF, c, v, seatMeta, DAY_CUTOFF);
 const CUTOFF_SCENARIOS = [
   {
+    name: "同一指定席の席替えでも、当日販売中の通常価格未設定はNG",
+    row: ugRow(SEAT_P.name, SEAT_P.cd, "大人", SEAT_P.name, SEAT_P.cd, "大人", 500, 999999),
+    expectStatus: "ng",
+  },
+  {
     // 元(R)・先(P)とも当日(07/05 19:00)まで売る＝当日窓にかぶるのに先(P)の当日がダミー→当日価格の設定漏れ＝NG（2026-07-10確定）
     name: "[dayCutoff] 元(R)・先(P)とも当日まで売るのに先(P)の当日がダミー → 当日はエラー（NG）",
     row: ugRow(SEAT_R.name, SEAT_R.cd, "大人", SEAT_P.name, SEAT_P.cd, "大人", 500, 12345),
@@ -640,6 +645,11 @@ for (const s of CUTOFF_SCENARIOS) {
     SP.name, SP.cd, "大人", SD.name, SD.cd, "大人",
     4000, 4000, "2026/06/01 11:00", "2026/08/31 21:00",
   ));
+  const alias = valSplit(ugRow("期分け 元", SP.cd, "大人", "期分け 先", SD.cd, "大人",
+    3000, 3000, "2026/06/01 11:00", "2026/08/31 21:00"));
+  for (const side of ["元", "先"]) {
+    eqCU(alias.problems.includes("UGの販売期間が" + side + "の通常販売期間を超えている"), true, "表記違い・コード一致の" + side + "の期間超過を検出");
+  }
   if (over.problems.some((p) => p.includes("通常販売期間を超えている"))) pass++;
   else { fail++; console.error(`NG [期分けでも超過は拾うべき]: ${JSON.stringify(over.problems)}`); }
 }

@@ -116,6 +116,24 @@ const seatMeta = () => ({ found: true, isReserved: true, isFree: false, stockTyp
   eq(pe.empty, true, "販売期間: 重なりが無ければ empty=true");
 }
 
+// 元の終了＝先の開始では販売できる時間がない。1分重なれば設定可能。
+{
+  const end = "2027/01/01 10:00";
+  for (const [start, possible] of [[end, false], ["2027/01/01 09:59", true]]) {
+    const normals = [normal(...A, 10000, 12000, { "販売終了日時": end }),
+      normal(...B, 15000, 18000, { "販売開始日時": start })];
+    const u = ugRow(A, B, 5000, 6000, { "販売開始日時": start, "販売終了日時": end });
+    const validate = L.buildUgValidator(normals, c, v, seatMeta, null);
+    const label = possible ? "1分重複" : "接点のみ";
+    eq(validate(u).status, possible ? "ok" : "invalid", label + " の登録済みUG検算");
+    eq(L.ugEditCorrectPeriod(normals, c, v, u).empty, !possible, label + " の販売期間");
+    eq(L.ugEditCheckInput({ adv: "5000", day: "6000", start, end }).ok, possible, label + " の編集");
+    const plan = L.ugEditPlanAdd(H, normals, c, v, validate, L.ugEditRowSpec(u, c, v), { allowNormalTemplate: true });
+    eq(plan.rows.length, possible ? 1 : 0, label + " のUG追加案");
+    eq(L.ugEditValidateExport(H, [...normals, u], c, v, validate).ok, possible, label + " のTSV出力");
+  }
+}
+
 // ===== 期待値（validate の結果から登録すべき差額を出す） =====
 {
   eq(L.ugEditExpected({ expected: 5000, expectedDay: 6000 }, { adv: "1", day: "2" }), { adv: "5000", day: "6000" }, "期待値: validate の期待差額");

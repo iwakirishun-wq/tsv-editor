@@ -4110,11 +4110,13 @@ body.vertical-headers .cmp-table thead tr:first-child th {
           else any.set(ak, rec);
           // 2026-10-31: 席種エリアコードでも引けるようにする（キーは「#コード」）。UG行と通常行で席種名の表記
           // （空白・全角半角）が少しでも違うと名前では通常価格が見つからず「価格不明」になっていた（冬花火27 車椅子 同伴）
-          const seatCd = c.seatCd ? v(row, c.seatCd).trim() : "";
+          const seatCd = c.seatCd != null && c.seatCd !== -1 ? v(row, c.seatCd).trim() : "";
           if (seatCd) {
             const ckc = condKey(row) + "|#" + seatCd + "|" + age, akc = "#" + seatCd + "|" + age;
             if (byCond.has(ckc)) multiNormal.add(ckc);
             byCond.set(ckc, rec);
+            bumpSpan(spanByCond, ckc, rec);
+            bumpSpan(spanAny, akc, rec);
             if (any.has(akc)) multiNormal.add("ANY|" + akc);
             else any.set(akc, rec);
           }
@@ -4255,8 +4257,10 @@ body.vertical-headers .cmp-table thead tr:first-child th {
         };
         const isDummyPrice = ugIsDummyPrice; // 売止め等のダミー価格判定（純粋ロジックを委譲）
         // code（席種エリアコード）があればコードで先に引き、無ければ席種名で引く
-        const lookup = (ck, seat, age, code) => (code && (byCond.get(ck + "|#" + code + "|" + age) || any.get("#" + code + "|" + age)))
-          || byCond.get(ck + "|" + seat + "|" + age) || any.get(seat + "|" + age) || null;
+        const lookupIndexed = (conditionIndex, fallbackIndex, ck, seat, age, code) =>
+          (code && (conditionIndex.get(ck + "|#" + code + "|" + age) || fallbackIndex.get("#" + code + "|" + age)))
+          || conditionIndex.get(ck + "|" + seat + "|" + age) || fallbackIndex.get(seat + "|" + age) || null;
+        const lookup = (ck, seat, age, code) => lookupIndexed(byCond, any, ck, seat, age, code);
         // lookup が返した通常行が「その席種×券種で唯一の行」だったか。
         // 期分け（同一キーに複数行）だと lookup は1行しか返せず、その行の期間は
         // UG行の期間と一致しないのが当たり前なので、厳密一致で判定してはいけない。
@@ -4267,14 +4271,13 @@ body.vertical-headers .cmp-table thead tr:first-child th {
           return any.has(seat + "|" + age) && !multiNormal.has("ANY|" + seat + "|" + age);
         };
         // 期分けがある場合に使う、その席種×券種の全期の外枠（最早の開始〜最遅の終了）。
-        const lookupSpan = (ck, seat, age) =>
-          spanByCond.get(ck + "|" + seat + "|" + age) || spanAny.get(seat + "|" + age) || null;
+        const lookupSpan = (ck, seat, age, code) => lookupIndexed(spanByCond, spanAny, ck, seat, age, code);
 
         // UG行が実在しなくても「この席種×券種の組み合わせは構造的にUG可能か」を判定する。
-        // 実在する行のkbn/rank/条件には依存しない（条件キーがないので最高額は"any"索引のみ参照）。
+        // 通常行が特定できる画面では同じ販売条件・経路の価格を使い、条件がないブリッジ等では全体の索引を参照する。
         // マトリクスの「—」セル（登録なし）が、本来UGが成立しうるのに登録漏れなのか、
         // そもそも対象外（車椅子/エリア/年齢降格/席種・券種ダウングレード）なのかを区別するために使う。
-        function canUpgrade(srcSeat, srcCode, srcAge, dstSeat, dstCode, dstAge) {
+        function canUpgrade(srcSeat, srcCode, srcAge, dstSeat, dstCode, dstAge, srcNormal, dstNormal) {
           const dr = ageRank(dstAge);
           // 2026-10-13（正本§15-4）: 未確定複合券種（KEN314 高校生以上＋中学生以下）は元・先ともUG不可
           if (ugIsCompositeAgeTicket(srcAge) || ugIsCompositeAgeTicket(dstAge)) return false;
@@ -4283,7 +4286,10 @@ body.vertical-headers .cmp-table thead tr:first-child th {
           // 2026-10-01: 大人・共通券種から子ども・若年限定券種への変更は同額以上でも不可
           if (ugAdultToYouthDowngradeReason(srcAge, dstAge)) return false;
           // 早期許可（パス/木曜日券/車椅子）より先に個別券種の値下がりを確認する。
-          if (ticketDowngradeWindows(any.get(srcSeat + "|" + srcAge), any.get(dstSeat + "|" + dstAge)).length) return false;
+          const srcPrice = srcNormal || any.get(srcSeat + "|" + srcAge);
+          const dstPrice = dstNormal || any.get(dstSeat + "|" + dstAge);
+          if (hasZeroPrice(srcPrice) || hasZeroPrice(dstPrice)) return false;
+          if (ticketDowngradeWindows(srcPrice, dstPrice).length) return false;
           // 公式HPでUG対象外と明示された席種（2026-08-18ルール。VBA側から2026-08-24に移植）
           if (isUgExcludedSeat(srcSeat) || isUgExcludedSeat(dstSeat)) return false;
           if (isUgSourceExcludedSeat(srcSeat) && srcSeat !== dstSeat) return false;
@@ -4323,10 +4329,10 @@ body.vertical-headers .cmp-table thead tr:first-child th {
             return true;
           }
           if (sameSeat && (dstCat === "エリア" || isNoSeatMoveSeat(dstSeat))) return false;
-          // 0円商品はUGの元にも先にもできない（VBAから2026-08-25移植）
-          if (hasZeroPrice(any.get(srcSeat + "|" + srcAge)) || hasZeroPrice(any.get(dstSeat + "|" + dstAge))) return false;
           // 席種の最高額どうしの比較によるダウングレード防止（2026-07-12 VBA確定ルール・2026-08-25 JS移植）
-          if (!sameSeat && !srcWc && !dstWc && isSeatDowngrade(maxAny, srcSeat, dstSeat)) return false;
+          const fullCond = srcNormal?.fullCond;
+          const prefix = fullCond == null ? "" : fullCond + "|";
+          if (!sameSeat && !srcWc && !dstWc && isSeatDowngrade(fullCond == null ? maxAny : maxByCond, prefix + srcSeat, prefix + dstSeat)) return false;
           return true;
         }
 
@@ -4450,6 +4456,7 @@ body.vertical-headers .cmp-table thead tr:first-child th {
           {
             const ugStart = parseDt(v(row, c.start)), ugEnd = parseDt(v(row, c.end));
             if (ugStart != null && ugEnd != null) {
+              if (ugStart >= ugEnd) problems.push("UGの販売終了は販売開始より後に設定してください");
               const ckP = condKey(row);
               const srcNormal = lookup(ckP, srcSeat, srcAge, srcCode), dstNormal = lookup(ckP, dstSeat, dstAge, dstCode);
               // 厳密な一致判定は「元・先とも通常行が一意に引き当てられる」ときだけ。
@@ -4478,7 +4485,7 @@ body.vertical-headers .cmp-table thead tr:first-child th {
                 // 期分けのある席種で lookup が返した1行の期間と比べると、別の期のUG行が
                 // 必ず食い違って誤検出になるため、最早の開始〜最遅の終了に収まっているかで判定する。
                 // 外枠なので誤検出は出ず、明らかな はみ出し（売っていない期間まで売る）は拾える。
-                const srcSpan = lookupSpan(ckP, srcSeat, srcAge), dstSpan = lookupSpan(ckP, dstSeat, dstAge);
+                const srcSpan = lookupSpan(ckP, srcSeat, srcAge, srcCode), dstSpan = lookupSpan(ckP, dstSeat, dstAge, dstCode);
                 if (srcSpan && (ugStart < srcSpan.start || ugEnd > srcSpan.end)) {
                   problems.push("UGの販売期間が元の通常販売期間を超えている");
                 }
@@ -4498,11 +4505,10 @@ body.vertical-headers .cmp-table thead tr:first-child th {
           // --- 期待差額（前売・当日） ---
           // 戻り: { exp:number|null, note:string, dummy:bool, dummyError:bool }
           const calc = (which) => {
-            if (sameSeat) return { exp: PRICE_RULES.SEAT_CHANGE_FEE, note: "同席種・同年齢区分=一律500（再発行等）", dummy: false };
             const ck = condKey(row);
             const s = lookup(ck, srcSeat, srcAge, srcCode), d = lookup(ck, dstSeat, dstAge, dstCode);
             const sp = s ? s[which] : null, dp = d ? d[which] : null;
-            if (sp == null || dp == null) return { exp: null, note: "価格不明", dummy: false };
+            if (!sameSeat && (sp == null || dp == null)) return { exp: null, note: "価格不明", dummy: false };
             if (isDummyPrice(sp) || isDummyPrice(dp)) {
               // ダミー価格（999999等の売止め）の正誤は、その窓の販売期間かぶりで決まる（dayCutoff基準・2026-07-10確定）。
               //  ・当日ダミー: 販売終了が dayCutoff より前（当日窓にかぶらない＝当日は売らない）なら正常。
@@ -4517,6 +4523,7 @@ body.vertical-headers .cmp-table thead tr:first-child th {
                 : "ダミー金額に変換が後程必要（境界日時を指定していない、または対象期間が重なっていないため現時点ではエラーではありません）";
               return { exp: null, note, dummy: true, dummyError: bothOverlap, srcPrice: sp, dstPrice: dp };
             }
+            if (sameSeat) return { exp: PRICE_RULES.SEAT_CHANGE_FEE, note: "同席種・同年齢区分=一律500（再発行等）", dummy: false };
             const diff = dp - sp;
             const adultYouthReason = ugAdultToYouthDowngradeReason(srcAge, dstAge);
             // 期待差額の写像は純粋関数 ugExpectedCharge に集約（負差額や子どもへのダウングレードはUG不可、同額は500、
@@ -4567,7 +4574,7 @@ body.vertical-headers .cmp-table thead tr:first-child th {
             advActual, dayActual, notes, advNg, dayNg,
             note: [problems.join(" / "), notes.join(" / "), problems.length ? "" : (adv.note || "")].filter(Boolean).join(" / "),
           };
-        }, { canUpgrade });
+        }, { canUpgrade, normalSpan: lookupSpan });
       }
       // ===UG_VALIDATOR_CORE_END===
       // ===UG_MATRIX_CORE_START=== UI/stateに依存しない純粋ロジック（tests/ug_matrix.test.js が抽出して検証する。PRICE_RULES_CORE・UG_VALIDATOR_CORE を使う）
@@ -4637,8 +4644,14 @@ body.vertical-headers .cmp-table thead tr:first-child th {
             if (s.price == null || n.adv < s.price) s.price = n.adv;
             if (ugAgeClass(n.age) === 4 && (s.adultPrice == null || n.adv < s.adultPrice)) s.adultPrice = n.adv;
           }
+          // 同じ画面ブロックでも経路が違えば価格は別。期分けは従来どおり最初の行を代表にする。
+          let bySeatAge = g.normal.get(n.fullCond);
+          if (!bySeatAge) { bySeatAge = new Map(); g.normal.set(n.fullCond, bySeatAge); }
           const k = n.seat + SEP + n.age;
-          if (!g.normal.has(k)) g.normal.set(k, n); // 期分けで複数行あるときは先の行（validate の any 索引と同じ）
+          if (!bySeatAge.has(k)) {
+            const span = opt.normalSpan?.(n.fullCond, n.seat, n.age, n.code);
+            bySeatAge.set(k, { ...n, span });
+          }
         }
         for (const u of ugs) {
           const g = getCond(u.cond);
@@ -4669,23 +4682,26 @@ body.vertical-headers .cmp-table thead tr:first-child th {
           }
           // 設定漏れ: UG行が1件でもある、UGを設定する販売条件だけ
           if (g.ugRows.length && isUgCond(g.cond)) {
-            const recs = [...g.normal.values()];
-            for (const s of recs) {
-              for (const d of recs) {
-                const ex = g.cells.get(s.seat + SEP + d.seat);
-                if (ex && ex.itemMap.has(s.age + SEP + d.age)) continue;
-                if (!canUpgrade(s.seat, s.code, s.age, d.seat, d.code, d.age)) continue;
-                // その販売条件の価格で値下がり（前売・当日どちらか）なら対象外。ダミー・空欄は比べない
-                if (["adv", "day"].some((w) => realPrice(s[w]) && realPrice(d[w]) && d[w] < s[w])) continue;
-                // validate と同じ「同席種・同年齢区分＝一律500円」の判定
-                // 同券種（座席移動・一律500円）の判定は検算と同じ ugSameTicket（正本§15-C1。年齢ランクだけで比べない）
-                const sameSeat = s.seat === d.seat && ugSameTicket(s.age, d.age);
-                const exp = (w) => sameSeat ? PRICE_RULES.SEAT_CHANGE_FEE
-                  : (realPrice(s[w]) && realPrice(d[w]) ? ugExpectedCharge(s.age, d.age, s[w], d[w]) : null);
-                const cell = cellOf(g, s.seat, d.seat);
-                const it = { srcAge: s.age, dstAge: d.age, state: "missing", rows: [],
-                  expAdv: exp("adv"), expDay: exp("day"), srcAdv: s.adv, srcDay: s.day, dstAdv: d.adv, dstDay: d.day };
-                cell.itemMap.set(s.age + SEP + d.age, it); cell.items.push(it);
+            for (const records of g.normal.values()) {
+              const recs = [...records.values()];
+              for (const s of recs) {
+                for (const d of recs) {
+                  const ex = g.cells.get(s.seat + SEP + d.seat);
+                  if (ex && ex.itemMap.has(s.age + SEP + d.age)) continue;
+                  // その販売条件の価格で値下がり（前売・当日どちらか）なら対象外。ダミー・空欄は比べない
+                  if (["adv", "day"].some((w) => realPrice(s[w]) && realPrice(d[w]) && d[w] < s[w])) continue;
+                  if (s.span && d.span && Math.max(s.span.start, d.span.start) >= Math.min(s.span.end, d.span.end)) continue;
+                  if (!canUpgrade(s.seat, s.code, s.age, d.seat, d.code, d.age, s, d)) continue;
+                  // validate と同じ「同席種・同年齢区分＝一律500円」の判定
+                  // 同券種（座席移動・一律500円）の判定は検算と同じ ugSameTicket（正本§15-C1。年齢ランクだけで比べない）
+                  const sameSeat = s.seat === d.seat && ugSameTicket(s.age, d.age);
+                  const exp = (w) => sameSeat ? PRICE_RULES.SEAT_CHANGE_FEE
+                    : (realPrice(s[w]) && realPrice(d[w]) ? ugExpectedCharge(s.age, d.age, s[w], d[w]) : null);
+                  const cell = cellOf(g, s.seat, d.seat);
+                  const it = { srcAge: s.age, dstAge: d.age, state: "missing", rows: [],
+                    expAdv: exp("adv"), expDay: exp("day"), srcAdv: s.adv, srcDay: s.day, dstAdv: d.adv, dstDay: d.day };
+                  cell.itemMap.set(s.age + SEP + d.age, it); cell.items.push(it);
+                }
               }
             }
           }
@@ -4747,7 +4763,7 @@ body.vertical-headers .cmp-table thead tr:first-child th {
             const ri = pos.get(cell.srcSeat), ci = pos.get(cell.dstSeat);
             const sa = seats[ri].ages, da = seats[ci].ages;
             const items = cell.items.map((it) => {
-              const chk = it.rows.length ? it.rows[0].chk : null;
+              const chk = it.rows.find((r) => r.chk?.status === it.state)?.chk;
               let note = "";
               if (it.state === "invalid") note = [...new Set(it.rows.flatMap((r) => (r.chk && r.chk.problems) || []))].join(" / ");
               else if (it.state === "unknown" && chk) note = chk.advNote || "通常価格が見つからず検算不能";
@@ -4806,7 +4822,7 @@ body.vertical-headers .cmp-table thead tr:first-child th {
         return d.getFullYear() + "/" + p(d.getMonth() + 1) + "/" + p(d.getDate()) + " " + p(d.getHours()) + ":" + p(d.getMinutes());
       }
       // 編集パネルの入力（前売差額・当日差額・販売開始・販売終了・販売経路）を検査し、登録用の文字列に整える。
-      //  金額: 全角・カンマ可、0以上の整数（売止めダミーの全桁9も可）。日時: 年/月/日 時:分（時刻は必須）。開始≦終了。
+      //  金額: 全角・カンマ可、0以上の整数（売止めダミーの全桁9も可）。日時: 年/月/日 時:分（時刻は必須）。開始＜終了。
       //  販売経路: 空欄不可・改行/タブ不可・トリム。
       //  戻り: { ok, values: { adv, day, start, end, route }, errors: { adv|day|start|end|route: 理由 } }
       function ugEditCheckInput(input) {
@@ -4826,7 +4842,7 @@ body.vertical-headers .cmp-table thead tr:first-child th {
           else if (n == null) errors[k] = "日時は 2026/11/15 11:00 の形で入力してください";
           else { ms[k] = n; values[k] = ugEditFormatDt(n); }
         }
-        if (ms.start != null && ms.end != null && ms.start > ms.end) errors.end = "販売終了が販売開始より前です";
+        if (ms.start != null && ms.end != null && ms.start >= ms.end) errors.end = "販売終了は販売開始より後に設定してください";
         if (src.route !== undefined) {
           const r = String(src.route ?? "").trim();
           if (r === "") errors.route = "販売経路が空です";
@@ -4865,7 +4881,7 @@ body.vertical-headers .cmp-table thead tr:first-child th {
         if (!s || !d) return null;
         const start = s.start >= d.start ? s.startStr : d.startStr;
         const end = s.end <= d.end ? s.endStr : d.endStr;
-        return { start, end, empty: Math.max(s.start, d.start) > Math.min(s.end, d.end), multi: s.n > 1 || d.n > 1 };
+        return { start, end, empty: Math.max(s.start, d.start) >= Math.min(s.end, d.end), multi: s.n > 1 || d.n > 1 };
       }
       // validate(row) の結果から「期待値」（登録すべき前売差額・当日差額の文字列）を出す。
       //  期待差額が出る窓はその値。通常価格が売止めダミー（全桁9）で検算対象外の窓は、今の登録値が全桁9ならそのまま、
@@ -4935,6 +4951,7 @@ body.vertical-headers .cmp-table thead tr:first-child th {
           && ugEditFullCond(row, c, v) === fc && v(row, c.seat) === seat && v(row, c.age) === age) || null;
         const raw = (r, i) => (i >= 0 ? String(r[i] ?? "") : "");
         const out = [];
+        let noOverlap = false;
         for (const [fc, tpl] of templates) {
           const src = findNormal(fc, spec.fs, spec.fa), dst = findNormal(fc, spec.ts, spec.ta);
           if (!src || !dst) continue;
@@ -4947,11 +4964,13 @@ body.vertical-headers .cmp-table thead tr:first-child th {
           if (ugVenueSeat >= 0 && ugVenueSeat !== c.ugSeatCd) set(ugVenueSeat, raw(src, venueSeat));
           set(c.adv, ""); set(c.day, "");
           const per = ugEditCorrectPeriod(rows, c, v, row);
-          if (per && !per.empty) { set(c.start, per.start); set(c.end, per.end); }
+          if (per?.empty) { noOverlap = true; continue; }
+          if (per) { set(c.start, per.start); set(c.end, per.end); }
           const exp = ugEditExpected(validate(row), null);
           set(c.adv, exp.adv ?? ""); set(c.day, exp.day ?? "");
           out.push({ row, chk: validate(row) });
         }
+        if (!out.length && noOverlap) return { rows: [], error: "元・先の通常販売期間が重ならないため追加できません" };
         if (!out.length) return { rows: [], error: "元・先の通常行（同じ販売条件・販売経路）が見つからないため追加できません" };
         return { rows: out, error: null };
       }
@@ -15493,10 +15512,10 @@ body.vertical-headers .cmp-table thead tr:first-child th {
         const condOf = _priceCondOf(c, v);
         const num = (s) => { const t = String(s).trim(); if (t === "") return null; const n = Number(t.replace(/,/g, "")); return isNaN(n) ? null : n; };
         const model = buildUgMatrixModel({
-          normals: normals.map((r) => ({ cond: condOf(r), seat: v(r, c.seat), code: v(r, c.seatCd), age: v(r, c.age), adv: num(v(r, c.adv)), day: num(v(r, c.day)) })),
+          normals: normals.map((r) => ({ cond: condOf(r), fullCond: ugEditFullCond(r, c, v), seat: v(r, c.seat), code: v(r, c.seatCd), age: v(r, c.age), adv: num(v(r, c.adv)), day: num(v(r, c.day)) })),
           ugs: ugs.map((r) => ({ cond: condOf(r), srcSeat: v(r, c.ugSeat) || "?", srcCode: v(r, c.ugSeatCd), srcAge: v(r, c.ugAge),
             dstSeat: v(r, c.seat) || "?", dstCode: v(r, c.seatCd), dstAge: v(r, c.age), chk: validate(r), ref: r })),
-          canUpgrade: validate.canUpgrade,
+          canUpgrade: validate.canUpgrade, normalSpan: validate.normalSpan,
           // 正本§2-1: 販売価格区分・会員ランクのどちらかに「会員」が無い条件はUG不可＝設定漏れを探さない
           isUgCond: (k) => /会員/.test(k),
         });
@@ -16202,10 +16221,10 @@ body.vertical-headers .cmp-table thead tr:first-child th {
         if (!ugs.length || !normals.length) return false;
         const num = (s) => { const t = String(s).trim(); if (t === "") return null; const n = Number(t.replace(/,/g, "")); return isNaN(n) ? null : n; };
         const model = buildUgMatrixModel({
-          normals: normals.map((r) => ({ cond: spec.cond, seat: v(r, c.seat), code: v(r, c.seatCd), age: v(r, c.age), adv: num(v(r, c.adv)), day: num(v(r, c.day)) })),
+          normals: normals.map((r) => ({ cond: spec.cond, fullCond: ugEditFullCond(r, c, v), seat: v(r, c.seat), code: v(r, c.seatCd), age: v(r, c.age), adv: num(v(r, c.adv)), day: num(v(r, c.day)) })),
           ugs: ugs.map((r) => ({ cond: spec.cond, srcSeat: v(r, c.ugSeat) || "?", srcCode: v(r, c.ugSeatCd), srcAge: v(r, c.ugAge),
             dstSeat: v(r, c.seat) || "?", dstCode: v(r, c.seatCd), dstAge: v(r, c.age), chk: null, ref: r })),
-          canUpgrade: validate.canUpgrade,
+          canUpgrade: validate.canUpgrade, normalSpan: validate.normalSpan,
           isUgCond: (k) => /会員/.test(k),
         });
         const g = model.conds[0];
